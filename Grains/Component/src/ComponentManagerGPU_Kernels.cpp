@@ -26,7 +26,7 @@ void zeroOutArray_kernel(uint* array, uint numElements)
 // -----------------------------------------------------------------------------
 // Returns the start Id for each hash value in cellStart
 __GLOBAL__
-void sortComponentsAndFindCellStart_kernel(uint const* componentCellHash,
+void sortComponentsAndFindCellStart_kernel(const uint* componentCellHash,
                                            uint        numComponents,
                                            uint*       cellStart,
                                            uint*       cellEnd)
@@ -83,11 +83,11 @@ __GLOBAL__ void detectCollisionAndComputeContactForcesObstacles_kernel(
     RigidBody<T, U> const* const*      obstacleRB,
     ContactForceModel<T> const* const* CF,
     uint*                              rigidBodyId,
-    Transform3<T> const*               transform,
-    Kinematics<T> const*               velocity,
+    const Transform3<T>*               transform,
+    const Kinematics<T>*               velocity,
     Torce<T>*                          torce,
     uint*                              obstacleRigidBodyId,
-    Transform3<T> const*               obstacleTransform,
+    const Transform3<T>*               obstacleTransform,
     int                                nParticles,
     int                                nObstacles)
 {
@@ -144,8 +144,8 @@ __GLOBAL__ void detectCollisionAndComputeContactForcesParticles_kernel(
     LinkedCell<T> const* const*        LC,
     ContactForceModel<T> const* const* CF,
     uint*                              rigidBodyId,
-    Transform3<T> const*               transform,
-    Kinematics<T> const*               velocity,
+    const Transform3<T>*               transform,
+    const Kinematics<T>*               velocity,
     Torce<T>*                          torce,
     uint*                              particleId,
     uint*                              particleCellHash,
@@ -270,11 +270,11 @@ __GLOBAL__ void moveParticles_kernel(RigidBody<T, U> const* const*   RB,
             RigidBody<T, U> const* const*      obstacleRB,          \
             ContactForceModel<T> const* const* CF,                  \
             uint*                              rigidBodyId,         \
-            Transform3<T> const*               transform,           \
-            Kinematics<T> const*               velocity,            \
+            const Transform3<T>*               transform,           \
+            const Kinematics<T>*               velocity,            \
             Torce<T>*                          torce,               \
             uint*                              obstacleRigidBodyId, \
-            Transform3<T> const*               obstacleTransform,   \
+            const Transform3<T>*               obstacleTransform,   \
             int                                nParticles,          \
             int                                nObstacles);                                        \
                                                                     \
@@ -284,8 +284,8 @@ __GLOBAL__ void moveParticles_kernel(RigidBody<T, U> const* const*   RB,
             LinkedCell<T> const* const*        LC,                  \
             ContactForceModel<T> const* const* CF,                  \
             uint*                              rigidBodyId,         \
-            Transform3<T> const*               transform,           \
-            Kinematics<T> const*               velocity,            \
+            const Transform3<T>*               transform,           \
+            const Kinematics<T>*               velocity,            \
             Torce<T>*                          torce,               \
             uint*                              particleId,          \
             uint*                              particleCellHash,    \
