@@ -3,7 +3,8 @@
 
 #include "CollisionDetection.hh"
 #include "ContactForceModel.hh"
-#include "ContactForceModelBuilderFactory.hh"
+#include "ContactForceModelFactory.hh"
+#include "GrainsMemBuffer.hh"
 #include "GrainsParameters.hh"
 #include "Insertion.hh"
 #include "Kinematics.hh"
@@ -21,165 +22,431 @@
 
     @author A.Yazdani - 2024 - Construction */
 // =============================================================================
-template <typename T>
+template <typename T, MemType M = MemType::HOST>
 class ComponentManager
 {
+protected:
+    /** @name Parameters */
+    //@{
+    // TODO: What to do with pointers? Better design? unique_ptr?
+    /** \brief Pointer to buffer of particles rigid bodies. */
+    const GrainsMemBuffer<RigidBody<T, T>*, M>* m_particleRB;
+    /** \brief Pointer to buffer of obstacles rigid bodies. */
+    const GrainsMemBuffer<RigidBody<T, T>*, M>* m_obstacleRB;
+    /** \brief Particles rigid body Id */
+    GrainsMemBuffer<uint, M> m_rigidBodyId;
+    /** \brief Obsatcles rigid body Id */
+    GrainsMemBuffer<uint, M> m_obstacleRigidBodyId;
+    /** \brief Particles transformation */
+    GrainsMemBuffer<Transform3<T>, M> m_transform;
+    /** \brief Obstacles transformation */
+    GrainsMemBuffer<Transform3<T>, M> m_obstacleTransform;
+    /** \brief Particles velocities */
+    GrainsMemBuffer<Kinematics<T>, M> m_velocity;
+    /** \brief Particles torce */
+    GrainsMemBuffer<Torce<T>, M> m_torce;
+    /** \brief Particles Id */
+    GrainsMemBuffer<uint, M> m_particleId;
+    /** \brief Number of particles in manager */
+    uint m_nParticles;
+    /** \brief Number of obstacles in manager */
+    uint m_nObstacles;
+    /** \brief Number of cells in manager */
+    uint m_nCells;
+    //@}
+
 public:
     /** @name Constructors */
     //@{
+    // -------------------------------------------------------------------------
     /** @brief Default constructor (forbidden except in derived classes) */
-    ComponentManager();
+    ComponentManager() = default;
 
+    // -------------------------------------------------------------------------
+    /** @brief Constructor with the number of particles, obstacles, and cells. 
+        @param particleRB Pointer to the particles rigid body buffer
+        @param obstacleRB Pointer to the obstacles rigid body buffer
+        @param nParticles Number of particles
+        @param nObstacles Number of obstacles
+        @param nCells Number of cells */
+    ComponentManager(GrainsMemBuffer<RigidBody<T, T>*, M>* particleRB,
+                     GrainsMemBuffer<RigidBody<T, T>*, M>* obstacleRB,
+                     uint                                  nParticles,
+                     uint                                  nObstacles,
+                     uint                                  nCells)
+        : m_particleRB(particleRB)
+        , m_obstacleRB(obstacleRB)
+        , m_nParticles(nParticles)
+        , m_nObstacles(nObstacles)
+        , m_nCells(nCells)
+    {
+        allocate();
+        initialize();
+    }
+
+    // -------------------------------------------------------------------------
     /** @brief Destructor */
-    virtual ~ComponentManager();
+    virtual ~ComponentManager() = default;
     //@}
 
     /** @name Get methods */
     //@{
-    /** @brief Gets particles rigid body Ids */
-    virtual std::vector<uint> getRigidBodyId() const = 0;
+    // -------------------------------------------------------------------------
+    /** @brief Gets particles rigid body Ids
+        @param buffer host buffer to copy data to */
+    template <MemType destM>
+    void getRigidBodyId(GrainsMemBuffer<uint, destM>& buffer) const
+    {
+        m_rigidBodyId.copyTo(buffer);
+    }
 
-    /** @brief Gets obstacles rigid body Id */
-    virtual std::vector<uint> getRigidBodyIdObstacles() const = 0;
+    // -------------------------------------------------------------------------
+    /** @brief Gets obstacles rigid body Ids
+        @param buffer host buffer to copy data to */
+    template <MemType destM>
+    void getRigidBodyIdObstacles(GrainsMemBuffer<uint, destM>& buffer) const
+    {
+        m_obstacleRigidBodyId.copyTo(buffer);
+    }
 
-    /** @brief Gets particles transformations */
-    virtual std::vector<Transform3<T>> getTransform() const = 0;
+    // -------------------------------------------------------------------------
+    /** @brief Gets particles transformations
+        @param buffer host buffer to copy data to */
+    template <MemType destM>
+    void getTransform(GrainsMemBuffer<Transform3<T>, destM>& buffer) const
+    {
+        m_transform.copyTo(buffer);
+    }
 
-    /** @brief Gets obstacles transformation */
-    virtual std::vector<Transform3<T>> getTransformObstacles() const = 0;
+    // -------------------------------------------------------------------------
+    /** @brief Gets obstacles transformation
+        @param buffer host buffer to copy data to */
+    template <MemType destM>
+    void getTransformObstacles(
+        GrainsMemBuffer<Transform3<T>, destM>& buffer) const
+    {
+        m_obstacleTransform.copyTo(buffer);
+    }
 
-    /** @brief Gets particles velocities */
-    virtual std::vector<Kinematics<T>> getVelocity() const = 0;
+    // -------------------------------------------------------------------------
+    /** @brief Gets particles velocities
+        @param buffer host buffer to copy data to */
+    template <MemType destM>
+    void getVelocity(GrainsMemBuffer<Kinematics<T>, destM>& buffer) const
+    {
+        m_velocity.copyTo(buffer);
+    }
 
-    /** @brief Gets particles torces */
-    virtual std::vector<Torce<T>> getTorce() const = 0;
+    // -------------------------------------------------------------------------
+    /** @brief Gets particles torces
+        @param buffer host buffer to copy data to */
+    template <MemType destM>
+    void getTorce(GrainsMemBuffer<Torce<T>, destM>& buffer) const
+    {
+        m_torce.copyTo(buffer);
+    }
 
-    /** @brief Gets the array of particles Ids */
-    virtual std::vector<uint> getParticleId() const = 0;
+    // -------------------------------------------------------------------------
+    /** @brief Gets the array of particles Ids
+        @param buffer host buffer to copy data to */
+    template <MemType destM>
+    void getParticleId(GrainsMemBuffer<uint, destM>& buffer) const
+    {
+        m_particleId.copyTo(buffer);
+    }
 
+    // -------------------------------------------------------------------------
     /** @brief Gets the number of particles in manager */
-    virtual uint getNumberOfParticles() const = 0;
+    uint getNumberOfParticles() const
+    {
+        return m_nParticles;
+    }
 
+    // -------------------------------------------------------------------------
     /** @brief Gets the number of obstacles in manager */
-    virtual uint getNumberOfObstacles() const = 0;
+    uint getNumberOfObstacles() const
+    {
+        return m_nObstacles;
+    }
 
+    // -------------------------------------------------------------------------
     /** @brief Gets the number of cells in manager */
-    virtual uint getNumberOfCells() const = 0;
-
-    // /** @brief Gets the array of components neighbor Id */
-    // std::vector<uint> getNeighborsId() const;
-
-    // /** @brief Gets the array of components neighbor count */
-    // std::vector<uint> getNeighborsCount() const;
+    uint getNumberOfCells() const
+    {
+        return m_nCells;
+    }
     //@}
 
     /** @name Set methods */
     //@{
-    /** @brief Sets the array of particles rigid body Ids */
-    virtual void setRigidBodyId(std::vector<uint> const& id) = 0;
+    // -------------------------------------------------------------------------
+    /** @brief Sets the array of particles rigid body Ids
+        @param id host buffer containing the rigid body Ids */
+    template <MemType srcM>
+    void setRigidBodyId(const GrainsMemBuffer<uint, srcM>& id)
+    {
+        m_rigidBodyId.copyFrom(id);
+    }
 
-    /** @brief Sets the array of obstacles rigid body Ids */
-    virtual void setRigidBodyIdObstacles(std::vector<uint> const& id) = 0;
+    // -------------------------------------------------------------------------
+    /** @brief Sets the array of obstacles rigid body Ids
+        @param id host buffer containing the rigid body Ids */
+    template <MemType srcM>
+    void setRigidBodyIdObstacles(const GrainsMemBuffer<uint, srcM>& id)
+    {
+        m_obstacleRigidBodyId.copyFrom(id);
+    }
 
-    /** @brief Sets particles transformations */
-    virtual void setTransform(std::vector<Transform3<T>> const& t) = 0;
+    // -------------------------------------------------------------------------
+    /** @brief Sets particles transformations
+        @param t host buffer containing the transformations */
+    template <MemType srcM>
+    void setTransform(const GrainsMemBuffer<Transform3<T>, srcM>& t)
+    {
+        m_transform.copyFrom(t);
+    }
 
-    /** @brief Sets obstacles transformations */
-    virtual void setTransformObstacles(std::vector<Transform3<T>> const& t) = 0;
+    // -------------------------------------------------------------------------
+    /** @brief Sets obstacles transformations
+        @param t host buffer containing the transformations */
+    template <MemType srcM>
+    void setTransformObstacles(const GrainsMemBuffer<Transform3<T>, srcM>& t)
+    {
+        m_obstacleTransform.copyFrom(t);
+    }
 
-    /** @brief Sets particles velocities */
-    virtual void setVelocity(std::vector<Kinematics<T>> const& v) = 0;
+    // -------------------------------------------------------------------------
+    /** @brief Sets particles velocities
+        @param v host buffer containing the velocities */
+    template <MemType srcM>
+    void setVelocity(const GrainsMemBuffer<Kinematics<T>, srcM>& v)
+    {
+        m_velocity.copyFrom(v);
+    }
 
-    /** @brief Sets particles torces */
-    virtual void setTorce(std::vector<Torce<T>> const& t) = 0;
+    // -------------------------------------------------------------------------
+    /** @brief Sets particles torces
+        @param t host buffer containing the torces */
+    template <MemType srcM>
+    void setTorce(const GrainsMemBuffer<Torce<T>, srcM>& t)
+    {
+        m_torce.copyFrom(t);
+    }
 
-    /** @brief Sets the array of particles Ids */
-    virtual void setParticleId(std::vector<uint> const& id) = 0;
+    // -------------------------------------------------------------------------
+    /** @brief Sets the array of particles Ids
+        @param id host buffer containing the particles Ids */
+    template <MemType srcM>
+    void setParticleId(const GrainsMemBuffer<uint, srcM>& id)
+    {
+        m_particleId.copyFrom(id);
+    }
+    //@}
 
-    // /** @brief Sets the array of components neighbor Id */
-    // void setNeighborsId( std::vector<uint> const& id );
+    /** @name Manager methods */
+    //@{
+    // -------------------------------------------------------------------------
+    /** @brief Allocates memory for the component manager */
+    virtual void allocate()
+    {
+        m_rigidBodyId.allocate(m_nParticles);
+        m_transform.allocate(m_nParticles);
+        m_velocity.allocate(m_nParticles);
+        m_torce.allocate(m_nParticles);
+        m_particleId.allocate(m_nParticles);
 
-    // /** @brief Sets the array of components neighbor count */
-    // void setNeighborsCount( std::vector<uint> const& count );
+        m_obstacleRigidBodyId.allocate(m_nObstacles);
+        m_obstacleTransform.allocate(m_nObstacles);
+    }
+
+    // -------------------------------------------------------------------------
+    /** @brief Initializes data members to default values */
+    virtual void initialize()
+    {
+        // Initializing the vectors for particles
+        for(uint i = 0; i < m_nParticles; ++i)
+        {
+            m_rigidBodyId.push_back(0);
+            m_transform.push_back(Transform3<T>());
+            m_velocity.push_back(Kinematics<T>());
+            m_torce.push_back(Torce<T>());
+            m_particleId.push_back(i);
+        }
+
+        // Initializing the vectors for obstacles
+        for(uint i = 0; i < m_nObstacles; ++i)
+        {
+            m_obstacleRigidBodyId.push_back(0);
+            m_obstacleTransform.push_back(Transform3<T>());
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    /** @brief Copies data from another ComponentManager object.
+        @param other other component manager */
+    template <MemType srcM>
+    void copyFrom(const std::unique_ptr<ComponentManager<T, srcM>>& other)
+    {
+        // RigidBodyId
+        GrainsMemBuffer<uint, srcM> tmpRigidBodyId;
+        other->getRigidBodyId(tmpRigidBodyId);
+        setRigidBodyId(tmpRigidBodyId);
+
+        // Obstacle RigidBodyId
+        GrainsMemBuffer<uint, srcM> tmpRigidBodyIdObstacles;
+        other->getRigidBodyIdObstacles(tmpRigidBodyIdObstacles);
+        setRigidBodyIdObstacles(tmpRigidBodyIdObstacles);
+
+        // Transform
+        GrainsMemBuffer<Transform3<T>, srcM> tmpTransform;
+        other->getTransform(tmpTransform);
+        setTransform(tmpTransform);
+
+        // Obstacle Transform
+        GrainsMemBuffer<Transform3<T>, srcM> tmpTransformObstacles;
+        other->getTransformObstacles(tmpTransformObstacles);
+        setTransformObstacles(tmpTransformObstacles);
+
+        // Velocity
+        GrainsMemBuffer<Kinematics<T>, srcM> tmpVelocity;
+        other->getVelocity(tmpVelocity);
+        setVelocity(tmpVelocity);
+
+        // Torce
+        GrainsMemBuffer<Torce<T>, srcM> tmpTorce;
+        other->getTorce(tmpTorce);
+        setTorce(tmpTorce);
+
+        // ParticleId
+        GrainsMemBuffer<uint, srcM> tmpParticleId;
+        other->getParticleId(tmpParticleId);
+        setParticleId(tmpParticleId);
+    }
     //@}
 
     /** @name Methods */
     //@{
-    /** @brief Copies data from another ComponentManager object.
-        @param cm component manager on device */
-    void copy(ComponentManager<T> const* cm);
-
+    // -------------------------------------------------------------------------
     /** @brief Initializes transformations for obstacles in the simulation
         @param initTr initial transformation of obstacles */
-    virtual void initializeObstacles(std::vector<Transform3<T>> initTr);
+    template <MemType srcM>
+    void initializeObstacles(const GrainsMemBuffer<Transform3<T>, srcM>& initTr)
+    {
+        // We can only initialize on host
+        static_assert(
+            M == MemType::HOST,
+            "Cannot initialize obstacles directly on the device. Try "
+            "initializing on host first, and copy to device. Aborting Grains!");
+        // Making sure that we have data for all obstacles and the number of
+        // initial TR matches the number of RBs
+        assert(initTr.getSize() == m_nObstacles);
 
+        // Assigning
+        for(uint i = 0; i < m_nObstacles; ++i)
+        {
+            // m_rigidBodyId
+            m_obstacleRigidBodyId[i] = i;
+
+            // m_transform
+            m_obstacleTransform[i] = initTr[i];
+        }
+    }
+
+    // -------------------------------------------------------------------------
     /** @brief Initializes transformations for particles in the simulation
         @param initTr initial transformation of particles */
-    virtual void initializeParticles(std::vector<Transform3<T>> initTr);
+    template <MemType srcM>
+    void initializeParticles(const GrainsMemBuffer<Transform3<T>, srcM>& initTr)
+    {
+        // We can only initialize on host
+        static_assert(
+            M == MemType::HOST,
+            "Cannot initialize particles directly on the device. Try "
+            "initializing on host first, and copy to device. Aborting Grains!");
+        // Making sure that we have data for all particles and the number of
+        // initial TR matches the number of RBs
+        assert(initTr.getSize() == m_nParticles);
 
+        // Assigning
+        for(uint i = 0; i < m_nParticles; ++i)
+        {
+            // m_rigidBodyId
+            m_rigidBodyId[i] = i;
+
+            // m_transform
+            m_transform[i] = initTr[i];
+        }
+    }
+
+    // -------------------------------------------------------------------------
     /** @brief Inserts particles according to a given insertion policy
         @param ins insertion policy */
-    virtual void insertParticles(Insertion<T>* ins);
+    void insertParticles(const std::unique_ptr<Insertion<T>>& ins)
+    {
+        // We can only insert on host
+        static_assert(
+            M == MemType::HOST,
+            "Cannot insert particles directly on the device. Try inserting on "
+            "host first, and copy to device. Aborting Grains!");
 
-    // /** @brief Sorts particles based on a Z-curve */
-    // void sortParticles();
+        std::pair<Transform3<T>, Kinematics<T>> insData;
+        // Inserting particles
+        for(uint i = 0; i < m_nParticles; ++i)
+        {
+            // Fetching insertion data from ins
+            insData = ins->fetchInsertionData();
 
-    // /** @brief Creates a neighbor list */
-    // void createNeighborList();
+            // m_transform
+            m_transform[i].composeLeftByRotation(insData.first);
+            m_transform[i].setOrigin(insData.first.getOrigin());
 
+            // m_velocity
+            m_velocity[i] = insData.second;
+        }
+    }
+
+    // -------------------------------------------------------------------------
     /** @brief Updates links between particles and linked cell
         @param LC linked cell */
-    virtual void updateLinks(LinkedCell<T> const* const* LC) = 0;
+    virtual void updateLinks(const GrainsMemBuffer<LinkedCell<T>*, M>& LC) = 0;
 
-    /** @brief Detects collision between particles and obstacles and 
-        // computes forces
-        @param particleRB array of rigid bodies for particles
-        @param obstacleRB array of rigid bodies for obstacles
+    // -------------------------------------------------------------------------
+    /** @brief Detects collision between particles and obstacles and computes 
+    forces
         @param CF array of all contact force models */
     virtual void detectCollisionAndComputeContactForcesObstacles(
-        RigidBody<T, T> const* const*      particleRB,
-        RigidBody<T, T> const* const*      obstacleRB,
-        ContactForceModel<T> const* const* CF)
+        const GrainsMemBuffer<ContactForceModel<T>*, M>& CF)
         = 0;
 
-    /** @brief Detects collision between particles and particles and 
-        // computes forces
-        @param particleRB array of rigid bodies for particles
+    // -------------------------------------------------------------------------
+    /** @brief Detects collision between particles and particles and computes 
+    forces
         @param LC linked cell
         @param CF array of all contact force models */
     virtual void detectCollisionAndComputeContactForcesParticles(
-        RigidBody<T, T> const* const*      particleRB,
-        LinkedCell<T> const* const*        LC,
-        ContactForceModel<T> const* const* CF)
+        const GrainsMemBuffer<LinkedCell<T>*, M>&        LC,
+        const GrainsMemBuffer<ContactForceModel<T>*, M>& CF)
         = 0;
 
+    // -------------------------------------------------------------------------
     /** @brief Detects collision between components and computes forces
-        @param particleRB array of rigid bodies for particles
-        @param obstacleRB array of rigid bodies for obstacles
         @param LC linked cell
         @param CF array of all contact force models */
     virtual void detectCollisionAndComputeContactForces(
-        RigidBody<T, T> const* const*      particleRB,
-        RigidBody<T, T> const* const*      obstacleRB,
-        LinkedCell<T> const* const*        LC,
-        ContactForceModel<T> const* const* CF)
+        const GrainsMemBuffer<LinkedCell<T>*, M>&        LC,
+        const GrainsMemBuffer<ContactForceModel<T>*, M>& CF)
         = 0;
 
-    /** @brief Adds external forces such as gravity
-        @param particleRB array of rigid bodies for particles */
-    virtual void addExternalForces(RigidBody<T, T> const* const* particleRB)
-        = 0;
+    // -------------------------------------------------------------------------
+    /** @brief Adds external forces such as gravity */
+    virtual void addExternalForces() = 0;
 
+    // -------------------------------------------------------------------------
     /** @brief Updates the position and velocities of particles
-        @param particleRB array of rigid bodies for particles
         @param TI time integration scheme */
-    virtual void moveParticles(RigidBody<T, T> const* const*   particleRB,
-                               TimeIntegrator<T> const* const* TI)
+    virtual void moveParticles(const GrainsMemBuffer<TimeIntegrator<T>*, M>& TI)
         = 0;
     //@}
 };
-
-typedef ComponentManager<float>  ComponentManager_d;
-typedef ComponentManager<double> ComponentManager_f;
 
 #endif

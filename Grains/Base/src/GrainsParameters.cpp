@@ -28,7 +28,7 @@ uint GrainsParameters<T>::m_numObstacles = 0;
 template <typename T>
 uint GrainsParameters<T>::m_numCells = 0;
 template <typename T>
-T GrainsParameters<T>::m_sizeLC = T(0);
+T GrainsParameters<T>::m_maxRadius = T(0);
 
 /* Physical */
 template <typename T>

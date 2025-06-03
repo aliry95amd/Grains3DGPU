@@ -1,11 +1,11 @@
-#ifndef _CONVEXBUILDERFACTORY_HH_
-#define _CONVEXBUILDERFACTORY_HH_
+#ifndef _CONVEXFACTORY_HH_
+#define _CONVEXFACTORY_HH_
 
 #include "Convex.hh"
 #include "ReaderXML.hh"
 
 // =============================================================================
-/** @brief The class ConvexBuilderFactory.
+/** @brief The class ConvexFactory.
 
     Static class that constructs a convex using input data from an XML node or a
     stream. Create a vonvex of the derived type and returns a pointer to the
@@ -17,24 +17,24 @@
     @author A.Yazdani - 2024 - Modification for GPUs */
 // =============================================================================
 template <typename T>
-class ConvexBuilderFactory
+class ConvexFactory
 {
 private:
     /** @name Constructors */
     //@{
     /** @brief Constructor */
-    ConvexBuilderFactory();
+    ConvexFactory();
 
     /** @brief Copy constructor
-    @param cb the other ConvexBuilderFactory object */
-    ConvexBuilderFactory(ConvexBuilderFactory<T> const& cb);
+    @param cb the other ConvexFactory object */
+    ConvexFactory(ConvexFactory<T> const& cb);
 
-    /** @brief Equal operator to another ConvexBuilderFactory object
-        @param cb the other ConvexBuilderFactory object */
-    ConvexBuilderFactory<T>& operator=(ConvexBuilderFactory<T> const& cb);
+    /** @brief Equal operator to another ConvexFactory object
+        @param cb the other ConvexFactory object */
+    ConvexFactory<T>& operator=(ConvexFactory<T> const& cb);
 
     /** @brief Destructor */
-    ~ConvexBuilderFactory();
+    ~ConvexFactory();
     //@}
 
 public:
@@ -52,7 +52,7 @@ public:
     //@}
 };
 
-typedef ConvexBuilderFactory<float>  ConvexBuilderFactoryF;
-typedef ConvexBuilderFactory<double> ConvexBuilderFactoryD;
+typedef ConvexFactory<float>  ConvexFactoryF;
+typedef ConvexFactory<double> ConvexFactoryD;
 
 #endif

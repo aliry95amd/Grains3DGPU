@@ -4,10 +4,11 @@
 #include "CollisionDetection.hh"
 #include "ComponentManagerCommon.hh"
 #include "ComponentManagerGPU_Kernels.hh"
-#include "ContactForceModelBuilderFactory.hh"
+#include "ContactForceModelFactory.hh"
 #include "GrainsParameters.hh"
 #include "LinkedCell.hh"
 #include "LinkedCellGPUWrapper.hh"
+#include "NeighborList.hh"
 #include "VectorMath.hh"
 
 // -----------------------------------------------------------------------------
@@ -110,9 +111,8 @@ __GLOBAL__ void detectCollisionAndComputeContactForcesObstacles_kernel(
         {
             // CF ID given materialIDs
             uint contactForceID
-                = ContactForceModelBuilderFactory<T>::computeHash(
-                    matA,
-                    rbB.getMaterial());
+                = ContactForceModelFactory<T>::computeHash(matA,
+                                                           rbB.getMaterial());
             // velocities of the particles
             Kinematics<T> v1(velocity[pId]);
             // Kinematics<T> v2( m_velocity[ oId ] );
@@ -188,10 +188,9 @@ __GLOBAL__ void detectCollisionAndComputeContactForcesParticles_kernel(
             if(ci.getOverlapDistance() < T(0))
             {
                 // CF ID given materialIDs
-                uint contactForceID
-                    = ContactForceModelBuilderFactory<T>::computeHash(
-                        matA,
-                        rbB.getMaterial());
+                uint contactForceID = ContactForceModelFactory<T>::computeHash(
+                    matA,
+                    rbB.getMaterial());
                 // velocities of the particles
                 Kinematics<T> v1(velocity[primaryId]);
                 Kinematics<T> v2(velocity[secondaryId]);
@@ -212,6 +211,87 @@ __GLOBAL__ void detectCollisionAndComputeContactForcesParticles_kernel(
         }
     }
 }
+
+// // -----------------------------------------------------------------------------
+// // Detects collision and computes forces between particles and particles
+// template <typename T, typename U>
+// __GLOBAL__ void
+//     detectCollisionsParticles_kernel(RigidBody<T, U> const* const* particleRB,
+//                                      const uint2*                  neighborList,
+//                                      const Transform3<T>*          transform,
+//                                      const int                     nPairs)
+// {
+//     uint pId = blockIdx.x * blockDim.x + threadIdx.x;
+
+//     if(pId >= nPairs)
+//         return;
+
+//     const uint2 pair = neighborList[pId];
+//     const uint  p1   = pair.x;
+//     const uint  p2   = pair.y;
+//     // Get the rigid body IDs of the particles
+//     const uint             primaryId   = particleId[p1];
+//     const uint             secondaryId = particleId[p2];
+//     const RigidBody<T, U>& rbA         = *(particleRB[rigidBodyId[primaryId]]);
+//     const RigidBody<T, U>& rbB = *(particleRB[rigidBodyId[secondaryId]]);
+//     const Transform3<T>&   trA = transform[primaryId];
+//     const Transform3<T>&   trB = transform[secondaryId];
+//     // Compute the contact information
+//     ContactInfo<T> ci = closestPointsRigidBodies(rbA, rbB, trA, trB);
+// }
+
+// // -----------------------------------------------------------------------------
+// // Detects collision and computes forces between particles and particles
+// template <typename T, typename U>
+// __GLOBAL__ void
+//     computeContactForces_Kernel(RigidBody<T, U> const* const*      particleRB,
+//                                 ContactForceModel<T> const* const* CF,
+//                                 const uint*                        rigidBodyId,
+//                                 const Kinematics<T>*               velocity,
+//                                 Torce<T>*                          torce,
+//                                 const uint                         nPairs)
+// {
+//     uint pId = blockIdx.x * blockDim.x + threadIdx.x;
+
+//     if(pId >= nPairs)
+//         return;
+
+//     const ContactInfo<T> ci = CI[pId];
+//     if(ci.getOverlapDistance() >= T(0))
+//         return;
+
+//     const uint2            pair        = neighborList[pId];
+//     const uint             p1          = pair.x;
+//     const uint             p2          = pair.y;
+//     const uint             primaryId   = particleId[p1];
+//     const uint             secondaryId = particleId[p2];
+//     const RigidBody<T, U>& rbA         = *(particleRB[rigidBodyId[primaryId]]);
+//     const T                massA       = rbA.getMass();
+//     const uint             matA        = rbA.getMaterial();
+//     const RigidBody<T, U>& rbB   = *(particleRB[rigidBodyId[secondaryId]]);
+//     const T                massB = rbB.getMass();
+//     const uint             matB  = rbB.getMaterial();
+
+//     // CF ID given materialIDs
+//     const uint contactForceID
+//         = ContactForceModelFactory<T>::computeHash(matA, matB);
+//     // velocities of the particles
+//     const Kinematics<T> v1(velocity[primaryId]);
+//     const Kinematics<T> v2(velocity[secondaryId]);
+//     // relative velocity at contact point
+//     const Vector3<T> relVel(v1.kinematicsAtPoint(ci.getContactPoint())
+//                             - v2.kinematicsAtPoint(ci.getContactPoint()));
+//     // relative angular velocity
+//     const Vector3<T> relAngVel(v1.getAngularComponent()
+//                                - v2.getAngularComponent());
+//     // CF[contactForceID]->computeForces(ci,
+//     //                                     relVel,
+//     //                                     relAngVel,
+//     //                                     massA,
+//     //                                     massB,
+//     //                                     trA.getOrigin(),
+//     //                                     torce[primaryId]);
+// }
 
 // -----------------------------------------------------------------------------
 // Adds external forces such as gravity
@@ -239,8 +319,8 @@ __GLOBAL__ void
 // -----------------------------------------------------------------------------
 // Updates the position and velocities of particles
 template <typename T, typename U>
-__GLOBAL__ void moveParticles_kernel(RigidBody<T, U> const* const*   RB,
-                                     TimeIntegrator<T> const* const* TI,
+__GLOBAL__ void moveParticles_kernel(const RigidBody<T, U>* const*   RB,
+                                     const TimeIntegrator<T>* const* TI,
                                      uint*          rigidBodyId,
                                      Transform3<T>* transform,
                                      Kinematics<T>* velocity,
@@ -294,7 +374,7 @@ __GLOBAL__ void moveParticles_kernel(RigidBody<T, U> const* const*   RB,
             int                                nParticles);                                        \
                                                                     \
     template __GLOBAL__ void addExternalForces_kernel(              \
-        RigidBody<T, U> const* const* particleRB,                   \
+        const RigidBody<T, U>* const* particleRB,                   \
         const uint*                   rigidBodyId,                  \
         const T                       gX,                           \
         const T                       gY,                           \
@@ -303,8 +383,8 @@ __GLOBAL__ void moveParticles_kernel(RigidBody<T, U> const* const*   RB,
         const uint                    nParticles);                                     \
                                                                     \
     template __GLOBAL__ void moveParticles_kernel(                  \
-        RigidBody<T, U> const* const*   RB,                         \
-        TimeIntegrator<T> const* const* TI,                         \
+        const RigidBody<T, U>* const*   RB,                         \
+        const TimeIntegrator<T>* const* TI,                         \
         uint*                           rigidBodyId,                \
         Transform3<T>*                  transform,                  \
         Kinematics<T>*                  velocity,                   \

@@ -67,15 +67,16 @@ public:
     void PostProcessing_start() final;
 
     /** @brief Writes post-processing data
-     @param particleRB Arrays of particles rigid bodies
-     @param obstacleRB Arrays of obstacles rigid bodies
-     @param cm component manager
-     @param currentTime Current simulation time */
+        @param particleRB Arrays of particles rigid bodies
+        @param obstacleRB Arrays of obstacles rigid bodies
+        @param cm Component manager
+        @param currentTime Current simulation time */
     __HOST__
-    void PostProcessing(RigidBody<T, T> const* const* particleRB,
-                        RigidBody<T, T> const* const* obstacleRB,
-                        const ComponentManager<T>*    cm,
-                        const T                       currentTime) final;
+    void PostProcessing(
+        const GrainsMemBuffer<RigidBody<T, T>*, MemType::HOST>&    particleRB,
+        const GrainsMemBuffer<RigidBody<T, T>*, MemType::HOST>&    obstacleRB,
+        const std::unique_ptr<ComponentManager<T, MemType::HOST>>& cm,
+        const T currentTime) final;
 
     /** @brief Finalizes writing data */
     void PostProcessing_end() final;

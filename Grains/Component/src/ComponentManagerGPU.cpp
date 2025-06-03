@@ -10,256 +10,54 @@
 #include "LinkedCellGPUWrapper.hh"
 
 // -----------------------------------------------------------------------------
-// Constructor with the number of particles, number of obstacles, and number of
-// cells. We only allocate memory in the constructor. Filling out the data
-// members must be done separately.
+// Default constructor
 template <typename T>
-ComponentManagerGPU<T>::ComponentManagerGPU(uint nParticles,
-                                            uint nObstacles,
-                                            uint nCells)
-    : m_nParticles(nParticles)
-    , m_nObstacles(nObstacles)
-    , m_nCells(nCells)
+ComponentManagerGPU<T>::ComponentManagerGPU() = default;
+
+// -----------------------------------------------------------------------------
+// Constructor with the number of particles, number of obstacles, and number of
+// cells.
+template <typename T>
+ComponentManagerGPU<T>::ComponentManagerGPU(
+    GrainsMemBuffer<RigidBody<T, T>*, MemType::DEVICE>* particleRB,
+    GrainsMemBuffer<RigidBody<T, T>*, MemType::DEVICE>* obstacleRB,
+    uint                                                nParticles,
+    uint                                                nObstacles,
+    uint                                                nCells)
+    : ComponentManager<T, MemType::DEVICE>(
+          particleRB, obstacleRB, nParticles, nObstacles, nCells)
 {
-    // Allocating memory on host
-    cudaErrCheck(
-        cudaMalloc((void**)&m_rigidBodyId, m_nParticles * sizeof(uint)));
-    cudaErrCheck(cudaMalloc((void**)&m_obstacleRigidBodyId,
-                            m_nObstacles * sizeof(uint)));
-    cudaErrCheck(
-        cudaMalloc((void**)&m_transform, m_nParticles * sizeof(Transform3<T>)));
-    cudaErrCheck(cudaMalloc((void**)&m_obstacleTransform,
-                            m_nObstacles * sizeof(Transform3<T>)));
-    cudaErrCheck(
-        cudaMalloc((void**)&m_velocity, m_nParticles * sizeof(Kinematics<T>)));
-    cudaErrCheck(cudaMalloc((void**)&m_torce, m_nParticles * sizeof(Torce<T>)));
-    cudaErrCheck(
-        cudaMalloc((void**)&m_particleId, m_nParticles * sizeof(uint)));
-    cudaErrCheck(
-        cudaMalloc((void**)&m_particleCellHash, m_nParticles * sizeof(uint)));
-    cudaErrCheck(
-        cudaMalloc((void**)&m_cellHashStart, (m_nCells + 1) * sizeof(uint)));
-    cudaErrCheck(
-        cudaMalloc((void**)&m_cellHashEnd, (m_nCells + 1) * sizeof(uint)));
+    allocate();
+    initialize();
 }
 
 // -----------------------------------------------------------------------------
 // Destructor
 template <typename T>
-ComponentManagerGPU<T>::~ComponentManagerGPU()
-{
-    cudaFree(m_rigidBodyId);
-    cudaFree(m_obstacleRigidBodyId);
-    cudaFree(m_transform);
-    cudaFree(m_obstacleTransform);
-    cudaFree(m_velocity);
-    cudaFree(m_torce);
-    cudaFree(m_particleId);
-    cudaFree(m_particleCellHash);
-    cudaFree(m_cellHashStart);
-    cudaFree(m_cellHashEnd);
-    // cudaFree( m_neighborsCount );
-    // cudaFree( m_neighborsId );
-}
+ComponentManagerGPU<T>::~ComponentManagerGPU() = default;
 
 // -----------------------------------------------------------------------------
-// Gets the array of particles rigid body Ids
+// Allocates memory for the component manager
 template <typename T>
-std::vector<uint> ComponentManagerGPU<T>::getRigidBodyId() const
+void ComponentManagerGPU<T>::allocate()
 {
-    std::vector<uint> h_rigidBodyId(m_nParticles);
-    cudaErrCheck(cudaMemcpy(h_rigidBodyId.data(),
-                            m_rigidBodyId,
-                            m_nParticles * sizeof(uint),
-                            cudaMemcpyDeviceToHost));
-    return (h_rigidBodyId);
+    m_particleCellHash.allocate(m_nParticles);
+    m_cellHashStart.allocate(m_nCells + 1);
+    m_cellHashEnd.allocate(m_nCells + 1);
 }
 
-// -----------------------------------------------------------------------------
-// Gets the array of obstacles rigid body Ids
+// -------------------------------------------------------------------------
+// Initializes data members to default values
 template <typename T>
-std::vector<uint> ComponentManagerGPU<T>::getRigidBodyIdObstacles() const
+void ComponentManagerGPU<T>::initialize()
 {
-    std::vector<uint> h_obstaclesRigidBodyId(m_nObstacles);
-    cudaErrCheck(cudaMemcpy(h_obstaclesRigidBodyId.data(),
-                            m_obstacleRigidBodyId,
-                            m_nObstacles * sizeof(uint),
-                            cudaMemcpyDeviceToHost));
-    return (h_obstaclesRigidBodyId);
-}
-
-// -----------------------------------------------------------------------------
-// Gets particles transformations
-template <typename T>
-std::vector<Transform3<T>> ComponentManagerGPU<T>::getTransform() const
-{
-    std::vector<Transform3<T>> h_transform(m_nParticles);
-    cudaErrCheck(cudaMemcpy(h_transform.data(),
-                            m_transform,
-                            m_nParticles * sizeof(Transform3<T>),
-                            cudaMemcpyDeviceToHost));
-    return (h_transform);
-}
-
-// -----------------------------------------------------------------------------
-// Gets obstacles transformations
-template <typename T>
-std::vector<Transform3<T>> ComponentManagerGPU<T>::getTransformObstacles() const
-{
-    std::vector<Transform3<T>> h_obstacleTransform(m_nObstacles);
-    cudaErrCheck(cudaMemcpy(h_obstacleTransform.data(),
-                            m_obstacleTransform,
-                            m_nObstacles * sizeof(Transform3<T>),
-                            cudaMemcpyDeviceToHost));
-    return (h_obstacleTransform);
-}
-
-// -----------------------------------------------------------------------------
-// Gets particles velocities
-template <typename T>
-std::vector<Kinematics<T>> ComponentManagerGPU<T>::getVelocity() const
-{
-    std::vector<Kinematics<T>> h_velocity(m_nParticles);
-    cudaErrCheck(cudaMemcpy(h_velocity.data(),
-                            m_velocity,
-                            m_nParticles * sizeof(Kinematics<T>),
-                            cudaMemcpyDeviceToHost));
-    return (h_velocity);
-}
-
-// -----------------------------------------------------------------------------
-// Gets particles torces
-template <typename T>
-std::vector<Torce<T>> ComponentManagerGPU<T>::getTorce() const
-{
-    std::vector<Torce<T>> h_torce(m_nParticles);
-    cudaErrCheck(cudaMemcpy(h_torce.data(),
-                            m_torce,
-                            m_nParticles * sizeof(Torce<T>),
-                            cudaMemcpyDeviceToHost));
-    return (h_torce);
-}
-
-// -----------------------------------------------------------------------------
-// Gets the array of particles Ids
-template <typename T>
-std::vector<uint> ComponentManagerGPU<T>::getParticleId() const
-{
-    std::vector<uint> h_particleId(m_nParticles);
-    cudaErrCheck(cudaMemcpy(h_particleId.data(),
-                            m_particleId,
-                            m_nParticles * sizeof(uint),
-                            cudaMemcpyDeviceToHost));
-    return (h_particleId);
-}
-
-// -----------------------------------------------------------------------------
-// Gets the number of particles in manager
-template <typename T>
-uint ComponentManagerGPU<T>::getNumberOfParticles() const
-{
-    return (m_nParticles);
-}
-
-// -----------------------------------------------------------------------------
-// Gets the number of obstacles in manager
-template <typename T>
-uint ComponentManagerGPU<T>::getNumberOfObstacles() const
-{
-    return (m_nObstacles);
-}
-
-// -----------------------------------------------------------------------------
-// Gets the number of cells in manager
-template <typename T>
-uint ComponentManagerGPU<T>::getNumberOfCells() const
-{
-    return (m_nCells);
-}
-
-// -----------------------------------------------------------------------------
-// Sets the array of particles rigid body Ids
-template <typename T>
-void ComponentManagerGPU<T>::setRigidBodyId(std::vector<uint> const& id)
-{
-    cudaErrCheck(cudaMemcpy(m_rigidBodyId,
-                            id.data(),
-                            m_nParticles * sizeof(uint),
-                            cudaMemcpyHostToDevice));
-}
-
-// -----------------------------------------------------------------------------
-// Sets the array of obstacles rigid body Ids
-template <typename T>
-void ComponentManagerGPU<T>::setRigidBodyIdObstacles(
-    std::vector<uint> const& id)
-{
-    cudaErrCheck(cudaMemcpy(m_obstacleRigidBodyId,
-                            id.data(),
-                            m_nObstacles * sizeof(uint),
-                            cudaMemcpyHostToDevice));
-}
-
-// -----------------------------------------------------------------------------
-// Sets particles transformations
-template <typename T>
-void ComponentManagerGPU<T>::setTransform(std::vector<Transform3<T>> const& t)
-{
-    cudaErrCheck(cudaMemcpy(m_transform,
-                            t.data(),
-                            m_nParticles * sizeof(Transform3<T>),
-                            cudaMemcpyHostToDevice));
-}
-
-// -----------------------------------------------------------------------------
-// Sets obstacles transformations
-template <typename T>
-void ComponentManagerGPU<T>::setTransformObstacles(
-    std::vector<Transform3<T>> const& t)
-{
-    cudaErrCheck(cudaMemcpy(m_obstacleTransform,
-                            t.data(),
-                            m_nObstacles * sizeof(Transform3<T>),
-                            cudaMemcpyHostToDevice));
-}
-
-// -----------------------------------------------------------------------------
-// Sets particles velocities
-template <typename T>
-void ComponentManagerGPU<T>::setVelocity(std::vector<Kinematics<T>> const& v)
-{
-    cudaErrCheck(cudaMemcpy(m_velocity,
-                            v.data(),
-                            m_nParticles * sizeof(Kinematics<T>),
-                            cudaMemcpyHostToDevice));
-}
-
-// -----------------------------------------------------------------------------
-// Sets particles torces
-template <typename T>
-void ComponentManagerGPU<T>::setTorce(std::vector<Torce<T>> const& t)
-{
-    cudaErrCheck(cudaMemcpy(m_torce,
-                            t.data(),
-                            m_nParticles * sizeof(Torce<T>),
-                            cudaMemcpyHostToDevice));
-}
-
-// -----------------------------------------------------------------------------
-// Sets the array of particles Ids
-template <typename T>
-void ComponentManagerGPU<T>::setParticleId(std::vector<uint> const& id)
-{
-    cudaErrCheck(cudaMemcpy(m_particleId,
-                            id.data(),
-                            m_nParticles * sizeof(uint),
-                            cudaMemcpyHostToDevice));
 }
 
 // -----------------------------------------------------------------------------
 // Updates links between particles and linked cell
 template <typename T>
-void ComponentManagerGPU<T>::updateLinks(LinkedCell<T> const* const* LC)
+void ComponentManagerGPU<T>::updateLinks(
+    const GrainsMemBuffer<LinkedCell<T>*, MemType::DEVICE>& LC)
 {
     using GP = GrainsParameters<T>;
     // Kernel launch parameters
@@ -268,39 +66,38 @@ void ComponentManagerGPU<T>::updateLinks(LinkedCell<T> const* const* LC)
     uint       sMemSize   = sizeof(uint) * (numThreads + 1);
 
     // Zeroing out the arrays
-    zeroOutArray_kernel<<<numBlocks, numThreads>>>(m_cellHashStart,
+    zeroOutArray_kernel<<<numBlocks, numThreads>>>(m_cellHashStart.getData(),
                                                    m_nCells + 1);
-    zeroOutArray_kernel<<<numBlocks, numThreads>>>(m_cellHashEnd, m_nCells + 1);
+    zeroOutArray_kernel<<<numBlocks, numThreads>>>(m_cellHashEnd.getData(),
+                                                   m_nCells + 1);
 
     // First - finding the cell hash for each particle
     computeLinearLinkedCellHashGPU_kernel<<<numBlocks, numThreads>>>(
-        LC,
-        m_transform,
+        LC.getData(),
+        m_transform.getData(),
         m_nParticles,
-        m_particleCellHash);
+        m_particleCellHash.getData());
 
     // Second - sorting the particle ids according to the cell hash
     thrust::sort_by_key(
-        thrust::device_ptr<uint>(m_particleCellHash),
-        thrust::device_ptr<uint>(m_particleCellHash + m_nParticles),
-        thrust::device_ptr<uint>(m_particleId));
+        thrust::device_ptr<uint>(m_particleCellHash.getData()),
+        thrust::device_ptr<uint>(m_particleCellHash.getData() + m_nParticles),
+        thrust::device_ptr<uint>(m_particleId.getData()));
 
     // Third - reseting the cellStart array and finding the start location of
     // each hash
     sortComponentsAndFindCellStart_kernel<<<numBlocks, numThreads, sMemSize>>>(
-        m_particleCellHash,
+        m_particleCellHash.getData(),
         m_nParticles,
-        m_cellHashStart,
-        m_cellHashEnd);
+        m_cellHashStart.getData(),
+        m_cellHashEnd.getData());
 }
 
 // -----------------------------------------------------------------------------
 // Detects collision and computes forces between particles and obstacles
 template <typename T>
 void ComponentManagerGPU<T>::detectCollisionAndComputeContactForcesObstacles(
-    RigidBody<T, T> const* const*      particleRB,
-    RigidBody<T, T> const* const*      obstacleRB,
-    ContactForceModel<T> const* const* CF)
+    const GrainsMemBuffer<ContactForceModel<T>*, MemType::DEVICE>& CF)
 {
     using GP = GrainsParameters<T>;
     // Kernel launch parameters
@@ -327,9 +124,8 @@ void ComponentManagerGPU<T>::detectCollisionAndComputeContactForcesObstacles(
 // Detects collision and computes forces between particles and particles
 template <typename T>
 void ComponentManagerGPU<T>::detectCollisionAndComputeContactForcesParticles(
-    RigidBody<T, T> const* const*      particleRB,
-    LinkedCell<T> const* const*        LC,
-    ContactForceModel<T> const* const* CF)
+    const GrainsMemBuffer<LinkedCell<T>*, MemType::DEVICE>&        LC,
+    const GrainsMemBuffer<ContactForceModel<T>*, MemType::DEVICE>& CF)
 {
     using GP = GrainsParameters<T>;
     // Kernel launch parameters
@@ -339,17 +135,17 @@ void ComponentManagerGPU<T>::detectCollisionAndComputeContactForcesParticles(
     // Invoke the kernel
     detectCollisionAndComputeContactForcesParticles_kernel<<<numBlocks,
                                                              numThreads>>>(
-        particleRB,
-        LC,
-        CF,
-        m_rigidBodyId,
-        m_transform,
-        m_velocity,
-        m_torce,
-        m_particleId,
-        m_particleCellHash,
-        m_cellHashStart,
-        m_cellHashEnd,
+        m_particleRB->getData(),
+        LC.getData(),
+        CF.getData(),
+        m_rigidBodyId.getData(),
+        m_transform.getData(),
+        m_velocity.getData(),
+        m_torce.getData(),
+        m_particleId.getData(),
+        m_particleCellHash.getData(),
+        m_cellHashStart.getData(),
+        m_cellHashEnd.getData(),
         m_nParticles);
 }
 
@@ -357,26 +153,23 @@ void ComponentManagerGPU<T>::detectCollisionAndComputeContactForcesParticles(
 // Detects collision and computes forces between all components
 template <typename T>
 void ComponentManagerGPU<T>::detectCollisionAndComputeContactForces(
-    RigidBody<T, T> const* const*      particleRB,
-    RigidBody<T, T> const* const*      obstacleRB,
-    LinkedCell<T> const* const*        LC,
-    ContactForceModel<T> const* const* CF)
+    const GrainsMemBuffer<LinkedCell<T>*, MemType::DEVICE>&        LC,
+    const GrainsMemBuffer<ContactForceModel<T>*, MemType::DEVICE>& CF)
 {
     // Updates links between components and linked cell
     updateLinks(LC);
 
     // Particle-particle interactions
-    detectCollisionAndComputeContactForcesParticles(particleRB, LC, CF);
+    detectCollisionAndComputeContactForcesParticles(LC, CF);
 
     // Particle-obstacle interactions
-    detectCollisionAndComputeContactForcesObstacles(particleRB, obstacleRB, CF);
+    detectCollisionAndComputeContactForcesObstacles(CF);
 }
 
 // -----------------------------------------------------------------------------
 // Adds external forces such as gravity
 template <typename T>
-void ComponentManagerGPU<T>::addExternalForces(
-    RigidBody<T, T> const* const* particleRB)
+void ComponentManagerGPU<T>::addExternalForces()
 {
     using GP = GrainsParameters<T>;
     // Kernel launch parameters
@@ -385,25 +178,25 @@ void ComponentManagerGPU<T>::addExternalForces(
 
     // since g is a host-side vector, we need to break it into three components
     // to be able to pass it to the kernel
-    const T gX = GrainsParameters<T>::m_gravity[X];
-    const T gY = GrainsParameters<T>::m_gravity[Y];
-    const T gZ = GrainsParameters<T>::m_gravity[Z];
+    const T gX = GP::m_gravity[X];
+    const T gY = GP::m_gravity[Y];
+    const T gZ = GP::m_gravity[Z];
 
     // Invoke the kernel
-    addExternalForces_kernel<<<numBlocks, numThreads>>>(particleRB,
-                                                        m_rigidBodyId,
+    addExternalForces_kernel<<<numBlocks, numThreads>>>(m_particleRB->getData(),
+                                                        m_rigidBodyId.getData(),
                                                         gX,
                                                         gY,
                                                         gZ,
-                                                        m_torce,
+                                                        m_torce.getData(),
                                                         m_nParticles);
 }
 
 // -----------------------------------------------------------------------------
 // Updates the position and velocities of particles
 template <typename T>
-void ComponentManagerGPU<T>::moveParticles(RigidBody<T, T> const* const*   RB,
-                                           TimeIntegrator<T> const* const* TI)
+void ComponentManagerGPU<T>::moveParticles(
+    const GrainsMemBuffer<TimeIntegrator<T>*, MemType::DEVICE>& TI)
 {
     using GP = GrainsParameters<T>;
     // Kernel launch parameters
@@ -411,12 +204,12 @@ void ComponentManagerGPU<T>::moveParticles(RigidBody<T, T> const* const*   RB,
     const uint numBlocks  = GP::m_numBlocksPerGrid;
 
     // Invoke the kernel
-    moveParticles_kernel<<<numBlocks, numThreads>>>(RB,
-                                                    TI,
-                                                    m_rigidBodyId,
-                                                    m_transform,
-                                                    m_velocity,
-                                                    m_torce,
+    moveParticles_kernel<<<numBlocks, numThreads>>>(m_particleRB->getData(),
+                                                    TI.getData(),
+                                                    m_rigidBodyId.getData(),
+                                                    m_transform.getData(),
+                                                    m_velocity.getData(),
+                                                    m_torce.getData(),
                                                     m_nParticles);
 }
 

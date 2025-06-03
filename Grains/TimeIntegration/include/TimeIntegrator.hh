@@ -55,6 +55,10 @@ public:
     /** @brief Returns the time integrator type */
     __HOSTDEVICE__
     virtual TimeIntegratorType getTimeIntegratorType() const = 0;
+
+    /** @brief Returns the time step */
+    __HOSTDEVICE__
+    T getTimeStep() const;
     //@}
 
     /** @name Methods */

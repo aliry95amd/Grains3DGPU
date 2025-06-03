@@ -1,11 +1,11 @@
-#ifndef _CONTACTFORCEMODELBUILDERFACTORY_HH_
-#define _CONTACTFORCEMODELBUILDERFACTORY_HH_
+#ifndef _CONTACTFORCEMODELFACTORY_HH_
+#define _CONTACTFORCEMODELFACTORY_HH_
 
 #include "ContactForceModel.hh"
-#include "ReaderXML.hh"
+#include "GrainsMemBuffer.hh"
 
 // =============================================================================
-/** @brief The class ContactForceModelBuilderFactory.
+/** @brief The class ContactForceModelFactory.
 
 	Creates the contact force model for each pair of materials. 
 	This class manages the mapping of material types from strings, as specified 
@@ -83,27 +83,27 @@
     @author A.YAZDANI - 2024 - Construction */
 // =============================================================================
 template <typename T>
-class ContactForceModelBuilderFactory
+class ContactForceModelFactory
 {
 private:
     /**@name Contructors & Destructor */
     //@{
     /** @brief Default constructor (forbidden) */
-    __HOST__
-    ContactForceModelBuilderFactory();
+    ContactForceModelFactory() = default;
 
     /** @brief Destructor (forbidden) */
-    __HOST__
-    ~ContactForceModelBuilderFactory();
+    ~ContactForceModelFactory() = default;
     //@}
 
 public:
     /**@name Methods */
     //@{
     /** @brief Creates and returns the contact force model given an XML node 
-		@param root XML node */
-    __HOST__
-    static ContactForceModel<T>** create(DOMElement* root);
+		@param root XML node 
+		@param CF Memory buffer for storing contact force models */
+    static void
+        create(DOMElement*                                            root,
+               GrainsMemBuffer<ContactForceModel<T>*, MemType::HOST>& CF);
 
     /** @brief Hash function to map a pair of material IDs x and y to a 
 		single ID to access the contact force model between them
@@ -115,19 +115,15 @@ public:
     /** @brief ContactForceModel objects must be instantiated on device, if 
 		we want to use them on device. Copying from host is not supported due to 
 		runtime polymorphism for this class.
-		This function constructs a ContactForceModel object in a given device 
-		memory from an XML node.
-		It calls a deivce kernel that is implemented in the source file.
-		@param root XML node
-		@param d_CF double pointer to a device memory to construct the object */
-    __HOST__
-    static void ContactForceModelCopyHostToDevice(ContactForceModel<T>** h_CF,
-                                                  ContactForceModel<T>** d_CF);
+		This function reads a host-side ContactForceModel object, and mimics it
+		in a given device buffer.
+		It calls a device kernel that is implemented in the source file.
+		@param h_CF Host-side ContactForceModel object
+		@param d_CF Device-side ContactForceModel object */
+    static void copyHostToDevice(
+        GrainsMemBuffer<ContactForceModel<T>*, MemType::HOST>&   h_CF,
+        GrainsMemBuffer<ContactForceModel<T>*, MemType::DEVICE>& d_CF);
     //@}
 };
-
-typedef ContactForceModelBuilderFactory<float> ContactForceModelBuilderFactoryF;
-typedef ContactForceModelBuilderFactory<double>
-    ContactForceModelBuilderFactoryD;
 
 #endif

@@ -1,11 +1,7 @@
 #ifndef _GRAINSMEMBUFFER_HH_
 #define _GRAINSMEMBUFFER_HH_
 
-#include <cassert>
-#include <cstdlib>
-#include <cstring>
-#include <cuda_runtime.h>
-#include <iostream>
+#include "GrainsUtils.hh"
 
 enum class MemType
 {
@@ -58,23 +54,35 @@ public:
     }
 
     // -------------------------------------------------------------------------
-    /** @brief Copy constructor */
-    GrainsMemBuffer(const GrainsMemBuffer&) = delete;
+    /** @brief Copy constructor
+    @param other the other buffer to copy from */
+    template <MemType srcM>
+    GrainsMemBuffer(const GrainsMemBuffer<T, srcM>& other)
+    {
+        copyFrom(other);
+    }
 
     // -------------------------------------------------------------------------
-    /** @brief Copy assignment operator */
-    GrainsMemBuffer& operator=(const GrainsMemBuffer&) = delete;
+    /** @brief Copy assignment operator 
+    @param other the other buffer to copy from */
+    template <MemType srcM>
+    GrainsMemBuffer<T, M>& operator=(const GrainsMemBuffer<T, srcM>& other)
+    {
+        if(this != &other)
+            copyFrom(other);
+        return *this;
+    }
 
     // -------------------------------------------------------------------------
     /** @brief Move constructor */
-    GrainsMemBuffer(GrainsMemBuffer&& other) noexcept
+    GrainsMemBuffer(GrainsMemBuffer<T, M>&& other) noexcept
     {
         moveFrom(other);
     }
 
     // -------------------------------------------------------------------------
     /** @brief Move assignment operator */
-    GrainsMemBuffer& operator=(GrainsMemBuffer&& other) noexcept
+    GrainsMemBuffer& operator=(GrainsMemBuffer<T, M>&& other) noexcept
     {
         if(this != &other)
             moveFrom(other);
@@ -92,9 +100,16 @@ public:
     }
 
     // -------------------------------------------------------------------------
+    /** @brief Returns the pointer to the data */
+    const T* getData() const
+    {
+        return m_ptr;
+    }
+
+    // -------------------------------------------------------------------------
     /** @brief Returns the pointer to the data on device (for zero-copy) */
     /** @note This is only valid for pinned memory */
-    T* getDeviceData()
+    __HOSTDEVICE__ T* getDeviceData()
     {
         if constexpr(M == MemType::PINNED)
             return m_d_ptr ? m_d_ptr : m_ptr;
@@ -120,13 +135,13 @@ public:
     /** @brief Returns the type of memory */
     MemType getMemType() const
     {
-        if constexpr(M == MemType::Host)
+        if constexpr(M == MemType::HOST)
             return MemType::HOST;
-        else if constexpr(M == MemType::Device)
+        else if constexpr(M == MemType::DEVICE)
             return MemType::DEVICE;
-        else if constexpr(M == MemType::Managed)
+        else if constexpr(M == MemType::MANAGED)
             return MemType::MANAGED;
-        else if constexpr(M == MemType::Pinned)
+        else if constexpr(M == MemType::PINNED)
             return MemType::PINNED;
         else
             return MemType::UNKNOWN;
@@ -142,7 +157,6 @@ public:
     {
         m_size     = count;
         m_capacity = count;
-        cudaError_t err;
 
         if constexpr(M == MemType::HOST)
         {
@@ -152,21 +166,15 @@ public:
         }
         else if constexpr(M == MemType::DEVICE)
         {
-            err = cudaMalloc(&m_ptr, sizeof(T) * count);
-            if(err != cudaSuccess)
-                throw std::bad_alloc();
+            cudaErrCheck(cudaMalloc(&m_ptr, sizeof(T) * count));
         }
         else if constexpr(M == MemType::MANAGED)
         {
-            err = cudaMallocManaged(&m_ptr, sizeof(T) * count);
-            if(err != cudaSuccess)
-                throw std::bad_alloc();
+            cudaErrCheck(cudaMallocManaged(&m_ptr, sizeof(T) * count));
         }
         else if constexpr(M == MemType::PINNED)
         {
-            err = cudaMallocHost(&m_ptr, sizeof(T) * count);
-            if(err != cudaSuccess)
-                throw std::bad_alloc();
+            cudaErrCheck(cudaMallocHost(&m_ptr, sizeof(T) * count));
         }
     }
 
@@ -182,25 +190,12 @@ public:
         GrainsMemBuffer<T, M> new_buf;
         new_buf.allocate(new_capacity);
 
-        cudaMemcpyKind kind;
-        if constexpr(M == MemType::HOST)
-            kind = cudaMemcpyHostToHost;
-        else if constexpr(M == MemType::DEVICE)
-            kind = cudaMemcpyDeviceToDevice;
-        else if constexpr(M == MemType::MANAGED)
-            kind = cudaMemcpyDeviceToDevice;
-        else if constexpr(M == MemType::PINNED)
-            kind = cudaMemcpyHostToHost;
-        else
-        {
-            std::cerr << "Unsupported memory type for reserve()\n";
-            return;
-        }
+        cudaMemcpyKind kind = getMemcpyKind<M, M>();
 
-        cudaMemcpy(new_buf.getDeviceData(),
-                   getDeviceData(),
-                   m_size * sizeof(T),
-                   kind);
+        cudaErrCheck(cudaMemcpy(new_buf.getDeviceData(),
+                                getDeviceData(),
+                                m_size * sizeof(T),
+                                kind));
 
         *this = std::move(new_buf);
     }
@@ -229,24 +224,24 @@ public:
             }
             else if constexpr(M == MemType::DEVICE)
             {
-                cudaMemcpy(m_ptr,
-                           old_data,
-                           old_size * sizeof(T),
-                           cudaMemcpyDeviceToDevice);
-                cudaFree(old_data);
+                cudaErrCheck(cudaMemcpy(m_ptr,
+                                        old_data,
+                                        old_size * sizeof(T),
+                                        cudaMemcpyDeviceToDevice));
+                cudaErrCheck(cudaFree(old_data));
             }
             else if constexpr(M == MemType::PINNED)
             {
                 std::memcpy(m_ptr, old_data, old_size * sizeof(T));
-                cudaFreeHost(old_data);
+                cudaErrCheck(cudaFreeHost(old_data));
             }
             else if constexpr(M == MemType::MANAGED)
             {
-                cudaMemcpy(m_ptr,
-                           old_data,
-                           old_size * sizeof(T),
-                           cudaMemcpyDeviceToDevice);
-                cudaFree(old_data);
+                cudaErrCheck(cudaMemcpy(m_ptr,
+                                        old_data,
+                                        old_size * sizeof(T),
+                                        cudaMemcpyDeviceToDevice));
+                cudaErrCheck(cudaFree(old_data));
             }
         }
         m_size     = new_size;
@@ -311,10 +306,10 @@ public:
         else if constexpr(M == MemType::DEVICE || M == MemType::MANAGED)
         {
             cudaMemcpyKind kind = cudaMemcpyDeviceToDevice;
-            cudaMemcpy(new_buf.getDeviceData(),
-                       getDeviceData(),
-                       m_size * sizeof(T),
-                       kind);
+            cudaErrCheck(cudaMemcpy(new_buf.getData(),
+                                    getData(),
+                                    m_size * sizeof(T),
+                                    kind));
         }
         else
         {
@@ -326,12 +321,48 @@ public:
     }
 
     // -------------------------------------------------------------------------
+    /** @brief Returns the kind of memory transfer for the given source and
+    destination memory types */
+    template <MemType Src, MemType Dst>
+    constexpr cudaMemcpyKind getMemcpyKind()
+    {
+        if constexpr(Src == MemType::HOST && Dst == MemType::HOST)
+            return cudaMemcpyHostToHost;
+        else if constexpr(Src == MemType::HOST && Dst == MemType::DEVICE)
+            return cudaMemcpyHostToDevice;
+        else if constexpr(Src == MemType::DEVICE && Dst == MemType::HOST)
+            return cudaMemcpyDeviceToHost;
+        else if constexpr(Src == MemType::DEVICE && Dst == MemType::DEVICE)
+            return cudaMemcpyDeviceToDevice;
+        else if constexpr(Src == MemType::HOST && Dst == MemType::MANAGED)
+            return cudaMemcpyHostToDevice;
+        else if constexpr(Src == MemType::MANAGED && Dst == MemType::HOST)
+            return cudaMemcpyDeviceToHost;
+        else if constexpr(Src == MemType::DEVICE && Dst == MemType::MANAGED)
+            return cudaMemcpyDeviceToDevice;
+        else if constexpr(Src == MemType::MANAGED && Dst == MemType::DEVICE)
+            return cudaMemcpyDeviceToDevice;
+        else if constexpr(Src == MemType::MANAGED && Dst == MemType::MANAGED)
+            return cudaMemcpyDeviceToDevice;
+        else if constexpr(Src == MemType::PINNED && Dst == MemType::HOST)
+            return cudaMemcpyHostToHost;
+        else if constexpr(Src == MemType::HOST && Dst == MemType::PINNED)
+            return cudaMemcpyHostToHost;
+        else if constexpr(Src == MemType::PINNED && Dst == MemType::DEVICE)
+            return cudaMemcpyHostToDevice;
+        else if constexpr(Src == MemType::DEVICE && Dst == MemType::PINNED)
+            return cudaMemcpyDeviceToHost;
+        else if constexpr(Src == MemType::PINNED && Dst == MemType::PINNED)
+            return cudaMemcpyHostToHost;
+        else
+            return cudaMemcpyDefault;
+    }
+
+    // -------------------------------------------------------------------------
     /** @brief Copy to another buffer (host/device aware)
-    @param dest destination buffer
-    @param kind type of copy (host to device, device to host, etc.)
-    @param stream CUDA stream to use for asynchronous operations */
-    template <MemType M2>
-    void copy_to(GrainsMemBuffer<T, M2>& dest, cudaMemcpyKind kind) const
+    @param dest destination buffer */
+    template <MemType destM>
+    void copyTo(GrainsMemBuffer<T, destM>& dest) const
     {
         if(m_size == 0 || !m_ptr)
             return;
@@ -342,18 +373,44 @@ public:
             return;
         }
 
-        if constexpr(M == MemType::HOST && M2 == MemType::HOST)
-        {
+        if constexpr(M == MemType::HOST && destM == MemType::HOST)
             std::memcpy(dest.getData(), getData(), getBytes());
+        else
+        {
+            cudaMemcpyKind kind    = getMemcpyKind<M, destM>();
+            const T*       src_ptr = this->getData();
+            T*             dst_ptr = dest.getData();
+            cudaErrCheck(cudaMemcpy(dst_ptr, src_ptr, getBytes(), kind));
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    /** @brief Copy from another buffer (host/device aware)
+    @param src source buffer */
+    template <MemType srcM>
+    void copyFrom(const GrainsMemBuffer<T, srcM>& src)
+    {
+        if constexpr(M == srcM)
+        {
+            if(this == &src)
+                return;
+        }
+
+        // Resize this buffer if needed
+        if(m_capacity < src.getSize())
+            resize(src.getSize());
+        m_size = src.getSize();
+
+        if constexpr(M == MemType::HOST && srcM == MemType::HOST)
+        {
+            std::memcpy(getData(), src.getData(), src.getBytes());
         }
         else
         {
-            const T*    src_ptr = this->getDeviceData();
-            T*          dst_ptr = dest.getDeviceData();
-            cudaError_t err = cudaMemcpy(dst_ptr, src_ptr, getBytes(), kind);
-            if(err != cudaSuccess)
-                std::cerr << "cudaMemcpy failed in copy_to: "
-                          << cudaGetErrorString(err) << "\n";
+            cudaMemcpyKind kind    = getMemcpyKind<srcM, M>();
+            const T*       src_ptr = src.getData();
+            T*             dst_ptr = getData();
+            cudaErrCheck(cudaMemcpy(dst_ptr, src_ptr, src.getBytes(), kind));
         }
     }
 
@@ -364,15 +421,25 @@ public:
         if(m_ptr)
         {
             if constexpr(M == MemType::HOST)
+            {
                 std::free(m_ptr);
+            }
             else if constexpr(M == MemType::DEVICE)
-                cudaFree(m_ptr);
+            {
+                cudaErrCheck(cudaFree(m_ptr));
+            }
             else if constexpr(M == MemType::PINNED)
-                cudaFreeHost(m_ptr);
+            {
+                cudaErrCheck(cudaFreeHost(m_ptr));
+            }
             else if constexpr(M == MemType::MANAGED)
-                cudaFree(m_ptr);
+            {
+                cudaErrCheck(cudaFree(m_ptr));
+            }
             else
+            {
                 std::cerr << "Unknown memory type for free()\n";
+            }
         }
 
         m_ptr       = nullptr;

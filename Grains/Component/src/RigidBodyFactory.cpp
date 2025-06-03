@@ -1,3 +1,4 @@
+#include "RigidBodyFactory.hh"
 #include "Box.hh"
 #include "Cone.hh"
 #include "Convex.hh"
@@ -57,7 +58,7 @@ __GLOBAL__ void createRigidBodyKernel(RigidBody<T, U>** rb,
 
     if(!convex)
     {
-        printf("Convex is not created! Aborting Grains!\n");
+        GAbort("Convex is not created! Aborting Grains!");
     }
 
     rb[index] = new RigidBody<T, U>(convex, crustThickness, material, density);
@@ -66,31 +67,59 @@ __GLOBAL__ void createRigidBodyKernel(RigidBody<T, U>** rb,
 /* ========================================================================== */
 /*                             High-Level Methods                             */
 /* ========================================================================== */
-// Constructs a RigidBody object on device identical to a RigidBody object on
-// the host memory.
-// It is assumed that appropriate memory is allocated to d_rb.
-template <typename T, typename U>
-__HOST__ void RigidBodyCopyHostToDevice(RigidBody<T, U>** h_rb,
-                                        RigidBody<T, U>** d_rb,
-                                        int               numRigidBodies)
+// Creates and stores a RigidBody object in the host memory.
+template <typename T>
+__HOST__ void RigidBodyFactory<T>::create(
+    DOMNode*                                          root,
+    GrainsMemBuffer<RigidBody<T, T>*, MemType::HOST>& refRB,
+    GrainsMemBuffer<Transform3<T>, MemType::HOST>&    initTransform,
+    GrainsMemBuffer<uint, MemType::HOST>&             numEachRefParticle,
+    uint&                                             numParticles)
 {
-    for(int index = 0; index < numRigidBodies; index++)
+    // Particles
+    DOMNodeList* allParticles = ReaderXML::getNodes(root);
+    // Number of unique shapes (rigid bodies) in the simulation
+    numParticles         = 0;
+    uint numRefParticles = allParticles->getLength();
+    refRB.allocate(numRefParticles);
+    initTransform.allocate(numRefParticles);
+    numEachRefParticle.allocate(numRefParticles);
+    for(int i = 0; i < numRefParticles; ++i)
+    {
+        DOMNode* nParticle    = allParticles->item(i);
+        numEachRefParticle[i] = static_cast<uint>(
+            ReaderXML::getNodeAttr_Int(nParticle, "Number"));
+        refRB[i]            = new RigidBody<T, T>(nParticle);
+        DOMNode* nTransform = ReaderXML::getNode(nParticle, "Transformation");
+        initTransform[i]    = Transform3<T>(nTransform);
+        numParticles += numEachRefParticle[i];
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Constructs a ContactForceModel object on device.
+template <typename T>
+__HOST__ void RigidBodyFactory<T>::copyHostToDevice(
+    GrainsMemBuffer<RigidBody<T, T>*, MemType::HOST>&   h_RB,
+    GrainsMemBuffer<RigidBody<T, T>*, MemType::DEVICE>& d_RB)
+{
+    for(uint i = 0; i < h_RB.getSize(); ++i)
     {
         // Extracting info from the host side object
-        Convex<T>* convex   = h_rb[index]->getConvex();
+        Convex<T>* convex   = h_RB[i]->getConvex();
         ConvexType cvxType  = convex->getConvexType();
-        T          ct       = h_rb[index]->getCrustThickness();
-        uint       material = h_rb[index]->getMaterial();
+        T          ct       = h_RB[i]->getCrustThickness();
+        uint       material = h_RB[i]->getMaterial();
         // We also need the density to calculate the mass of the rigid body.
         // However, it is not available here. So, we manually compute it:
-        T density = h_rb[index]->getMass() / h_rb[index]->getVolume();
+        T density = h_RB[i]->getMass() / h_RB[i]->getVolume();
 
         if(cvxType == SPHERE)
         {
             Sphere<T>* c = dynamic_cast<Sphere<T>*>(convex);
             T          r = c->getRadius();
-            createRigidBodyKernel<<<1, 1>>>(d_rb,
-                                            index,
+            createRigidBodyKernel<<<1, 1>>>(d_RB.getData(),
+                                            i,
                                             ct,
                                             material,
                                             density,
@@ -101,8 +130,8 @@ __HOST__ void RigidBodyCopyHostToDevice(RigidBody<T, U>** h_rb,
         {
             Box<T>*    c = dynamic_cast<Box<T>*>(convex);
             Vector3<T> L = c->getExtent();
-            createRigidBodyKernel<<<1, 1>>>(d_rb,
-                                            index,
+            createRigidBodyKernel<<<1, 1>>>(d_RB.getData(),
+                                            i,
                                             ct,
                                             material,
                                             density,
@@ -116,8 +145,8 @@ __HOST__ void RigidBodyCopyHostToDevice(RigidBody<T, U>** h_rb,
             Cylinder<T>* c = dynamic_cast<Cylinder<T>*>(convex);
             T            r = c->getRadius();
             T            h = c->getHeight();
-            createRigidBodyKernel<<<1, 1>>>(d_rb,
-                                            index,
+            createRigidBodyKernel<<<1, 1>>>(d_RB.getData(),
+                                            i,
                                             ct,
                                             material,
                                             density,
@@ -130,8 +159,8 @@ __HOST__ void RigidBodyCopyHostToDevice(RigidBody<T, U>** h_rb,
             Cone<T>* c = dynamic_cast<Cone<T>*>(convex);
             T        r = c->getRadius();
             T        h = c->getHeight();
-            createRigidBodyKernel<<<1, 1>>>(d_rb,
-                                            index,
+            createRigidBodyKernel<<<1, 1>>>(d_RB.getData(),
+                                            i,
                                             ct,
                                             material,
                                             density,
@@ -144,8 +173,8 @@ __HOST__ void RigidBodyCopyHostToDevice(RigidBody<T, U>** h_rb,
             Superquadric<T>* c = dynamic_cast<Superquadric<T>*>(convex);
             Vector3<T>       L = c->getExtent();
             Vector3<T>       N = c->getExponent();
-            createRigidBodyKernel<<<1, 1>>>(d_rb,
-                                            index,
+            createRigidBodyKernel<<<1, 1>>>(d_RB.getData(),
+                                            i,
                                             ct,
                                             material,
                                             density,
@@ -160,8 +189,8 @@ __HOST__ void RigidBodyCopyHostToDevice(RigidBody<T, U>** h_rb,
         {
             Rectangle<T>* c = dynamic_cast<Rectangle<T>*>(convex);
             Vector3<T>    L = c->getExtent();
-            createRigidBodyKernel<<<1, 1>>>(d_rb,
-                                            index,
+            createRigidBodyKernel<<<1, 1>>>(d_RB.getData(),
+                                            i,
                                             ct,
                                             material,
                                             density,
@@ -170,23 +199,12 @@ __HOST__ void RigidBodyCopyHostToDevice(RigidBody<T, U>** h_rb,
                                             L[Y]);
         }
         else
-        {
-            cout << "Convex type is not implemented for GPU! Aborting "
-                    "Grains!"
-                 << endl;
-            exit(1);
-        }
+            GAbort("Convex type is not implemented for GPU! Aborting Grains!");
     }
     cudaDeviceSynchronize();
 }
 
 // -----------------------------------------------------------------------------
 // Explicit instantiation
-#define X(T, U)                                                              \
-    template __HOST__ void RigidBodyCopyHostToDevice(RigidBody<T, U>** h_rb, \
-                                                     RigidBody<T, U>** d_rb, \
-                                                     int numRigidBodies);
-X(float, float)
-X(double, float)
-X(double, double)
-#undef X
+template class RigidBodyFactory<float>;
+template class RigidBodyFactory<double>;

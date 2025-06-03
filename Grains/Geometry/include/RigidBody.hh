@@ -63,6 +63,11 @@ public:
     __HOSTDEVICE__
     RigidBody(RigidBody<T, U> const& rb);
 
+    /** @brief Copy assignment operator
+        @param other RigidBody object to be assigned */
+    __HOSTDEVICE__
+    RigidBody<T, U>& operator=(const RigidBody<T, U>& other);
+
     /** @brief Destructor */
     __HOSTDEVICE__
     ~RigidBody();

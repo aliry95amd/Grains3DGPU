@@ -1,4 +1,4 @@
-#include "GrainsBuilderFactory.hh"
+#include "GrainsFactory.hh"
 #include "Grains.hh"
 #include "GrainsCPU.hh"
 #include "GrainsGPU.hh"
@@ -9,7 +9,7 @@
 // a copy of the input file. Returns the name of this copy.
 // TODO: CLEAN
 template <typename T>
-string GrainsBuilderFactory<T>::init(string const& filename)
+string GrainsFactory<T>::init(string const& filename)
 {
     // Get the GRAINS_HOME from the shell
     char*  grainshome = getenv("GRAINS_HOME");
@@ -94,14 +94,11 @@ string GrainsBuilderFactory<T>::init(string const& filename)
 // -----------------------------------------------------------------------------
 // Creates and returns a standard Grains application
 template <typename T>
-Grains<T>* GrainsBuilderFactory<T>::create(DOMElement* root)
+Grains<T>* GrainsFactory<T>::create(DOMElement* root)
 {
     // Preconditions
     if(!root)
-    {
-        cout << "Invalid XML file! Aborting Grains!" << endl;
-        exit(1);
-    }
+        GAbort("Invalid XML file! Aborting Grains!");
 
     Grains<T>* grains = NULL;
 
@@ -117,15 +114,12 @@ Grains<T>* GrainsBuilderFactory<T>::create(DOMElement* root)
 
     // Postconditions
     if(!grains)
-    {
-        cout << "Invalid Mode! Aborting Grains!" << endl;
-        exit(1);
-    }
+        GAbort("Invalid Mode! Aborting Grains!");
 
     return (grains);
 }
 
 // -----------------------------------------------------------------------------
 // Explicit instantiation
-template class GrainsBuilderFactory<float>;
-template class GrainsBuilderFactory<double>;
+template class GrainsFactory<float>;
+template class GrainsFactory<double>;

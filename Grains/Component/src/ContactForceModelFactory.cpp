@@ -1,6 +1,5 @@
-#include "ContactForceModelBuilderFactory.hh"
+#include "ContactForceModelFactory.hh"
 #include "GrainsParameters.hh"
-#include "GrainsUtils.hh"
 #include "HookeContactForceModel.hh"
 
 /* ========================================================================== */
@@ -10,8 +9,6 @@
 // This is mandatory as we cannot access device memory addresses on the host
 // So, we pass a device memory address to a kernel.
 // Memory address is then populated within the kernel.
-// This kernel is not declared in any header file since we directly use it below
-// It helps to NOT explicitly instantiate it.
 template <typename T, typename... Arguments>
 __GLOBAL__ void
     createContactForceModelKernel(ContactForceModel<T>** CF,
@@ -23,24 +20,25 @@ __GLOBAL__ void
     if(tid > 0)
         return;
 
-    if constexpr(sizeof...(args) == 5)
+    if(contactForceModelType == HOOKE)
     {
-        if(contactForceModelType == HOOKE)
-            CF[index] = new HookeContactForceModel<T>(args...);
+        static_assert(sizeof...(args) == 5,
+                      "Hooke contact force model requires 5 parameters!");
+        CF[index] = new HookeContactForceModel<T>(args...);
     }
 }
 
 /* ========================================================================== */
 /*                             High-Level Methods                             */
 /* ========================================================================== */
-// Creates and returns the contact force model
+// Creates and stores a ContactForceModel object in the host memory.
 template <typename T>
-__HOST__ ContactForceModel<T>**
-         ContactForceModelBuilderFactory<T>::create(DOMElement* root)
+__HOST__ void ContactForceModelFactory<T>::create(
+    DOMElement* root, GrainsMemBuffer<ContactForceModel<T>*, MemType::HOST>& CF)
 {
-    uint numContactPairs      = GrainsParameters<T>::m_numContactPairs;
-    ContactForceModel<T>** CF = new ContactForceModel<T>*[numContactPairs];
-    DOMNodeList* allContacts  = ReaderXML::getNodes(root, "ContactForceModel");
+    uint numContactPairs = GrainsParameters<T>::m_numContactPairs;
+    CF.allocate(numContactPairs);
+    DOMNodeList* allContacts = ReaderXML::getNodes(root, "ContactForceModel");
     for(XMLSize_t i = 0; i < allContacts->getLength(); i++)
     {
         DOMNode*    contact = allContacts->item(i);
@@ -58,13 +56,8 @@ __HOST__ ContactForceModel<T>**
         if(contactType == "Hooke")
             CF[index] = new HookeContactForceModel<T>(parameters);
         else
-        {
-            GoutWI(9, "Contact force model is not known.", "Aborting Grains!");
-            exit(1);
-        }
+            GAbort("Unknown contact force model! Aborting Grains!");
     }
-
-    return (CF);
 }
 
 // -----------------------------------------------------------------------------
@@ -74,44 +67,29 @@ __HOST__ ContactForceModel<T>**
 // inputs would persumably crash the code by accessing memory accesses that are
 // not valid.
 template <typename T>
-__HOSTDEVICE__ uint ContactForceModelBuilderFactory<T>::computeHash(uint x,
-                                                                    uint y)
+__HOSTDEVICE__ uint ContactForceModelFactory<T>::computeHash(uint x, uint y)
 {
     uint s = min(x, y); // smaller one
     uint l = max(x, y); // larger one
     return (l * (l + 1) / 2 + s);
-
-    // uint numPM = numParticleMaterials<T>;
-    // uint s = min( x, y ); // smaller one
-    // uint l = max( x, y ); // larger one
-    // if ( l < numPM )
-    // 	return ( l * ( l + 1 ) / 2 + s );
-    // // offset if contact between a part and obst
-    // else if ( l >= numPM )
-    // 	return ( numPM * (numPM + 1) / 2 + s + ( l - numPM ) * numPM );
-    // else
-    // {
-    // 	printf( "Wrong inputs in" );
-    // 	printf( "ContactForceModelBuilderFactory<T>::computeHash\n" );
-    // 	printf( "Contact between two obstacles is not handled!\n" );
-    // 	return ( 0 );
-    // }
 }
 
 // -----------------------------------------------------------------------------
 // Constructs a ContactForceModel object on device.
-// It is assumed that appropriate memory is allocated to d_cf.
 template <typename T>
-__HOST__ void
-    ContactForceModelBuilderFactory<T>::ContactForceModelCopyHostToDevice(
-        ContactForceModel<T>** h_cf, ContactForceModel<T>** d_cf)
+__HOST__ void ContactForceModelFactory<T>::copyHostToDevice(
+    GrainsMemBuffer<ContactForceModel<T>*, MemType::HOST>&   h_CF,
+    GrainsMemBuffer<ContactForceModel<T>*, MemType::DEVICE>& d_CF)
 {
-    for(int i = 0; i < GrainsParameters<T>::m_numContactPairs; i++)
+    // Allocate the device memory for the contact force models
+    d_CF.allocate(h_CF.getSize());
+    for(uint i = 0; i < h_CF.getSize(); ++i)
     {
-        if(!h_cf[i])
+        if(h_CF[i] == nullptr)
             continue;
+
         // Extracting info from the host side object
-        ContactForceModel<T>* contact     = h_cf[i];
+        ContactForceModel<T>* contact     = h_CF[i];
         ContactForceModelType contactType = contact->getContactForceModelType();
 
         if(contactType == HOOKE)
@@ -120,7 +98,7 @@ __HOST__ void
                 = dynamic_cast<HookeContactForceModel<T>*>(contact);
             T kn, en, etat, muc, kr;
             c->getContactForceModelParameters(kn, en, etat, muc, kr);
-            createContactForceModelKernel<<<1, 1>>>(d_cf,
+            createContactForceModelKernel<<<1, 1>>>(d_CF.getData(),
                                                     i,
                                                     HOOKE,
                                                     kn,
@@ -130,17 +108,13 @@ __HOST__ void
                                                     kr);
         }
         else
-        {
-            GoutWI(9,
-                   "Contact force model is not implemented for GPU!",
+            GAbort("Contact force model is not implemented for GPU!",
                    "Aborting Grains!");
-            exit(1);
-        }
     }
     cudaDeviceSynchronize();
 }
 
 // -----------------------------------------------------------------------------
 // Explicit instantiation
-template class ContactForceModelBuilderFactory<float>;
-template class ContactForceModelBuilderFactory<double>;
+template class ContactForceModelFactory<float>;
+template class ContactForceModelFactory<double>;

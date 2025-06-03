@@ -23,6 +23,14 @@ __HOSTDEVICE__ TimeIntegrator<T>::~TimeIntegrator()
 }
 
 // -----------------------------------------------------------------------------
+// Returns the time step
+template <typename T>
+__HOSTDEVICE__ T TimeIntegrator<T>::getTimeStep() const
+{
+    return m_dt;
+}
+
+// -----------------------------------------------------------------------------
 // Computes the quaternion change over the time step
 template <typename T>
 __HOSTDEVICE__ Quaternion<T> TimeIntegrator<T>::computeQuaternionChange(

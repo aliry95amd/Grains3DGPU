@@ -7,13 +7,15 @@
 /* ========================================================================== */
 // Writes obstacles data
 template <typename T>
-__HOST__ void writeObstacles_Paraview(RigidBody<T, T> const* const* obstacleRB,
-                                      const ComponentManager<T>*    cm,
-                                      const std::string&            obsFileName)
+__HOST__ void writeObstacles_Paraview(
+    const GrainsMemBuffer<RigidBody<T, T>*, MemType::HOST>&    obstacleRB,
+    const std::unique_ptr<ComponentManager<T, MemType::HOST>>& cm,
+    const std::string&                                         obsFileName)
 {
-    ofstream                         f((obsFileName).c_str(), ios::out);
-    const uint                       numObstacles = cm->getNumberOfObstacles();
-    const std::vector<Transform3<T>> tr           = cm->getTransformObstacles();
+    ofstream   f((obsFileName).c_str(), ios::out);
+    const uint numObstacles = cm->getNumberOfObstacles();
+    GrainsMemBuffer<Transform3<T>, MemType::HOST> tr;
+    cm->getTransformObstacles(tr);
 
     f << "<VTKFile type=\"UnstructuredGrid\" version=\"0.1\" "
       << "byte_order=\"LittleEndian\" ";
@@ -95,14 +97,17 @@ __HOST__ void writeObstacles_Paraview(RigidBody<T, T> const* const* obstacleRB,
 // -----------------------------------------------------------------------------
 // Writes particles data
 template <typename T>
-__HOST__ void writeParticles_Paraview(RigidBody<T, T> const* const* particleRB,
-                                      const ComponentManager<T>*    cm,
-                                      const std::string&            parFileName)
+__HOST__ void writeParticles_Paraview(
+    const GrainsMemBuffer<RigidBody<T, T>*, MemType::HOST>&    particleRB,
+    const std::unique_ptr<ComponentManager<T, MemType::HOST>>& cm,
+    const std::string&                                         parFileName)
 {
-    ofstream                         f((parFileName).c_str(), ios::out);
-    const uint                       numParticles = cm->getNumberOfParticles();
-    const std::vector<Transform3<T>> tr           = cm->getTransform();
-    const std::vector<Kinematics<T>> kin          = cm->getVelocity();
+    ofstream   f((parFileName).c_str(), ios::out);
+    const uint numParticles = cm->getNumberOfParticles();
+    GrainsMemBuffer<Transform3<T>, MemType::HOST> tr;
+    cm->getTransformObstacles(tr);
+    GrainsMemBuffer<Kinematics<T>, MemType::HOST> kin;
+    cm->getVelocity(kin);
 
     f << "<VTKFile type=\"UnstructuredGrid\" version=\"0.1\" "
       << "byte_order=\"LittleEndian\" ";
@@ -300,10 +305,10 @@ __HOST__ void ParaviewPostProcessingWriter<T>::PostProcessing_start()
 // Writes data
 template <typename T>
 __HOST__ void ParaviewPostProcessingWriter<T>::PostProcessing(
-    RigidBody<T, T> const* const* particleRB,
-    RigidBody<T, T> const* const* obstacleRB,
-    const ComponentManager<T>*    cm,
-    const T                       currentTime)
+    const GrainsMemBuffer<RigidBody<T, T>*, MemType::HOST>&    particleRB,
+    const GrainsMemBuffer<RigidBody<T, T>*, MemType::HOST>&    obstacleRB,
+    const std::unique_ptr<ComponentManager<T, MemType::HOST>>& cm,
+    const T                                                    currentTime)
 {
     // list<string> Scalars;
     // Scalars.push_back("NormU");

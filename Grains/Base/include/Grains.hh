@@ -1,12 +1,13 @@
 #ifndef _GRAINS_HH_
 #define _GRAINS_HH_
 
+#include "Basic.hh"
 #include "ComponentManager.hh"
 #include "ContactForceModel.hh"
 #include "GrainsParameters.hh"
+#include "GrainsUtils.hh"
 #include "Insertion.hh"
 #include "PostProcessingWriter.hh"
-#include "ReaderXML.hh"
 #include "RigidBody.hh"
 #include "TimeIntegrator.hh"
 
@@ -23,43 +24,30 @@ class Grains
 protected:
     /** @name Parameters */
     //@{
-    // TODO: COMMENTS!
     /** \brief Parameters used in the simulation on the host memory. */
     GrainsParameters<T> m_parameters;
-    /** \brief List of rigid bodies as a double pointer. The first ptr is
-        for the list of rigid bodies as we might have different rigid bodies in
-        the simulation, and the second pointer is for dynamically allocating
-        the memory. */
-    RigidBody<T, T>** m_particleRigidBodyList;
-    /** \brief List of rigid bodies as a double pointer. The first ptr is
-        for the list of rigid bodies as we might have different rigid bodies in
-        the simulation, and the second pointer is for dynamically allocating
-        the memory. */
-    RigidBody<T, T>** m_obstacleRigidBodyList;
-    /** \brief Manager of the components in the simulation on the host mem. 
-        We use a pointer here as we want to use runtime polymorphism for
-        switching between ComponentManagerCPU and ComponentManagerGPU. */
-    ComponentManager<T>* m_components;
-    /** \brief Linked cell for broad-phase. We use a pointer because
-        the linkedCell is directly instantiated on device in the case that we
-        run Grains on GPU. */
-    LinkedCell<T>** m_linkedCell;
-    /** \brief Linked cell for broad-phase. We use a pointer because
-        the linkedCell is directly instantiated on device in the case that we
-        run Grains on GPU. */
-    ContactForceModel<T>** m_contactForce;
-    /** \brief Linked cell for broad-phase. We use a pointer because
-        the linkedCell is directly instantiated on device in the case that we
-        run Grains on GPU. */
-    TimeIntegrator<T>** m_timeIntegrator;
-    /** \brief Linked cell for broad-phase. We use a pointer because
-        the linkedCell is directly instantiated on device in the case that we
-        run Grains on GPU. */
-    std::list<PostProcessingWriter<T>*> m_postProcessor;
-    /** \brief Linked cell for broad-phase. We use a pointer because
-        the linkedCell is directly instantiated on device in the case that we
-        run Grains on GPU. */
-    Insertion<T>* m_insertion;
+    /** \brief Buffer of particles rigid bodies. The pointer is used because we
+    want to use runtime polymorphism for switching between different particle
+    types. */
+    GrainsMemBuffer<RigidBody<T, T>*, MemType::HOST> m_particleRigidBodyList;
+    /** \brief Buffer of obstacles rigid bodies. The pointer is used because we 
+    want to use runtime polymorphism for switching between different obstacle 
+    types. */
+    GrainsMemBuffer<RigidBody<T, T>*, MemType::HOST> m_obstacleRigidBodyList;
+    /** \brief Insertion object. */
+    std::unique_ptr<Insertion<T>> m_insertion;
+    /** \brief Manager of the components in the simulation on the host memory. 
+    We use a pointer here as we want to use runtime polymorphism for switching 
+    between ComponentManagerCPU and ComponentManagerGPU. */
+    std::unique_ptr<ComponentManager<T, MemType::HOST>> m_components;
+    /** \brief Buffer of Linked cells. */
+    GrainsMemBuffer<LinkedCell<T>*, MemType::HOST> m_linkedCell;
+    /** \brief Buffer of contact forces. */
+    GrainsMemBuffer<ContactForceModel<T>*, MemType::HOST> m_contactForce;
+    /** \brief Buffer of time integrators. */
+    GrainsMemBuffer<TimeIntegrator<T>*, MemType::HOST> m_timeIntegrator;
+    /** \brief List of post-processing writers. */
+    std::list<std::unique_ptr<PostProcessingWriter<T>>> m_postProcessor;
     //@}
 
 public:
@@ -69,7 +57,6 @@ public:
     Grains();
 
     /** @brief Destructor */
-    // TODO: cudaFree!!!
     virtual ~Grains();
     //@}
 
@@ -85,7 +72,13 @@ public:
 
     /** @brief Performs post-processing
         @param cm ComponentManager object, either host or device */
-    virtual void postProcess(ComponentManager<T> const* cm) const;
+    void postProcess(
+        const std::unique_ptr<ComponentManager<T, MemType::HOST>>& cm) const;
+
+    /** @brief Performs post-processing
+        @param cm ComponentManager object, either host or device */
+    void postProcessDevice(
+        const std::unique_ptr<ComponentManager<T, MemType::DEVICE>>& cm) const;
 
     /** @brief Tasks to perform after time-stepping */
     virtual void finalize();

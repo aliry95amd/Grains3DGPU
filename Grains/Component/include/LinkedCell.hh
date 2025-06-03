@@ -21,7 +21,7 @@ protected:
     /** @name Parameters */
     //@{
     /** \brief Neighboring cell hash values as a flat array. Each cell has 27
-     * neighbors. */
+        neighbors. */
     uint* m_neighborsList;
     /** \brief Min corner point of the linked cell */
     Vector3<T> m_minCorner;
@@ -61,6 +61,18 @@ public:
         @param cellHash hash value of the cell */
     __HOSTDEVICE__
     const uint* getNeighbors(const uint cellHash) const;
+
+    /** @brief Gets the min corner point of the linked cell */
+    __HOSTDEVICE__
+    const Vector3<T>& getMinCorner() const;
+
+    /** @brief Gets the max corner point of the linked cell */
+    __HOSTDEVICE__
+    const Vector3<T>& getMaxCorner() const;
+
+    /** @brief Gets the extent of each cell */
+    __HOSTDEVICE__
+    T getCellExtents() const;
 
     /** @brief Gets the number of cells */
     __HOSTDEVICE__
@@ -112,10 +124,9 @@ public:
         @param pos position of components
         @param numComponents number of components
         @param componentCellHash hash values for particles */
-    void computeLinearLinkedCellHashCPU(
-        const std::vector<Transform3<T>>& tr,
-        uint                              numComponents,
-        std::vector<uint>&                componentCellHash) const;
+    void computeLinearLinkedCellHashCPU(const Transform3<T>* tr,
+                                        uint                 numComponents,
+                                        uint* componentCellHash) const;
 
     /** @brief Computes and stores the linear cell hash values in 
         componentCellHash for all components using GPU - Wrapper

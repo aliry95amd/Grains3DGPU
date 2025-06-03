@@ -73,22 +73,28 @@ __HOST__ void RawDataPostProcessingWriter<T>::PostProcessing_start()
 // Writes data -- Particles come first, followed by obtacles
 template <typename T>
 __HOST__ void RawDataPostProcessingWriter<T>::PostProcessing(
-    RigidBody<T, T> const* const* particleRB,
-    RigidBody<T, T> const* const* obstacleRB,
-    const ComponentManager<T>*    cm,
-    const T                       currentTime)
+    const GrainsMemBuffer<RigidBody<T, T>*, MemType::HOST>&    particleRB,
+    const GrainsMemBuffer<RigidBody<T, T>*, MemType::HOST>&    obstacleRB,
+    const std::unique_ptr<ComponentManager<T, MemType::HOST>>& cm,
+    const T                                                    currentTime)
 {
     // Particles
-    uint                       numParticles = cm->getNumberOfParticles();
-    std::vector<uint>          rbParticle   = cm->getRigidBodyId();
-    std::vector<Transform3<T>> tParticle    = cm->getTransform();
-    std::vector<Kinematics<T>> kParticle    = cm->getVelocity();
+    uint numParticles = cm->getNumberOfParticles();
+    GrainsMemBuffer<uint, MemType::HOST> rbParticle;
+    cm->getRigidBodyId(rbParticle);
+    GrainsMemBuffer<Transform3<T>, MemType::HOST> tParticle;
+    cm->getTransform(tParticle);
+    GrainsMemBuffer<Kinematics<T>, MemType::HOST> kParticle;
+    cm->getVelocity(kParticle);
     // Obstacles
-    uint                       numObstacles = cm->getNumberOfObstacles();
-    std::vector<uint>          rbObstacle   = cm->getRigidBodyIdObstacles();
-    std::vector<Transform3<T>> tObstacle    = cm->getTransformObstacles();
+    uint numObstacles = cm->getNumberOfObstacles();
+    GrainsMemBuffer<uint, MemType::HOST> rbObstacle;
+    cm->getRigidBodyIdObstacles(rbObstacle);
+    GrainsMemBuffer<Transform3<T>, MemType::HOST> tObstacle;
+    cm->getTransformObstacles(tObstacle);
     // TODO:
-    std::vector<Kinematics<T>> kObstacle(numObstacles);
+    GrainsMemBuffer<Kinematics<T>, MemType::HOST> kObstacle;
+    // cm->getVelocityObstacles(kObstacle);
     // Aux. variables
     Vector3<T>  centre;
     Vector3<T>  velT;

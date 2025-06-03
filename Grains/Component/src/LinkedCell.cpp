@@ -91,6 +91,30 @@ __HOSTDEVICE__ const uint*
 }
 
 // -----------------------------------------------------------------------------
+// Gets the min corner point of the linked cell
+template <typename T>
+__HOSTDEVICE__ const Vector3<T>& LinkedCell<T>::getMinCorner() const
+{
+    return (m_minCorner);
+}
+
+// -----------------------------------------------------------------------------
+// Gets the max corner point of the linked cell
+template <typename T>
+__HOSTDEVICE__ const Vector3<T>& LinkedCell<T>::getMaxCorner() const
+{
+    return (m_maxCorner);
+}
+
+// -----------------------------------------------------------------------------
+// Gets the extent of each cell
+template <typename T>
+__HOSTDEVICE__ T LinkedCell<T>::getCellExtents() const
+{
+    return (m_cellExtent);
+}
+
+// -----------------------------------------------------------------------------
 // Gets the number of cells
 template <typename T>
 __HOSTDEVICE__ uint LinkedCell<T>::getNumCells() const
@@ -177,9 +201,7 @@ __HOSTDEVICE__ uint LinkedCell<T>::computeNeighboringCellLinearHash(
 // components using CPU
 template <typename T>
 void LinkedCell<T>::computeLinearLinkedCellHashCPU(
-    const std::vector<Transform3<T>>& tr,
-    uint                              numComponents,
-    std::vector<uint>&                componentCellHash) const
+    const Transform3<T>* tr, uint numComponents, uint* componentCellHash) const
 {
     for(uint i = 0; i < numComponents; i++)
         componentCellHash[i] = computeLinearCellHash(tr[i].getOrigin());

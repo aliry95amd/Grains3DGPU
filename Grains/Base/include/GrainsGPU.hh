@@ -16,28 +16,22 @@ template <typename T>
 class GrainsGPU : public Grains<T>
 {
 protected:
-    /** \brief Same thing as above but on device if using GPU. Note that we
-        force to use single precision for bounding volume. */
-    RigidBody<T, T>** m_d_particleRigidBodyList;
-    /** \brief Same thing as above but on device if using GPU. Note that we
-        force to use single precision for bounding volume. */
-    RigidBody<T, T>** m_d_obstacleRigidBodyList;
-    /** \brief Manager of the components in the simulation on the device 
-        memory. We use a pointer here as we want to use runtime polymorphism for
-        switching between ComponentManagerCPU and ComponentManagerGPU. */
-    ComponentManager<T>* m_d_components;
-    /** \brief Linked cell for broad-phase. We use a pointer because
-        the linkedCell is directly instantiated on device in the case that we
-        run Grains on GPU. */
-    LinkedCell<T>** m_d_linkedCell;
-    /** \brief Linked cell for broad-phase. We use a pointer because
-        the linkedCell is directly instantiated on device in the case that we
-        run Grains on GPU. */
-    ContactForceModel<T>** m_d_contactForce;
-    /** \brief Linked cell for broad-phase. We use a pointer because
-        the linkedCell is directly instantiated on device in the case that we
-        run Grains on GPU. */
-    TimeIntegrator<T>** m_d_timeIntegrator;
+    /** \brief Memory buffer for particle rigid bodies on the device. */
+    GrainsMemBuffer<RigidBody<T, T>*, MemType::DEVICE>
+        m_d_particleRigidBodyList;
+    /** \brief Memory buffer for obstacle rigid bodies on the device. */
+    GrainsMemBuffer<RigidBody<T, T>*, MemType::DEVICE>
+        m_d_obstacleRigidBodyList;
+    /** \brief Manager of the components in the simulation. We use a pointer 
+    here as we want to use runtime polymorphism for switching between 
+    ComponentManagerCPU and ComponentManagerGPU. */
+    std::unique_ptr<ComponentManager<T, MemType::DEVICE>> m_d_components;
+    /** \brief Buffer of Linked cells. */
+    GrainsMemBuffer<LinkedCell<T>*, MemType::DEVICE> m_d_linkedCell;
+    /** \brief Buffer of contact forces. */
+    GrainsMemBuffer<ContactForceModel<T>*, MemType::DEVICE> m_d_contactForce;
+    /** \brief Buffer of time integrators. */
+    GrainsMemBuffer<TimeIntegrator<T>*, MemType::DEVICE> m_d_timeIntegrator;
     //@}
 
 public:

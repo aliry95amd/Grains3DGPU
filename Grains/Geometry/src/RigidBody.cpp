@@ -1,5 +1,5 @@
 #include "RigidBody.hh"
-#include "ConvexBuilderFactory.hh"
+#include "ConvexFactory.hh"
 #include "GrainsParameters.hh"
 #include "QuaternionMath.hh"
 #include "VectorMath.hh"
@@ -65,7 +65,7 @@ __HOST__ RigidBody<T, U>::RigidBody(DOMNode* root)
 {
     // Convex
     DOMNode* shape = ReaderXML::getNode(root, "Convex");
-    m_convex       = ConvexBuilderFactory<T>::create(shape);
+    m_convex       = ConvexFactory<T>::create(shape);
     // Crust thickenss
     m_crustThickness
         = T(ReaderXML::getNodeAttr_Double(shape, "CrustThickness"));
@@ -90,25 +90,26 @@ __HOST__ RigidBody<T, U>::RigidBody(DOMNode* root)
     }
     // Volume and mass
     m_volume  = m_convex->computeVolume();
-    T density = T(ReaderXML::getNodeAttr_Double(root, "Density"));
-    m_mass    = density * m_volume;
-    // Considering the density for tensor of inertia
-    if(density == 0)
+    T density = T(0);
+    if(ReaderXML::hasNodeAttr(root, "Density"))
     {
-        for(int i = 0; i < 6; i++)
-        {
-            m_inertia[i]   = 0;
-            m_inertia_1[i] = 0;
-        }
-    }
-    else
-    {
+        density = T(ReaderXML::getNodeAttr_Double(root, "Density"));
+        m_mass  = density * m_volume;
         // Storing inertia and inverse of it
         m_convex->computeInertia(m_inertia, m_inertia_1);
         for(int i = 0; i < 6; i++)
         {
             m_inertia[i] *= density;
             m_inertia_1[i] /= density;
+        }
+    }
+    else
+    {
+        m_mass = T(0);
+        for(int i = 0; i < 6; i++)
+        {
+            m_inertia[i]   = T(0);
+            m_inertia_1[i] = T(0);
         }
     }
     // Last, bounding volume and circumscribed radius
@@ -140,6 +141,39 @@ __HOSTDEVICE__ RigidBody<T, U>::RigidBody(RigidBody<T, U> const& rb)
         m_inertia[i]   = rb.m_inertia[i];
         m_inertia_1[i] = rb.m_inertia_1[i];
     }
+}
+
+// -----------------------------------------------------------------------------
+// Copy assignment operator
+template <typename T, typename U>
+__HOSTDEVICE__ RigidBody<T, U>&
+               RigidBody<T, U>::operator=(const RigidBody<T, U>& other)
+{
+    if(this != &other)
+    {
+        delete m_convex;
+        delete m_boundingBox;
+        for(int i = 0; i < 6; ++i)
+        {
+            m_inertia[i]   = 0;
+            m_inertia_1[i] = 0;
+        }
+        m_convex         = other.m_convex ? other.m_convex->clone() : nullptr;
+        m_crustThickness = other.m_crustThickness;
+        m_scaling        = other.m_scaling;
+        m_material       = other.m_material;
+        m_volume         = other.m_volume;
+        m_mass           = other.m_mass;
+        m_boundingBox
+            = other.m_boundingBox ? other.m_boundingBox->clone() : nullptr;
+        m_circumscribedRadius = other.m_circumscribedRadius;
+        for(int i = 0; i < 6; ++i)
+        {
+            m_inertia[i]   = other.m_inertia[i];
+            m_inertia_1[i] = other.m_inertia_1[i];
+        }
+    }
+    return *this;
 }
 
 // -----------------------------------------------------------------------------

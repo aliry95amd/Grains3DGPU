@@ -1,11 +1,12 @@
-#ifndef _GRAINSBUILDERFACTORY_HH_
-#define _GRAINSBUILDERFACTORY_HH_
+#ifndef _GRAINSFACTORY_HH_
+#define _GRAINSFACTORY_HH_
 
 #include "Grains.hh"
+#include "GrainsUtils.hh"
 #include "ReaderXML.hh"
 
 // =============================================================================
-/** @brief The class GrainsBuilderFactory.
+/** @brief The class GrainsFactory.
 
     Creates the appropriate Grains application depending on options.
     
@@ -14,16 +15,16 @@
     @author A.Yazdani - 2024 - Modification for GPU */
 // =============================================================================
 template <typename T>
-class GrainsBuilderFactory
+class GrainsFactory
 {
 public:
     /**@name Constructors */
     //@{
     /** @brief Default constructor (forbidden) */
-    GrainsBuilderFactory() {}
+    GrainsFactory() {}
 
     /** @brief Destructor (forbidden) */
-    ~GrainsBuilderFactory() {}
+    ~GrainsFactory() {}
     //@}
 
     /**@name Static methods */

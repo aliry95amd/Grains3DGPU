@@ -1,6 +1,7 @@
 #ifndef _GRAINSUTILS_HH_
 #define _GRAINSUTILS_HH_
 
+#include "Basic.hh"
 #include "Vector3.hh"
 
 // =============================================================================
@@ -10,6 +11,30 @@
 // =============================================================================
 /** @name Miscellaneous functions and utilities for Grains */
 //@{
+// Macro for outputting CUDA errors
+#define cudaErrCheck(ans) cudaAssert((ans), __FILE__, __LINE__);
+
+/** @brief Returns CUDA error
+@param code the error code
+@param file the file name
+@param line the line number
+@param abort whether to abort the program */
+__HOST__ static INLINE void
+    cudaAssert(cudaError_t code, const char* file, int line, bool abort = false)
+{
+    if(code != cudaSuccess)
+    {
+        fprintf(stderr,
+                "GPUassert: %s %s %d\n",
+                cudaGetErrorString(code),
+                file,
+                line);
+        if(abort)
+            exit(code);
+    }
+}
+
+// -----------------------------------------------------------------------------
 /** @brief Writes a real number with a prescribed number of digits in a string
 @param figure the float number
 @param size number of digits */
@@ -67,8 +92,7 @@ __HOST__ static constexpr INLINE void Gout(const Args&... args)
 
 // -----------------------------------------------------------------------------
 /** @brief Writes a message to stdout with Indent (WI)
- @param numShift the number of shift characters at the beginning
-@param nextLine if going to the next line is required
+@param numShift the number of shift characters at the beginning
 @param args the output messages */
 template <typename... Args>
 __HOST__ INLINE void GoutWI(const int numShift, const Args&... args)
@@ -79,6 +103,26 @@ __HOST__ INLINE void GoutWI(const int numShift, const Args&... args)
     std::cout << shift(numShift);
     ((std::cout << args << " "), ...);
     std::cout << std::endl;
+}
+
+// -----------------------------------------------------------------------------
+/** @brief Writes a message to stdout with Indent (WI)
+@param numShift the number of shift characters at the beginning
+@param args the output messages */
+template <typename... Args>
+__HOSTDEVICE__ INLINE void GAbort(const Args&... args)
+{
+#ifdef __CUDA_ARCH__
+    printf("[DEVICE] ");
+    (printf("%s ", args), ...);
+    printf("\n");
+    __trap(); // aborts the kernel
+#else
+    std::cerr << "[HOST] ";
+    ((std::cerr << args << " "), ...);
+    std::cerr << std::endl;
+    std::abort();
+#endif
 }
 
 #endif

@@ -14,19 +14,6 @@
 // =============================================================================
 /** @name LinkedCellGPUWrapper : External methods */
 //@{
-/** @brief Creates a LinkedCell object on device and returns the number of cells
-after the construction
-@param min smallest corner of the domain
-@param max greatest corner of the domain 
-@param size size of each cell 
-@param LC device pointer to the linked cell object to be created
-@param numCells number of cells after constructing the linked cell */
-template <typename T>
-__HOST__ int createLinkedCellOnDevice(Vector3<T>      min,
-                                      Vector3<T>      max,
-                                      T               size,
-                                      LinkedCell<T>** LC);
-
 /** @brief Computes the linear linked cell hash values for all components
 @param LC linked cell
 @param tr list of all transformations

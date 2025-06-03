@@ -3,7 +3,7 @@
 
 #include "CollisionDetection.hh"
 #include "ContactForceModel.hh"
-#include "ContactForceModelBuilderFactory.hh"
+#include "ContactForceModelFactory.hh"
 #include "GrainsParameters.hh"
 #include "Kinematics.hh"
 #include "LinkedCell.hh"
@@ -23,7 +23,7 @@
     for flexibility in usage. The functions are marked as inline to allow for 
     better optimization by the compiler.
 
-    @author A.Yazdani - 2024 - Construction */
+    @author A.Yazdani - 2025 - Construction */
 // =============================================================================
 /** @name ComponentManager common functions between host and device */
 //@{
@@ -34,7 +34,7 @@
 @param torce the torce acting on the particle */
 template <typename T, typename U>
 __HOSTDEVICE__ static INLINE void
-    addGravity(RigidBody<T, U> const* const* particleRB,
+    addGravity(const RigidBody<T, U>* const* particleRB,
                const uint                    rigidBodyId,
                const Vector3<T>&             g,
                Torce<T>&                     torce)
@@ -56,8 +56,8 @@ __HOSTDEVICE__ static INLINE void
 @param pId the ID of the particle */
 template <typename T, typename U>
 __HOSTDEVICE__ static INLINE void
-    moveParticle(RigidBody<T, U> const* const*   particleRB,
-                 TimeIntegrator<T> const* const* TI,
+    moveParticle(const RigidBody<T, U>* const*   particleRB,
+                 const TimeIntegrator<T>* const* TI,
                  Transform3<T>&                  transform,
                  Kinematics<T>&                  kinematics,
                  Torce<T>&                       torce,
@@ -66,7 +66,6 @@ __HOSTDEVICE__ static INLINE void
 {
     // Rigid body
     const RigidBody<T, U>* rb = particleRB[rigidBodyId];
-
     // First, we compute quaternion of orientation
     Quaternion<T> qRot(transform.getBasis());
     // Computing momentums in the space-fixed coordinate
@@ -77,7 +76,7 @@ __HOSTDEVICE__ static INLINE void
     // Finally, we move particles using the given time integration
     Vector3<T>    transMotion;
     Quaternion<T> rotMotion;
-    (*TI)->Move(momentum, kinematics, transMotion, rotMotion);
+    TI[0]->Move(momentum, kinematics, transMotion, rotMotion);
 
     // Quaternion and rotation quaternion conjugate
     Vector3<T>    om = kinematics.getAngularComponent();

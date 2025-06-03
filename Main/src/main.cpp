@@ -6,7 +6,7 @@
 #include <cuda_runtime.h>
 
 #include "Grains.hh"
-#include "GrainsBuilderFactory.hh"
+#include "GrainsFactory.hh"
 #include "ReaderXML.hh"
 
 using namespace std;
@@ -32,9 +32,9 @@ int main(int argc, char* argv[])
     if(!error)
     {
         // Create a temporary input file with the proper XML header
-        // We use the double version of GrainsBuilderFactory, but it doesn't
+        // We use the double version of GrainsFactory, but it doesn't
         // matter.
-        filename_exe = GrainsBuilderFactory<double>::init(filename);
+        filename_exe = GrainsFactory<double>::init(filename);
 
         // Creates the Grains application
         ReaderXML::initialize();
@@ -43,7 +43,7 @@ int main(int argc, char* argv[])
         if(prc == "Single")
         {
             Grains<float>* grains = nullptr;
-            grains = GrainsBuilderFactory<float>::create(rootNode);
+            grains                = GrainsFactory<float>::create(rootNode);
 
             // Initial output message
             // grains->initialOutputMessage();
@@ -75,7 +75,7 @@ int main(int argc, char* argv[])
             }
 
             Grains<double>* grains = nullptr;
-            grains = GrainsBuilderFactory<double>::create(rootNode);
+            grains                 = GrainsFactory<double>::create(rootNode);
 
             // Initial output message
             // grains->initialOutputMessage();

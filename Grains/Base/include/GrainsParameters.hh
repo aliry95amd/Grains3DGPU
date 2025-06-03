@@ -39,8 +39,8 @@ public:
     static uint m_numObstacles;
     /** @brief Number of cells in simulation */
     static uint m_numCells;
-    /** @brief Size of cells in LinkedCell */
-    static T m_sizeLC;
+    /** @brief Maximum radius among all particles */
+    static T m_maxRadius;
 
     /* Physical */
     /** \brief Gravity vector */
