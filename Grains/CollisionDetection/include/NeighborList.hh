@@ -27,8 +27,7 @@ protected:
     //@{
     /** \brief Pair list */
     GrainsMemBuffer<uint2, M> m_pairList;
-    /** \brief Number of pairs */
-    uint m_nPairs;
+    //@}
 
 public:
     /** @name Constructors */
@@ -36,16 +35,12 @@ public:
     // -------------------------------------------------------------------------
     /** @brief Default constructor (forbidden except in derived classes) */
     __HOSTDEVICE__
-    NeighborList()
-        : m_nPairs(0)
-    {
-    }
+    NeighborList() = default;
 
     // -------------------------------------------------------------------------
     /** @brief Constructor with number of pairs */
     __HOSTDEVICE__
     NeighborList(const uint nPairs)
-        : m_nPairs(nPairs)
     {
         m_pairList.reserve(nPairs);
     }
@@ -66,13 +61,6 @@ public:
     uint2* getList() const
     {
         return m_pairList.getData();
-    }
-
-    // -------------------------------------------------------------------------
-    /** @brief Gets number of pairs in the list */
-    uint getNumberOfPairs() const
-    {
-        return m_nPairs;
     }
     //@}
 

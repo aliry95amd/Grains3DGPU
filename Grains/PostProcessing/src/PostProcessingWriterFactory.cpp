@@ -6,8 +6,7 @@
 // -----------------------------------------------------------------------------
 // Creates a post-processing writer from an XML node
 template <typename T>
-__HOST__ PostProcessingWriter<T>*
-         PostProcessingWriterFactory<T>::create(DOMNode* nPPW)
+PostProcessingWriter<T>* PostProcessingWriterFactory<T>::create(DOMNode* nPPW)
 {
     std::string              PPWName = ReaderXML::getNodeName(nPPW);
     PostProcessingWriter<T>* ppw     = NULL;

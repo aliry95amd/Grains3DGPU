@@ -75,11 +75,6 @@ public:
     void postProcess(
         const std::unique_ptr<ComponentManager<T, MemType::HOST>>& cm) const;
 
-    /** @brief Performs post-processing
-        @param cm ComponentManager object, either host or device */
-    void postProcessDevice(
-        const std::unique_ptr<ComponentManager<T, MemType::DEVICE>>& cm) const;
-
     /** @brief Tasks to perform after time-stepping */
     virtual void finalize();
     //@}

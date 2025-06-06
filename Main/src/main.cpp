@@ -26,7 +26,6 @@ int main(int argc, char* argv[])
         cout << "ERROR: input file needs the .xml extension" << endl;
         error = true;
     }
-    uint returnSysCmd = 0;
 
     // Execute the Grains application
     if(!error)
@@ -53,8 +52,7 @@ int main(int argc, char* argv[])
             ReaderXML::terminate();
 
             // Delete the temporary input file
-            std::string cmd = "/bin/rm " + filename_exe;
-            returnSysCmd    = system(cmd.c_str());
+            std::remove(filename_exe.c_str());
 
             // Run the simulation
             grains->simulate();
@@ -85,8 +83,7 @@ int main(int argc, char* argv[])
             ReaderXML::terminate();
 
             // Delete the temporary input file
-            std::string cmd = "/bin/rm " + filename_exe;
-            returnSysCmd    = system(cmd.c_str());
+            std::remove(filename_exe.c_str());
 
             // Run the simulation
             grains->simulate();

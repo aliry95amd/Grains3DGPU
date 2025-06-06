@@ -143,7 +143,7 @@ void GrainsGPU<T>::simulate()
         m_d_components->moveParticles(m_d_timeIntegrator);
 
         // Post-Processing
-        // Grains<T>::postProcessDevice(m_d_components);
+        // Grains<T>::postProcess(m_d_components);
     }
     cudaDeviceSynchronize();
 }

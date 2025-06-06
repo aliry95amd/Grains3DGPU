@@ -38,32 +38,32 @@ public:
     /** @name Constructors */
     //@{
     /** @brief Default constructor */
-    __HOST__
+
     ParaviewPostProcessingWriter();
 
     /** @brief Constructor with an XML node */
-    __HOST__
+
     ParaviewPostProcessingWriter(DOMNode* dn);
 
     /** @brief Destructor */
-    __HOST__
+
     ~ParaviewPostProcessingWriter();
     //@}
 
     /** @name Get methods */
     //@{
-    __HOST__
+
     PostProcessingWriterType getPostProcessingWriterType() const;
     //@}
 
     /** @name Methods */
     //@{
     /** @brief Removes post-processing files already in the directory */
-    __HOST__
+
     void clearPostProcessingFiles() const;
 
     /** @brief Initializes the post-processing writer */
-    __HOST__
+
     void PostProcessing_start() final;
 
     /** @brief Writes post-processing data
@@ -71,12 +71,11 @@ public:
         @param obstacleRB Arrays of obstacles rigid bodies
         @param cm Component manager
         @param currentTime Current simulation time */
-    __HOST__
-    void PostProcessing(
-        const GrainsMemBuffer<RigidBody<T, T>*, MemType::HOST>&    particleRB,
-        const GrainsMemBuffer<RigidBody<T, T>*, MemType::HOST>&    obstacleRB,
-        const std::unique_ptr<ComponentManager<T, MemType::HOST>>& cm,
-        const T currentTime) final;
+
+    void PostProcessing(const GrainsMemBuffer<RigidBody<T, T>*>&    particleRB,
+                        const GrainsMemBuffer<RigidBody<T, T>*>&    obstacleRB,
+                        const std::unique_ptr<ComponentManager<T>>& cm,
+                        const T currentTime) final;
 
     /** @brief Finalizes writing data */
     void PostProcessing_end() final;

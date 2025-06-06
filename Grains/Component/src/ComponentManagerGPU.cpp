@@ -41,9 +41,9 @@ ComponentManagerGPU<T>::~ComponentManagerGPU() = default;
 template <typename T>
 void ComponentManagerGPU<T>::allocate()
 {
-    m_particleCellHash.allocate(m_nParticles);
-    m_cellHashStart.allocate(m_nCells + 1);
-    m_cellHashEnd.allocate(m_nCells + 1);
+    m_particleCellHash.reserve(m_nParticles);
+    m_cellHashStart.reserve(m_nCells + 1);
+    m_cellHashEnd.reserve(m_nCells + 1);
 }
 
 // -------------------------------------------------------------------------
@@ -101,8 +101,8 @@ void ComponentManagerGPU<T>::detectCollisionAndComputeContactForcesObstacles(
 {
     using GP = GrainsParameters<T>;
     // Kernel launch parameters
-    const uint numThreads = GP::m_numThreadsPerBlock;
-    const uint numBlocks  = GP::m_numBlocksPerGrid;
+    // const uint numThreads = GP::m_numThreadsPerBlock;
+    // const uint numBlocks  = GP::m_numBlocksPerGrid;
 
     // Invoke the kernel
     // detectCollisionAndComputeContactForcesObstacles_kernel<<<numBlocks,
@@ -183,11 +183,11 @@ void ComponentManagerGPU<T>::addExternalForces()
     const T gZ = GP::m_gravity[Z];
 
     // Invoke the kernel
-    addExternalForces_kernel<<<numBlocks, numThreads>>>(m_particleRB->getData(),
-                                                        m_rigidBodyId.getData(),
-                                                        gX,
+    addExternalForces_kernel<<<numBlocks, numThreads>>>(gX,
                                                         gY,
                                                         gZ,
+                                                        m_particleRB->getData(),
+                                                        m_rigidBodyId.getData(),
                                                         m_torce.getData(),
                                                         m_nParticles);
 }
@@ -204,8 +204,8 @@ void ComponentManagerGPU<T>::moveParticles(
     const uint numBlocks  = GP::m_numBlocksPerGrid;
 
     // Invoke the kernel
-    moveParticles_kernel<<<numBlocks, numThreads>>>(m_particleRB->getData(),
-                                                    TI.getData(),
+    moveParticles_kernel<<<numBlocks, numThreads>>>(TI.getData(),
+                                                    m_particleRB->getData(),
                                                     m_rigidBodyId.getData(),
                                                     m_transform.getData(),
                                                     m_velocity.getData(),

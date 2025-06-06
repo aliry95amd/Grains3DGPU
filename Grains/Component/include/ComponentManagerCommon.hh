@@ -34,9 +34,9 @@
 @param torce the torce acting on the particle */
 template <typename T, typename U>
 __HOSTDEVICE__ static INLINE void
-    addGravity(const RigidBody<T, U>* const* particleRB,
+    addGravity(const Vector3<T>&             g,
+               const RigidBody<T, U>* const* particleRB,
                const uint                    rigidBodyId,
-               const Vector3<T>&             g,
                Torce<T>&                     torce)
 {
     const RigidBody<T, U>* rb   = particleRB[rigidBodyId];
@@ -56,8 +56,8 @@ __HOSTDEVICE__ static INLINE void
 @param pId the ID of the particle */
 template <typename T, typename U>
 __HOSTDEVICE__ static INLINE void
-    moveParticle(const RigidBody<T, U>* const*   particleRB,
-                 const TimeIntegrator<T>* const* TI,
+    moveParticle(const TimeIntegrator<T>* const* TI,
+                 const RigidBody<T, U>* const*   particleRB,
                  Transform3<T>&                  transform,
                  Kinematics<T>&                  kinematics,
                  Torce<T>&                       torce,

@@ -35,8 +35,6 @@ protected:
     size_t m_size = 0;
     /** \brief Capacity of the buffer */
     size_t m_capacity = 0;
-    /** \brief Next index to write to */
-    size_t m_nextIndex = 0;
     //@}
 
 public:
@@ -45,6 +43,13 @@ public:
     // -------------------------------------------------------------------------
     /** @brief Default constructor */
     GrainsMemBuffer() = default;
+
+    // -------------------------------------------------------------------------
+    /** @brief Constructor with the size */
+    GrainsMemBuffer(size_t size)
+    {
+        allocate(size);
+    }
 
     // -------------------------------------------------------------------------
     /** @brief Destructor */
@@ -109,7 +114,7 @@ public:
     // -------------------------------------------------------------------------
     /** @brief Returns the pointer to the data on device (for zero-copy) */
     /** @note This is only valid for pinned memory */
-    __HOSTDEVICE__ T* getDeviceData()
+    T* getDeviceData()
     {
         if constexpr(M == MemType::PINNED)
             return m_d_ptr ? m_d_ptr : m_ptr;
@@ -255,13 +260,12 @@ public:
     {
         if constexpr(M == MemType::HOST || M == MemType::PINNED)
         {
-            if(m_nextIndex >= m_capacity)
+            if(m_size >= m_capacity)
             {
                 std::cerr << "GrainsMemBuffer::push_back overflow\n";
                 return;
             }
-            getData()[m_nextIndex++] = value;
-            m_size                   = m_nextIndex;
+            m_ptr[m_size++] = value;
         }
         else
             std::cerr << "GrainsMemBuffer::push_back() only allowed on host or "
@@ -276,15 +280,14 @@ public:
     {
         if constexpr(M == MemType::HOST || M == MemType::PINNED)
         {
-            if(m_nextIndex + count > m_capacity)
+            if(m_size + count > m_capacity)
             {
                 std::cerr << "GrainsMemBuffer::push_bulk overflow\n";
                 return;
             }
-            T* dst = getData() + m_nextIndex;
+            T* dst = m_ptr + m_size;
             std::memcpy(dst, values, count * sizeof(T));
-            m_nextIndex += count;
-            m_size = m_nextIndex;
+            m_size += count;
         }
         else
             std::cerr << "GrainsMemBuffer::push_bulk() only allowed on host or "
@@ -298,18 +301,16 @@ public:
         if(m_size == m_capacity)
             return;
 
-        GrainsMemBuffer<T, M> new_buf;
+        GrainsMemBuffer<T, M> new_buf{};
         new_buf.allocate(m_size);
 
         if constexpr(M == MemType::HOST || M == MemType::PINNED)
-            std::memcpy(new_buf.getData(), getData(), m_size * sizeof(T));
+            std::memcpy(new_buf.m_ptr, m_ptr, m_size * sizeof(T));
         else if constexpr(M == MemType::DEVICE || M == MemType::MANAGED)
         {
             cudaMemcpyKind kind = cudaMemcpyDeviceToDevice;
-            cudaErrCheck(cudaMemcpy(new_buf.getData(),
-                                    getData(),
-                                    m_size * sizeof(T),
-                                    kind));
+            cudaErrCheck(
+                cudaMemcpy(new_buf.getData(), m_ptr, m_size * sizeof(T), kind));
         }
         else
         {
@@ -368,17 +369,14 @@ public:
             return;
 
         if(dest.m_size < m_size)
-        {
-            std::cerr << "Destination buffer too small for copy\n";
-            return;
-        }
+            GAbort("Destination buffer too small for copy");
 
         if constexpr(M == MemType::HOST && destM == MemType::HOST)
-            std::memcpy(dest.getData(), getData(), getBytes());
+            std::memcpy(dest.m_ptr, m_ptr, getBytes());
         else
         {
             cudaMemcpyKind kind    = getMemcpyKind<M, destM>();
-            const T*       src_ptr = this->getData();
+            const T*       src_ptr = m_ptr;
             T*             dst_ptr = dest.getData();
             cudaErrCheck(cudaMemcpy(dst_ptr, src_ptr, getBytes(), kind));
         }
@@ -403,13 +401,13 @@ public:
 
         if constexpr(M == MemType::HOST && srcM == MemType::HOST)
         {
-            std::memcpy(getData(), src.getData(), src.getBytes());
+            std::memcpy(m_ptr, src.m_ptr, src.getBytes());
         }
         else
         {
             cudaMemcpyKind kind    = getMemcpyKind<srcM, M>();
             const T*       src_ptr = src.getData();
-            T*             dst_ptr = getData();
+            T*             dst_ptr = m_ptr;
             cudaErrCheck(cudaMemcpy(dst_ptr, src_ptr, src.getBytes(), kind));
         }
     }
@@ -442,11 +440,10 @@ public:
             }
         }
 
-        m_ptr       = nullptr;
-        m_d_ptr     = nullptr;
-        m_size      = 0;
-        m_capacity  = 0;
-        m_nextIndex = 0;
+        m_ptr      = nullptr;
+        m_d_ptr    = nullptr;
+        m_size     = 0;
+        m_capacity = 0;
     }
     //@}
 
@@ -480,17 +477,15 @@ private:
     @param other source buffer */
     void moveFrom(GrainsMemBuffer<T, M>& other)
     {
-        m_ptr       = other.m_ptr;
-        m_d_ptr     = other.m_d_ptr;
-        m_size      = other.m_size;
-        m_capacity  = other.m_capacity;
-        m_nextIndex = other.m_nextIndex;
+        m_ptr      = other.m_ptr;
+        m_d_ptr    = other.m_d_ptr;
+        m_size     = other.m_size;
+        m_capacity = other.m_capacity;
 
-        other.m_ptr       = nullptr;
-        other.m_d_ptr     = nullptr;
-        other.m_size      = 0;
-        other.m_capacity  = 0;
-        other.m_nextIndex = 0;
+        other.m_ptr      = nullptr;
+        other.m_d_ptr    = nullptr;
+        other.m_size     = 0;
+        other.m_capacity = 0;
     }
 };
 

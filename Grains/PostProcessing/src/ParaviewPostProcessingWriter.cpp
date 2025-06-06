@@ -7,15 +7,15 @@
 /* ========================================================================== */
 // Writes obstacles data
 template <typename T>
-__HOST__ void writeObstacles_Paraview(
-    const GrainsMemBuffer<RigidBody<T, T>*, MemType::HOST>&    obstacleRB,
-    const std::unique_ptr<ComponentManager<T, MemType::HOST>>& cm,
-    const std::string&                                         obsFileName)
+void writeObstacles_Paraview(
+    const GrainsMemBuffer<RigidBody<T, T>*>&    obstacleRB,
+    const std::unique_ptr<ComponentManager<T>>& cm,
+    const std::string&                          obsFileName)
 {
     ofstream   f((obsFileName).c_str(), ios::out);
-    const uint numObstacles = cm->getNumberOfObstacles();
-    GrainsMemBuffer<Transform3<T>, MemType::HOST> tr;
-    cm->getTransformObstacles(tr);
+    const uint numObstacles                   = cm->getNumberOfObstacles();
+    const GrainsMemBuffer<Transform3<T>>& tr  = cm->getObstaclesTransform();
+    const GrainsMemBuffer<Kinematics<T>>& kin = cm->getObstaclesVelocity();
 
     f << "<VTKFile type=\"UnstructuredGrid\" version=\"0.1\" "
       << "byte_order=\"LittleEndian\" ";
@@ -97,17 +97,15 @@ __HOST__ void writeObstacles_Paraview(
 // -----------------------------------------------------------------------------
 // Writes particles data
 template <typename T>
-__HOST__ void writeParticles_Paraview(
-    const GrainsMemBuffer<RigidBody<T, T>*, MemType::HOST>&    particleRB,
-    const std::unique_ptr<ComponentManager<T, MemType::HOST>>& cm,
-    const std::string&                                         parFileName)
+void writeParticles_Paraview(
+    const GrainsMemBuffer<RigidBody<T, T>*>&    particleRB,
+    const std::unique_ptr<ComponentManager<T>>& cm,
+    const std::string&                          parFileName)
 {
     ofstream   f((parFileName).c_str(), ios::out);
-    const uint numParticles = cm->getNumberOfParticles();
-    GrainsMemBuffer<Transform3<T>, MemType::HOST> tr;
-    cm->getTransformObstacles(tr);
-    GrainsMemBuffer<Kinematics<T>, MemType::HOST> kin;
-    cm->getVelocity(kin);
+    const uint numParticles                   = cm->getNumberOfParticles();
+    const GrainsMemBuffer<Transform3<T>>& tr  = cm->getTransform();
+    const GrainsMemBuffer<Kinematics<T>>& kin = cm->getVelocity();
 
     f << "<VTKFile type=\"UnstructuredGrid\" version=\"0.1\" "
       << "byte_order=\"LittleEndian\" ";
@@ -222,15 +220,15 @@ __HOST__ void writeParticles_Paraview(
 /* ========================================================================== */
 // Default constructor
 template <typename T>
-__HOST__ ParaviewPostProcessingWriter<T>::ParaviewPostProcessingWriter()
+ParaviewPostProcessingWriter<T>::ParaviewPostProcessingWriter()
 {
 }
 
 // -----------------------------------------------------------------------------
 // Constructor with XML node, rank and number of processes as input parameters
 template <typename T>
-__HOST__
-    ParaviewPostProcessingWriter<T>::ParaviewPostProcessingWriter(DOMNode* dn)
+
+ParaviewPostProcessingWriter<T>::ParaviewPostProcessingWriter(DOMNode* dn)
 {
     m_rootName  = ReaderXML::getNodeAttr_String(dn, "RootName");
     m_directory = ReaderXML::getNodeAttr_String(dn, "Directory");
@@ -244,14 +242,14 @@ __HOST__
 // -----------------------------------------------------------------------------
 // Destructor
 template <typename T>
-__HOST__ ParaviewPostProcessingWriter<T>::~ParaviewPostProcessingWriter()
+ParaviewPostProcessingWriter<T>::~ParaviewPostProcessingWriter()
 {
 }
 
 // ----------------------------------------------------------------------------
 // Gets the post-processing writer type
 template <typename T>
-__HOST__ PostProcessingWriterType
+PostProcessingWriterType
     ParaviewPostProcessingWriter<T>::getPostProcessingWriterType() const
 {
     return (PARAVIEW);
@@ -260,7 +258,7 @@ __HOST__ PostProcessingWriterType
 // ----------------------------------------------------------------------------
 // Removes post-processing files already in the directory
 template <typename T>
-__HOST__ void ParaviewPostProcessingWriter<T>::clearPostProcessingFiles() const
+void ParaviewPostProcessingWriter<T>::clearPostProcessingFiles() const
 {
     std::string              directory   = m_directory;
     std::vector<std::string> patternsStr = {"^" + m_rootName + R"(_.*\.pvd$)",
@@ -277,7 +275,7 @@ __HOST__ void ParaviewPostProcessingWriter<T>::clearPostProcessingFiles() const
 
 // -----------------------------------------------------------------------------
 template <typename T>
-__HOST__ void ParaviewPostProcessingWriter<T>::PostProcessing_start()
+void ParaviewPostProcessingWriter<T>::PostProcessing_start()
 {
     clearPostProcessingFiles();
     // Obstacles
@@ -304,11 +302,11 @@ __HOST__ void ParaviewPostProcessingWriter<T>::PostProcessing_start()
 // -----------------------------------------------------------------------------
 // Writes data
 template <typename T>
-__HOST__ void ParaviewPostProcessingWriter<T>::PostProcessing(
-    const GrainsMemBuffer<RigidBody<T, T>*, MemType::HOST>&    particleRB,
-    const GrainsMemBuffer<RigidBody<T, T>*, MemType::HOST>&    obstacleRB,
-    const std::unique_ptr<ComponentManager<T, MemType::HOST>>& cm,
-    const T                                                    currentTime)
+void ParaviewPostProcessingWriter<T>::PostProcessing(
+    const GrainsMemBuffer<RigidBody<T, T>*>&    particleRB,
+    const GrainsMemBuffer<RigidBody<T, T>*>&    obstacleRB,
+    const std::unique_ptr<ComponentManager<T>>& cm,
+    const T                                     currentTime)
 {
     // list<string> Scalars;
     // Scalars.push_back("NormU");
@@ -355,7 +353,7 @@ __HOST__ void ParaviewPostProcessingWriter<T>::PostProcessing(
 // ----------------------------------------------------------------------------
 // Finalizes writing data
 template <typename T>
-__HOST__ void ParaviewPostProcessingWriter<T>::PostProcessing_end()
+void ParaviewPostProcessingWriter<T>::PostProcessing_end()
 {
 }
 

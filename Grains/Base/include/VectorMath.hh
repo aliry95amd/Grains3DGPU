@@ -19,7 +19,7 @@
 template <typename T>
 __HOSTDEVICE__ static INLINE T norm(const Vector3<T>& v) noexcept
 {
-    T const* __RESTRICT__ buffer = v.getBuffer();
+    const T* __RESTRICT__ buffer = v.getBuffer();
     return (sqrt(buffer[0] * buffer[0] + buffer[1] * buffer[1]
                  + buffer[2] * buffer[2]));
 }
@@ -30,7 +30,7 @@ __HOSTDEVICE__ static INLINE T norm(const Vector3<T>& v) noexcept
 template <typename T>
 __HOSTDEVICE__ static INLINE T norm2(const Vector3<T>& v) noexcept
 {
-    T const* __RESTRICT__ buffer = v.getBuffer();
+    const T* __RESTRICT__ buffer = v.getBuffer();
     return (buffer[0] * buffer[0] + buffer[1] * buffer[1]
             + buffer[2] * buffer[2]);
 }
@@ -42,7 +42,7 @@ template <typename T>
 __HOSTDEVICE__ static INLINE bool isApproxZero(const Vector3<T>& v,
                                                T tol = HIGHEPS<T>) noexcept
 {
-    T const* __RESTRICT__ buffer = v.getBuffer();
+    const T* __RESTRICT__ buffer = v.getBuffer();
     return (fabs(buffer[0]) < tol && fabs(buffer[1]) < tol
             && fabs(buffer[2]) < tol);
 }
@@ -55,8 +55,8 @@ template <typename T>
 __HOSTDEVICE__ static INLINE Vector3<T> operator+(const Vector3<T>& v1,
                                                   const Vector3<T>& v2) noexcept
 {
-    T const* __RESTRICT__ b1 = v1.getBuffer();
-    T const* __RESTRICT__ b2 = v2.getBuffer();
+    const T* __RESTRICT__ b1 = v1.getBuffer();
+    const T* __RESTRICT__ b2 = v2.getBuffer();
     T __RESTRICT__        out[3];
     for(uint i = 0; i < 3; ++i)
         out[i] = b1[i] + b2[i];
@@ -71,8 +71,8 @@ template <typename T>
 __HOSTDEVICE__ static INLINE Vector3<T> operator-(const Vector3<T>& v1,
                                                   const Vector3<T>& v2) noexcept
 {
-    T const* __RESTRICT__ b1 = v1.getBuffer();
-    T const* __RESTRICT__ b2 = v2.getBuffer();
+    const T* __RESTRICT__ b1 = v1.getBuffer();
+    const T* __RESTRICT__ b2 = v2.getBuffer();
     T __RESTRICT__        out[3];
     for(uint i = 0; i < 3; ++i)
         out[i] = b1[i] - b2[i];
@@ -87,7 +87,7 @@ template <typename T>
 __HOSTDEVICE__ static INLINE Vector3<T> operator*(T                 d,
                                                   const Vector3<T>& v) noexcept
 {
-    T const* __RESTRICT__ buffer = v.getBuffer();
+    const T* __RESTRICT__ buffer = v.getBuffer();
     T __RESTRICT__        out[3];
     for(uint i = 0; i < 3; ++i)
         out[i] = d * buffer[i];
@@ -102,7 +102,7 @@ template <typename T>
 __HOSTDEVICE__ static INLINE Vector3<T> operator/(const Vector3<T>& v,
                                                   T                 d) noexcept
 {
-    T const* __RESTRICT__ buffer = v.getBuffer();
+    const T* __RESTRICT__ buffer = v.getBuffer();
     T __RESTRICT__        out[3];
     for(uint i = 0; i < 3; ++i)
         out[i] = buffer[i] / d;
@@ -117,8 +117,8 @@ template <typename T>
 __HOSTDEVICE__ static INLINE T operator*(const Vector3<T>& v1,
                                          const Vector3<T>& v2) noexcept
 {
-    T const* __RESTRICT__ b1  = v1.getBuffer();
-    T const* __RESTRICT__ b2  = v2.getBuffer();
+    const T* __RESTRICT__ b1  = v1.getBuffer();
+    const T* __RESTRICT__ b2  = v2.getBuffer();
     T                     out = T(0);
     for(uint i = 0; i < 3; ++i)
         out += b1[i] * b2[i];
@@ -133,8 +133,8 @@ template <typename T>
 __HOSTDEVICE__ static INLINE Vector3<T> operator^(const Vector3<T>& v1,
                                                   const Vector3<T>& v2) noexcept
 {
-    T const* __RESTRICT__ b1 = v1.getBuffer();
-    T const* __RESTRICT__ b2 = v2.getBuffer();
+    const T* __RESTRICT__ b1 = v1.getBuffer();
+    const T* __RESTRICT__ b2 = v2.getBuffer();
     T __RESTRICT__        out[3];
     out[0] = b1[1] * b2[2] - b1[2] * b2[1];
     out[1] = b1[2] * b2[0] - b1[0] * b2[2];

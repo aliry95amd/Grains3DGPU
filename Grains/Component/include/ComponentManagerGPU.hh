@@ -20,6 +20,7 @@ class ComponentManagerGPU : public ComponentManager<T, MemType::DEVICE>
     using CM::m_obstacleRB;
     using CM::m_obstacleRigidBodyId;
     using CM::m_obstacleTransform;
+    using CM::m_obstacleVelocity;
     using CM::m_particleId;
     using CM::m_particleRB;
     using CM::m_rigidBodyId;
@@ -75,7 +76,7 @@ public:
     void allocate() final;
 
     /** @brief Initializes data members to default values */
-    void initialize() final;
+    void initialize();
     //@}
 
     /** @name Methods */

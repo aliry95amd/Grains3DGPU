@@ -35,7 +35,7 @@ ComponentManagerCPU<T>::~ComponentManagerCPU() = default;
 template <typename T>
 void ComponentManagerCPU<T>::allocate()
 {
-    m_particleCellHash.allocate(m_nParticles);
+    m_particleCellHash.reserve(m_nParticles);
     m_cell.resize(m_nCells + 1);
 }
 
@@ -44,6 +44,23 @@ void ComponentManagerCPU<T>::allocate()
 template <typename T>
 void ComponentManagerCPU<T>::initialize()
 {
+    // Initializing the vectors for particles
+    for(uint i = 0; i < m_nParticles; ++i)
+    {
+        m_rigidBodyId[i] = i;
+        m_transform[i]   = Transform3<T>();
+        m_velocity[i]    = Kinematics<T>();
+        m_torce[i]       = Torce<T>();
+        m_particleId[i]  = i;
+    }
+
+    // Initializing the vectors for obstacles
+    for(uint i = 0; i < m_nObstacles; ++i)
+    {
+        m_obstacleRigidBodyId[i] = i;
+        m_obstacleTransform[i]   = Transform3<T>();
+        m_obstacleVelocity[i]    = Kinematics<T>();
+    }
 }
 
 // -----------------------------------------------------------------------------
@@ -65,7 +82,7 @@ void ComponentManagerCPU<T>::updateLinks(
     // Update cells
     for(int i = 0; i < m_nParticles; i++)
     {
-        uint cellId = m_particleCellHash.getData()[i];
+        uint cellId = m_particleCellHash[i];
         m_cell[cellId].push_back(i);
     }
 }
@@ -80,25 +97,25 @@ void ComponentManagerCPU<T>::detectCollisionAndComputeContactForcesObstacles(
     for(int pId = 0; pId < m_nParticles; pId++)
     {
         // Parameters of the particle
-        const RigidBody<T, T>& rbA
-            = *(m_particleRB->getData()[m_rigidBodyId[pId]]);
-        const Transform3<T>& trA   = m_transform.getData()[pId];
-        T                    massA = rbA.getMass();
-        uint                 matA  = rbA.getMaterial();
+        const RigidBody<T, T>* rbA
+            = (m_particleRB->getData())[m_rigidBodyId[pId]];
+        const Transform3<T>& trA   = m_transform[pId];
+        T                    massA = rbA->getMass();
+        uint                 matA  = rbA->getMaterial();
 
         // Loop over all obstacles
         for(int oId = 0; oId < m_nObstacles; oId++)
         {
-            RigidBody<T, T> const& rbB
-                = *((m_obstacleRB->getData())[m_obstacleRigidBodyId[oId]]);
-            const Transform3<T>& trB = m_obstacleTransform.getData()[oId];
-            ContactInfo<T> ci = closestPointsRigidBodies(rbA, rbB, trA, trB);
+            RigidBody<T, T> const* rbB
+                = (m_obstacleRB->getData())[m_obstacleRigidBodyId[oId]];
+            const Transform3<T>& trB = m_obstacleTransform[oId];
+            ContactInfo<T> ci = closestPointsRigidBodies(*rbA, *rbB, trA, trB);
             if(ci.getOverlapDistance() < T(0))
             {
                 // CF ID given materialIDs
                 uint contactForceID = ContactForceModelFactory<T>::computeHash(
                     matA,
-                    rbB.getMaterial());
+                    rbB->getMaterial());
                 // velocities of the particles
                 Kinematics<T> v1(m_velocity[pId]);
                 Kinematics<T> v2(m_velocity[oId]);
@@ -115,7 +132,7 @@ void ComponentManagerCPU<T>::detectCollisionAndComputeContactForcesObstacles(
                     relVel,
                     relAngVel,
                     massA,
-                    rbB.getMass(),
+                    rbB->getMass(),
                     trA.getOrigin(),
                     m_torce.getData()[pId]);
             }
@@ -135,14 +152,14 @@ void ComponentManagerCPU<T>::detectCollisionAndComputeContactForcesParticles(
     for(int pId = 0; pId < m_nParticles; pId++)
     {
         // Parameters of the primary particle
-        const uint             particleId = m_particleId.getData()[pId];
+        const uint             particleId = m_particleId[pId];
         const uint             cellHash   = m_particleCellHash[pId];
-        const RigidBody<T, T>& rbA
-            = *(m_particleRB->getData()[m_rigidBodyId[particleId]]);
-        const Transform3<T>& trA   = m_transform.getData()[particleId];
-        T                    massA = rbA.getMass();
-        uint                 matA  = rbA.getMaterial();
-        const uint* neighborsList  = (LC.getData()[0])->getNeighbors(cellHash);
+        const RigidBody<T, T>* rbA
+            = (m_particleRB->getData())[m_rigidBodyId[particleId]];
+        const Transform3<T>& trA           = m_transform[particleId];
+        T                    massA         = rbA->getMass();
+        uint                 matA          = rbA->getMaterial();
+        const uint*          neighborsList = (LC[0])->getNeighbors(cellHash);
         // Loop over all neighboring particles
         for(int i = 0; i < 27; ++i)
         {
@@ -157,21 +174,21 @@ void ComponentManagerCPU<T>::detectCollisionAndComputeContactForcesParticles(
                 // To skip self-collision
                 if(secondaryId == particleId)
                     continue;
-                const RigidBody<T, T>& rbB
-                    = *(m_particleRB->getData()[m_rigidBodyId[secondaryId]]);
-                const Transform3<T>& trB = m_transform.getData()[secondaryId];
+                const RigidBody<T, T>* rbB
+                    = (m_particleRB->getData())[m_rigidBodyId[secondaryId]];
+                const Transform3<T>& trB = m_transform[secondaryId];
                 ContactInfo<T>       ci
-                    = closestPointsRigidBodies(rbA, rbB, trA, trB);
+                    = closestPointsRigidBodies(*rbA, *rbB, trA, trB);
                 if(ci.getOverlapDistance() < T(0))
                 {
                     // CF ID given materialIDs
                     uint contactForceID
                         = ContactForceModelFactory<T>::computeHash(
                             matA,
-                            rbB.getMaterial());
+                            rbB->getMaterial());
                     // velocities of the particles
-                    Kinematics<T> v1(CM::m_velocity[particleId]);
-                    Kinematics<T> v2(CM::m_velocity[secondaryId]);
+                    Kinematics<T> v1(m_velocity[particleId]);
+                    Kinematics<T> v2(m_velocity[secondaryId]);
                     // geometric point of contact
                     Vector3<T> contactPt(ci.getContactPoint());
                     // relative velocity at contact point
@@ -180,14 +197,13 @@ void ComponentManagerCPU<T>::detectCollisionAndComputeContactForcesParticles(
                     // relative angular velocity
                     Vector3<T> relAngVel(v1.getAngularComponent()
                                          - v2.getAngularComponent());
-                    (CF.getData())[contactForceID]->computeForces(
-                        ci,
-                        relVel,
-                        relAngVel,
-                        massA,
-                        rbB.getMass(),
-                        trA.getOrigin(),
-                        m_torce[particleId]);
+                    CF[contactForceID]->computeForces(ci,
+                                                      relVel,
+                                                      relAngVel,
+                                                      massA,
+                                                      rbB->getMass(),
+                                                      trA.getOrigin(),
+                                                      m_torce[particleId]);
                 }
             }
         }
@@ -219,9 +235,9 @@ void ComponentManagerCPU<T>::addExternalForces()
     // #pragma omp parallel for
     for(int pId = 0; pId < m_nParticles; pId++)
     {
-        addGravity(m_particleRB->getData(),
+        addGravity(GrainsParameters<T>::m_gravity,
+                   m_particleRB->getData(),
                    m_rigidBodyId[pId],
-                   GrainsParameters<T>::m_gravity,
                    m_torce[pId]);
     }
 }
@@ -235,8 +251,8 @@ void ComponentManagerCPU<T>::moveParticles(
     // #pragma omp parallel for
     for(int pId = 0; pId < m_nParticles; pId++)
     {
-        moveParticle(m_particleRB->getData(),
-                     TI.getData(),
+        moveParticle(TI.getData(),
+                     m_particleRB->getData(),
                      m_transform[pId],
                      m_velocity[pId],
                      m_torce[pId],

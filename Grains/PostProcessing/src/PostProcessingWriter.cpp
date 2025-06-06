@@ -4,21 +4,21 @@
 // ----------------------------------------------------------------------------
 // Default constructor
 template <typename T>
-__HOST__ PostProcessingWriter<T>::PostProcessingWriter()
+PostProcessingWriter<T>::PostProcessingWriter()
 {
 }
 
 // ----------------------------------------------------------------------------
 // Destructor
 template <typename T>
-__HOST__ PostProcessingWriter<T>::~PostProcessingWriter()
+PostProcessingWriter<T>::~PostProcessingWriter()
 {
 }
 
 // ----------------------------------------------------------------------------
 // Removes post-processing files already in the directory
 template <typename T>
-__HOST__ void PostProcessingWriter<T>::clearPostProcessingFiles(
+void PostProcessingWriter<T>::clearPostProcessingFiles(
     const std::filesystem::path&   directory,
     const std::vector<std::regex>& patterns) const
 {

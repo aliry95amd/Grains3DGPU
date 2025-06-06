@@ -31,7 +31,7 @@ protected:
     /** @name Constructors */
     //@{
     /** @brief Default constructor */
-    __HOST__
+
     PostProcessingWriter();
     //@}
 
@@ -39,13 +39,13 @@ public:
     /** @name Constructors */
     //@{
     /** @brief Destructor */
-    __HOST__
+
     virtual ~PostProcessingWriter();
     //@}
 
     /** @name Get methods */
     //@{
-    __HOST__
+
     virtual PostProcessingWriterType getPostProcessingWriterType() const = 0;
     //@}
 
@@ -54,13 +54,13 @@ public:
     /** @brief Removes post-processing files already in the directory
      @param directory directory of the files to be removed
      @param patterns Regex patterns of the files to be removed */
-    __HOST__
+
     void
         clearPostProcessingFiles(const std::filesystem::path&   directory,
                                  const std::vector<std::regex>& patterns) const;
 
     /** @brief Initializes the post-processing writer */
-    __HOST__
+
     virtual void PostProcessing_start() = 0;
 
     /** @brief Writes post-processing data
@@ -68,16 +68,16 @@ public:
         @param obstacleRB Arrays of obstacles rigid bodies
         @param cm Component manager
         @param currentTime Current simulation time */
-    __HOST__
-    virtual void PostProcessing(
-        const GrainsMemBuffer<RigidBody<T, T>*, MemType::HOST>&    particleRB,
-        const GrainsMemBuffer<RigidBody<T, T>*, MemType::HOST>&    obstacleRB,
-        const std::unique_ptr<ComponentManager<T, MemType::HOST>>& cm,
-        const T                                                    currentTime)
+
+    virtual void
+        PostProcessing(const GrainsMemBuffer<RigidBody<T, T>*>&    particleRB,
+                       const GrainsMemBuffer<RigidBody<T, T>*>&    obstacleRB,
+                       const std::unique_ptr<ComponentManager<T>>& cm,
+                       const T                                     currentTime)
         = 0;
 
     /** @brief Finalizes writing data */
-    __HOST__
+
     virtual void PostProcessing_end() = 0;
     //@}
 };

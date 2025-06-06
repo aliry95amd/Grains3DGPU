@@ -72,28 +72,6 @@ void Grains<T>::postProcess(
 }
 
 // -----------------------------------------------------------------------------
-// Performs post-processing
-template <typename T>
-void Grains<T>::postProcessDevice(
-    const std::unique_ptr<ComponentManager<T, MemType::DEVICE>>& cm) const
-{
-    using GP = GrainsParameters<T>;
-
-    if(GP::m_tSave.front() - GP::m_time < 0.01 * GP::m_dt)
-    {
-        GP::m_tSave.pop();
-        // for(auto& pp : m_postProcessor)
-        //     pp->PostProcessing(m_particleRigidBodyList,
-        //                        m_obstacleRigidBodyList,
-        //                        cm,
-        //                        GP::m_time);
-    }
-    // In case we get past the saveTime, we need to remove it from the queue
-    if(GP::m_time > GP::m_tSave.front())
-        GP::m_tSave.pop();
-}
-
-// -----------------------------------------------------------------------------
 // Performs tasks after time-stepping
 template <typename T>
 void Grains<T>::finalize()

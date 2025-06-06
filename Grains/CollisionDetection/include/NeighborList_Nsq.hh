@@ -61,7 +61,7 @@ public:
                 this->m_pairList.getData());
         }
         else
-            std::cerr << "Unsupported memory type for createNeighborList()\n";
+            GAbort("Unsupported memory type for createNeighborList()");
     }
 
     // -------------------------------------------------------------------------
@@ -71,8 +71,9 @@ public:
     void updateNeighborList(const Transform3<T>* transforms,
                             const uint           nParticles) override
     {
-        // For O(N^2) algorithm, we don't need to update the list since it remains the same.
-        // This is a dummy implementation, but it is needed to satisfy the interface.
+        // For O(N^2) algorithm, we don't need to update the list since it
+        // remains the same. This is a dummy implementation, but it is needed to
+        // satisfy the interface.
         return;
     }
 
@@ -83,11 +84,49 @@ public:
     bool needsUpdate(const Transform3<T>* transforms,
                      const uint           nParticles) const override
     {
-        // For O(N^2) algorithm, we don't need to update the list since it remains the same.
-        // This is a dummy implementation, but it is needed to satisfy the interface.
+        // For O(N^2) algorithm, we don't need to update the list since it
+        // remains the same. This is a dummy implementation, but it is needed to
+        // satisfy the interface.
         return false;
     }
     //@}
+};
+
+// =============================================================================
+/** @name NeighborList_Nsq: External kernels */
+//@{
+/** @brief Creates the neighbor list on host
+@param transforms array of transformations
+@param nParticles number of particles
+@param pairList array of pairs */
+template <typename T>
+__HOST__ bool createNeighborList_Host(const Transform3<T>* transforms,
+                                      const uint           nParticles,
+                                      uint2*               pairList)
+{
+    for(uint i = 0; i < nParticles; ++i)
+        for(uint j = i + 1; j < nParticles; ++j)
+            pairList[i + j * (j + 1) / 2] = make_uint2(i, j);
+    return true;
+};
+
+// -----------------------------------------------------------------------------
+/** @brief Creates the neighbor list on device
+@param transforms array of transformations
+@param nParticles number of particles
+@param pairList array of pairs */
+template <typename T>
+__GLOBAL__ bool createNeighborList_Device(const Transform3<T>* transforms,
+                                          const uint           nParticles,
+                                          uint2*               pairList)
+{
+    uint tid = blockIdx.x * blockDim.x + threadIdx.x;
+    if(tid >= nParticles)
+        return false;
+
+    for(uint j = tid + 1; j < nParticles; ++j)
+        pairList[tid + j * (j + 1) / 2] = make_uint2(tid, j);
+    return true;
 };
 
 #endif

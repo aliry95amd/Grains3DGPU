@@ -297,11 +297,11 @@ __GLOBAL__ void detectCollisionAndComputeContactForcesParticles_kernel(
 // Adds external forces such as gravity
 template <typename T, typename U>
 __GLOBAL__ void
-    addExternalForces_kernel(RigidBody<T, U> const* const* particleRB,
-                             const uint*                   rigidBodyId,
-                             const T                       gX,
+    addExternalForces_kernel(const T                       gX,
                              const T                       gY,
                              const T                       gZ,
+                             RigidBody<T, U> const* const* particleRB,
+                             const uint*                   rigidBodyId,
                              Torce<T>*                     torce,
                              const uint                    nParticles)
 {
@@ -310,17 +310,17 @@ __GLOBAL__ void
     if(pId >= nParticles)
         return;
 
-    addGravity(particleRB,
+    addGravity(Vector3<T>(gX, gY, gZ),
+               particleRB,
                rigidBodyId[pId],
-               Vector3<T>(gX, gY, gZ),
                torce[pId]);
 }
 
 // -----------------------------------------------------------------------------
 // Updates the position and velocities of particles
 template <typename T, typename U>
-__GLOBAL__ void moveParticles_kernel(const RigidBody<T, U>* const*   RB,
-                                     const TimeIntegrator<T>* const* TI,
+__GLOBAL__ void moveParticles_kernel(const TimeIntegrator<T>* const* TI,
+                                     const RigidBody<T, U>* const*   RB,
                                      uint*          rigidBodyId,
                                      Transform3<T>* transform,
                                      Kinematics<T>* velocity,
@@ -332,8 +332,8 @@ __GLOBAL__ void moveParticles_kernel(const RigidBody<T, U>* const*   RB,
     if(pId >= nParticles)
         return;
 
-    moveParticle(RB,
-                 TI,
+    moveParticle(TI,
+                 RB,
                  transform[pId],
                  velocity[pId],
                  torce[pId],
@@ -374,17 +374,17 @@ __GLOBAL__ void moveParticles_kernel(const RigidBody<T, U>* const*   RB,
             int                                nParticles);                                        \
                                                                     \
     template __GLOBAL__ void addExternalForces_kernel(              \
-        const RigidBody<T, U>* const* particleRB,                   \
-        const uint*                   rigidBodyId,                  \
         const T                       gX,                           \
         const T                       gY,                           \
         const T                       gZ,                           \
+        const RigidBody<T, U>* const* particleRB,                   \
+        const uint*                   rigidBodyId,                  \
         Torce<T>*                     torce,                        \
         const uint                    nParticles);                                     \
                                                                     \
     template __GLOBAL__ void moveParticles_kernel(                  \
-        const RigidBody<T, U>* const*   RB,                         \
         const TimeIntegrator<T>* const* TI,                         \
+        const RigidBody<T, U>* const*   RB,                         \
         uint*                           rigidBodyId,                \
         Transform3<T>*                  transform,                  \
         Kinematics<T>*                  velocity,                   \

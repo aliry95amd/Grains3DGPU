@@ -215,8 +215,8 @@ template <typename T>
 void LinkedCell<T>::computeLinearLinkedCellHashGPU(
     Transform3<T> const* tr, uint numComponents, uint* componentCellHash) const
 {
-    uint numThreads = 256;
-    uint numBlocks  = (numComponents + numThreads - 1) / numThreads;
+    // uint numThreads = 256;
+    // uint numBlocks  = (numComponents + numThreads - 1) / numThreads;
     // computeLinearLinkedCellHashGPU_kernel<<< numBlocks, numThreads >>>
     //                                                       ( this,
     //                                                         tr,

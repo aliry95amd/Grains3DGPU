@@ -88,18 +88,18 @@ __GLOBAL__ void detectCollisionAndComputeContactForcesParticles_kernel(
     int                                nParticles);
 
 /** @brief Adds external forces such as gravity
+@param g the gravity field
 @param particleRB array of rigid bodies for particles
 @param rigidBodyId array of rigid body IDs for particles
-@param g the gravity field
 @param torce array of particles torces
 @param nParticles number of particles */
 template <typename T, typename U>
 __GLOBAL__ void
-    addExternalForces_kernel(RigidBody<T, U> const* const* particleRB,
-                             const uint*                   rigidBodyId,
-                             const T                       gX,
+    addExternalForces_kernel(const T                       gX,
                              const T                       gY,
                              const T                       gZ,
+                             RigidBody<T, U> const* const* particleRB,
+                             const uint*                   rigidBodyId,
                              Torce<T>*                     torce,
                              const uint                    nParticles);
 
@@ -112,8 +112,8 @@ __GLOBAL__ void
 @param torce array of particles torces
 @param nParticles number of particles */
 template <typename T, typename U>
-__GLOBAL__ void moveParticles_kernel(RigidBody<T, U> const* const*   particleRB,
-                                     TimeIntegrator<T> const* const* TI,
+__GLOBAL__ void moveParticles_kernel(TimeIntegrator<T> const* const* TI,
+                                     RigidBody<T, U> const* const*   particleRB,
                                      uint*          rigidBodyId,
                                      Transform3<T>* transform,
                                      Kinematics<T>* velocity,
