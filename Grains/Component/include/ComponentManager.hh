@@ -14,6 +14,9 @@
 #include "Torce.hh"
 #include "Transform3.hh"
 
+#include "NeighborList.hh"
+#include "NeighborList_Nsq.hh"
+
 // =============================================================================
 /** @brief The class ComponentManager.
 
@@ -55,6 +58,9 @@ protected:
     uint m_nObstacles;
     /** \brief Number of cells in manager */
     uint m_nCells;
+
+    /** \brief Neighbor list object */
+    NeighborList<T, M>* m_neighborList;
     //@}
 
 public:
@@ -83,6 +89,7 @@ public:
         , m_nCells(nCells)
     {
         allocate();
+        m_neighborList = new NeighborList_Nsq<T, M>(nParticles);
     }
 
     // -------------------------------------------------------------------------

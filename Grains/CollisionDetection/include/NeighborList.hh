@@ -34,20 +34,10 @@ public:
     //@{
     // -------------------------------------------------------------------------
     /** @brief Default constructor (forbidden except in derived classes) */
-    __HOSTDEVICE__
     NeighborList() = default;
 
     // -------------------------------------------------------------------------
-    /** @brief Constructor with number of pairs */
-    __HOSTDEVICE__
-    NeighborList(const uint nPairs)
-    {
-        m_pairList.reserve(nPairs);
-    }
-
-    // -------------------------------------------------------------------------
     /** @brief Destructor */
-    __HOSTDEVICE__
     virtual ~NeighborList()
     {
         m_pairList.free();
@@ -80,6 +70,14 @@ public:
     @param nParticles number of particles */
     virtual void updateNeighborList(const Transform3<T>* transforms,
                                     const uint           nParticles)
+        = 0;
+
+    // -------------------------------------------------------------------------
+    /** @brief Returns true if update is needed 
+    @param transforms array of transformations
+    @param nParticles number of particles */
+    virtual bool needsUpdate(const Transform3<T>* transforms,
+                             const uint           nParticles) const
         = 0;
     //@}
 };

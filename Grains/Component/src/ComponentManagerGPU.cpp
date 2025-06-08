@@ -156,6 +156,7 @@ void ComponentManagerGPU<T>::detectCollisionAndComputeContactForces(
     const GrainsMemBuffer<LinkedCell<T>*, MemType::DEVICE>&        LC,
     const GrainsMemBuffer<ContactForceModel<T>*, MemType::DEVICE>& CF)
 {
+    m_neighborList->createNeighborList(m_transform.getData(), m_nParticles);
     // Updates links between components and linked cell
     updateLinks(LC);
 

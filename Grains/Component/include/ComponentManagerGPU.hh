@@ -15,6 +15,7 @@ class ComponentManagerGPU : public ComponentManager<T, MemType::DEVICE>
 {
     using CM = ComponentManager<T, MemType::DEVICE>;
     using CM::m_nCells;
+    using CM::m_neighborList;
     using CM::m_nObstacles;
     using CM::m_nParticles;
     using CM::m_obstacleRB;
@@ -79,8 +80,6 @@ public:
     void initialize();
     //@}
 
-    /** @name Methods */
-    //@{
     /** @name Methods */
     //@{
     /** @brief Updates links between particles and linked cell
