@@ -20,7 +20,7 @@
 @param numComponents number of all components in the simulation */
 template <typename T>
 __GLOBAL__ void
-    computeLinearLinkedCellHashGPU_kernel(LinkedCell<T> const* const* LC,
+    computeLinearLinkedCellHashGPU_Kernel(LinkedCell<T> const* const* LC,
                                           Transform3<T> const*        tr,
                                           uint  numComponents,
                                           uint* componentCellHash);

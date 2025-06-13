@@ -5,6 +5,9 @@
 template <typename T>
 __HOSTDEVICE__ ContactInfo<T>::ContactInfo()
 {
+    m_contactPoint.setValue(T(0), T(0), T(0));
+    m_contactVector.setValue(T(0), T(0), T(0));
+    m_overlapDistance = T(0);
 }
 
 // -----------------------------------------------------------------------------

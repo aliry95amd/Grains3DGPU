@@ -73,8 +73,8 @@ void RawDataPostProcessingWriter<T>::PostProcessing_start()
 // Writes data -- Particles come first, followed by obtacles
 template <typename T>
 void RawDataPostProcessingWriter<T>::PostProcessing(
-    const GrainsMemBuffer<RigidBody<T, T>*>&    particleRB,
-    const GrainsMemBuffer<RigidBody<T, T>*>&    obstacleRB,
+    const GrainsMemBuffer<RigidBody<T>*>&       particleRB,
+    const GrainsMemBuffer<RigidBody<T>*>&       obstacleRB,
     const std::unique_ptr<ComponentManager<T>>& cm,
     const T                                     currentTime)
 {

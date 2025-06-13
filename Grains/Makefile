@@ -174,7 +174,8 @@ XML   : $(OBJS_XML)
 
 $(OBJDIR)/%.o : %.cpp
 	@echo 'Compiling '$<
-	$(GRAINS_GPU_COMPILER) $(COMPFLAGS) -MMD -MP -D_XML $< -o $@
+	$(GRAINS_GPU_COMPILER) $(COMPFLAGS) -D_XML $< -o $@
+# $(GRAINS_GPU_COMPILER) $(COMPFLAGS) -MMD -MP -D_XML $< -o $@
 
 
 # DEPENDENCIES

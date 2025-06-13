@@ -16,49 +16,68 @@
 // =============================================================================
 /** @name GJK : External methods */
 //@{
-/** @brief Returns whether 2 convex shapes intersect
-@param a convex shape A
-@param b convex shape B
-@param a2w geometric tramsformation describing convex A in the world reference
-frame
-@param b2w geometric tramsformation describing convex B in the world reference
-frame */
+/** @brief Returns whether 2 convex shapes intersect - relative transformation
+    @param a convex shape A
+    @param b convex shape B
+    @param b2a geometric transformation describing convex B in the A's reference
+    frame */
 template <typename T>
-__HOSTDEVICE__ bool intersectGJK(Convex<T> const&     a,
-                                 Convex<T> const&     b,
+__HOSTDEVICE__ bool intersectGJK(const Convex<T>&     a,
+                                 const Convex<T>&     b,
+                                 const Transform3<T>& b2a);
+
+/** @brief Returns whether 2 convex shapes intersect   
+    @param a convex shape A 
+    @param b convex shape B
+    @param a2w geometric transformation describing convex A in the world
+    reference frame
+    @param b2w geometric transformation describing convex B in the world
+    reference frame */
+template <typename T>
+__HOSTDEVICE__ bool intersectGJK(const Convex<T>&     a,
+                                 const Convex<T>&     b,
                                  const Transform3<T>& a2w,
                                  const Transform3<T>& b2w);
 
-/** @brief Returns whether 2 convex shapes intersect - relative transformation
-@param a convex shape A
-@param b convex shape B
-@param b2a geometric tramsformation describing convex B in the A's reference
-frame */
+/** @brief Returns the minimal distance between 2 convex shapes and a point per
+    convex shape that represents the tips of the minimal distance segment --
+    relative transformation
+    @param a convex shape A
+    @param b convex shape B
+    @param b2a geometric transformation describing convex B in the reference  
+    frame of A
+    @param pa point representing one tip of the minimal distance segment on A
+    @param pb point representing the other tip of the minimal distance segment 
+    on B
+    @param nbIter number of iterations of GJK for convergence */
 template <typename T>
-__HOSTDEVICE__ bool intersectGJK(Convex<T> const&     a,
-                                 Convex<T> const&     b,
-                                 const Transform3<T>& b2a);
+__HOSTDEVICE__ T computeClosestPoints_GJK_JH(const Convex<T>&     a,
+                                             const Convex<T>&     b,
+                                             const Transform3<T>& b2a,
+                                             Vector3<T>&          pa,
+                                             Vector3<T>&          pb,
+                                             uint&                nbIter);
 
 /** @brief Returns the minimal distance between 2 convex shapes and a point per
-convex shape that represents the tips of the minimal distance segment
-@param a convex shape A
-@param b convex shape B
-@param a2w geometric tramsformation describing convex A in the world reference
-frame
-@param b2w geometric tramsformation describing convex B in the world reference
-frame
-@param pa point representing one tip of the minimal distance segment on A
-@param pb point representing the other tip of the minimal distance segment on
-B
-@param nbIter number of iterations of GJK for convergence */
+    convex shape that represents the tips of the minimal distance segment
+    @param a convex shape A
+    @param b convex shape B
+    @param a2w geometric transformation describing convex A in the world 
+    reference frame
+    @param b2w geometric transformation describing convex B in the world 
+    reference frame
+    @param pa point representing one tip of the minimal distance segment on A
+    @param pb point representing the other tip of the minimal distance segment 
+    on B
+    @param nbIter number of iterations of GJK for convergence */
 template <typename T>
-__HOSTDEVICE__ T computeClosestPoints_GJK_JH(Convex<T> const&     a,
-                                             Convex<T> const&     b,
+__HOSTDEVICE__ T computeClosestPoints_GJK_JH(const Convex<T>&     a,
+                                             const Convex<T>&     b,
                                              const Transform3<T>& a2w,
                                              const Transform3<T>& b2w,
                                              Vector3<T>&          pa,
                                              Vector3<T>&          pb,
-                                             int&                 nbIter);
+                                             uint&                nbIter);
 //@}
 
 #endif

@@ -1,10 +1,4 @@
 // #include <curand.h>
-#include "thrust/device_ptr.h"
-#include "thrust/for_each.h"
-#include "thrust/iterator/zip_iterator.h"
-#include "thrust/sort.h"
-#include <cooperative_groups.h>
-
 #include "ComponentManagerGPU.hh"
 #include "ComponentManagerGPU_Kernels.hh"
 #include "LinkedCellGPUWrapper.hh"
@@ -19,11 +13,11 @@ ComponentManagerGPU<T>::ComponentManagerGPU() = default;
 // cells.
 template <typename T>
 ComponentManagerGPU<T>::ComponentManagerGPU(
-    GrainsMemBuffer<RigidBody<T, T>*, MemType::DEVICE>* particleRB,
-    GrainsMemBuffer<RigidBody<T, T>*, MemType::DEVICE>* obstacleRB,
-    uint                                                nParticles,
-    uint                                                nObstacles,
-    uint                                                nCells)
+    GrainsMemBuffer<RigidBody<T>*, MemType::DEVICE>* particleRB,
+    GrainsMemBuffer<RigidBody<T>*, MemType::DEVICE>* obstacleRB,
+    uint                                             nParticles,
+    uint                                             nObstacles,
+    uint                                             nCells)
     : ComponentManager<T, MemType::DEVICE>(
           particleRB, obstacleRB, nParticles, nObstacles, nCells)
 {
@@ -42,8 +36,8 @@ template <typename T>
 void ComponentManagerGPU<T>::allocate()
 {
     m_particleCellHash.reserve(m_nParticles);
-    m_cellHashStart.reserve(m_nCells + 1);
-    m_cellHashEnd.reserve(m_nCells + 1);
+    m_cellHashStart.reserve(m_nCells);
+    m_cellHashEnd.reserve(m_nCells);
 }
 
 // -------------------------------------------------------------------------
@@ -51,53 +45,40 @@ void ComponentManagerGPU<T>::allocate()
 template <typename T>
 void ComponentManagerGPU<T>::initialize()
 {
+    m_neighborList->createNeighborList(m_transform.getData(), m_nParticles);
 }
 
 // -----------------------------------------------------------------------------
 // Updates links between particles and linked cell
 template <typename T>
-void ComponentManagerGPU<T>::updateLinks(
-    const GrainsMemBuffer<LinkedCell<T>*, MemType::DEVICE>& LC)
+void ComponentManagerGPU<T>::updateNeighborList()
+{
+    if(m_neighborList->needsUpdate(m_transform.getData(), m_nParticles) == true)
+        m_neighborList->updateNeighborList(m_transform.getData(), m_nParticles);
+}
+
+// -----------------------------------------------------------------------------
+// Computes relative transformations
+template <typename T>
+void ComponentManagerGPU<T>::computeRelativeTransformations()
 {
     using GP = GrainsParameters<T>;
     // Kernel launch parameters
     const uint numThreads = GP::m_numThreadsPerBlock;
     const uint numBlocks  = GP::m_numBlocksPerGrid;
-    uint       sMemSize   = sizeof(uint) * (numThreads + 1);
 
-    // Zeroing out the arrays
-    zeroOutArray_kernel<<<numBlocks, numThreads>>>(m_cellHashStart.getData(),
-                                                   m_nCells + 1);
-    zeroOutArray_kernel<<<numBlocks, numThreads>>>(m_cellHashEnd.getData(),
-                                                   m_nCells + 1);
-
-    // First - finding the cell hash for each particle
-    computeLinearLinkedCellHashGPU_kernel<<<numBlocks, numThreads>>>(
-        LC.getData(),
+    // Invoke the kernel
+    computeRelativeTransformations_Kernel<<<numBlocks, numThreads>>>(
+        m_neighborList->getData(),
         m_transform.getData(),
-        m_nParticles,
-        m_particleCellHash.getData());
-
-    // Second - sorting the particle ids according to the cell hash
-    thrust::sort_by_key(
-        thrust::device_ptr<uint>(m_particleCellHash.getData()),
-        thrust::device_ptr<uint>(m_particleCellHash.getData() + m_nParticles),
-        thrust::device_ptr<uint>(m_particleId.getData()));
-
-    // Third - reseting the cellStart array and finding the start location of
-    // each hash
-    sortComponentsAndFindCellStart_kernel<<<numBlocks, numThreads, sMemSize>>>(
-        m_particleCellHash.getData(),
-        m_nParticles,
-        m_cellHashStart.getData(),
-        m_cellHashEnd.getData());
+        m_relTransform.getData(),
+        m_nPairs);
 }
 
 // -----------------------------------------------------------------------------
-// Detects collision and computes forces between particles and obstacles
+// Detects collision between particles and obstacles
 template <typename T>
-void ComponentManagerGPU<T>::detectCollisionAndComputeContactForcesObstacles(
-    const GrainsMemBuffer<ContactForceModel<T>*, MemType::DEVICE>& CF)
+void ComponentManagerGPU<T>::detectCollisionsObstacles()
 {
     using GP = GrainsParameters<T>;
     // Kernel launch parameters
@@ -105,7 +86,7 @@ void ComponentManagerGPU<T>::detectCollisionAndComputeContactForcesObstacles(
     // const uint numBlocks  = GP::m_numBlocksPerGrid;
 
     // Invoke the kernel
-    // detectCollisionAndComputeContactForcesObstacles_kernel<<<numBlocks,
+    // detectCollisionAndComputeContactForcesObstacles_Kernel<<<numBlocks,
     //                                                          numThreads>>>(
     //     particleRB,
     //     obstacleRB,
@@ -121,11 +102,9 @@ void ComponentManagerGPU<T>::detectCollisionAndComputeContactForcesObstacles(
 }
 
 // -----------------------------------------------------------------------------
-// Detects collision and computes forces between particles and particles
+// Detects collisions between particles and particles
 template <typename T>
-void ComponentManagerGPU<T>::detectCollisionAndComputeContactForcesParticles(
-    const GrainsMemBuffer<LinkedCell<T>*, MemType::DEVICE>&        LC,
-    const GrainsMemBuffer<ContactForceModel<T>*, MemType::DEVICE>& CF)
+void ComponentManagerGPU<T>::detectCollisionsParticles()
 {
     using GP = GrainsParameters<T>;
     // Kernel launch parameters
@@ -133,38 +112,52 @@ void ComponentManagerGPU<T>::detectCollisionAndComputeContactForcesParticles(
     const uint numBlocks  = GP::m_numBlocksPerGrid;
 
     // Invoke the kernel
-    detectCollisionAndComputeContactForcesParticles_kernel<<<numBlocks,
-                                                             numThreads>>>(
+    detectCollisionsParticles_Kernel<<<numBlocks, numThreads>>>(
+        m_neighborList->getData(),
         m_particleRB->getData(),
-        LC.getData(),
-        CF.getData(),
-        m_rigidBodyId.getData(),
-        m_transform.getData(),
-        m_velocity.getData(),
-        m_torce.getData(),
-        m_particleId.getData(),
-        m_particleCellHash.getData(),
-        m_cellHashStart.getData(),
-        m_cellHashEnd.getData(),
-        m_nParticles);
+        m_relTransform.getData(),
+        m_contactInfo.getData(),
+        m_nPairs);
 }
 
 // -----------------------------------------------------------------------------
-// Detects collision and computes forces between all components
+// Detects collision between all components
 template <typename T>
-void ComponentManagerGPU<T>::detectCollisionAndComputeContactForces(
-    const GrainsMemBuffer<LinkedCell<T>*, MemType::DEVICE>&        LC,
-    const GrainsMemBuffer<ContactForceModel<T>*, MemType::DEVICE>& CF)
+void ComponentManagerGPU<T>::detectCollisions()
 {
-    m_neighborList->createNeighborList(m_transform.getData(), m_nParticles);
     // Updates links between components and linked cell
-    updateLinks(LC);
+    updateNeighborList();
+
+    // Computes the relative transformations
+    computeRelativeTransformations();
 
     // Particle-particle interactions
-    detectCollisionAndComputeContactForcesParticles(LC, CF);
+    detectCollisionsParticles();
 
     // Particle-obstacle interactions
-    detectCollisionAndComputeContactForcesObstacles(CF);
+    detectCollisionsObstacles();
+}
+
+// -----------------------------------------------------------------------------
+// Computes contact forces
+template <typename T>
+void ComponentManagerGPU<T>::computeContactForces(
+    const GrainsMemBuffer<ContactForceModel<T>*, MemType::DEVICE>& CF)
+{
+    using GP = GrainsParameters<T>;
+    // // Kernel launch parameters
+    // const uint numThreads = GP::m_numThreadsPerBlock;
+    // const uint numBlocks  = GP::m_numBlocksPerGrid;
+
+    // Invoke the kernel
+    // computeContactForces_Kernel<<<numBlocks, numThreads>>>(CF,
+    //                                                        pairList,
+    //                                                        contactInfo,
+    //                                                        particleRB,
+    //                                                        velocity,
+    //                                                        torce,
+    //                                                        transform,
+    //                                                        m_nParticles);
 }
 
 // -----------------------------------------------------------------------------
@@ -184,11 +177,10 @@ void ComponentManagerGPU<T>::addExternalForces()
     const T gZ = GP::m_gravity[Z];
 
     // Invoke the kernel
-    addExternalForces_kernel<<<numBlocks, numThreads>>>(gX,
+    addExternalForces_Kernel<<<numBlocks, numThreads>>>(gX,
                                                         gY,
                                                         gZ,
                                                         m_particleRB->getData(),
-                                                        m_rigidBodyId.getData(),
                                                         m_torce.getData(),
                                                         m_nParticles);
 }
@@ -201,17 +193,17 @@ void ComponentManagerGPU<T>::moveParticles(
 {
     using GP = GrainsParameters<T>;
     // Kernel launch parameters
-    const uint numThreads = GP::m_numThreadsPerBlock;
-    const uint numBlocks  = GP::m_numBlocksPerGrid;
+    // const uint numThreads = GP::m_numThreadsPerBlock;
+    // const uint numBlocks  = GP::m_numBlocksPerGrid;
 
     // Invoke the kernel
-    moveParticles_kernel<<<numBlocks, numThreads>>>(TI.getData(),
-                                                    m_particleRB->getData(),
-                                                    m_rigidBodyId.getData(),
-                                                    m_transform.getData(),
-                                                    m_velocity.getData(),
-                                                    m_torce.getData(),
-                                                    m_nParticles);
+    // moveParticles_Kernel<<<numBlocks, numThreads>>>(TI.getData(),
+    //                                                 m_particleRB->getData(),
+    //                                                 m_rigidBodyId.getData(),
+    //                                                 m_transform.getData(),
+    //                                                 m_velocity.getData(),
+    //                                                 m_torce.getData(),
+    //                                                 m_nParticles);
 }
 
 // -----------------------------------------------------------------------------

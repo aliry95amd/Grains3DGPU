@@ -1,7 +1,6 @@
 #ifndef _RIGIDBODY_HH_
 #define _RIGIDBODY_HH_
 
-#include "BoundingBox.hh"
 #include "Convex.hh"
 #include "Kinematics.hh"
 #include "Quaternion.hh"
@@ -19,22 +18,28 @@
 
     @author A.Yazdani - 2024 - Construction */
 // =============================================================================
-template <typename T, typename U>
+template <typename T>
 class RigidBody
 {
 protected:
     /**@name Parameters */
     //@{
-    Convex<T>*      m_convex; /**< Convex shape */
-    T               m_crustThickness; /**< Rigid body's crust thickness */
-    Vector3<T>      m_scaling; /**< Scaling vector related to crust thickness */
-    uint            m_material; /**< Rigid body's material ID */
-    T               m_volume; /**< Rigid body's volume */
-    T               m_mass; /**< Rigid body's mass */
-    T               m_inertia[6]; /**< Rigid body's inertia */
-    T               m_inertia_1[6]; /**< Rigid body's inversed inertia */
-    BoundingBox<U>* m_boundingBox; /** Bounding box of the convex body **/
-    U               m_circumscribedRadius; /**< Circumscribed radius */
+    /** \brief Convex shape */
+    Convex<T>* m_convex;
+    /** \brief Crust thickness */
+    T m_crustThickness;
+    /** \brief Scaling vector related to crust thickness */
+    Vector3<T> m_scaling;
+    /** \brief Material ID */
+    uint m_material;
+    /** \brief Volume */
+    T m_volume;
+    /** \brief Mass */
+    T m_mass;
+    /** \brief Inertia tensor */
+    T m_inertia[6];
+    /** \brief Inverse of the inertia tensor */
+    T m_inertia_1[6];
     //@}
 
 public:
@@ -61,12 +66,12 @@ public:
     /** @brief Copy constructor
         @param rb RigidBody object to be copied */
     __HOSTDEVICE__
-    RigidBody(RigidBody<T, U> const& rb);
+    RigidBody(RigidBody<T> const& rb);
 
     /** @brief Copy assignment operator
         @param other RigidBody object to be assigned */
     __HOSTDEVICE__
-    RigidBody<T, U>& operator=(const RigidBody<T, U>& other);
+    RigidBody<T>& operator=(const RigidBody<T>& other);
 
     /** @brief Destructor */
     __HOSTDEVICE__
@@ -109,45 +114,9 @@ public:
     __HOSTDEVICE__
     void getInertia_1(T (&inertia_1)[6]) const;
 
-    /** @brief Gets the rigid body's bounding box */
+    /** @brief Gets the circumcribed radius of the rigid body */
     __HOSTDEVICE__
-    BoundingBox<U>* getBoundingBox() const;
-
-    /** @brief Gets the rigid body's circumscribed radius */
-    __HOSTDEVICE__
-    U getCircumscribedRadius() const;
-    //@}
-
-    /**@name Set methods */
-    //@{
-    // TODO: IMPLEMENT SET METHODS
-    // /** @brief Sets the rigid body's convex
-    // @param convex convex object */
-    // __HOSTDEVICE__ void setConvex( Convex const* convex );
-
-    // /** @brief Sets the rigid body's curst thickness
-    // @param ct crust thickness */
-    // __HOSTDEVICE__ void setCrustThickness( double ct );
-
-    // /** @brief Sets the rigid body's volume
-    // @param v volume */
-    // __HOSTDEVICE__ void setVolume( double v );
-
-    // /** @brief Sets the rigid body's inertia
-    // @param inertia inertia tensor */
-    // __HOSTDEVICE__ void setInertia( double* inertia );
-
-    // /** @brief Sets the inverse of rigid body's inertia
-    // @param inertia_1 inverse of the inertia tensor */
-    // __HOSTDEVICE__ void setInertia_1( double* inertia_1 );
-
-    // /** @brief Sets the rigid body's bounding box
-    // @param r circumscribed radius */
-    // __HOSTDEVICE__ void setOBB( OBB const* bb );
-
-    // /** @brief Sets the rigid body's circumscribed radius
-    // @param r circumscribed radius */
-    // __HOSTDEVICE__ void setCircumscribedRadius( float r );
+    T getCircumscribedRadius() const;
     //@}
 
     /**@name Methods */
@@ -174,9 +143,5 @@ public:
                                   const Quaternion<T>& q) const;
     //@}
 };
-
-typedef RigidBody<float, float>   RigidBodyF;
-typedef RigidBody<double, float>  RigidBodyDF;
-typedef RigidBody<double, double> RigidBodyD;
 
 #endif

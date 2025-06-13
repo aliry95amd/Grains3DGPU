@@ -160,6 +160,16 @@ public:
     __HOSTDEVICE__
     operator Vector3<float>() const;
     //@}
+
+    /** @name Static Methods */
+    //@{
+    /** @brief Returns a Vector3 object with all components set to zero */
+    __HOSTDEVICE__
+    static Vector3<T> NULLVECTOR()
+    {
+        return Vector3<T>(T(0), T(0), T(0));
+    }
+    //@}
 };
 
 /** @name External Methods - I/O methods */
@@ -176,8 +186,5 @@ __HOST__ std::istream& operator>>(std::istream& fileIn, Vector3<T>& v);
 template <typename T>
 __HOST__ std::ostream& operator<<(std::ostream& fileOut, const Vector3<T>& v);
 //@}
-
-typedef Vector3<float>  Vec3F;
-typedef Vector3<double> Vec3D;
 
 #endif

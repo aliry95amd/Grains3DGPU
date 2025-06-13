@@ -17,13 +17,13 @@
 // Memory address is then populated within the kernel.
 // This kernel is not declared in any header file since we directly use it below
 // It helps to NOT explicitly instantiate it.
-template <typename T, typename U, typename... Arguments>
-__GLOBAL__ void createRigidBodyKernel(RigidBody<T, U>** rb,
-                                      uint              index,
-                                      T                 crustThickness,
-                                      uint              material,
-                                      T                 density,
-                                      ConvexType        convexType,
+template <typename T, typename... Arguments>
+__GLOBAL__ void createRigidBodyKernel(RigidBody<T>** rb,
+                                      uint           index,
+                                      T              crustThickness,
+                                      uint           material,
+                                      T              density,
+                                      ConvexType     convexType,
                                       Arguments... args)
 {
     uint tid = blockIdx.x * blockDim.x + threadIdx.x;
@@ -61,7 +61,7 @@ __GLOBAL__ void createRigidBodyKernel(RigidBody<T, U>** rb,
         GAbort("Convex is not created! Aborting Grains!");
     }
 
-    rb[index] = new RigidBody<T, U>(convex, crustThickness, material, density);
+    rb[index] = new RigidBody<T>(convex, crustThickness, material, density);
 }
 
 /* ========================================================================== */
@@ -70,11 +70,11 @@ __GLOBAL__ void createRigidBodyKernel(RigidBody<T, U>** rb,
 // Creates and stores a RigidBody object in the host memory.
 template <typename T>
 __HOST__ void RigidBodyFactory<T>::create(
-    DOMNode*                                          root,
-    GrainsMemBuffer<RigidBody<T, T>*, MemType::HOST>& refRB,
-    GrainsMemBuffer<Transform3<T>, MemType::HOST>&    initTransform,
-    GrainsMemBuffer<uint, MemType::HOST>&             numEachRefParticle,
-    uint&                                             numParticles)
+    DOMNode*                                       root,
+    GrainsMemBuffer<RigidBody<T>*, MemType::HOST>& refRB,
+    GrainsMemBuffer<Transform3<T>, MemType::HOST>& initTransform,
+    GrainsMemBuffer<uint, MemType::HOST>&          numEachRefParticle,
+    uint&                                          numParticles)
 {
     // Particles
     DOMNodeList* allParticles = ReaderXML::getNodes(root);
@@ -89,7 +89,7 @@ __HOST__ void RigidBodyFactory<T>::create(
         DOMNode* nParticle    = allParticles->item(i);
         numEachRefParticle[i] = static_cast<uint>(
             ReaderXML::getNodeAttr_Int(nParticle, "Number"));
-        refRB[i]            = new RigidBody<T, T>(nParticle);
+        refRB[i]            = new RigidBody<T>(nParticle);
         DOMNode* nTransform = ReaderXML::getNode(nParticle, "Transformation");
         initTransform[i]    = Transform3<T>(nTransform);
         numParticles += numEachRefParticle[i];
@@ -100,8 +100,8 @@ __HOST__ void RigidBodyFactory<T>::create(
 // Constructs a ContactForceModel object on device.
 template <typename T>
 __HOST__ void RigidBodyFactory<T>::copyHostToDevice(
-    GrainsMemBuffer<RigidBody<T, T>*, MemType::HOST>&   h_RB,
-    GrainsMemBuffer<RigidBody<T, T>*, MemType::DEVICE>& d_RB)
+    GrainsMemBuffer<RigidBody<T>*, MemType::HOST>&   h_RB,
+    GrainsMemBuffer<RigidBody<T>*, MemType::DEVICE>& d_RB)
 {
     for(uint i = 0; i < h_RB.getSize(); ++i)
     {

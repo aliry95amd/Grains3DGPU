@@ -6,7 +6,7 @@
 // Kernel for computing the linear linked cell hash values for all components
 template <typename T>
 __GLOBAL__ void
-    computeLinearLinkedCellHashGPU_kernel(LinkedCell<T> const* const* LC,
+    computeLinearLinkedCellHashGPU_Kernel(LinkedCell<T> const* const* LC,
                                           Transform3<T> const*        tr,
                                           uint  numComponents,
                                           uint* componentCellHash)
@@ -23,7 +23,7 @@ __GLOBAL__ void
 // -----------------------------------------------------------------------------
 // Explicit instantiation
 #define X(T)                                                        \
-    template __GLOBAL__ void computeLinearLinkedCellHashGPU_kernel( \
+    template __GLOBAL__ void computeLinearLinkedCellHashGPU_Kernel( \
         LinkedCell<T> const* const* LC,                             \
         Transform3<T> const*        tr,                             \
         uint                        numComponents,                  \

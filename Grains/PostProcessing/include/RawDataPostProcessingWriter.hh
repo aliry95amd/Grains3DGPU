@@ -87,8 +87,8 @@ public:
         @param cm Component manager
         @param currentTime Current simulation time */
 
-    void PostProcessing(const GrainsMemBuffer<RigidBody<T, T>*>&    particleRB,
-                        const GrainsMemBuffer<RigidBody<T, T>*>&    obstacleRB,
+    void PostProcessing(const GrainsMemBuffer<RigidBody<T>*>&       particleRB,
+                        const GrainsMemBuffer<RigidBody<T>*>&       obstacleRB,
                         const std::unique_ptr<ComponentManager<T>>& cm,
                         const T currentTime) final;
 

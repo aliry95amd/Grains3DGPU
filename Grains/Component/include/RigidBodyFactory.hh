@@ -37,9 +37,9 @@ public:
 		reference particle
 		@param numParticles Total number of particles in the simulation */
     static void
-        create(DOMNode*                                          root,
-               GrainsMemBuffer<RigidBody<T, T>*, MemType::HOST>& refRB,
-               GrainsMemBuffer<Transform3<T>, MemType::HOST>&    initTransform,
+        create(DOMNode*                                       root,
+               GrainsMemBuffer<RigidBody<T>*, MemType::HOST>& refRB,
+               GrainsMemBuffer<Transform3<T>, MemType::HOST>& initTransform,
                GrainsMemBuffer<uint, MemType::HOST>& numEachRefParticle,
                uint&                                 numParticles);
 
@@ -51,9 +51,9 @@ public:
 		It calls a device kernel that is implemented in the source file.
 		@param h_RB Host-side RigidBody object
 		@param d_RB Device-side RigidBody object */
-    static void copyHostToDevice(
-        GrainsMemBuffer<RigidBody<T, T>*, MemType::HOST>&   h_RB,
-        GrainsMemBuffer<RigidBody<T, T>*, MemType::DEVICE>& d_RB);
+    static void
+        copyHostToDevice(GrainsMemBuffer<RigidBody<T>*, MemType::HOST>&   h_RB,
+                         GrainsMemBuffer<RigidBody<T>*, MemType::DEVICE>& d_RB);
     //@}
 };
 

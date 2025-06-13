@@ -130,7 +130,7 @@ void Grains<T>::Construction(DOMElement* rootElement)
     // Particles
     DOMNode* particles = ReaderXML::getNode(root, "Particles");
 
-    GrainsMemBuffer<RigidBody<T, T>*, MemType::HOST> m_refParticleRigidBodyList;
+    GrainsMemBuffer<RigidBody<T>*, MemType::HOST> m_refParticleRigidBodyList;
     GrainsMemBuffer<Transform3<T>, MemType::HOST> refParticlesInitialTransform;
     GrainsMemBuffer<uint, MemType::HOST>          numEachRefParticle;
     uint                                          numParticles = 0;
@@ -157,7 +157,7 @@ void Grains<T>::Construction(DOMElement* rootElement)
             {
                 // Deep copy of the rigid body
                 m_particleRigidBodyList[offset + j]
-                    = new RigidBody<T, T>(*m_refParticleRigidBodyList[i]);
+                    = new RigidBody<T>(*m_refParticleRigidBodyList[i]);
                 // Initial transformation of the rigid body
                 particlesInitialTransform[offset + j]
                     = refParticlesInitialTransform[i];
@@ -198,7 +198,7 @@ void Grains<T>::Construction(DOMElement* rootElement)
         {
             DOMNode* nObstacle = allObstacles->item(i);
             // Create the Rigid Body
-            m_obstacleRigidBodyList[i] = new RigidBody<T, T>(nObstacle);
+            m_obstacleRigidBodyList[i] = new RigidBody<T>(nObstacle);
             // Initial transformation of the rigid body
             // One draw back is we might end up with the same rigid body shape,
             // but with different initial transformation.

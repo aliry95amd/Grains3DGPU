@@ -7,10 +7,9 @@
 /* ========================================================================== */
 // Writes obstacles data
 template <typename T>
-void writeObstacles_Paraview(
-    const GrainsMemBuffer<RigidBody<T, T>*>&    obstacleRB,
-    const std::unique_ptr<ComponentManager<T>>& cm,
-    const std::string&                          obsFileName)
+void writeObstacles_Paraview(const GrainsMemBuffer<RigidBody<T>*>& obstacleRB,
+                             const std::unique_ptr<ComponentManager<T>>& cm,
+                             const std::string& obsFileName)
 {
     ofstream   f((obsFileName).c_str(), ios::out);
     const uint numObstacles                   = cm->getNumberOfObstacles();
@@ -97,10 +96,9 @@ void writeObstacles_Paraview(
 // -----------------------------------------------------------------------------
 // Writes particles data
 template <typename T>
-void writeParticles_Paraview(
-    const GrainsMemBuffer<RigidBody<T, T>*>&    particleRB,
-    const std::unique_ptr<ComponentManager<T>>& cm,
-    const std::string&                          parFileName)
+void writeParticles_Paraview(const GrainsMemBuffer<RigidBody<T>*>& particleRB,
+                             const std::unique_ptr<ComponentManager<T>>& cm,
+                             const std::string& parFileName)
 {
     ofstream   f((parFileName).c_str(), ios::out);
     const uint numParticles                   = cm->getNumberOfParticles();
@@ -303,8 +301,8 @@ void ParaviewPostProcessingWriter<T>::PostProcessing_start()
 // Writes data
 template <typename T>
 void ParaviewPostProcessingWriter<T>::PostProcessing(
-    const GrainsMemBuffer<RigidBody<T, T>*>&    particleRB,
-    const GrainsMemBuffer<RigidBody<T, T>*>&    obstacleRB,
+    const GrainsMemBuffer<RigidBody<T>*>&       particleRB,
+    const GrainsMemBuffer<RigidBody<T>*>&       obstacleRB,
     const std::unique_ptr<ComponentManager<T>>& cm,
     const T                                     currentTime)
 {

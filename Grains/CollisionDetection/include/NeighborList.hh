@@ -48,9 +48,23 @@ public:
     //@{
     // -------------------------------------------------------------------------
     /** @brief Gets pair list */
-    uint2* getList() const
+    const GrainsMemBuffer<uint2, M>& getBuffer() const
+    {
+        return m_pairList;
+    }
+
+    // -------------------------------------------------------------------------
+    /** @brief Gets pair list data */
+    uint2* getData()
     {
         return m_pairList.getData();
+    }
+
+    // -------------------------------------------------------------------------
+    /** @brief Gets size of pair list */
+    uint getSize() const
+    {
+        return m_pairList.getSize();
     }
     //@}
 

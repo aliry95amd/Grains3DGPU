@@ -217,7 +217,7 @@ void LinkedCell<T>::computeLinearLinkedCellHashGPU(
 {
     // uint numThreads = 256;
     // uint numBlocks  = (numComponents + numThreads - 1) / numThreads;
-    // computeLinearLinkedCellHashGPU_kernel<<< numBlocks, numThreads >>>
+    // computeLinearLinkedCellHashGPU_Kernel<<< numBlocks, numThreads >>>
     //                                                       ( this,
     //                                                         tr,
     //                                                         numComponents,

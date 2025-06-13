@@ -136,9 +136,8 @@ void GrainsGPU<T>::simulate()
         oss << left << GP::m_time;
         std::cout << '\r' << oss.str() << "  \t" << GP::m_tEnd << std::flush;
 
-        m_d_components->detectCollisionAndComputeContactForces(
-            m_d_linkedCell,
-            m_d_contactForce);
+        m_d_components->detectCollisions();
+        m_d_components->computeContactForces(m_d_contactForce);
         m_d_components->addExternalForces();
         m_d_components->moveParticles(m_d_timeIntegrator);
 

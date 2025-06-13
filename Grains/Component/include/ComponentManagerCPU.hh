@@ -16,7 +16,9 @@ class ComponentManagerCPU : public ComponentManager<T, MemType::HOST>
     using CM = ComponentManager<T, MemType::HOST>;
     using CM::m_nCells;
     using CM::m_nObstacles;
+    using CM::m_nPairs;
     using CM::m_nParticles;
+
     using CM::m_obstacleRB;
     using CM::m_obstacleRigidBodyId;
     using CM::m_obstacleTransform;
@@ -27,6 +29,10 @@ class ComponentManagerCPU : public ComponentManager<T, MemType::HOST>
     using CM::m_torce;
     using CM::m_transform;
     using CM::m_velocity;
+
+    using CM::m_contactInfo;
+    using CM::m_neighborList;
+    using CM::m_relTransform;
 
 protected:
     /** @name Parameters */
@@ -50,11 +56,11 @@ public:
         @param nObstacles Number of obstacles
         @param nCells Number of cells */
     ComponentManagerCPU(
-        GrainsMemBuffer<RigidBody<T, T>*, MemType::HOST>* particleRB,
-        GrainsMemBuffer<RigidBody<T, T>*, MemType::HOST>* obstacleRB,
-        uint                                              nParticles,
-        uint                                              nObstacles,
-        uint                                              nCells);
+        GrainsMemBuffer<RigidBody<T>*, MemType::HOST>* particleRB,
+        GrainsMemBuffer<RigidBody<T>*, MemType::HOST>* obstacleRB,
+        uint                                           nParticles,
+        uint                                           nObstacles,
+        uint                                           nCells);
 
     /** @brief Destructor */
     ~ComponentManagerCPU();
@@ -71,7 +77,7 @@ public:
     /** @name Manager methods */
     //@{
     /** @brief Allocates memory for the component manager */
-    void allocate() final;
+    void allocate();
 
     /** @brief Initializes data members to default values */
     void initialize();
@@ -79,30 +85,24 @@ public:
 
     /** @name Methods */
     //@{
-    /** @brief Updates links between particles and linked cell
-        @param LC linked cell */
-    void updateLinks(
-        const GrainsMemBuffer<LinkedCell<T>*, MemType::HOST>& LC) final;
+    /** @brief Updates neighbor list */
+    void updateNeighborList() final;
 
-    /** @brief Detects collision between particles and obstacles and computes 
-        forces
-        @param CF array of all contact force models */
-    void detectCollisionAndComputeContactForcesObstacles(
-        const GrainsMemBuffer<ContactForceModel<T>*, MemType::HOST>& CF) final;
+    /** @brief Computes the relative transformations */
+    void computeRelativeTransformations() final;
 
-    /** @brief Detects collision between particles and particles and computes 
-        forces
-        @param LC linked cell
-        @param CF array of all contact force models */
-    void detectCollisionAndComputeContactForcesParticles(
-        const GrainsMemBuffer<LinkedCell<T>*, MemType::HOST>&        LC,
-        const GrainsMemBuffer<ContactForceModel<T>*, MemType::HOST>& CF) final;
+    /** @brief Detects collisions between particles and obstacles */
+    void detectCollisionsObstacles() final;
 
-    /** @brief Detects collision between components and computes forces
-        @param LC linked cell
+    /** @brief Detects collisions between particles and particles */
+    void detectCollisionsParticles() final;
+
+    /** @brief Detects collision between particles and particles and */
+    void detectCollisions() final;
+
+    /** @brief Computes contact forces between different components
         @param CF array of all contact force models */
-    void detectCollisionAndComputeContactForces(
-        const GrainsMemBuffer<LinkedCell<T>*, MemType::HOST>&        LC,
+    void computeContactForces(
         const GrainsMemBuffer<ContactForceModel<T>*, MemType::HOST>& CF) final;
 
     /** @brief Adds external forces such as gravity */

@@ -22,6 +22,7 @@ GrainsCPU<T>::~GrainsCPU()
 template <typename T>
 void GrainsCPU<T>::simulate()
 {
+    using G  = Grains<T>;
     using GP = GrainsParameters<T>;
 
     Gout(std::string(80, '='));
@@ -29,7 +30,7 @@ void GrainsCPU<T>::simulate()
     Gout(std::string(80, '='));
 
     // first, inserting particles on host
-    Grains<T>::m_components->insertParticles(Grains<T>::m_insertion);
+    G::m_components->insertParticles(G::m_insertion);
 
     cout << "Time \t TO \tend \tParticles \tIn \tOut" << endl;
     // time marching
@@ -42,14 +43,13 @@ void GrainsCPU<T>::simulate()
         oss << left << GP::m_time;
         std::cout << '\r' << oss.str() << "  \t" << GP::m_tEnd << std::flush;
 
-        Grains<T>::m_components->detectCollisionAndComputeContactForces(
-            Grains<T>::m_linkedCell,
-            Grains<T>::m_contactForce);
-        Grains<T>::m_components->addExternalForces();
-        Grains<T>::m_components->moveParticles(Grains<T>::m_timeIntegrator);
+        G::m_components->detectCollisions();
+        G::m_components->computeContactForces(G::m_contactForce);
+        G::m_components->addExternalForces();
+        G::m_components->moveParticles(G::m_timeIntegrator);
 
         // Post-Processing
-        Grains<T>::postProcess(Grains<T>::m_components);
+        G::postProcess(G::m_components);
     }
 }
 

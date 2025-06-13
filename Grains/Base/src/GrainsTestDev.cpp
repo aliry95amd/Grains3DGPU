@@ -14,12 +14,12 @@ namespace GrainsCPU
 {
     // ...
     template <typename T>
-    void collisionDetectionGJK(RigidBody<T, T> const* const* rb,
-                               Transform3<T> const*          t1,
-                               Transform3<T> const*          t2,
-                               T*                            dist,
-                               int const                     method,
-                               int const                     N)
+    void collisionDetectionGJK(RigidBody<T> const* const* rb,
+                               Transform3<T> const*       t1,
+                               Transform3<T> const*       t2,
+                               T*                         dist,
+                               int const                  method,
+                               int const                  N)
     {
         for(int i = 0; i < N; i++)
         {
@@ -38,12 +38,12 @@ namespace GrainsGPU
     template <typename T>
     __global__ void
         // __maxnreg__( 49 )
-        collisionDetectionGJK(RigidBody<T, T> const* const* rb,
-                              Transform3<T> const*          t1,
-                              Transform3<T> const*          t2,
-                              T*                            dist,
-                              int const                     method,
-                              int const                     N)
+        collisionDetectionGJK(RigidBody<T> const* const* rb,
+                              Transform3<T> const*       t1,
+                              Transform3<T> const*       t2,
+                              T*                         dist,
+                              int const                  method,
+                              int const                  N)
     {
         int bid = gridDim.x * gridDim.y * blockIdx.z + blockIdx.y * gridDim.x
                   + blockIdx.x;
@@ -135,13 +135,13 @@ void GrainsTestDev<T>::simulate()
     // // Convex<T> *h_convex2 = new Cylinder<T>( r1, r2 );
     // Convex<T>*        h_convex1 = new Superquadric<T>(r1, r2, r3, T(3.), T(3));
     // Convex<T>*        h_convex2 = new Superquadric<T>(r1, r2, r3, T(3), T(3));
-    // RigidBody<T, T>** h_rb
-    //     = (RigidBody<T, T>**)malloc(2 * sizeof(RigidBody<T, T>*));
-    // h_rb[0] = new RigidBody<T, T>(h_convex1, T(0), 0, 1);
-    // h_rb[1] = new RigidBody<T, T>(h_convex2, T(0), 0, 1);
+    // RigidBody<T>** h_rb
+    //     = (RigidBody<T>**)malloc(2 * sizeof(RigidBody<T>*));
+    // h_rb[0] = new RigidBody<T>(h_convex1, T(0), 0, 1);
+    // h_rb[1] = new RigidBody<T>(h_convex2, T(0), 0, 1);
 
-    // RigidBody<T, T>** d_rb;
-    // cudaErrCheck(cudaMalloc((void**)&d_rb, 2 * sizeof(RigidBody<T, T>*)));
+    // RigidBody<T>** d_rb;
+    // cudaErrCheck(cudaMalloc((void**)&d_rb, 2 * sizeof(RigidBody<T>*)));
     // RigidBodyCopyHostToDevice(h_rb, d_rb, 2);
     // cudaDeviceSynchronize();
 

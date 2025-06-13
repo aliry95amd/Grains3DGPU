@@ -29,11 +29,11 @@ protected:
     /** \brief Buffer of particles rigid bodies. The pointer is used because we
     want to use runtime polymorphism for switching between different particle
     types. */
-    GrainsMemBuffer<RigidBody<T, T>*, MemType::HOST> m_particleRigidBodyList;
+    GrainsMemBuffer<RigidBody<T>*, MemType::HOST> m_particleRigidBodyList;
     /** \brief Buffer of obstacles rigid bodies. The pointer is used because we 
     want to use runtime polymorphism for switching between different obstacle 
     types. */
-    GrainsMemBuffer<RigidBody<T, T>*, MemType::HOST> m_obstacleRigidBodyList;
+    GrainsMemBuffer<RigidBody<T>*, MemType::HOST> m_obstacleRigidBodyList;
     /** \brief Insertion object. */
     std::unique_ptr<Insertion<T>> m_insertion;
     /** \brief Manager of the components in the simulation on the host memory. 

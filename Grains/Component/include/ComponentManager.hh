@@ -1,19 +1,18 @@
 #ifndef _COMPONENTMANAGER_HH_
 #define _COMPONENTMANAGER_HH_
 
-#include "CollisionDetection.hh"
+#include "ComponentManagerCommon.hh"
 #include "ContactForceModel.hh"
-#include "ContactForceModelFactory.hh"
 #include "GrainsMemBuffer.hh"
 #include "GrainsParameters.hh"
 #include "Insertion.hh"
 #include "Kinematics.hh"
-#include "LinkedCell.hh"
 #include "RigidBody.hh"
 #include "TimeIntegrator.hh"
 #include "Torce.hh"
 #include "Transform3.hh"
 
+#include "ContactInfo.hh"
 #include "NeighborList.hh"
 #include "NeighborList_Nsq.hh"
 
@@ -33,9 +32,9 @@ protected:
     //@{
     // TODO: What to do with pointers? Better design? unique_ptr?
     /** \brief Pointer to buffer of particles rigid bodies. */
-    const GrainsMemBuffer<RigidBody<T, T>*, M>* m_particleRB;
+    const GrainsMemBuffer<RigidBody<T>*, M>* m_particleRB;
     /** \brief Pointer to buffer of obstacles rigid bodies. */
-    const GrainsMemBuffer<RigidBody<T, T>*, M>* m_obstacleRB;
+    const GrainsMemBuffer<RigidBody<T>*, M>* m_obstacleRB;
     /** \brief Particles rigid body Id */
     GrainsMemBuffer<uint, M> m_rigidBodyId;
     /** \brief Particles transformation */
@@ -58,9 +57,17 @@ protected:
     uint m_nObstacles;
     /** \brief Number of cells in manager */
     uint m_nCells;
+    /** \brief Number of pairs in manager */
+    uint m_nPairs;
 
     /** \brief Neighbor list object */
     NeighborList<T, M>* m_neighborList;
+    /** \brief Relative transformation */
+    GrainsMemBuffer<Transform3<T>, M> m_relTransform;
+    /** \brief Contact information */
+    GrainsMemBuffer<ContactInfo<T>, M> m_contactInfo;
+    // /** \brief Rigid bodies bounding volume */
+    // GrainsMemBuffer<BoundingVolume<T>, M> m_boundingVolume;
     //@}
 
 public:
@@ -77,19 +84,20 @@ public:
         @param nParticles Number of particles
         @param nObstacles Number of obstacles
         @param nCells Number of cells */
-    ComponentManager(GrainsMemBuffer<RigidBody<T, T>*, M>* particleRB,
-                     GrainsMemBuffer<RigidBody<T, T>*, M>* obstacleRB,
-                     uint                                  nParticles,
-                     uint                                  nObstacles,
-                     uint                                  nCells)
+    ComponentManager(GrainsMemBuffer<RigidBody<T>*, M>* particleRB,
+                     GrainsMemBuffer<RigidBody<T>*, M>* obstacleRB,
+                     uint                               nParticles,
+                     uint                               nObstacles,
+                     uint                               nCells)
         : m_particleRB(particleRB)
         , m_obstacleRB(obstacleRB)
         , m_nParticles(nParticles)
         , m_nObstacles(nObstacles)
         , m_nCells(nCells)
     {
-        allocate();
         m_neighborList = new NeighborList_Nsq<T, M>(nParticles);
+        m_nPairs       = m_neighborList->getSize();
+        initialize();
     }
 
     // -------------------------------------------------------------------------
@@ -171,6 +179,25 @@ public:
         GrainsMemBuffer<Kinematics<T>, destM>& buffer) const
     {
         m_obstacleVelocity.copyTo(buffer);
+    }
+
+    // -------------------------------------------------------------------------
+    /** @brief Gets relative transformations
+     @param buffer host buffer to copy data to */
+    template <MemType destM>
+    void getRelativeTransform(
+        GrainsMemBuffer<Transform3<T>, destM>& buffer) const
+    {
+        m_relTransform.copyTo(buffer);
+    }
+
+    // -------------------------------------------------------------------------
+    /** @brief Gets contact information
+        @param buffer host buffer to copy data to */
+    template <MemType destM>
+    void getContactInfo(GrainsMemBuffer<ContactInfo<T>, destM>& buffer) const
+    {
+        m_contactInfo.copyTo(buffer);
     }
 
     // -------------------------------------------------------------------------
@@ -343,23 +370,46 @@ public:
     {
         m_obstacleVelocity.copyFrom(v);
     }
+
+    // -------------------------------------------------------------------------
+    /** @brief Sets the relative transformations
+        @param relTransform host buffer containing the rel transformations */
+    template <MemType srcM>
+    void setRelativeTransform(
+        const GrainsMemBuffer<Transform3<T>, srcM>& relTransform)
+    {
+        m_relTransform.copyFrom(relTransform);
+    }
+
+    // -------------------------------------------------------------------------
+    /** @brief Sets the contact information
+        @param contactInfo host buffer containing the contact information */
+    template <MemType srcM>
+    void
+        setContactInfo(const GrainsMemBuffer<ContactInfo<T>, srcM>& contactInfo)
+    {
+        m_contactInfo.copyFrom(contactInfo);
+    }
     //@}
 
     /** @name Manager methods */
     //@{
     // -------------------------------------------------------------------------
-    /** @brief Allocates memory for the component manager */
-    virtual void allocate()
+    /** @brief Initializes (and reserves memory) the members to default */
+    void initialize()
     {
-        m_rigidBodyId.reserve(m_nParticles);
-        m_transform.reserve(m_nParticles);
-        m_velocity.reserve(m_nParticles);
-        m_torce.reserve(m_nParticles);
-        m_particleId.reserve(m_nParticles);
+        initDefault(m_obstacleRigidBodyId, m_nObstacles);
+        initDefault(m_obstacleTransform, m_nObstacles);
+        initDefault(m_obstacleVelocity, m_nObstacles);
 
-        m_obstacleRigidBodyId.reserve(m_nObstacles);
-        m_obstacleTransform.reserve(m_nObstacles);
-        m_obstacleVelocity.reserve(m_nObstacles);
+        initDefault(m_rigidBodyId, m_nParticles);
+        initDefault(m_transform, m_nParticles);
+        initDefault(m_velocity, m_nParticles);
+        initDefault(m_torce, m_nParticles);
+
+        initDefault(m_particleId, m_nParticles);
+        initDefault(m_relTransform, m_nPairs);
+        initDefault(m_contactInfo, m_nPairs);
     }
 
     // -------------------------------------------------------------------------
@@ -408,6 +458,16 @@ public:
         GrainsMemBuffer<Kinematics<T>, srcM> tmpVelocityObstacles(m_nObstacles);
         other->getObstaclesVelocity(tmpVelocityObstacles);
         setObstaclesVelocity(tmpVelocityObstacles);
+
+        // Relative Transformations
+        GrainsMemBuffer<Transform3<T>, srcM> tmpRelTransform(m_nPairs);
+        other->getRelativeTransform(tmpRelTransform);
+        setRelativeTransform(tmpRelTransform);
+
+        // Contact Info
+        GrainsMemBuffer<ContactInfo<T>, srcM> tmpContactInfo(m_nPairs);
+        other->getContactInfo(tmpContactInfo);
+        setContactInfo(tmpContactInfo);
     }
     //@}
 
@@ -431,10 +491,6 @@ public:
         // Assigning
         for(uint i = 0; i < m_nParticles; ++i)
         {
-            // m_rigidBodyId
-            m_rigidBodyId[i] = i;
-
-            // m_transform
             m_transform[i] = initTr[i];
         }
     }
@@ -457,14 +513,7 @@ public:
         // Assigning
         for(uint i = 0; i < m_nObstacles; ++i)
         {
-            // m_rigidBodyId
-            m_obstacleRigidBodyId[i] = i;
-
-            // m_transform
             m_obstacleTransform[i] = initTr[i];
-
-            // m_velocity
-            m_obstacleVelocity[i] = Kinematics<T>();
         }
     }
 
@@ -496,34 +545,29 @@ public:
     }
 
     // -------------------------------------------------------------------------
-    /** @brief Updates links between particles and linked cell
-        @param LC linked cell */
-    virtual void updateLinks(const GrainsMemBuffer<LinkedCell<T>*, M>& LC) = 0;
+    /** @brief Updates neighbor list */
+    virtual void updateNeighborList() = 0;
 
     // -------------------------------------------------------------------------
-    /** @brief Detects collision between particles and obstacles and computes 
-    forces
-        @param CF array of all contact force models */
-    virtual void detectCollisionAndComputeContactForcesObstacles(
-        const GrainsMemBuffer<ContactForceModel<T>*, M>& CF)
-        = 0;
+    /** @brief Computes the relative transformations */
+    virtual void computeRelativeTransformations() = 0;
 
     // -------------------------------------------------------------------------
-    /** @brief Detects collision between particles and particles and computes 
-    forces
-        @param LC linked cell
-        @param CF array of all contact force models */
-    virtual void detectCollisionAndComputeContactForcesParticles(
-        const GrainsMemBuffer<LinkedCell<T>*, M>&        LC,
-        const GrainsMemBuffer<ContactForceModel<T>*, M>& CF)
-        = 0;
+    /** @brief Detects collisions between particles and obstacles */
+    virtual void detectCollisionsObstacles() = 0;
 
     // -------------------------------------------------------------------------
-    /** @brief Detects collision between components and computes forces
-        @param LC linked cell
+    /** @brief Detects collisions between particles and particles */
+    virtual void detectCollisionsParticles() = 0;
+
+    // -------------------------------------------------------------------------
+    /** @brief Detects collision between particles and particles and */
+    virtual void detectCollisions() = 0;
+
+    // -------------------------------------------------------------------------
+    /** @brief Computes contact forces between different components
         @param CF array of all contact force models */
-    virtual void detectCollisionAndComputeContactForces(
-        const GrainsMemBuffer<LinkedCell<T>*, M>&        LC,
+    virtual void computeContactForces(
         const GrainsMemBuffer<ContactForceModel<T>*, M>& CF)
         = 0;
 

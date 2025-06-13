@@ -13,11 +13,11 @@ ComponentManagerCPU<T>::ComponentManagerCPU() = default;
 // cells with all other data members initialized as default.
 template <typename T>
 ComponentManagerCPU<T>::ComponentManagerCPU(
-    GrainsMemBuffer<RigidBody<T, T>*, MemType::HOST>* particleRB,
-    GrainsMemBuffer<RigidBody<T, T>*, MemType::HOST>* obstacleRB,
-    uint                                              nParticles,
-    uint                                              nObstacles,
-    uint                                              nCells)
+    GrainsMemBuffer<RigidBody<T>*, MemType::HOST>* particleRB,
+    GrainsMemBuffer<RigidBody<T>*, MemType::HOST>* obstacleRB,
+    uint                                           nParticles,
+    uint                                           nObstacles,
+    uint                                           nCells)
     : ComponentManager<T, MemType::HOST>(
           particleRB, obstacleRB, nParticles, nObstacles, nCells)
 {
@@ -44,187 +44,87 @@ void ComponentManagerCPU<T>::allocate()
 template <typename T>
 void ComponentManagerCPU<T>::initialize()
 {
-    // Initializing the vectors for particles
-    for(uint i = 0; i < m_nParticles; ++i)
-    {
-        m_rigidBodyId[i] = i;
-        m_transform[i]   = Transform3<T>();
-        m_velocity[i]    = Kinematics<T>();
-        m_torce[i]       = Torce<T>();
-        m_particleId[i]  = i;
-    }
-
-    // Initializing the vectors for obstacles
-    for(uint i = 0; i < m_nObstacles; ++i)
-    {
-        m_obstacleRigidBodyId[i] = i;
-        m_obstacleTransform[i]   = Transform3<T>();
-        m_obstacleVelocity[i]    = Kinematics<T>();
-    }
+    m_neighborList->createNeighborList(m_transform.getData(), m_nParticles);
 }
 
 // -----------------------------------------------------------------------------
-// Updates links between components and linked cell
+// Updates links between particles and linked cell
 template <typename T>
-void ComponentManagerCPU<T>::updateLinks(
-    const GrainsMemBuffer<LinkedCell<T>*, MemType::HOST>& LC)
+void ComponentManagerCPU<T>::updateNeighborList()
 {
-    // Reset
-    for(int i = 0; i < m_nCells + 1; i++)
-        m_cell[i].clear();
-
-    // Updating m_particleCellHash according to the linkedCell. That is,
-    // assigning a hash value to each particle based on the cell it belongs to.
-    (LC[0])->computeLinearLinkedCellHashCPU(m_transform.getData(),
-                                            m_nParticles,
-                                            m_particleCellHash.getData());
-
-    // Update cells
-    for(int i = 0; i < m_nParticles; i++)
-    {
-        uint cellId = m_particleCellHash[i];
-        m_cell[cellId].push_back(i);
-    }
+    if(m_neighborList->needsUpdate(m_transform.getData(), m_nParticles) == true)
+        m_neighborList->updateNeighborList(m_transform.getData(), m_nParticles);
 }
 
 // -----------------------------------------------------------------------------
-// Detects collision and computes forces between particles and obstacles
+// Computes relative transformations
 template <typename T>
-void ComponentManagerCPU<T>::detectCollisionAndComputeContactForcesObstacles(
-    const GrainsMemBuffer<ContactForceModel<T>*, MemType::HOST>& CF)
+void ComponentManagerCPU<T>::computeRelativeTransformations()
 {
-    // Loop over all particles
-    for(int pId = 0; pId < m_nParticles; pId++)
+    for(uint pID = 0; pID < m_nPairs; ++pID)
     {
-        // Parameters of the particle
-        const RigidBody<T, T>* rbA
-            = (m_particleRB->getData())[m_rigidBodyId[pId]];
-        const Transform3<T>& trA   = m_transform[pId];
-        T                    massA = rbA->getMass();
-        uint                 matA  = rbA->getMaterial();
-
-        // Loop over all obstacles
-        for(int oId = 0; oId < m_nObstacles; oId++)
-        {
-            RigidBody<T, T> const* rbB
-                = (m_obstacleRB->getData())[m_obstacleRigidBodyId[oId]];
-            const Transform3<T>& trB = m_obstacleTransform[oId];
-            ContactInfo<T> ci = closestPointsRigidBodies(*rbA, *rbB, trA, trB);
-            if(ci.getOverlapDistance() < T(0))
-            {
-                // CF ID given materialIDs
-                uint contactForceID = ContactForceModelFactory<T>::computeHash(
-                    matA,
-                    rbB->getMaterial());
-                // velocities of the particles
-                Kinematics<T> v1(m_velocity[pId]);
-                Kinematics<T> v2(m_velocity[oId]);
-                // geometric point of contact
-                Vector3<T> contactPt(ci.getContactPoint());
-                // relative velocity at contact point
-                Vector3<T> relVel(v1.kinematicsAtPoint(contactPt)
-                                  - v2.kinematicsAtPoint(contactPt));
-                // relative angular velocity
-                Vector3<T> relAngVel(v1.getAngularComponent()
-                                     - v2.getAngularComponent());
-                (CF.getData())[contactForceID]->computeForces(
-                    ci,
-                    relVel,
-                    relAngVel,
-                    massA,
-                    rbB->getMass(),
-                    trA.getOrigin(),
-                    m_torce.getData()[pId]);
-            }
-        }
+        computeRelativeTransformations_common(m_neighborList->getData(),
+                                              m_transform.getData(),
+                                              m_relTransform.getData(),
+                                              pID);
     }
 }
 
 // -----------------------------------------------------------------------------
-// Detects collision and computes forces between particles and particles
+// Detects collision between particles and obstacles
 template <typename T>
-void ComponentManagerCPU<T>::detectCollisionAndComputeContactForcesParticles(
-    const GrainsMemBuffer<LinkedCell<T>*, MemType::HOST>&        LC,
-    const GrainsMemBuffer<ContactForceModel<T>*, MemType::HOST>& CF)
+void ComponentManagerCPU<T>::detectCollisionsObstacles()
 {
-    // Loop over all particles
-    // #pragma omp parallel for
-    for(int pId = 0; pId < m_nParticles; pId++)
+}
+
+// -----------------------------------------------------------------------------
+// Detects collisions between particles and particles
+template <typename T>
+void ComponentManagerCPU<T>::detectCollisionsParticles()
+{
+    for(uint i = 0; i < m_nPairs; ++i)
     {
-        // Parameters of the primary particle
-        const uint             particleId = m_particleId[pId];
-        const uint             cellHash   = m_particleCellHash[pId];
-        const RigidBody<T, T>* rbA
-            = (m_particleRB->getData())[m_rigidBodyId[particleId]];
-        const Transform3<T>& trA           = m_transform[particleId];
-        T                    massA         = rbA->getMass();
-        uint                 matA          = rbA->getMaterial();
-        const uint*          neighborsList = (LC[0])->getNeighbors(cellHash);
-        // Loop over all neighboring particles
-        for(int i = 0; i < 27; ++i)
-        {
-            // Get the neighboring cell hash
-            uint neighborCellHash = neighborsList[i];
-            // Check if the neighboring cell is valid
-            if(neighborCellHash == UINT_MAX)
-                continue;
-            for(auto id : m_cell[neighborCellHash])
-            {
-                const uint secondaryId = id;
-                // To skip self-collision
-                if(secondaryId == particleId)
-                    continue;
-                const RigidBody<T, T>* rbB
-                    = (m_particleRB->getData())[m_rigidBodyId[secondaryId]];
-                const Transform3<T>& trB = m_transform[secondaryId];
-                ContactInfo<T>       ci
-                    = closestPointsRigidBodies(*rbA, *rbB, trA, trB);
-                if(ci.getOverlapDistance() < T(0))
-                {
-                    // CF ID given materialIDs
-                    uint contactForceID
-                        = ContactForceModelFactory<T>::computeHash(
-                            matA,
-                            rbB->getMaterial());
-                    // velocities of the particles
-                    Kinematics<T> v1(m_velocity[particleId]);
-                    Kinematics<T> v2(m_velocity[secondaryId]);
-                    // geometric point of contact
-                    Vector3<T> contactPt(ci.getContactPoint());
-                    // relative velocity at contact point
-                    Vector3<T> relVel(v1.kinematicsAtPoint(contactPt)
-                                      - v2.kinematicsAtPoint(contactPt));
-                    // relative angular velocity
-                    Vector3<T> relAngVel(v1.getAngularComponent()
-                                         - v2.getAngularComponent());
-                    CF[contactForceID]->computeForces(ci,
-                                                      relVel,
-                                                      relAngVel,
-                                                      massA,
-                                                      rbB->getMass(),
-                                                      trA.getOrigin(),
-                                                      m_torce[particleId]);
-                }
-            }
-        }
+        detectCollisionsParticles_common(m_neighborList->getData(),
+                                         m_particleRB->getData(),
+                                         m_relTransform.getData(),
+                                         m_contactInfo.getData(),
+                                         i);
     }
 }
 
 // -----------------------------------------------------------------------------
-// Detects collision and computes forces between all components
+// Detects collision between all components
 template <typename T>
-void ComponentManagerCPU<T>::detectCollisionAndComputeContactForces(
-    const GrainsMemBuffer<LinkedCell<T>*, MemType::HOST>&        LC,
-    const GrainsMemBuffer<ContactForceModel<T>*, MemType::HOST>& CF)
+void ComponentManagerCPU<T>::detectCollisions()
 {
     // Updates links between components and linked cell
-    updateLinks(LC);
+    updateNeighborList();
+
+    // Computes the relative transformations
+    computeRelativeTransformations();
 
     // Particle-particle interactions
-    detectCollisionAndComputeContactForcesParticles(LC, CF);
+    detectCollisionsParticles();
 
     // Particle-obstacle interactions
-    detectCollisionAndComputeContactForcesObstacles(CF);
+    detectCollisionsObstacles();
+}
+
+// -----------------------------------------------------------------------------
+// Computes contact forces
+template <typename T>
+void ComponentManagerCPU<T>::computeContactForces(
+    const GrainsMemBuffer<ContactForceModel<T>*, MemType::HOST>& CF)
+{
+    // Invoke the kernel
+    // computeContactForces_Kernel<<<numBlocks, numThreads>>>(CF,
+    //                                                        pairList,
+    //                                                        contactInfo,
+    //                                                        particleRB,
+    //                                                        velocity,
+    //                                                        torce,
+    //                                                        transform,
+    //                                                        m_nParticles);
 }
 
 // -----------------------------------------------------------------------------
@@ -233,12 +133,12 @@ template <typename T>
 void ComponentManagerCPU<T>::addExternalForces()
 {
     // #pragma omp parallel for
-    for(int pId = 0; pId < m_nParticles; pId++)
+    for(uint pID = 0; pID < m_nParticles; ++pID)
     {
-        addGravity(GrainsParameters<T>::m_gravity,
-                   m_particleRB->getData(),
-                   m_rigidBodyId[pId],
-                   m_torce[pId]);
+        addExternalForces_common(GrainsParameters<T>::m_gravity,
+                                 m_particleRB->getData(),
+                                 m_torce.getData(),
+                                 pID);
     }
 }
 
@@ -249,15 +149,15 @@ void ComponentManagerCPU<T>::moveParticles(
     const GrainsMemBuffer<TimeIntegrator<T>*, MemType::HOST>& TI)
 {
     // #pragma omp parallel for
-    for(int pId = 0; pId < m_nParticles; pId++)
+    for(uint pID = 0; pID < m_nParticles; ++pID)
     {
-        moveParticle(TI.getData(),
-                     m_particleRB->getData(),
-                     m_transform[pId],
-                     m_velocity[pId],
-                     m_torce[pId],
-                     m_rigidBodyId[pId],
-                     pId);
+        moveParticles_common(TI.getData(),
+                             m_particleRB->getData(),
+                             m_transform.getData(),
+                             m_velocity.getData(),
+                             m_torce.getData(),
+                             m_rigidBodyId.getData(),
+                             pID);
     }
 }
 
