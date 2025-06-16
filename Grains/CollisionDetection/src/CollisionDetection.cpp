@@ -147,12 +147,11 @@ __HOSTDEVICE__ void closestPointsRigidBodies(const RigidBody<T>&  rbA,
                                              ptB,
                                              nbIterGJK);
 
-    // TODO: What if too much overlap?
-
     // Computation of the actual overlap
     // distance = distance - crustA - crustB
     // If actual overlap distance < 0 => contact otherwise no contact
     distance -= ctSum;
+    // TODO: What if too much overlap?
     contactInfo.setOverlapDistance(distance);
     if(distance > T(0))
         return;
@@ -209,12 +208,11 @@ __HOSTDEVICE__ void closestPointsRigidBodies(const RigidBody<T>&  rbA,
                                              ptB,
                                              nbIterGJK);
 
-    // TODO: What if too much overlap?
-
     // Computation of the actual overlap
     // distance = distance - crustA - crustB
     // If actual overlap distance < 0 => contact otherwise no contact
     distance -= ctSum;
+    // TODO: What if too much overlap?
     contactInfo.setOverlapDistance(distance);
     if(distance > T(0))
         return;

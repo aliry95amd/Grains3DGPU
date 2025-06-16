@@ -21,8 +21,8 @@ __GLOBAL__ void createLinkedCellKernel(LinkedCell<T>** LC,
                                        T               size,
                                        uint*           numCells)
 {
-    uint tid = blockIdx.x * blockDim.x + threadIdx.x;
-    if(tid > 0)
+    uint tID = blockIdx.x * blockDim.x + threadIdx.x;
+    if(tID > 0)
         return;
 
     LC[index] = new LinkedCell<T>(Vector3<T>(minX, minY, minZ),

@@ -16,8 +16,8 @@ __GLOBAL__ void
                                   ContactForceModelType  contactForceModelType,
                                   Arguments... args)
 {
-    uint tid = blockIdx.x * blockDim.x + threadIdx.x;
-    if(tid > 0)
+    uint tID = blockIdx.x * blockDim.x + threadIdx.x;
+    if(tID > 0)
         return;
 
     if(contactForceModelType == HOOKE)

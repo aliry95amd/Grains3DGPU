@@ -169,7 +169,7 @@ __HOSTDEVICE__ void Transform3<T>::setOrigin(const Vector3<T>& v)
 // -----------------------------------------------------------------------------
 // Sets the transformation to the identity
 template <typename T>
-__HOSTDEVICE__ void Transform3<T>::setIdentity()
+__HOSTDEVICE__ void Transform3<T>::setIDentity()
 {
     m_basis.setValue(T(1), T(0), T(0), T(0), T(1), T(0), T(0), T(0), T(1));
     m_origin.setValue(T(0), T(0), T(0));

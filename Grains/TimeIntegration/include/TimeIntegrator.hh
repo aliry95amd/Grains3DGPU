@@ -79,7 +79,7 @@ public:
 		@param transMotion translational motion over dt
 		@param rotMotion rotational motion over dt */
     __HOSTDEVICE__
-    virtual void Move(Kinematics<T> const& momentum,
+    virtual void Move(const Kinematics<T>& momentum,
                       Kinematics<T>&       velocity,
                       Vector3<T>&          transMotion,
                       Quaternion<T>&       rotMotion) const

@@ -193,17 +193,17 @@ void ComponentManagerGPU<T>::moveParticles(
 {
     using GP = GrainsParameters<T>;
     // Kernel launch parameters
-    // const uint numThreads = GP::m_numThreadsPerBlock;
-    // const uint numBlocks  = GP::m_numBlocksPerGrid;
+    const uint numThreads = GP::m_numThreadsPerBlock;
+    const uint numBlocks  = GP::m_numBlocksPerGrid;
 
     // Invoke the kernel
-    // moveParticles_Kernel<<<numBlocks, numThreads>>>(TI.getData(),
-    //                                                 m_particleRB->getData(),
-    //                                                 m_rigidBodyId.getData(),
-    //                                                 m_transform.getData(),
-    //                                                 m_velocity.getData(),
-    //                                                 m_torce.getData(),
-    //                                                 m_nParticles);
+    moveParticles_Kernel<<<numBlocks, numThreads>>>(TI.getData(),
+                                                    m_particleRB->getData(),
+                                                    m_transform.getData(),
+                                                    m_velocity.getData(),
+                                                    m_torce.getData(),
+                                                    m_rigidBodyId.getData(),
+                                                    m_nParticles);
 }
 
 // -----------------------------------------------------------------------------

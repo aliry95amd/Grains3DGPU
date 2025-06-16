@@ -125,12 +125,12 @@ __GLOBAL__ void createNeighborList_Device(const Transform3<T>* transforms,
                                           const uint           nParticles,
                                           uint2*               pairList)
 {
-    uint tid = blockIdx.x * blockDim.x + threadIdx.x;
-    if(tid >= nParticles)
+    uint tID = blockIdx.x * blockDim.x + threadIdx.x;
+    if(tID >= nParticles)
         return;
 
-    for(uint j = tid + 1; j < nParticles; ++j)
-        pairList[tid + j * (j - 1) / 2] = make_uint2(tid, j);
+    for(uint j = tID + 1; j < nParticles; ++j)
+        pairList[tID + j * (j - 1) / 2] = make_uint2(tID, j);
 };
 
 #endif

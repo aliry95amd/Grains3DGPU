@@ -416,58 +416,43 @@ public:
     /** @brief Copies data from another ComponentManager object.
         @param other other component manager */
     template <MemType srcM>
-    void copyFrom(const std::unique_ptr<ComponentManager<T, srcM>>& other)
+    void copyTo(const std::unique_ptr<ComponentManager<T, srcM>>& other)
+    {
+        // Particles
+        other->setRigidBodyId(m_rigidBodyId);
+        other->setTransform(m_transform);
+        other->setVelocity(m_velocity);
+        other->setTorce(m_torce);
+        other->setParticleId(m_particleId);
+        // Obstacles
+        other->setObstaclesRigidBodyId(m_obstacleRigidBodyId);
+        other->setObstaclesTransform(m_obstacleTransform);
+        other->setObstaclesVelocity(m_obstacleVelocity);
+        // Neighbor list
+        other->setRelativeTransform(m_relTransform);
+        other->setContactInfo(m_contactInfo);
+    }
+
+    // -------------------------------------------------------------------------
+    /** @brief Copies data to ComponentManagerCPU object for post-processing.
+        @param other other component manager */
+    void copyTo_PostProcessing(
+        const std::unique_ptr<ComponentManager<T, MemType::HOST>>& other)
     {
         // RigidBodyId
-        GrainsMemBuffer<uint, srcM> tmpRigidBodyId(m_nParticles);
-        other->getRigidBodyId(tmpRigidBodyId);
-        setRigidBodyId(tmpRigidBodyId);
+        other->setRigidBodyId(m_rigidBodyId);
 
         // Transform
-        GrainsMemBuffer<Transform3<T>, srcM> tmpTransform(m_nParticles);
-        other->getTransform(tmpTransform);
-        setTransform(tmpTransform);
+        other->setTransform(m_transform);
 
         // Velocity
-        GrainsMemBuffer<Kinematics<T>, srcM> tmpVelocity(m_nParticles);
-        other->getVelocity(tmpVelocity);
-        setVelocity(tmpVelocity);
-
-        // Torce
-        GrainsMemBuffer<Torce<T>, srcM> tmpTorce(m_nParticles);
-        other->getTorce(tmpTorce);
-        setTorce(tmpTorce);
-
-        // ParticleId
-        GrainsMemBuffer<uint, srcM> tmpParticleId(m_nParticles);
-        other->getParticleId(tmpParticleId);
-        setParticleId(tmpParticleId);
-
-        // Obstacle RigidBodyId
-        GrainsMemBuffer<uint, srcM> tmpRigidBodyIdObstacles(m_nObstacles);
-        other->getObstaclesRigidBodyId(tmpRigidBodyIdObstacles);
-        setObstaclesRigidBodyId(tmpRigidBodyIdObstacles);
+        other->setVelocity(m_velocity);
 
         // Obstacle Transform
-        GrainsMemBuffer<Transform3<T>, srcM> tmpTransformObstacles(
-            m_nObstacles);
-        other->getObstaclesTransform(tmpTransformObstacles);
-        setObstaclesTransform(tmpTransformObstacles);
+        other->setObstaclesTransform(m_obstacleTransform);
 
         // Obstacle Velocity
-        GrainsMemBuffer<Kinematics<T>, srcM> tmpVelocityObstacles(m_nObstacles);
-        other->getObstaclesVelocity(tmpVelocityObstacles);
-        setObstaclesVelocity(tmpVelocityObstacles);
-
-        // Relative Transformations
-        GrainsMemBuffer<Transform3<T>, srcM> tmpRelTransform(m_nPairs);
-        other->getRelativeTransform(tmpRelTransform);
-        setRelativeTransform(tmpRelTransform);
-
-        // Contact Info
-        GrainsMemBuffer<ContactInfo<T>, srcM> tmpContactInfo(m_nPairs);
-        other->getContactInfo(tmpContactInfo);
-        setContactInfo(tmpContactInfo);
+        other->setObstaclesVelocity(m_obstacleVelocity);
     }
     //@}
 

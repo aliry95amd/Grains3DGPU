@@ -37,12 +37,12 @@
 __GLOBAL__
 void zeroOutArray_Kernel(uint* array, uint numElements)
 {
-    uint tid = blockIdx.x * blockDim.x + threadIdx.x;
+    uint tID = blockIdx.x * blockDim.x + threadIdx.x;
 
-    if(tid >= numElements)
+    if(tID >= numElements)
         return;
 
-    array[tid] = 0;
+    array[tID] = 0;
 }
 
 // -----------------------------------------------------------------------------
@@ -60,36 +60,36 @@ void sortComponentsAndFindCellStart_Kernel(const uint* componentCellHash,
     cooperative_groups::thread_block cta
         = cooperative_groups::this_thread_block();
     extern __shared__ uint sharedHash[]; // blockSize + 1 elements
-    uint                   tid = blockIdx.x * blockDim.x + threadIdx.x;
+    uint                   tID = blockIdx.x * blockDim.x + threadIdx.x;
 
     uint hash;
-    if(tid < numComponents)
+    if(tID < numComponents)
     {
-        hash = componentCellHash[tid];
+        hash = componentCellHash[tID];
         // Load hash data into shared memory so that we can look at neighboring
         // component's hash value without loading two hash values per thread
         sharedHash[threadIdx.x + 1] = hash;
         // first thread in block must load neighboring component hash as well
-        if(tid > 0 && threadIdx.x == 0)
-            sharedHash[0] = componentCellHash[tid - 1];
+        if(tID > 0 && threadIdx.x == 0)
+            sharedHash[0] = componentCellHash[tID - 1];
     }
     cooperative_groups::sync(cta);
 
-    if(tid < numComponents)
+    if(tID < numComponents)
     {
         // If this component has a different cell hash value to the previous
         // component then it must be the first component in the cell.
         // As it isn't the first component, it must also be the end of the
         // previous component's cell.
 
-        if(tid == 0 || hash != sharedHash[threadIdx.x])
+        if(tID == 0 || hash != sharedHash[threadIdx.x])
         {
-            cellStart[hash] = tid;
-            if(tid > 0)
-                cellEnd[sharedHash[threadIdx.x]] = tid; // excluding
+            cellStart[hash] = tID;
+            if(tID > 0)
+                cellEnd[sharedHash[threadIdx.x]] = tID; // excluding
         }
-        if(tid == numComponents - 1)
-            cellEnd[hash] = tid + 1;
+        if(tID == numComponents - 1)
+            cellEnd[hash] = tID + 1;
     }
     // // Now use the sorted index to reorder the pos and vel data
     // uint sortedIndex = gridParticleIndex[index];
@@ -113,15 +113,15 @@ __GLOBAL__ void
                                           Transform3<T>* relativeTransform,
                                           const uint     nPairs)
 {
-    uint tId = blockIdx.x * blockDim.x + threadIdx.x;
+    uint tID = blockIdx.x * blockDim.x + threadIdx.x;
 
-    if(tId >= nPairs)
+    if(tID >= nPairs)
         return;
 
     computeRelativeTransformations_common(pairList,
                                           transform,
                                           relativeTransform,
-                                          tId);
+                                          tID);
 }
 
 // -----------------------------------------------------------------------------
@@ -143,9 +143,9 @@ __GLOBAL__ void
                                      ContactInfo<T>*      contactInfo,
                                      const uint           nPairs)
 {
-    uint tId = blockIdx.x * blockDim.x + threadIdx.x;
+    uint tID = blockIdx.x * blockDim.x + threadIdx.x;
 
-    if(tId >= nPairs)
+    if(tID >= nPairs)
         return;
 
     detectCollisionsObstacles_common(pairList,
@@ -154,7 +154,7 @@ __GLOBAL__ void
                                      transform,
                                      obstacleTransform,
                                      contactInfo,
-                                     tId);
+                                     tID);
 }
 
 // -----------------------------------------------------------------------------
@@ -172,16 +172,16 @@ __GLOBAL__ void
                                      ContactInfo<T>*            contactInfo,
                                      const uint                 nPairs)
 {
-    uint tId = blockIdx.x * blockDim.x + threadIdx.x;
+    uint tID = blockIdx.x * blockDim.x + threadIdx.x;
 
-    if(tId >= nPairs)
+    if(tID >= nPairs)
         return;
 
     detectCollisionsParticles_common(pairList,
                                      particleRB,
                                      relTransform,
                                      contactInfo,
-                                     tId);
+                                     tID);
 }
 
 // -----------------------------------------------------------------------------
@@ -223,12 +223,12 @@ __GLOBAL__ void moveParticles_Kernel(const TimeIntegrator<T>* const* TI,
                                      Transform3<T>*                  transform,
                                      Kinematics<T>*                  velocity,
                                      Torce<T>*                       torce,
-                                     uint* rigidBodyId,
-                                     int   nParticles)
+                                     const uint* rigidBodyId,
+                                     int         nParticles)
 {
-    uint pId = blockIdx.x * blockDim.x + threadIdx.x;
+    uint pID = blockIdx.x * blockDim.x + threadIdx.x;
 
-    if(pId >= nParticles)
+    if(pID >= nParticles)
         return;
 
     moveParticles_common(TI,
@@ -237,7 +237,7 @@ __GLOBAL__ void moveParticles_Kernel(const TimeIntegrator<T>* const* TI,
                          velocity,
                          torce,
                          rigidBodyId,
-                         pId);
+                         pID);
 }
 //@}
 

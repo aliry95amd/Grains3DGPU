@@ -71,9 +71,14 @@ public:
     virtual void simulate() = 0;
 
     /** @brief Performs post-processing
-        @param cm ComponentManager object, either host or device */
+        @param cm ComponentManagerCPU object */
     void postProcess(
         const std::unique_ptr<ComponentManager<T, MemType::HOST>>& cm) const;
+
+    /** @brief Performs post-processing
+        @param cm ComponentManagerGPU object */
+    void postProcess(
+        const std::unique_ptr<ComponentManager<T, MemType::DEVICE>>& cm);
 
     /** @brief Tasks to perform after time-stepping */
     virtual void finalize();

@@ -11,13 +11,13 @@ __GLOBAL__ void
                                           uint  numComponents,
                                           uint* componentCellHash)
 {
-    uint tid = blockIdx.x * blockDim.x + threadIdx.x;
-    if(tid >= numComponents)
+    uint tID = blockIdx.x * blockDim.x + threadIdx.x;
+    if(tID >= numComponents)
         return;
 
-    // componentCellHash[tid] =
-    // (*LC)->computeLinearCellHash( (*LC)->computeCellId( tr[tid].getOrigin() ) );
-    componentCellHash[tid] = (*LC)->computeLinearCellHash(tr[tid].getOrigin());
+    // componentCellHash[tID] =
+    // (*LC)->computeLinearCellHash( (*LC)->computeCellId( tr[tID].getOrigin() ) );
+    componentCellHash[tID] = (*LC)->computeLinearCellHash(tr[tID].getOrigin());
 }
 
 // -----------------------------------------------------------------------------

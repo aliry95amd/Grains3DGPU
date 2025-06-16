@@ -124,7 +124,7 @@ void GrainsGPU<T>::simulate()
     Grains<T>::m_components->insertParticles(Grains<T>::m_insertion);
     // Copying to device
     cout << "Copying the inserted particles to the device ..." << endl;
-    m_d_components->copyFrom(Grains<T>::m_components);
+    Grains<T>::m_components->copyTo(m_d_components);
     cout << "Copying completed!" << endl;
     cout << "\nTime \t TO \tend \tParticles \tIn \tOut" << endl;
     for(GP::m_time = GP::m_tStart; GP::m_time <= GP::m_tEnd;
@@ -142,7 +142,7 @@ void GrainsGPU<T>::simulate()
         m_d_components->moveParticles(m_d_timeIntegrator);
 
         // Post-Processing
-        // Grains<T>::postProcess(m_d_components);
+        Grains<T>::postProcess(m_d_components);
     }
     cudaDeviceSynchronize();
 }
@@ -193,7 +193,7 @@ void GrainsGPU<T>::Construction(DOMElement* rootElement)
                                                    GP::m_numParticles,
                                                    GP::m_numObstacles,
                                                    GP::m_numCells);
-    m_d_components->copyFrom(Grains<T>::m_components);
+    // m_d_components->copyFrom(Grains<T>::m_components);
 
     // -------------------------------------------------------------------------
     // Contact force models
@@ -207,8 +207,6 @@ void GrainsGPU<T>::Construction(DOMElement* rootElement)
 
     // -------------------------------------------------------------------------
     // Temporal setting and time integration
-    DOMNode* tempSetting = ReaderXML::getNode(root, "TemporalSetting");
-    DOMNode* nTI         = ReaderXML::getNode(tempSetting, "TimeIntegration");
     // It is a GPU simulation, and we have already read time integration on the
     // host. We allocate memory on device and copy the scheme over.
     GoutWI(3, "Copying time integration scheme to device ...");

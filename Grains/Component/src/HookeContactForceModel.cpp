@@ -17,28 +17,28 @@ __HOST__ HookeContactForceModel<T>::HookeContactForceModel(DOMNode* root)
     DOMNode* parameter;
     parameter = ReaderXML::getNode(root, "kn");
     if(!parameter)
-        GoutWI(9, "kn not defined!", "Aborting Grains!");
+        GAbort("kn not defined! Aborting Grains!");
     m_kn = T(ReaderXML::getNodeValue_Double(parameter));
 
     parameter = ReaderXML::getNode(root, "en");
     if(!parameter)
-        GoutWI(9, "en not defined!", "Aborting Grains!");
+        GAbort("en not defined! Aborting Grains!");
     m_en   = T(ReaderXML::getNodeValue_Double(parameter));
     m_muen = log(m_en) / sqrt(PI<T> * PI<T> + log(m_en) * log(m_en));
 
     parameter = ReaderXML::getNode(root, "etat");
     if(!parameter)
-        GoutWI(9, "etat not defined!", "Aborting Grains!");
+        GAbort("etat not defined! Aborting Grains!");
     m_etat = T(ReaderXML::getNodeValue_Double(parameter));
 
     parameter = ReaderXML::getNode(root, "muc");
     if(!parameter)
-        GoutWI(9, "muc not defined!", "Aborting Grains!");
+        GAbort("muc not defined! Aborting Grains!");
     m_muc = T(ReaderXML::getNodeValue_Double(parameter));
 
     parameter = ReaderXML::getNode(root, "kr");
     if(!parameter)
-        GoutWI(9, "kr not defined!", "Aborting Grains!");
+        GAbort("kr not defined! Aborting Grains!");
     m_kr = T(ReaderXML::getNodeValue_Double(parameter));
 }
 
@@ -89,7 +89,7 @@ __HOSTDEVICE__ void HookeContactForceModel<T>::getContactForceModelParameters(
 // Performs forces & torques computation
 template <typename T>
 __HOSTDEVICE__ void HookeContactForceModel<T>::performForcesCalculus(
-    ContactInfo<T> const& contactInfos,
+    const ContactInfo<T>& contactInfos,
     const Vector3<T>&     relVelocityAtContact,
     const Vector3<T>&     relAngVelocity,
     T                     m1,
@@ -160,7 +160,7 @@ __HOSTDEVICE__ void HookeContactForceModel<T>::performForcesCalculus(
 // Returns a torce based on the contact information
 template <typename T>
 __HOSTDEVICE__ void HookeContactForceModel<T>::computeForces(
-    ContactInfo<T> const& contactInfos,
+    const ContactInfo<T>& contactInfos,
     const Vector3<T>&     relVelocityAtContact,
     const Vector3<T>&     relAngVelocity,
     T                     m1,

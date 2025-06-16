@@ -243,7 +243,7 @@ __HOSTDEVICE__ T RigidBody<T>::getCircumscribedRadius() const
 template <typename T>
 __HOSTDEVICE__ Kinematics<T>
                RigidBody<T>::computeMomentum(const Vector3<T>& omega,
-                                  Torce<T> const&   t) const
+                                  const Torce<T>&   t) const
 {
     // Translational momentum
     Vector3<T> transMomentum(t.getForce() / m_mass);

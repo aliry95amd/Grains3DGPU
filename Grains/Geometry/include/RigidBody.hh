@@ -129,7 +129,7 @@ public:
         @param t imposed torce in the body-fixed coordinate system */
     __HOSTDEVICE__
     Kinematics<T> computeMomentum(const Vector3<T>& omega,
-                                  Torce<T> const&   t) const;
+                                  const Torce<T>&   t) const;
 
     /** @brief Computes the acceleration of the rigid body as a kinematics
         object after imposing a torce (Torque + Force). The assumption is that

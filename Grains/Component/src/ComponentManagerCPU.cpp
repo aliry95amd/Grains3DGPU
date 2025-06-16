@@ -116,15 +116,17 @@ template <typename T>
 void ComponentManagerCPU<T>::computeContactForces(
     const GrainsMemBuffer<ContactForceModel<T>*, MemType::HOST>& CF)
 {
-    // Invoke the kernel
-    // computeContactForces_Kernel<<<numBlocks, numThreads>>>(CF,
-    //                                                        pairList,
-    //                                                        contactInfo,
-    //                                                        particleRB,
-    //                                                        velocity,
-    //                                                        torce,
-    //                                                        transform,
-    //                                                        m_nParticles);
+    // for(uint i = 0; i < m_nPairs; ++i)
+    // {
+    //     computeContactForces_common(CF.getData(),
+    //                                 m_neighborList->getData(),
+    //                                 m_contactInfo.getData(),
+    //                                 m_particleRB->getData(),
+    //                                 m_velocity.getData(),
+    //                                 m_torce.getData(),
+    //                                 m_transform.getData(),
+    //                                 i);
+    // }
 }
 
 // -----------------------------------------------------------------------------

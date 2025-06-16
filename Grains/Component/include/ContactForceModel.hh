@@ -65,7 +65,7 @@ public:
         @param torce computed force and torque */
     // @param nbContact number of contact points for composite particles */
     __HOSTDEVICE__
-    virtual void computeForces(ContactInfo<T> const& contactInfos,
+    virtual void computeForces(const ContactInfo<T>& contactInfos,
                                const Vector3<T>&     relVelocityAtContact,
                                const Vector3<T>&     relAngVelocity,
                                T                     m1,

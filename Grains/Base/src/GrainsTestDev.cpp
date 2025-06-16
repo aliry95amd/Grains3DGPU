@@ -47,11 +47,11 @@ namespace GrainsGPU
     {
         int bid = gridDim.x * gridDim.y * blockIdx.z + blockIdx.y * gridDim.x
                   + blockIdx.x;
-        int tid = bid * blockDim.x + threadIdx.x;
+        int tID = bid * blockDim.x + threadIdx.x;
 
-        dist[tid]
-            = distanceRigidBodies(*(rb[0]), *(rb[1]), t1[tid], t2[tid], method);
-        // dist[tid] = norm( t1[tid].getOrigin() + t2[tid].getOrigin() );
+        dist[tID]
+            = distanceRigidBodies(*(rb[0]), *(rb[1]), t1[tID], t2[tID], method);
+        // dist[tID] = norm( t1[tID].getOrigin() + t2[tID].getOrigin() );
     };
 } // GrainsGPU namespace end
 

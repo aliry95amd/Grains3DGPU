@@ -1,8 +1,6 @@
-#include <numeric>
-
+#include "Grains.hh"
 #include "ComponentManagerCPU.hh"
 #include "ContactForceModelFactory.hh"
-#include "Grains.hh"
 #include "LinkedCellFactory.hh"
 #include "PostProcessingWriterFactory.hh"
 #include "RigidBodyFactory.hh"
@@ -64,6 +62,29 @@ void Grains<T>::postProcess(
             pp->PostProcessing(m_particleRigidBodyList,
                                m_obstacleRigidBodyList,
                                cm,
+                               GP::m_time);
+    }
+    // In case we get past the saveTime, we need to remove it from the queue
+    if(GP::m_time > GP::m_tSave.front())
+        GP::m_tSave.pop();
+}
+
+// -----------------------------------------------------------------------------
+// Performs post-processing
+template <typename T>
+void Grains<T>::postProcess(
+    const std::unique_ptr<ComponentManager<T, MemType::DEVICE>>& cm)
+{
+    using GP = GrainsParameters<T>;
+
+    if(GP::m_tSave.front() - GP::m_time < 0.01 * GP::m_dt)
+    {
+        GP::m_tSave.pop();
+        cm->copyTo_PostProcessing(m_components);
+        for(auto& pp : m_postProcessor)
+            pp->PostProcessing(m_particleRigidBodyList,
+                               m_obstacleRigidBodyList,
+                               m_components,
                                GP::m_time);
     }
     // In case we get past the saveTime, we need to remove it from the queue

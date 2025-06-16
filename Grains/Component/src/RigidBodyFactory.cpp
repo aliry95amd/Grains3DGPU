@@ -26,8 +26,8 @@ __GLOBAL__ void createRigidBodyKernel(RigidBody<T>** rb,
                                       ConvexType     convexType,
                                       Arguments... args)
 {
-    uint tid = blockIdx.x * blockDim.x + threadIdx.x;
-    if(tid > 0)
+    uint tID = blockIdx.x * blockDim.x + threadIdx.x;
+    if(tID > 0)
         return;
 
     Convex<T>* convex = nullptr;

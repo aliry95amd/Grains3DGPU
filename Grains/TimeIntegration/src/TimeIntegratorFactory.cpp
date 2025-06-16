@@ -10,13 +10,13 @@
 // Memory address is then populated within the kernel.
 template <typename T>
 __GLOBAL__ void
-    createTimeIntegratorKernel(TimeIntegrator<T>** TI,
-                               uint                index,
-                               TimeIntegratorType  timeIntegratorType,
-                               T                   dt)
+    createTimeIntegratorKernel(TimeIntegrator<T>**      TI,
+                               const uint               index,
+                               const TimeIntegratorType timeIntegratorType,
+                               const T                  dt)
 {
-    uint tid = blockIdx.x * blockDim.x + threadIdx.x;
-    if(tid > 0)
+    uint tID = blockIdx.x * blockDim.x + threadIdx.x;
+    if(tID > 0)
         return;
 
     if(timeIntegratorType == FIRSTORDEREXPLICIT)
@@ -58,7 +58,7 @@ __HOST__ void TimeIntegratorFactory<T>::copyHostToDevice(
             continue;
 
         // Extracting info from the host side object
-        TimeIntegratorType timeIntegratorType
+        const TimeIntegratorType timeIntegratorType
             = h_TI[i]->getTimeIntegratorType();
         const T dt = h_TI[i]->getTimeStep();
         createTimeIntegratorKernel<<<1, 1>>>(d_TI.getData(),

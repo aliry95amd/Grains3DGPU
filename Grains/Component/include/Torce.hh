@@ -100,7 +100,7 @@ __HOST__ std::istream& operator>>(std::istream& fileIn, Torce<T>& t);
 @param fileOut output stream
 @param t torce */
 template <typename T>
-__HOST__ std::ostream& operator<<(std::ostream& fileOut, Torce<T> const& t);
+__HOST__ std::ostream& operator<<(std::ostream& fileOut, const Torce<T>& t);
 //@}
 
 typedef Torce<float>  TorceF;

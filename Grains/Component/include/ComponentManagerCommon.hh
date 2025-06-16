@@ -215,7 +215,7 @@ __HOSTDEVICE__ static INLINE void
     @param kinematics the kinematics of the particle
     @param torce the torce acting on the particle
     @param rigidBodyId the rigid body ID of the particle
-    @param pId the ID of the particle */
+    @param pID the ID of the particle */
 template <typename T>
 __HOSTDEVICE__ static INLINE void
     moveParticles_common(const TimeIntegrator<T>* const* TI,
@@ -224,43 +224,34 @@ __HOSTDEVICE__ static INLINE void
                          Kinematics<T>*                  kinematics,
                          Torce<T>*                       torce,
                          const uint*                     rigidBodyId,
-                         const uint                      pId)
+                         const uint                      pID)
 {
-    // // Rigid body
-    // const RigidBody<T>* rb = particleRB[rigidBodyId[pId]];
-    // // First, we compute quaternion of orientation
-    // Quaternion<T> qRot(transform.getBasis());
-    // // Computing momentums in the space-fixed coordinate
-    // const Kinematics<T>& momentum
-    //     = rb->computeMomentum(kinematics.getAngularComponent(), torce, qRot);
-    // // Reset torces
-    // torce.reset();
-    // // Finally, we move particles using the given time integration
-    // Vector3<T>    transMotion;
-    // Quaternion<T> rotMotion;
-    // TI[0]->Move(momentum, kinematics, transMotion, rotMotion);
+    // Rigid body
+    const RigidBody<T>* rb = particleRB[pID];
+    // First, we compute quaternion of orientation
+    Quaternion<T> qRot(transform[pID].getBasis());
+    // Computing momentums in the space-fixed coordinate
+    const Kinematics<T>& momentum
+        = rb->computeMomentum(kinematics[pID].getAngularComponent(),
+                              torce[pID],
+                              qRot);
+    // Reset torces
+    torce[pID].reset();
+    // Finally, we move particles using the given time integration
+    Vector3<T>    transMotion;
+    Quaternion<T> rotMotion;
+    TI[0]->Move(momentum, kinematics[pID], transMotion, rotMotion);
 
-    // // Quaternion and rotation quaternion conjugate
-    // Vector3<T>    om = kinematics.getAngularComponent();
-    // Quaternion<T> qRotCon(qRot.conjugate());
-    // // Write torque in body-fixed coordinates system
-    // Vector3<T> angAcc(qRot.multToVector3(om * qRotCon));
-    // // and update the transformation of the component
-    // transform.updateTransform(transMotion, rotMotion);
-    // // TODO
-    // // qRot = qRotChange * qRot;
-    // // qRotChange = T( 0.5 ) * ( m_velocity[ pId ].getAngularComponent() * qRot );
+    // Quaternion and rotation quaternion conjugate
+    Vector3<T>    om = kinematics[pID].getAngularComponent();
+    Quaternion<T> qRotCon(qRot.conjugate());
+    // Write torque in body-fixed coordinates system
+    Vector3<T> angAcc(qRot.multToVector3(om * qRotCon));
+    // and update the transformation of the component
+    transform[pID].updateTransform(transMotion, rotMotion);
+    // TODO
+    // qRot = qRotChange * qRot;
+    // qRotChange = T( 0.5 ) * ( m_velocity[ pID ].getAngularComponent() * qRot );
 }
 
-// /** @brief Resets the particle configurations
-// @param transform the transformation of the particle
-// */
-// template <typename T>
-// __HOSTDEVICE__ static INLINE void resetParticle(
-//     const Transform3<T>& transform,
-//     Torce<T>& torce
-// )
-// {
-//     torce.reset();
-// }
 #endif

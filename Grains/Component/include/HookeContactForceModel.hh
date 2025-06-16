@@ -82,7 +82,7 @@ public:
         @param delFT tangential force
         @param delM torque */
     __HOSTDEVICE__
-    void performForcesCalculus(ContactInfo<T> const& contactInfos,
+    void performForcesCalculus(const ContactInfo<T>& contactInfos,
                                const Vector3<T>&     relVelocityAtContact,
                                const Vector3<T>&     relAngVelocity,
                                T                     m1,
@@ -100,7 +100,7 @@ public:
         @param torce computed force and torque */
     // @param nbContact number of contact points for composite particles */
     __HOSTDEVICE__
-    void computeForces(ContactInfo<T> const& contactInfos,
+    void computeForces(const ContactInfo<T>& contactInfos,
                        const Vector3<T>&     relVelocityAtContact,
                        const Vector3<T>&     relAngVelocity,
                        T                     m1,
