@@ -37,12 +37,11 @@ __HOSTDEVICE__ Quaternion<T> TimeIntegrator<T>::computeQuaternionChange(
     const Vector3<T>& avgAngVel) const
 {
     // Quaternion change over dt
-    Quaternion<T> qRotChange;
-    T             nOmega = norm(avgAngVel);
+    const T nOmega = norm(avgAngVel);
     if(nOmega > HIGHEPS<T>)
     {
-        T c = cos(nOmega * m_dt / T(2));
-        T s = sin(nOmega * m_dt / T(2));
+        const T c = cos(nOmega * m_dt / T(2));
+        const T s = sin(nOmega * m_dt / T(2));
         // T c = cos( nOmega * m_dt );
         // T s = sin( nOmega * m_dt );
         return (Quaternion<T>((s / nOmega) * avgAngVel, c));

@@ -62,12 +62,12 @@ void ComponentManagerGPU<T>::updateNeighborList()
 template <typename T>
 void ComponentManagerGPU<T>::computeRelativeTransformations()
 {
-    using GP = GrainsParameters<T>;
-    // Kernel launch parameters
-    const uint numThreads = GP::m_numThreadsPerBlock;
-    const uint numBlocks  = GP::m_numBlocksPerGrid;
+    uint numThreads, numBlocks;
+    computeOptimalThreadsAndBlocks(m_neighborList->getSize(),
+                                   GrainsParameters<T>::m_GPU,
+                                   numBlocks,
+                                   numThreads);
 
-    // Invoke the kernel
     computeRelativeTransformations_Kernel<<<numBlocks, numThreads>>>(
         m_neighborList->getData(),
         m_transform.getData(),
@@ -82,8 +82,8 @@ void ComponentManagerGPU<T>::detectCollisionsObstacles()
 {
     using GP = GrainsParameters<T>;
     // Kernel launch parameters
-    // const uint numThreads = GP::m_numThreadsPerBlock;
-    // const uint numBlocks  = GP::m_numBlocksPerGrid;
+    // const uint numThreads = GP::m_numThreads;
+    // const uint numBlocks  = GP::m_numBlocks;
 
     // Invoke the kernel
     // detectCollisionAndComputeContactForcesObstacles_Kernel<<<numBlocks,
@@ -106,12 +106,12 @@ void ComponentManagerGPU<T>::detectCollisionsObstacles()
 template <typename T>
 void ComponentManagerGPU<T>::detectCollisionsParticles()
 {
-    using GP = GrainsParameters<T>;
-    // Kernel launch parameters
-    const uint numThreads = GP::m_numThreadsPerBlock;
-    const uint numBlocks  = GP::m_numBlocksPerGrid;
+    uint numThreads, numBlocks;
+    computeOptimalThreadsAndBlocks(m_neighborList->getSize(),
+                                   GrainsParameters<T>::m_GPU,
+                                   numBlocks,
+                                   numThreads);
 
-    // Invoke the kernel
     detectCollisionsParticles_Kernel<<<numBlocks, numThreads>>>(
         m_neighborList->getData(),
         m_particleRB->getData(),
@@ -144,20 +144,21 @@ template <typename T>
 void ComponentManagerGPU<T>::computeContactForces(
     const GrainsMemBuffer<ContactForceModel<T>*, MemType::DEVICE>& CF)
 {
-    using GP = GrainsParameters<T>;
-    // // Kernel launch parameters
-    // const uint numThreads = GP::m_numThreadsPerBlock;
-    // const uint numBlocks  = GP::m_numBlocksPerGrid;
+    uint numThreads, numBlocks;
+    computeOptimalThreadsAndBlocks(m_neighborList->getSize(),
+                                   GrainsParameters<T>::m_GPU,
+                                   numBlocks,
+                                   numThreads);
 
-    // Invoke the kernel
-    // computeContactForces_Kernel<<<numBlocks, numThreads>>>(CF,
-    //                                                        pairList,
-    //                                                        contactInfo,
-    //                                                        particleRB,
-    //                                                        velocity,
-    //                                                        torce,
-    //                                                        transform,
-    //                                                        m_nParticles);
+    computeContactForces_Kernel<<<numBlocks, numThreads>>>(
+        CF.getData(),
+        m_neighborList->getData(),
+        m_contactInfo.getData(),
+        m_particleRB->getData(),
+        m_velocity.getData(),
+        m_torce.getData(),
+        m_relTransform.getData(),
+        m_nPairs);
 }
 
 // -----------------------------------------------------------------------------
@@ -166,9 +167,12 @@ template <typename T>
 void ComponentManagerGPU<T>::addExternalForces()
 {
     using GP = GrainsParameters<T>;
-    // Kernel launch parameters
-    const uint numThreads = GP::m_numThreadsPerBlock;
-    const uint numBlocks  = GP::m_numBlocksPerGrid;
+
+    uint numThreads, numBlocks;
+    computeOptimalThreadsAndBlocks(GP::m_numParticles,
+                                   GP::m_GPU,
+                                   numBlocks,
+                                   numThreads);
 
     // since g is a host-side vector, we need to break it into three components
     // to be able to pass it to the kernel
@@ -176,7 +180,6 @@ void ComponentManagerGPU<T>::addExternalForces()
     const T gY = GP::m_gravity[Y];
     const T gZ = GP::m_gravity[Z];
 
-    // Invoke the kernel
     addExternalForces_Kernel<<<numBlocks, numThreads>>>(gX,
                                                         gY,
                                                         gZ,
@@ -191,15 +194,16 @@ template <typename T>
 void ComponentManagerGPU<T>::moveParticles(
     const GrainsMemBuffer<TimeIntegrator<T>*, MemType::DEVICE>& TI)
 {
-    using GP = GrainsParameters<T>;
-    // Kernel launch parameters
-    const uint numThreads = GP::m_numThreadsPerBlock;
-    const uint numBlocks  = GP::m_numBlocksPerGrid;
+    uint numThreads, numBlocks;
+    computeOptimalThreadsAndBlocks(GrainsParameters<T>::m_numParticles,
+                                   GrainsParameters<T>::m_GPU,
+                                   numBlocks,
+                                   numThreads);
 
-    // Invoke the kernel
     moveParticles_Kernel<<<numBlocks, numThreads>>>(TI.getData(),
                                                     m_particleRB->getData(),
                                                     m_transform.getData(),
+                                                    m_quaternion.getData(),
                                                     m_velocity.getData(),
                                                     m_torce.getData(),
                                                     m_rigidBodyId.getData(),

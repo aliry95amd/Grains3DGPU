@@ -185,6 +185,11 @@ public:
     __HOSTDEVICE__
     Quaternion<T>& operator*=(T d);
 
+    /** @brief Operator *=
+		@param q the other quaternion */
+    __HOSTDEVICE__
+    Quaternion<T>& operator*=(const Quaternion<T>& q);
+
     /** @brief ith component accessor
         @param i component index */
     __HOSTDEVICE__

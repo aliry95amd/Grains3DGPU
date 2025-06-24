@@ -35,6 +35,7 @@ protected:
     const GrainsMemBuffer<RigidBody<T>*, M>* m_particleRB;
     /** \brief Pointer to buffer of obstacles rigid bodies. */
     const GrainsMemBuffer<RigidBody<T>*, M>* m_obstacleRB;
+
     /** \brief Particles rigid body Id */
     GrainsMemBuffer<uint, M> m_rigidBodyId;
     /** \brief Particles transformation */
@@ -43,14 +44,18 @@ protected:
     GrainsMemBuffer<Kinematics<T>, M> m_velocity;
     /** \brief Particles torce */
     GrainsMemBuffer<Torce<T>, M> m_torce;
+    /** \brief Particles quaternion */
+    GrainsMemBuffer<Quaternion<T>, M> m_quaternion;
     /** \brief Particles Id */
     GrainsMemBuffer<uint, M> m_particleId;
+
     /** \brief Obstacles rigid body Id */
     GrainsMemBuffer<uint, M> m_obstacleRigidBodyId;
     /** \brief Obstacles transformation */
     GrainsMemBuffer<Transform3<T>, M> m_obstacleTransform;
     /** \brief Obstacles velocities */
     GrainsMemBuffer<Kinematics<T>, M> m_obstacleVelocity;
+
     /** \brief Number of particles in manager */
     uint m_nParticles;
     /** \brief Number of obstacles in manager */
@@ -97,7 +102,7 @@ public:
     {
         m_neighborList = new NeighborList_Nsq<T, M>(nParticles);
         m_nPairs       = m_neighborList->getSize();
-        initialize();
+        initializeToDefault();
     }
 
     // -------------------------------------------------------------------------
@@ -150,6 +155,15 @@ public:
     void getParticleId(GrainsMemBuffer<uint, destM>& buffer) const
     {
         m_particleId.copyTo(buffer);
+    }
+
+    // -------------------------------------------------------------------------
+    /** @brief Gets particles quaternions
+        @param buffer host buffer to copy data to */
+    template <MemType destM>
+    void getQuaternion(GrainsMemBuffer<Quaternion<T>, destM>& buffer) const
+    {
+        m_quaternion.copyTo(buffer);
     }
 
     // -------------------------------------------------------------------------
@@ -234,6 +248,15 @@ public:
         static_assert(M == MemType::HOST,
                       "getTorce() only available for HOST memory");
         return m_torce;
+    }
+
+    // -------------------------------------------------------------------------
+    /** @brief Gets particles quaternions */
+    const GrainsMemBuffer<Quaternion<T>, MemType::HOST>& getQuaternion() const
+    {
+        static_assert(M == MemType::HOST,
+                      "getQuaternion() only available for HOST memory");
+        return m_quaternion;
     }
 
     // -------------------------------------------------------------------------
@@ -336,6 +359,15 @@ public:
     }
 
     // -------------------------------------------------------------------------
+    /** @brief Sets particles torces
+        @param t host buffer containing the torces */
+    template <MemType srcM>
+    void setQuaternion(const GrainsMemBuffer<Quaternion<T>, srcM>& t)
+    {
+        m_quaternion.copyFrom(t);
+    }
+
+    // -------------------------------------------------------------------------
     /** @brief Sets the array of particles Ids
         @param id host buffer containing the particles Ids */
     template <MemType srcM>
@@ -396,18 +428,19 @@ public:
     //@{
     // -------------------------------------------------------------------------
     /** @brief Initializes (and reserves memory) the members to default */
-    void initialize()
+    void initializeToDefault()
     {
-        initDefault(m_obstacleRigidBodyId, m_nObstacles);
-        initDefault(m_obstacleTransform, m_nObstacles);
-        initDefault(m_obstacleVelocity, m_nObstacles);
-
         initDefault(m_rigidBodyId, m_nParticles);
         initDefault(m_transform, m_nParticles);
         initDefault(m_velocity, m_nParticles);
         initDefault(m_torce, m_nParticles);
-
+        initDefault(m_quaternion, m_nParticles);
         initDefault(m_particleId, m_nParticles);
+
+        initDefault(m_obstacleRigidBodyId, m_nObstacles);
+        initDefault(m_obstacleTransform, m_nObstacles);
+        initDefault(m_obstacleVelocity, m_nObstacles);
+
         initDefault(m_relTransform, m_nPairs);
         initDefault(m_contactInfo, m_nPairs);
     }
@@ -423,6 +456,7 @@ public:
         other->setTransform(m_transform);
         other->setVelocity(m_velocity);
         other->setTorce(m_torce);
+        other->setQuaternion(m_quaternion);
         other->setParticleId(m_particleId);
         // Obstacles
         other->setObstaclesRigidBodyId(m_obstacleRigidBodyId);
@@ -476,7 +510,8 @@ public:
         // Assigning
         for(uint i = 0; i < m_nParticles; ++i)
         {
-            m_transform[i] = initTr[i];
+            m_transform[i]  = initTr[i];
+            m_quaternion[i] = Quaternion<T>(initTr[i].getBasis());
         }
     }
 

@@ -134,21 +134,24 @@ __HOSTDEVICE__ static INLINE void
 
 // -----------------------------------------------------------------------------
 /** @brief Computes the contact forces
+    @param CF contact force models
     @param pairList list of rigid bodies pairs
-    @param particleRB rigid body of particles
-    @param transform transformation of the particles
     @param contactInfo contact information
+    @param particleRB rigid body of particles
+    @param velocity kinematics of the particles
+    @param torce torce acting on the particles
+    @param relTransform transformation of the particles
     @param pairID ID of the pair */
 template <typename T>
 __HOSTDEVICE__ static INLINE void
-    computeContactForces_common(ContactForceModel<T>**     CF,
-                                const uint2*               pairList,
-                                const ContactInfo<T>*      contactInfo,
-                                const RigidBody<T>* const* particleRB,
-                                const Kinematics<T>*       velocity,
-                                Torce<T>*                  torce,
-                                const Transform3<T>*       transform,
-                                const uint                 pairID)
+    computeContactForces_common(const ContactForceModel<T>* const* CF,
+                                const uint2*                       pairList,
+                                const ContactInfo<T>*              contactInfo,
+                                const RigidBody<T>* const*         particleRB,
+                                const Kinematics<T>*               velocity,
+                                Torce<T>*                          torce,
+                                const Transform3<T>*               relTransform,
+                                const uint                         pairID)
 {
     const ContactInfo<T>& ci = contactInfo[pairID];
     // Compute the forces
@@ -182,7 +185,7 @@ __HOSTDEVICE__ static INLINE void
                                           relAngVel,
                                           massA,
                                           massB,
-                                          transform[idA].getOrigin(),
+                                          relTransform[pairID].getOrigin(),
                                           torce[idA],
                                           torce[idB]);
     }
@@ -221,6 +224,7 @@ __HOSTDEVICE__ static INLINE void
     moveParticles_common(const TimeIntegrator<T>* const* TI,
                          const RigidBody<T>* const*      particleRB,
                          Transform3<T>*                  transform,
+                         Quaternion<T>*                  quaternion,
                          Kinematics<T>*                  kinematics,
                          Torce<T>*                       torce,
                          const uint*                     rigidBodyId,
@@ -228,13 +232,11 @@ __HOSTDEVICE__ static INLINE void
 {
     // Rigid body
     const RigidBody<T>* rb = particleRB[pID];
-    // First, we compute quaternion of orientation
-    Quaternion<T> qRot(transform[pID].getBasis());
     // Computing momentums in the space-fixed coordinate
     const Kinematics<T>& momentum
         = rb->computeMomentum(kinematics[pID].getAngularComponent(),
                               torce[pID],
-                              qRot);
+                              quaternion[pID]);
     // Reset torces
     torce[pID].reset();
     // Finally, we move particles using the given time integration
@@ -242,16 +244,8 @@ __HOSTDEVICE__ static INLINE void
     Quaternion<T> rotMotion;
     TI[0]->Move(momentum, kinematics[pID], transMotion, rotMotion);
 
-    // Quaternion and rotation quaternion conjugate
-    Vector3<T>    om = kinematics[pID].getAngularComponent();
-    Quaternion<T> qRotCon(qRot.conjugate());
-    // Write torque in body-fixed coordinates system
-    Vector3<T> angAcc(qRot.multToVector3(om * qRotCon));
-    // and update the transformation of the component
+    quaternion[pID] *= rotMotion;
     transform[pID].updateTransform(transMotion, rotMotion);
-    // TODO
-    // qRot = qRotChange * qRot;
-    // qRotChange = T( 0.5 ) * ( m_velocity[ pID ].getAngularComponent() * qRot );
 }
 
 #endif

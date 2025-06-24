@@ -71,15 +71,14 @@ __HOST__ RigidBody<T>::RigidBody(DOMNode* root)
     // checking if the material name is already defined.
     // If yes, we access the ID and store it for the rigid body.
     // If it is not, we add the material to the map.
-    if(GrainsParameters<T>::m_materialMap.count(material))
-        m_material = GrainsParameters<T>::m_materialMap[material];
-    else
+    // Getting the ID of the last material added to the map.
+    // This is basically the same as the size of the map.
+    if(GrainsParameters<T>::m_materialMap.count(material) == 0)
     {
-        // Getting the ID of the last material added to the map.
-        // This is basically the same as the size of the map.
         uint id = GrainsParameters<T>::m_materialMap.size();
         GrainsParameters<T>::m_materialMap.emplace(material, id);
     }
+    m_material = GrainsParameters<T>::m_materialMap[material];
     // Volume and mass
     m_volume  = m_convex->computeVolume();
     T density = T(0);

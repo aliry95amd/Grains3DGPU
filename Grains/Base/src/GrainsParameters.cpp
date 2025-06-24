@@ -48,9 +48,7 @@ std::queue<T> GrainsParameters<T>::m_tSave;
 template <typename T>
 bool GrainsParameters<T>::m_isGPU = false;
 template <typename T>
-uint GrainsParameters<T>::m_numThreadsPerBlock = 0;
-template <typename T>
-uint GrainsParameters<T>::m_numBlocksPerGrid = 0;
+cudaDeviceProp GrainsParameters<T>::m_GPU = {};
 
 /* MPI */
 // template <typename T> bool GrainsParameters<T>::m_isMPI = false;

@@ -11,8 +11,8 @@
 /* ========================================================================== */
 // Returns whether two rigid bodies os spherical shape intersect
 template <typename T>
-__HOSTDEVICE__ static INLINE bool intersectSpheres(RigidBody<T> const& rbA,
-                                                   RigidBody<T> const& rbB,
+__HOSTDEVICE__ static INLINE bool intersectSpheres(const RigidBody<T>& rbA,
+                                                   const RigidBody<T>& rbB,
                                                    const Vector3<T>&   b2a)
 {
     T radiiSum = rbA.getCircumscribedRadius() + rbB.getCircumscribedRadius();
@@ -24,11 +24,36 @@ __HOSTDEVICE__ static INLINE bool intersectSpheres(RigidBody<T> const& rbA,
 // Returns the contact information (if any) for 2 rigid bodies of spherical
 // shape
 template <typename T>
-__HOSTDEVICE__ static INLINE ContactInfo<T>
-                             closestPointsSpheres(RigidBody<T> const&  rbA,
-                                                  RigidBody<T> const&  rbB,
-                                                  const Transform3<T>& a2w,
-                                                  const Transform3<T>& b2w)
+__HOSTDEVICE__ static INLINE void
+    closestPointsSpheres(const RigidBody<T>&  rbA,
+                         const RigidBody<T>&  rbB,
+                         const Transform3<T>& b2a,
+                         ContactInfo<T>&      contactInfo)
+{
+    T          rA    = rbA.getCircumscribedRadius();
+    T          rB    = rbB.getCircumscribedRadius();
+    Vector3<T> vecBA = b2a.getOrigin();
+    // We calculate the overlap, and then normalize the distance vector.
+    T overlap = vecBA.norm() - rA - rB;
+    contactInfo.setOverlapDistance(overlap);
+    if(overlap < T(0))
+    {
+        contactInfo.setContactPoint((rA + T(.5) * overlap) * vecBA);
+        contactInfo.setContactVector(overlap * vecBA);
+    }
+    return;
+}
+
+// -----------------------------------------------------------------------------
+// Returns the contact information (if any) for 2 rigid bodies of spherical
+// shape
+template <typename T>
+__HOSTDEVICE__ static INLINE void
+    closestPointsSpheres(const RigidBody<T>&  rbA,
+                         const RigidBody<T>&  rbB,
+                         const Transform3<T>& a2w,
+                         const Transform3<T>& b2w,
+                         ContactInfo<T>&      contactInfo)
 {
     T          rA    = rbA.getCircumscribedRadius();
     T          rB    = rbB.getCircumscribedRadius();
@@ -36,15 +61,13 @@ __HOSTDEVICE__ static INLINE ContactInfo<T>
     Vector3<T> vecBA = b2w.getOrigin() - cenA;
     // We calculate the overlap, and then normalize the distance vector.
     T overlap = vecBA.norm() - rA - rB;
-    vecBA.normalize();
+    contactInfo.setOverlapDistance(overlap);
     if(overlap < T(0))
     {
-        Vector3<T> contactPt  = cenA + (rA + T(.5) * overlap) * vecBA;
-        Vector3<T> contactVec = overlap * vecBA;
-        return (ContactInfo<T>(contactPt, contactVec, overlap));
+        contactInfo.setContactPoint(cenA + (rA + T(.5) * overlap) * vecBA);
+        contactInfo.setContactVector(overlap * vecBA);
     }
-    else
-        return (noContact);
+    return;
 }
 
 // -----------------------------------------------------------------------------
@@ -135,6 +158,16 @@ __HOSTDEVICE__ void closestPointsRigidBodies(const RigidBody<T>&  rbA,
 
     const Convex<T>& convexA = *(rbA.getConvex());
     const Convex<T>& convexB = *(rbB.getConvex());
+
+    // If both convexes are spheres, we use a specific method
+    if(convexA.getConvexType() == ConvexType::SPHERE
+       && convexB.getConvexType() == ConvexType::SPHERE)
+    {
+        closestPointsSpheres(rbA, rbB, b2a, contactInfo);
+        return;
+    }
+
+    // General case for convexes
     // Sum of crust thicknesses
     T ctSum = rbA.getCrustThickness() + rbB.getCrustThickness();
 
@@ -195,6 +228,16 @@ __HOSTDEVICE__ void closestPointsRigidBodies(const RigidBody<T>&  rbA,
 
     const Convex<T>& convexA = *(rbA.getConvex());
     const Convex<T>& convexB = *(rbB.getConvex());
+
+    // If both convexes are spheres, we use a specific method
+    if(convexA.getConvexType() == ConvexType::SPHERE
+       && convexB.getConvexType() == ConvexType::SPHERE)
+    {
+        closestPointsSpheres(rbA, rbB, a2w, b2w, contactInfo);
+        return;
+    }
+
+    // General case for convexes
     // Sum of crust thicknesses
     T ctSum = rbA.getCrustThickness() + rbB.getCrustThickness();
 

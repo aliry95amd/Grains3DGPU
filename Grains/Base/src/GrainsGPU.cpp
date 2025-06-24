@@ -53,37 +53,7 @@ void GrainsGPU<T>::setupGPUDevice()
 
     // Since this function is invoked, it means a GPU simulation is requested.
     GP::m_isGPU = true;
-    // // Set the number of threads per block
-    // GP::m_numThreadsPerBlock = 2 * prop.multiProcessorCount;
-    // // Set the number of blocks
-    // GP::m_numBlocksPerGrid = (GP::m_numParticles + GP::m_numThreadsPerBlock - 1)
-    //                          / GP::m_numThreadsPerBlock;
-
-    // const uint warpSize   = 32;
-    const uint maxThreads = 256; // Avoid 1024 unless necessary
-    const uint minThreads = 32;
-    const uint minBlocks  = 2 * prop.multiProcessorCount;
-
-    // Start with 128 threads and compute how many blocks we need
-    uint threads = 128;
-    uint blocks  = (GP::m_numParticles + threads - 1) / threads;
-
-    // If we’re not filling the SMs enough, reduce threads
-    if(blocks < minBlocks && threads > minThreads)
-    {
-        blocks  = minBlocks;
-        threads = minThreads;
-    }
-
-    // If we're oversubscribing the SMs too much, increase thread count
-    if(blocks > 4 * prop.multiProcessorCount && threads < maxThreads)
-    {
-        threads = maxThreads;
-        blocks  = (GP::m_numParticles + threads - 1) / threads;
-    }
-
-    GP::m_numThreadsPerBlock = threads;
-    GP::m_numBlocksPerGrid   = blocks;
+    GP::m_GPU   = prop;
 }
 
 // -----------------------------------------------------------------------------

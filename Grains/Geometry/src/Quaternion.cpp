@@ -311,6 +311,19 @@ __HOSTDEVICE__ Quaternion<T>& Quaternion<T>::operator*=(T d)
 }
 
 // -----------------------------------------------------------------------------
+// Unitary operator *= by a quaternion -- this = q o this
+template <typename T>
+__HOSTDEVICE__ Quaternion<T>& Quaternion<T>::operator*=(const Quaternion<T>& q)
+{
+    T          w   = q.getScalar();
+    Vector3<T> v   = q.getVector();
+    T          tmp = (m_w * w) - (m_vqt * v);
+    m_vqt          = (m_vqt ^ v) + (m_w * v) + (w * m_vqt);
+    m_w            = tmp;
+    return (*this);
+}
+
+// -----------------------------------------------------------------------------
 // ith-component accessor: (0,1,2) for the vector components and 3 forthe scalar
 template <typename T>
 __HOSTDEVICE__ T Quaternion<T>::operator[](size_t i) const

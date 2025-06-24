@@ -59,10 +59,8 @@ public:
     /* GPU */
     /** \brief is simulation on GPU? */
     static bool m_isGPU;
-    /** \brief number of threads per block */
-    static uint m_numThreadsPerBlock;
-    /** \brief number of blocks per grid */
-    static uint m_numBlocksPerGrid;
+    /** \brief GPU device properties */
+    static cudaDeviceProp m_GPU;
     //@}
 };
 

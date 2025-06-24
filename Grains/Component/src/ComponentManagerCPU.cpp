@@ -116,17 +116,17 @@ template <typename T>
 void ComponentManagerCPU<T>::computeContactForces(
     const GrainsMemBuffer<ContactForceModel<T>*, MemType::HOST>& CF)
 {
-    // for(uint i = 0; i < m_nPairs; ++i)
-    // {
-    //     computeContactForces_common(CF.getData(),
-    //                                 m_neighborList->getData(),
-    //                                 m_contactInfo.getData(),
-    //                                 m_particleRB->getData(),
-    //                                 m_velocity.getData(),
-    //                                 m_torce.getData(),
-    //                                 m_transform.getData(),
-    //                                 i);
-    // }
+    for(uint i = 0; i < m_nPairs; ++i)
+    {
+        computeContactForces_common(CF.getData(),
+                                    m_neighborList->getData(),
+                                    m_contactInfo.getData(),
+                                    m_particleRB->getData(),
+                                    m_velocity.getData(),
+                                    m_torce.getData(),
+                                    m_relTransform.getData(),
+                                    i);
+    }
 }
 
 // -----------------------------------------------------------------------------
@@ -156,6 +156,7 @@ void ComponentManagerCPU<T>::moveParticles(
         moveParticles_common(TI.getData(),
                              m_particleRB->getData(),
                              m_transform.getData(),
+                             m_quaternion.getData(),
                              m_velocity.getData(),
                              m_torce.getData(),
                              m_rigidBodyId.getData(),

@@ -121,19 +121,19 @@ void Grains<T>::Construction(DOMElement* rootElement)
 
     // -------------------------------------------------------------------------
     // Domain size: origin, max coordinates and periodicity
-    DOMNode* nDomain = ReaderXML::getNode(root, "LinkedCell");
-    GP::m_maxCoordinate.setValue(
-        T(ReaderXML::getNodeAttr_Double(nDomain, "MX")),
-        T(ReaderXML::getNodeAttr_Double(nDomain, "MY")),
-        T(ReaderXML::getNodeAttr_Double(nDomain, "MZ")));
-
     DOMNode* nOrigin = ReaderXML::getNode(root, "Origin");
     if(nOrigin)
-        GP::m_origin.setValue(T(ReaderXML::getNodeAttr_Double(nOrigin, "OX")),
-                              T(ReaderXML::getNodeAttr_Double(nOrigin, "OY")),
-                              T(ReaderXML::getNodeAttr_Double(nOrigin, "OZ")));
+        GP::m_origin.setValue(T(ReaderXML::getNodeAttr_Double(nOrigin, "X")),
+                              T(ReaderXML::getNodeAttr_Double(nOrigin, "Y")),
+                              T(ReaderXML::getNodeAttr_Double(nOrigin, "Z")));
     else
         GP::m_origin.setValue(T(0), T(0), T(0));
+
+    DOMNode* nDomain = ReaderXML::getNode(root, "MaxCoordinate");
+    GP::m_maxCoordinate.setValue(
+        T(ReaderXML::getNodeAttr_Double(nDomain, "X")),
+        T(ReaderXML::getNodeAttr_Double(nDomain, "Y")),
+        T(ReaderXML::getNodeAttr_Double(nDomain, "Z")));
 
     // if the simulation is periodic
     DOMNode* nPeriodicity = ReaderXML::getNode(root, "Periodicity");

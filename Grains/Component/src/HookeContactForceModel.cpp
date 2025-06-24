@@ -166,7 +166,8 @@ __HOSTDEVICE__ void HookeContactForceModel<T>::computeForces(
     T                     m1,
     T                     m2,
     const Vector3<T>&     trOrigin,
-    Torce<T>&             torce) const
+    Torce<T>&             torceA,
+    Torce<T>&             torceB) const
 {
     // Compute contact force and torque
     Vector3<T> delFN, delFT, delM;
@@ -179,10 +180,15 @@ __HOSTDEVICE__ void HookeContactForceModel<T>::computeForces(
                           delFT,
                           delM);
 
-    Vector3<T> geometricPointOfContact = contactInfos.getContactPoint();
-    torce.addForce(delFN + delFT, geometricPointOfContact - trOrigin);
+    const Vector3<T>& geometricPointOfContact = contactInfos.getContactPoint();
+    delFN += delFT;
+    torceA.addForce(delFN, geometricPointOfContact);
+    torceB.addForce(-delFN, geometricPointOfContact - trOrigin);
     if(m_kr)
-        torce.addTorque(delM);
+    {
+        torceA.addTorque(delM);
+        torceB.addTorque(-delM);
+    }
 }
 
 // -----------------------------------------------------------------------------

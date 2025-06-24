@@ -35,6 +35,41 @@ __HOST__ static INLINE void
 }
 
 // -----------------------------------------------------------------------------
+/** @brief computes the optimal number of threads and blocks for a given number
+    of elements and an architecture
+    @param numElements the number of elements
+    @param numThreads the number of threads per block
+    @param numBlocks the minimum number of blocks
+    @param prop the device properties */
+__HOST__ static INLINE void
+    computeOptimalThreadsAndBlocks(const uint            numElements,
+                                   const cudaDeviceProp& prop,
+                                   uint&                 numThreads,
+                                   uint&                 numBlocks)
+{
+    constexpr uint maxThreads = 256; // Avoid 1024 unless necessary
+    constexpr uint minThreads = 32;
+    const uint     minBlocks  = 2 * prop.multiProcessorCount;
+
+    // Start with 128 threads and compute how many blocks we need
+    numThreads = 128;
+    numBlocks  = (numElements + numThreads - 1) / numThreads;
+
+    // If we’re not filling the SMs enough, reduce threads
+    if(numBlocks < minBlocks && numThreads > minThreads)
+    {
+        numBlocks  = minBlocks;
+        numThreads = minThreads;
+    }
+    // If we're oversubscribing the SMs too much, increase thread count
+    if(numBlocks > 4 * prop.multiProcessorCount && numThreads < maxThreads)
+    {
+        numThreads = maxThreads;
+        numBlocks  = (numElements + numThreads - 1) / numThreads;
+    }
+}
+
+// -----------------------------------------------------------------------------
 /** @brief Writes a real number with a prescribed number of digits in a string
 @param figure the float number
 @param size number of digits */

@@ -185,6 +185,41 @@ __GLOBAL__ void
 }
 
 // -----------------------------------------------------------------------------
+/** @brief Computes the contact forces
+    @param CF contact force models
+    @param pairList list of rigid bodies pairs
+    @param contactInfo contact information
+    @param particleRB rigid body of particles
+    @param velocity kinematics of the particles
+    @param torce torce acting on the particles
+    @param relTransform transformation of the particles */
+template <typename T>
+__GLOBAL__ void
+    computeContactForces_Kernel(const ContactForceModel<T>* const* CF,
+                                const uint2*                       pairList,
+                                const ContactInfo<T>*              contactInfo,
+                                const RigidBody<T>* const*         particleRB,
+                                const Kinematics<T>*               velocity,
+                                Torce<T>*                          torce,
+                                const Transform3<T>*               relTransform,
+                                const uint                         nPairs)
+{
+    uint tID = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if(tID >= nPairs)
+        return;
+
+    computeContactForces_common(CF,
+                                pairList,
+                                contactInfo,
+                                particleRB,
+                                velocity,
+                                torce,
+                                relTransform,
+                                tID);
+}
+
+// -----------------------------------------------------------------------------
 /** @brief Adds external forces such as gravity
     @param gx the gravity field - the x component
     @param gy the gravity field - the y component
@@ -213,6 +248,7 @@ __GLOBAL__ void addExternalForces_Kernel(const T                    gX,
     @param TI time integrator scheme
     @param particleRB array of rigid bodies for particles
     @param transform array of particles transformations
+    @param quaternion array of particles quaternions
     @param velocity array of particles velocities
     @param torce array of particles torces
     @param rigidBodyId array of rigid body IDs for particles
@@ -221,6 +257,7 @@ template <typename T>
 __GLOBAL__ void moveParticles_Kernel(const TimeIntegrator<T>* const* TI,
                                      const RigidBody<T>* const*      particleRB,
                                      Transform3<T>*                  transform,
+                                     Quaternion<T>*                  quaternion,
                                      Kinematics<T>*                  velocity,
                                      Torce<T>*                       torce,
                                      const uint* rigidBodyId,
@@ -234,6 +271,7 @@ __GLOBAL__ void moveParticles_Kernel(const TimeIntegrator<T>* const* TI,
     moveParticles_common(TI,
                          particleRB,
                          transform,
+                         quaternion,
                          velocity,
                          torce,
                          rigidBodyId,

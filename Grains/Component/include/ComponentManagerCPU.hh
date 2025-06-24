@@ -23,8 +23,10 @@ class ComponentManagerCPU : public ComponentManager<T, MemType::HOST>
     using CM::m_obstacleRigidBodyId;
     using CM::m_obstacleTransform;
     using CM::m_obstacleVelocity;
+
     using CM::m_particleId;
     using CM::m_particleRB;
+    using CM::m_quaternion;
     using CM::m_rigidBodyId;
     using CM::m_torce;
     using CM::m_transform;
