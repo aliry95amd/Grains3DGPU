@@ -9,17 +9,15 @@ template <typename T>
 ComponentManagerCPU<T>::ComponentManagerCPU() = default;
 
 // -----------------------------------------------------------------------------
-// Constructor with the number of particles, number of obstacles, and number of
-// cells with all other data members initialized as default.
+// Constructor with the number of particles, and obstacles
 template <typename T>
 ComponentManagerCPU<T>::ComponentManagerCPU(
     GrainsMemBuffer<RigidBody<T>*, MemType::HOST>* particleRB,
     GrainsMemBuffer<RigidBody<T>*, MemType::HOST>* obstacleRB,
     uint                                           nParticles,
-    uint                                           nObstacles,
-    uint                                           nCells)
+    uint                                           nObstacles)
     : ComponentManager<T, MemType::HOST>(
-          particleRB, obstacleRB, nParticles, nObstacles, nCells)
+          particleRB, obstacleRB, nParticles, nObstacles)
 {
     allocate();
     initialize();
@@ -35,8 +33,6 @@ ComponentManagerCPU<T>::~ComponentManagerCPU() = default;
 template <typename T>
 void ComponentManagerCPU<T>::allocate()
 {
-    m_particleCellHash.reserve(m_nParticles);
-    m_cell.resize(m_nCells + 1);
 }
 
 // -------------------------------------------------------------------------
@@ -44,16 +40,15 @@ void ComponentManagerCPU<T>::allocate()
 template <typename T>
 void ComponentManagerCPU<T>::initialize()
 {
-    m_neighborList->createNeighborList(m_transform.getData(), m_nParticles);
 }
 
 // -----------------------------------------------------------------------------
-// Updates links between particles and linked cell
+// Updates neighbor list if needed
 template <typename T>
 void ComponentManagerCPU<T>::updateNeighborList()
 {
-    if(m_neighborList->needsUpdate(m_transform.getData(), m_nParticles) == true)
-        m_neighborList->updateNeighborList(m_transform.getData(), m_nParticles);
+    if(m_neighborList->needsUpdate())
+        m_neighborList->updateNeighborList(m_transform);
 }
 
 // -----------------------------------------------------------------------------

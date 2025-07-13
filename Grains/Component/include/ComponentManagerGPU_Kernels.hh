@@ -13,8 +13,6 @@
 #include "ContactForceModel.hh"
 #include "ContactForceModelFactory.hh"
 #include "GrainsParameters.hh"
-#include "LinkedCell.hh"
-#include "LinkedCellGPUWrapper.hh"
 #include "NeighborList.hh"
 #include "RigidBody.hh"
 #include "TimeIntegrator.hh"
@@ -31,75 +29,6 @@
 // =============================================================================
 /** @name ComponentManagerGPU_Kernels : External methods */
 //@{
-/** @brief Zeros out the array
-    @param array array to be zero-ed out
-    @param numElements number of elements in the array */
-__GLOBAL__
-void zeroOutArray_Kernel(uint* array, uint numElements)
-{
-    uint tID = blockIdx.x * blockDim.x + threadIdx.x;
-
-    if(tID >= numElements)
-        return;
-
-    array[tID] = 0;
-}
-
-// -----------------------------------------------------------------------------
-/** @brief Returns the start Id for each hash value in cellStart
-    @param componentCellHash sorted array of cell hash values
-    @param numComponents number of components
-    @param cellStartAndEnd start and end indices as s1, e1, s2, e2, ... */
-__GLOBAL__
-void sortComponentsAndFindCellStart_Kernel(const uint* componentCellHash,
-                                           uint        numComponents,
-                                           uint*       cellStart,
-                                           uint*       cellEnd)
-{
-    // Handle to thread block group
-    cooperative_groups::thread_block cta
-        = cooperative_groups::this_thread_block();
-    extern __shared__ uint sharedHash[]; // blockSize + 1 elements
-    uint                   tID = blockIdx.x * blockDim.x + threadIdx.x;
-
-    uint hash;
-    if(tID < numComponents)
-    {
-        hash = componentCellHash[tID];
-        // Load hash data into shared memory so that we can look at neighboring
-        // component's hash value without loading two hash values per thread
-        sharedHash[threadIdx.x + 1] = hash;
-        // first thread in block must load neighboring component hash as well
-        if(tID > 0 && threadIdx.x == 0)
-            sharedHash[0] = componentCellHash[tID - 1];
-    }
-    cooperative_groups::sync(cta);
-
-    if(tID < numComponents)
-    {
-        // If this component has a different cell hash value to the previous
-        // component then it must be the first component in the cell.
-        // As it isn't the first component, it must also be the end of the
-        // previous component's cell.
-
-        if(tID == 0 || hash != sharedHash[threadIdx.x])
-        {
-            cellStart[hash] = tID;
-            if(tID > 0)
-                cellEnd[sharedHash[threadIdx.x]] = tID; // excluding
-        }
-        if(tID == numComponents - 1)
-            cellEnd[hash] = tID + 1;
-    }
-    // // Now use the sorted index to reorder the pos and vel data
-    // uint sortedIndex = gridParticleIndex[index];
-    // float4 pos = oldPos[sortedIndex];
-    // float4 vel = oldVel[sortedIndex];
-
-    // sortedPos[index] = pos;
-    // sortedVel[index] = vel;
-}
-
 // -----------------------------------------------------------------------------
 /** @brief Computes the relative transformations between pairs of components
     @param pairList list of pairs of components

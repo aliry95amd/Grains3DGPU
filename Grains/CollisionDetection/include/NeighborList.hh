@@ -27,6 +27,8 @@ protected:
     //@{
     /** \brief Pair list */
     GrainsMemBuffer<uint2, M> m_pairList;
+    /** \brief If neighbor list needs update */
+    bool m_needsUpdate;
     //@}
 
 public:
@@ -38,10 +40,7 @@ public:
 
     // -------------------------------------------------------------------------
     /** @brief Destructor */
-    virtual ~NeighborList()
-    {
-        m_pairList.free();
-    }
+    virtual ~NeighborList() = default;
     //@}
 
     /** @name Get methods */
@@ -71,28 +70,19 @@ public:
     /** @name Methods */
     //@{
     // -------------------------------------------------------------------------
-    /** @brief Creates the neighbor list 
-    @param transforms array of transformations
-    @param nParticles number of particles */
-    virtual void createNeighborList(const Transform3<T>* transforms,
-                                    const uint           nParticles)
-        = 0;
-
-    // -------------------------------------------------------------------------
     /** @brief Updates the neighbor list 
-    @param transforms array of transformations
-    @param nParticles number of particles */
-    virtual void updateNeighborList(const Transform3<T>* transforms,
-                                    const uint           nParticles)
+    @param transforms array of transformations */
+    virtual void
+        updateNeighborList(GrainsMemBuffer<Transform3<T>, M>& transforms)
         = 0;
 
     // -------------------------------------------------------------------------
     /** @brief Returns true if update is needed 
-    @param transforms array of transformations
-    @param nParticles number of particles */
-    virtual bool needsUpdate(const Transform3<T>* transforms,
-                             const uint           nParticles) const
-        = 0;
+    @param transforms array of transformations */
+    bool needsUpdate() const
+    {
+        return m_needsUpdate;
+    }
     //@}
 };
 

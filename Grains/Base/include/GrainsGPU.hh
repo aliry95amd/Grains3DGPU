@@ -24,8 +24,6 @@ protected:
     here as we want to use runtime polymorphism for switching between 
     ComponentManagerCPU and ComponentManagerGPU. */
     std::unique_ptr<ComponentManager<T, MemType::DEVICE>> m_d_components;
-    /** \brief Buffer of Linked cells. */
-    GrainsMemBuffer<LinkedCell<T>*, MemType::DEVICE> m_d_linkedCell;
     /** \brief Buffer of contact forces. */
     GrainsMemBuffer<ContactForceModel<T>*, MemType::DEVICE> m_d_contactForce;
     /** \brief Buffer of time integrators. */

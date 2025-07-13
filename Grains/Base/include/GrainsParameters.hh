@@ -37,8 +37,6 @@ public:
     static uint m_numParticles;
     /** @brief Number of obstacles in simulation */
     static uint m_numObstacles;
-    /** @brief Number of cells in simulation */
-    static uint m_numCells;
     /** @brief Maximum radius among all particles */
     static T m_maxRadius;
 
@@ -53,7 +51,7 @@ public:
     static uint m_numContactPairs;
 
     /* Post-Processing */
-    /** \brief Queue of simulation time to write PP */
+    /** \brief Queue of simulation time to write Post-Processing */
     static std::queue<T> m_tSave;
 
     /* GPU */
@@ -61,10 +59,25 @@ public:
     static bool m_isGPU;
     /** \brief GPU device properties */
     static cudaDeviceProp m_GPU;
+
+    /* Collision Detection */
+    /** \brief Type of neighbor list */
+    static uint m_neighborListType;
+    /** \brief Frequency of updating neighbor list */
+    static uint m_neighborListFrequency;
+    /** \brief Type of linked cell */
+    static uint m_linkedCellType;
+    /** \brief Linked cell size factor */
+    static uint m_linkedCellSizeFactor;
+    /** \brief Frequency of sorting particles */
+    static uint m_sortingFrequency;
+    /** @brief Number of cells in linked cell */
+    static uint m_numCells;
+    /** \brief Type of bounding volume */
+    static uint m_boundingVolumeType;
+    /** \brief Type of narrow-phase detection */
+    static uint m_narrowPhaseType;
     //@}
 };
-
-typedef GrainsParameters<float>  GrainsParamatersF;
-typedef GrainsParameters<double> GrainsParamatersD;
 
 #endif

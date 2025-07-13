@@ -111,6 +111,8 @@ INCFLAGS  := $(INCDIR:%=-I%) $(GRAINS_XERCES_INCDIR:%=-I%)
 COMPFLAGS := $(GRAINS_GPU_COMPILER_FLAGS) $(INCFLAGS)
 LINKFLAGS := $(GRAINS_GPU_LINKER_FLAGS) $(GRAINS_Z_FLAGS) $(GRAINS_XERCES_FLAGS)
 
+# Enable parallel compilation by default (using 2 fewer cores)
+MAKEFLAGS += -j$(shell nproc)
 
 #------------------------------------------------------------------------------
 # Production rules

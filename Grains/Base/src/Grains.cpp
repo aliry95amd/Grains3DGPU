@@ -1,7 +1,6 @@
 #include "Grains.hh"
 #include "ComponentManagerCPU.hh"
 #include "ContactForceModelFactory.hh"
-#include "LinkedCellFactory.hh"
 #include "PostProcessingWriterFactory.hh"
 #include "RigidBodyFactory.hh"
 #include "TimeIntegratorFactory.hh"
@@ -48,7 +47,7 @@ void Grains<T>::initialize(DOMElement* rootElement)
 }
 
 // -----------------------------------------------------------------------------
-// Performs post-processing
+// Performs post-processing on the host
 template <typename T>
 void Grains<T>::postProcess(
     const std::unique_ptr<ComponentManager<T, MemType::HOST>>& cm) const
@@ -70,7 +69,7 @@ void Grains<T>::postProcess(
 }
 
 // -----------------------------------------------------------------------------
-// Performs post-processing
+// Performs post-processing on the device
 template <typename T>
 void Grains<T>::postProcess(
     const std::unique_ptr<ComponentManager<T, MemType::DEVICE>>& cm)
@@ -230,28 +229,86 @@ void Grains<T>::Construction(DOMElement* rootElement)
     }
 
     // -------------------------------------------------------------------------
-    // LinkedCell
-    GoutWI(6, "Constructing linked cell ...");
-    DOMNode* nColDet     = ReaderXML::getNode(root, "CollisionDetection");
-    DOMNode* nLinkedCell = ReaderXML::getNode(nColDet, "LinkedCell");
-    uint     numCells    = 0;
-    LinkedCellFactory<T>::create(nLinkedCell, m_linkedCell, numCells);
-    GP::m_numCells = numCells;
-    GoutWI(6, "Constructing linked cell completed!");
-
-    // -------------------------------------------------------------------------
-    // Setting up the component managers
-    GP::m_numParticles = numParticles;
-    GP::m_numObstacles = numObstacles;
-    m_components
-        = std::make_unique<ComponentManagerCPU<T>>(&m_particleRigidBodyList,
-                                                   &m_obstacleRigidBodyList,
-                                                   GP::m_numParticles,
-                                                   GP::m_numObstacles,
-                                                   GP::m_numCells);
-    // Initialize the particles and obstacles
-    m_components->initializeParticles(particlesInitialTransform);
-    m_components->initializeObstacles(obstaclesInitialTransform);
+    // Setting up collision detection
+    GoutWI(6, "Reading collision detection ...");
+    DOMNode* collisionDetection
+        = ReaderXML::getNode(root, "CollisionDetection");
+    if(!collisionDetection)
+        GAbort("CollisionDetection node is mandatory!");
+    // Neighbor list
+    DOMNode* nNeighborList
+        = ReaderXML::getNode(collisionDetection, "NeighborList");
+    if(!nNeighborList)
+        GAbort("NeighborList node not found");
+    std::string neighborListType
+        = ReaderXML::getNodeAttr_String(nNeighborList, "Type");
+    if(neighborListType == "BruteForce")
+        GP::m_neighborListType = 0;
+    else if(neighborListType == "LinkedCell")
+        GP::m_neighborListType = 1;
+    else
+        GAbort("Unknown NeighborList type! Aborting Grains!");
+    GP::m_neighborListFrequency
+        = ReaderXML::getNodeAttr_Int(nNeighborList, "UpdateFrequency");
+    GoutWI(9,
+           "NeighborList generation with " + neighborListType
+               + " and frequency " + std::to_string(GP::m_neighborListFrequency)
+               + " ...");
+    // Linked cell
+    if(GP::m_neighborListType == 1)
+    {
+        DOMNode* nLinkedCell
+            = ReaderXML::getNode(collisionDetection, "LinkedCell");
+        if(!nLinkedCell)
+            GAbort("LinkedCell node is mandatory when using LinkedCell "
+                   "neighbor list!");
+        std::string linkedCellType
+            = ReaderXML::getNodeAttr_String(nLinkedCell, "Type");
+        if(linkedCellType == "MemoryEfficient")
+            GP::m_linkedCellType = 1;
+        else
+            GAbort("Unknown LinkedCell type! Aborting Grains!");
+        GP::m_linkedCellSizeFactor
+            = T(ReaderXML::getNodeAttr_Double(nLinkedCell, "CellSizeFactor"));
+        GP::m_sortingFrequency
+            = ReaderXML::getNodeAttr_Int(nLinkedCell, "SortingFrequency");
+        GoutWI(9,
+               linkedCellType + " LinkedCell" + " with cell size factor: "
+                   + std::to_string(GP::m_linkedCellSizeFactor)
+                   + " and sorting frequency "
+                   + std::to_string(GP::m_sortingFrequency) + " ...");
+    }
+    // Bounding volume
+    DOMNode* nBoundingVolume
+        = ReaderXML::getNode(collisionDetection, "BoundingVolume");
+    if(nBoundingVolume)
+    {
+        std::string boundingVolumeType
+            = ReaderXML::getNodeAttr_String(nBoundingVolume, "Type");
+        if(boundingVolumeType == "OFF")
+            GP::m_boundingVolumeType = 0;
+        else if(boundingVolumeType == "OBB")
+            GP::m_boundingVolumeType = 1;
+        else if(boundingVolumeType == "OBC")
+            GP::m_boundingVolumeType = 2;
+        else
+            GAbort("Unknown bounding volume type! Aborting Grains!");
+        GoutWI(9, boundingVolumeType + " Bounding volume ...");
+    }
+    // Narrow phase detection
+    DOMNode* nNarrowPhase
+        = ReaderXML::getNode(collisionDetection, "NarrowPhase");
+    if(nNarrowPhase)
+    {
+        std::string narrowPhaseType
+            = ReaderXML::getNodeAttr_String(nNarrowPhase, "Type");
+        if(narrowPhaseType == "GJK")
+            GP::m_narrowPhaseType = 0;
+        else
+            GAbort("Unknown narrow phase type! Aborting Grains!");
+        GoutWI(9, narrowPhaseType + " Narrow phase detection ...");
+    }
+    GoutWI(6, "Reading collision detection completed!");
 
     // -------------------------------------------------------------------------
     // Contact force models
@@ -288,6 +345,19 @@ void Grains<T>::Construction(DOMElement* rootElement)
             GoutWI(6, "Reading time integration model completed!");
         }
     }
+
+    // -------------------------------------------------------------------------
+    // Setting up the component managers
+    GP::m_numParticles = numParticles;
+    GP::m_numObstacles = numObstacles;
+    m_components
+        = std::make_unique<ComponentManagerCPU<T>>(&m_particleRigidBodyList,
+                                                   &m_obstacleRigidBodyList,
+                                                   GP::m_numParticles,
+                                                   GP::m_numObstacles);
+    // Initialize the particles and obstacles
+    m_components->initializeParticles(particlesInitialTransform);
+    m_components->initializeObstacles(obstaclesInitialTransform);
 }
 
 // -----------------------------------------------------------------------------

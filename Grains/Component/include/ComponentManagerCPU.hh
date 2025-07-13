@@ -14,7 +14,6 @@ template <typename T>
 class ComponentManagerCPU : public ComponentManager<T, MemType::HOST>
 {
     using CM = ComponentManager<T, MemType::HOST>;
-    using CM::m_nCells;
     using CM::m_nObstacles;
     using CM::m_nPairs;
     using CM::m_nParticles;
@@ -36,33 +35,22 @@ class ComponentManagerCPU : public ComponentManager<T, MemType::HOST>
     using CM::m_neighborList;
     using CM::m_relTransform;
 
-protected:
-    /** @name Parameters */
-    //@{
-    /** \brief Particles cell hash */
-    GrainsMemBuffer<uint, MemType::HOST> m_particleCellHash;
-    /** \brief Cells and particle Ids each cell contains */
-    std::vector<std::vector<uint>> m_cell;
-    //@}
-
 public:
     /** @name Constructors */
     //@{
     /** @brief Default constructor */
     ComponentManagerCPU();
 
-    /** @brief Constructor with the number of particles, obstacles, and cells. 
+    /** @brief Constructor with the number of particles, and obstacles. 
         @param particleRB Pointer to the particles rigid body buffer
         @param obstacleRB Pointer to the obstacles rigid body buffer
         @param nParticles Number of particles
-        @param nObstacles Number of obstacles
-        @param nCells Number of cells */
+        @param nObstacles Number of obstacles */
     ComponentManagerCPU(
         GrainsMemBuffer<RigidBody<T>*, MemType::HOST>* particleRB,
         GrainsMemBuffer<RigidBody<T>*, MemType::HOST>* obstacleRB,
         uint                                           nParticles,
-        uint                                           nObstacles,
-        uint                                           nCells);
+        uint                                           nObstacles);
 
     /** @brief Destructor */
     ~ComponentManagerCPU();

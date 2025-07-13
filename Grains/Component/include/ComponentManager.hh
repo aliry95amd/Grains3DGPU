@@ -14,7 +14,7 @@
 
 #include "ContactInfo.hh"
 #include "NeighborList.hh"
-#include "NeighborList_Nsq.hh"
+#include "NeighborListFactory.hh"
 
 // =============================================================================
 /** @brief The class ComponentManager.
@@ -60,8 +60,6 @@ protected:
     uint m_nParticles;
     /** \brief Number of obstacles in manager */
     uint m_nObstacles;
-    /** \brief Number of cells in manager */
-    uint m_nCells;
     /** \brief Number of pairs in manager */
     uint m_nPairs;
 
@@ -83,31 +81,32 @@ public:
     ComponentManager() = default;
 
     // -------------------------------------------------------------------------
-    /** @brief Constructor with the number of particles, obstacles, and cells. 
+    /** @brief Constructor with the number of particles, and obstacles 
         @param particleRB Pointer to the particles rigid body buffer
         @param obstacleRB Pointer to the obstacles rigid body buffer
         @param nParticles Number of particles
-        @param nObstacles Number of obstacles
-        @param nCells Number of cells */
+        @param nObstacles Number of obstacles */
     ComponentManager(GrainsMemBuffer<RigidBody<T>*, M>* particleRB,
                      GrainsMemBuffer<RigidBody<T>*, M>* obstacleRB,
                      uint                               nParticles,
-                     uint                               nObstacles,
-                     uint                               nCells)
+                     uint                               nObstacles)
         : m_particleRB(particleRB)
         , m_obstacleRB(obstacleRB)
         , m_nParticles(nParticles)
         , m_nObstacles(nObstacles)
-        , m_nCells(nCells)
     {
-        m_neighborList = new NeighborList_Nsq<T, M>(nParticles);
-        m_nPairs       = m_neighborList->getSize();
+        NeighborListFactory<T, M>::create(m_neighborList);
+        m_nPairs = m_neighborList->getSize();
         initializeToDefault();
     }
 
     // -------------------------------------------------------------------------
     /** @brief Destructor */
-    virtual ~ComponentManager() = default;
+    virtual ~ComponentManager()
+    {
+        if(m_neighborList)
+            delete m_neighborList;
+    }
     //@}
 
     /** @name Get methods */
@@ -310,13 +309,6 @@ public:
     uint getNumberOfObstacles() const
     {
         return m_nObstacles;
-    }
-
-    // -------------------------------------------------------------------------
-    /** @brief Gets the number of cells in manager */
-    uint getNumberOfCells() const
-    {
-        return m_nCells;
     }
     //@}
 

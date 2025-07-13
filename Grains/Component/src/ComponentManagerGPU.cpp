@@ -1,7 +1,6 @@
 // #include <curand.h>
 #include "ComponentManagerGPU.hh"
 #include "ComponentManagerGPU_Kernels.hh"
-#include "LinkedCellGPUWrapper.hh"
 
 // -----------------------------------------------------------------------------
 // Default constructor
@@ -9,17 +8,15 @@ template <typename T>
 ComponentManagerGPU<T>::ComponentManagerGPU() = default;
 
 // -----------------------------------------------------------------------------
-// Constructor with the number of particles, number of obstacles, and number of
-// cells.
+// Constructor with the number of particles, and obstacles
 template <typename T>
 ComponentManagerGPU<T>::ComponentManagerGPU(
     GrainsMemBuffer<RigidBody<T>*, MemType::DEVICE>* particleRB,
     GrainsMemBuffer<RigidBody<T>*, MemType::DEVICE>* obstacleRB,
     uint                                             nParticles,
-    uint                                             nObstacles,
-    uint                                             nCells)
+    uint                                             nObstacles)
     : ComponentManager<T, MemType::DEVICE>(
-          particleRB, obstacleRB, nParticles, nObstacles, nCells)
+          particleRB, obstacleRB, nParticles, nObstacles)
 {
     allocate();
     initialize();
@@ -35,9 +32,6 @@ ComponentManagerGPU<T>::~ComponentManagerGPU() = default;
 template <typename T>
 void ComponentManagerGPU<T>::allocate()
 {
-    m_particleCellHash.reserve(m_nParticles);
-    m_cellHashStart.reserve(m_nCells);
-    m_cellHashEnd.reserve(m_nCells);
 }
 
 // -------------------------------------------------------------------------
@@ -45,16 +39,15 @@ void ComponentManagerGPU<T>::allocate()
 template <typename T>
 void ComponentManagerGPU<T>::initialize()
 {
-    m_neighborList->createNeighborList(m_transform.getData(), m_nParticles);
 }
 
 // -----------------------------------------------------------------------------
-// Updates links between particles and linked cell
+// Updates the neighbor list if needed
 template <typename T>
 void ComponentManagerGPU<T>::updateNeighborList()
 {
-    if(m_neighborList->needsUpdate(m_transform.getData(), m_nParticles) == true)
-        m_neighborList->updateNeighborList(m_transform.getData(), m_nParticles);
+    if(m_neighborList->needsUpdate())
+        m_neighborList->updateNeighborList(m_transform);
 }
 
 // -----------------------------------------------------------------------------

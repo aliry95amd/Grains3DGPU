@@ -1,7 +1,6 @@
 #include "GrainsGPU.hh"
 #include "ContactForceModelFactory.hh"
 #include "Grains.hh"
-#include "LinkedCellFactory.hh"
 #include "PostProcessingWriterFactory.hh"
 #include "RigidBodyFactory.hh"
 #include "TimeIntegratorFactory.hh"
@@ -149,20 +148,12 @@ void GrainsGPU<T>::Construction(DOMElement* rootElement)
     GoutWI(3, "Copying obstacle types to device completed!");
 
     // -------------------------------------------------------------------------
-    // LinkedCell
-    GoutWI(3, "Constructing linked cell on device ...");
-    LinkedCellFactory<T>::copyHostToDevice(Grains<T>::m_linkedCell,
-                                           m_d_linkedCell);
-    GoutWI(3, "Constructing linked cell on device completed!");
-
-    // -------------------------------------------------------------------------
     // Setting up the component managers
     m_d_components
         = std::make_unique<ComponentManagerGPU<T>>(&m_d_particleRigidBodyList,
                                                    &m_d_obstacleRigidBodyList,
                                                    GP::m_numParticles,
-                                                   GP::m_numObstacles,
-                                                   GP::m_numCells);
+                                                   GP::m_numObstacles);
     // m_d_components->copyFrom(Grains<T>::m_components);
 
     // -------------------------------------------------------------------------
