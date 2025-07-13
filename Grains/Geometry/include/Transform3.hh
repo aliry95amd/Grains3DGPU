@@ -110,7 +110,7 @@ public:
 
     /** @brief Sets the transformation to the identity */
     __HOSTDEVICE__
-    void setIdentity();
+    void setIDentity();
 
     /** @brief Sets the transformation to the inverse of another 
         transformation

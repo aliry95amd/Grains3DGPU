@@ -14,68 +14,70 @@
 // =============================================================================
 /** @name CollisionDetection : External methods */
 //@{
-/** @brief Returns whether 2 rigid bodies intersect
- @param rbA first rigid body
- @param rbB second rigid body
- @param a2w geometric transformation describing convex A in the world reference
- frame
- @param b2w geometric transformation describing convex B in the world reference
- frame */
-template <typename T, typename U>
-__HOSTDEVICE__ bool intersectRigidBodies(RigidBody<T, U> const& rbA,
-                                         RigidBody<T, U> const& rbB,
-                                         const Transform3<T>&   a2w,
-                                         const Transform3<T>&   b2w);
-
 /** @brief Returns whether 2 rigid bodies intersect - relative transformation
- @param rbA first rigid body
- @param rbB second rigid body
- @param b2a geometric tramsformation describing convex B in the A's reference
- frame */
-template <typename T, typename U>
-__HOSTDEVICE__ bool intersectRigidBodies(RigidBody<T, U> const& rbA,
-                                         RigidBody<T, U> const& rbB,
-                                         const Transform3<T>&   b2a);
+    @param rbA first rigid body
+    @param rbB second rigid body
+    @param b2a geometric tramsformation describing convex B in the A's reference
+    frame */
+template <typename T>
+__HOSTDEVICE__ bool intersectRigidBodies(const RigidBody<T>&  rbA,
+                                         const RigidBody<T>&  rbB,
+                                         const Transform3<T>& b2a);
+
+/** @brief Returns whether 2 rigid bodies intersect
+    @param rbA first rigid body
+    @param rbB second rigid body
+    @param a2w geometric transformation describing convex A in the world reference
+    frame
+    @param b2w geometric transformation describing convex B in the world reference
+    frame */
+template <typename T>
+__HOSTDEVICE__ bool intersectRigidBodies(const RigidBody<T>&  rbA,
+                                         const RigidBody<T>&  rbB,
+                                         const Transform3<T>& a2w,
+                                         const Transform3<T>& b2w);
+
+/** @brief Returns the contact information (if any) for 2 rigid bodies - 
+    relative transformation
+    @param rbA first rigid body
+    @param rbB second rigid body
+    @param b2a geometric tramsformation describing convex B in the A's reference
+    frame
+    @param contactInfo output contact information */
+template <typename T>
+__HOSTDEVICE__ void closestPointsRigidBodies(const RigidBody<T>&  rbA,
+                                             const RigidBody<T>&  rbB,
+                                             const Transform3<T>& b2a,
+                                             ContactInfo<T>&      contactInfo);
 
 /** @brief Returns the contact information (if any) for 2 rigid bodies
- @param rbA first rigid body
- @param rbB second rigid body
- @param a2w geometric tramsformation describing convex A in the world reference
- frame
- @param b2w geometric tramsformation describing convex B in the world reference
- frame */
-template <typename T, typename U>
-__HOSTDEVICE__ ContactInfo<T>
-               closestPointsRigidBodies(RigidBody<T, U> const& rbA,
-                                        RigidBody<T, U> const& rbB,
-                                        const Transform3<T>&   a2w,
-                                        const Transform3<T>&   b2w);
-
-// TODO: LATER
-// /** @brief Returns the contact information (if any) for 2 rigid bodies -
-// relative transformation
-//  @param rbA first rigid body
-//  @param rbB second rigid body
-//  @param b2a geometric tramsformation describing convex B in the A's reference
-//  frame */
-// __HOSTDEVICE__
-// ContactInfo closestPointsRigidBodies( RigidBody const& rbA,
-//                                       RigidBody const& rbB,
-//                                       Transform3d const& b2a );
+    @param rbA first rigid body
+    @param rbB second rigid body
+    @param a2w geometric tramsformation describing convex A in the world reference
+    frame
+    @param b2w geometric tramsformation describing convex B in the world reference
+    frame
+    @param contactInfo output contact information */
+template <typename T>
+__HOSTDEVICE__ void closestPointsRigidBodies(const RigidBody<T>&  rbA,
+                                             const RigidBody<T>&  rbB,
+                                             const Transform3<T>& a2w,
+                                             const Transform3<T>& b2w,
+                                             ContactInfo<T>&      contactInfo);
 
 /** @brief Returns the di (if any) for 2 rigid bodies
- @param rbA first rigid body
- @param rbB second rigid body
- @param a2w geometric tramsformation describing convex A in the world reference
- frame
- @param b2w geometric tramsformation describing convex B in the world reference
- frame */
-template <typename T, typename U>
-__HOSTDEVICE__ T distanceRigidBodies(RigidBody<T, U> const& rbA,
-                                     RigidBody<T, U> const& rbB,
-                                     const Transform3<T>&   a2w,
-                                     const Transform3<T>&   b2w,
-                                     int const              method);
+    @param rbA first rigid body
+    @param rbB second rigid body
+    @param a2w geometric tramsformation describing convex A in the world 
+    reference frame
+    @param b2w geometric tramsformation describing convex B in the world 
+    reference frame */
+template <typename T>
+__HOSTDEVICE__ T distanceRigidBodies(const RigidBody<T>&  rbA,
+                                     const RigidBody<T>&  rbB,
+                                     const Transform3<T>& a2w,
+                                     const Transform3<T>& b2w,
+                                     const uint           method);
 //@}
 
 #endif

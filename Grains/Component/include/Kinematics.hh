@@ -94,7 +94,7 @@ __HOST__ std::istream& operator>>(std::istream& fileIn, Kinematics<T>& k);
 @param k kinematics */
 template <typename T>
 __HOST__ std::ostream& operator<<(std::ostream&        fileOut,
-                                  Kinematics<T> const& k);
+                                  const Kinematics<T>& k);
 //@}
 
 typedef Kinematics<float>  KinematicsF;

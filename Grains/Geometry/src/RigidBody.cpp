@@ -1,25 +1,22 @@
 #include "RigidBody.hh"
-#include "ConvexBuilderFactory.hh"
+#include "ConvexFactory.hh"
 #include "GrainsParameters.hh"
 #include "QuaternionMath.hh"
 #include "VectorMath.hh"
 
 // -----------------------------------------------------------------------------
 // Default constructor
-template <typename T, typename U>
-__HOSTDEVICE__ RigidBody<T, U>::RigidBody()
+template <typename T>
+__HOSTDEVICE__ RigidBody<T>::RigidBody()
     : m_convex(NULL)
-    , m_boundingBox(NULL)
 {
 }
 
 // -----------------------------------------------------------------------------
 // Constructor with a convex and the crust thickness
-template <typename T, typename U>
-__HOSTDEVICE__ RigidBody<T, U>::RigidBody(Convex<T>* convex,
-                                          T          ct,
-                                          uint       material,
-                                          T          density)
+template <typename T>
+__HOSTDEVICE__
+    RigidBody<T>::RigidBody(Convex<T>* convex, T ct, uint material, T density)
     : m_convex(convex)
     , m_crustThickness(ct)
     , m_material(material)
@@ -51,21 +48,16 @@ __HOSTDEVICE__ RigidBody<T, U>::RigidBody(Convex<T>* convex,
             m_inertia_1[i] /= density;
         }
     }
-    // Last, bounding volume and circumscribed radius
-    // We cast type T to U just in case they are different.
-    // It happens only at the start when the rigid body is created.
-    m_boundingBox         = new BoundingBox(Vector3<U>(boundingBox));
-    m_circumscribedRadius = U(m_convex->computeCircumscribedRadius());
 }
 
 // -----------------------------------------------------------------------------
 // Constructor with an XML input
-template <typename T, typename U>
-__HOST__ RigidBody<T, U>::RigidBody(DOMNode* root)
+template <typename T>
+__HOST__ RigidBody<T>::RigidBody(DOMNode* root)
 {
     // Convex
     DOMNode* shape = ReaderXML::getNode(root, "Convex");
-    m_convex       = ConvexBuilderFactory<T>::create(shape);
+    m_convex       = ConvexFactory<T>::create(shape);
     // Crust thickenss
     m_crustThickness
         = T(ReaderXML::getNodeAttr_Double(shape, "CrustThickness"));
@@ -79,30 +71,21 @@ __HOST__ RigidBody<T, U>::RigidBody(DOMNode* root)
     // checking if the material name is already defined.
     // If yes, we access the ID and store it for the rigid body.
     // If it is not, we add the material to the map.
-    if(GrainsParameters<T>::m_materialMap.count(material))
-        m_material = GrainsParameters<T>::m_materialMap[material];
-    else
+    // Getting the ID of the last material added to the map.
+    // This is basically the same as the size of the map.
+    if(GrainsParameters<T>::m_materialMap.count(material) == 0)
     {
-        // Getting the ID of the last material added to the map.
-        // This is basically the same as the size of the map.
         uint id = GrainsParameters<T>::m_materialMap.size();
         GrainsParameters<T>::m_materialMap.emplace(material, id);
     }
+    m_material = GrainsParameters<T>::m_materialMap[material];
     // Volume and mass
     m_volume  = m_convex->computeVolume();
-    T density = T(ReaderXML::getNodeAttr_Double(root, "Density"));
-    m_mass    = density * m_volume;
-    // Considering the density for tensor of inertia
-    if(density == 0)
+    T density = T(0);
+    if(ReaderXML::hasNodeAttr(root, "Density"))
     {
-        for(int i = 0; i < 6; i++)
-        {
-            m_inertia[i]   = 0;
-            m_inertia_1[i] = 0;
-        }
-    }
-    else
-    {
+        density = T(ReaderXML::getNodeAttr_Double(root, "Density"));
+        m_mass  = density * m_volume;
         // Storing inertia and inverse of it
         m_convex->computeInertia(m_inertia, m_inertia_1);
         for(int i = 0; i < 6; i++)
@@ -111,30 +94,30 @@ __HOST__ RigidBody<T, U>::RigidBody(DOMNode* root)
             m_inertia_1[i] /= density;
         }
     }
-    // Last, bounding volume and circumscribed radius
-    // We cast type T to U just in case they are different.
-    // It happens only at the start when the rigid body is created.
-    m_boundingBox         = new BoundingBox(Vector3<U>(boundingBox));
-    m_circumscribedRadius = U(m_convex->computeCircumscribedRadius());
+    else
+    {
+        m_mass = T(0);
+        for(int i = 0; i < 6; i++)
+        {
+            m_inertia[i]   = T(0);
+            m_inertia_1[i] = T(0);
+        }
+    }
 }
 
 // -----------------------------------------------------------------------------
 // Copy constructor
-template <typename T, typename U>
-__HOSTDEVICE__ RigidBody<T, U>::RigidBody(RigidBody<T, U> const& rb)
+template <typename T>
+__HOSTDEVICE__ RigidBody<T>::RigidBody(RigidBody<T> const& rb)
     : m_convex(NULL)
     , m_crustThickness(rb.m_crustThickness)
     , m_scaling(rb.m_scaling)
     , m_material(rb.m_material)
     , m_volume(rb.m_volume)
     , m_mass(rb.m_mass)
-    , m_boundingBox(NULL)
-    , m_circumscribedRadius(rb.m_circumscribedRadius)
 {
     if(rb.m_convex)
         m_convex = rb.m_convex->clone();
-    if(rb.m_boundingBox)
-        m_boundingBox = rb.m_boundingBox->clone();
     for(int i = 0; i < 6; ++i)
     {
         m_inertia[i]   = rb.m_inertia[i];
@@ -143,66 +126,93 @@ __HOSTDEVICE__ RigidBody<T, U>::RigidBody(RigidBody<T, U> const& rb)
 }
 
 // -----------------------------------------------------------------------------
+// Copy assignment operator
+template <typename T>
+__HOSTDEVICE__ RigidBody<T>& RigidBody<T>::operator=(const RigidBody<T>& other)
+{
+    if(this != &other)
+    {
+        delete m_convex;
+        for(int i = 0; i < 6; ++i)
+        {
+            m_inertia[i]   = 0;
+            m_inertia_1[i] = 0;
+        }
+        m_convex         = other.m_convex ? other.m_convex->clone() : nullptr;
+        m_crustThickness = other.m_crustThickness;
+        m_scaling        = other.m_scaling;
+        m_material       = other.m_material;
+        m_volume         = other.m_volume;
+        m_mass           = other.m_mass;
+        for(int i = 0; i < 6; ++i)
+        {
+            m_inertia[i]   = other.m_inertia[i];
+            m_inertia_1[i] = other.m_inertia_1[i];
+        }
+    }
+    return *this;
+}
+
+// -----------------------------------------------------------------------------
 // Destructor
-template <typename T, typename U>
-__HOSTDEVICE__ RigidBody<T, U>::~RigidBody()
+template <typename T>
+__HOSTDEVICE__ RigidBody<T>::~RigidBody()
 {
     delete m_convex;
-    delete m_boundingBox;
 }
 
 // -----------------------------------------------------------------------------
 // Gets the rigid body's convex
-template <typename T, typename U>
-__HOSTDEVICE__ Convex<T>* RigidBody<T, U>::getConvex() const
+template <typename T>
+__HOSTDEVICE__ Convex<T>* RigidBody<T>::getConvex() const
 {
     return (m_convex);
 }
 
 // -----------------------------------------------------------------------------
 // Gets the rigid body's crust thickness
-template <typename T, typename U>
-__HOSTDEVICE__ T RigidBody<T, U>::getCrustThickness() const
+template <typename T>
+__HOSTDEVICE__ T RigidBody<T>::getCrustThickness() const
 {
     return (m_crustThickness);
 }
 
 // -----------------------------------------------------------------------------
 // Gets the scaling vector related to crust thickness
-template <typename T, typename U>
-__HOSTDEVICE__ Vector3<T> RigidBody<T, U>::getScalingVector() const
+template <typename T>
+__HOSTDEVICE__ Vector3<T> RigidBody<T>::getScalingVector() const
 {
     return (m_scaling);
 }
 
 // -----------------------------------------------------------------------------
 // Gets the rigid body's material ID
-template <typename T, typename U>
-__HOSTDEVICE__ uint RigidBody<T, U>::getMaterial() const
+template <typename T>
+__HOSTDEVICE__ uint RigidBody<T>::getMaterial() const
 {
     return (m_material);
 }
 
 // -----------------------------------------------------------------------------
 // Gets the rigid body's volume
-template <typename T, typename U>
-__HOSTDEVICE__ T RigidBody<T, U>::getVolume() const
+template <typename T>
+__HOSTDEVICE__ T RigidBody<T>::getVolume() const
 {
     return (m_volume);
 }
 
 // -----------------------------------------------------------------------------
 // Gets the rigid body's volume
-template <typename T, typename U>
-__HOSTDEVICE__ T RigidBody<T, U>::getMass() const
+template <typename T>
+__HOSTDEVICE__ T RigidBody<T>::getMass() const
 {
     return (m_mass);
 }
 
 // -----------------------------------------------------------------------------
 // Gets the rigid body's inertia
-template <typename T, typename U>
-__HOSTDEVICE__ void RigidBody<T, U>::getInertia(T (&inertia)[6]) const
+template <typename T>
+__HOSTDEVICE__ void RigidBody<T>::getInertia(T (&inertia)[6]) const
 {
     for(int i = 0; i < 6; ++i)
         inertia[i] = m_inertia[i];
@@ -210,37 +220,29 @@ __HOSTDEVICE__ void RigidBody<T, U>::getInertia(T (&inertia)[6]) const
 
 // -----------------------------------------------------------------------------
 // Gets the inverse of rigid body's inertia
-template <typename T, typename U>
-__HOSTDEVICE__ void RigidBody<T, U>::getInertia_1(T (&inertia_1)[6]) const
+template <typename T>
+__HOSTDEVICE__ void RigidBody<T>::getInertia_1(T (&inertia_1)[6]) const
 {
     for(int i = 0; i < 6; ++i)
         inertia_1[i] = m_inertia_1[i];
 }
 
 // -----------------------------------------------------------------------------
-// Gets the rigid body's bounding box
-template <typename T, typename U>
-__HOSTDEVICE__ BoundingBox<U>* RigidBody<T, U>::getBoundingBox() const
+// Gets the circumcribed radius of the rigid body
+template <typename T>
+__HOSTDEVICE__ T RigidBody<T>::getCircumscribedRadius() const
 {
-    return (m_boundingBox);
-}
-
-// -----------------------------------------------------------------------------
-// Gets the rigid body's circumscribed radius
-template <typename T, typename U>
-__HOSTDEVICE__ U RigidBody<T, U>::getCircumscribedRadius() const
-{
-    return (m_circumscribedRadius);
+    return (m_convex->computeCircumscribedRadius());
 }
 
 // -----------------------------------------------------------------------------
 // Computes the acceleration of the rigid body given a torce and angular
 // velocity in the body-fixed coordinate system -- In the body-fixed coordinate
 // system, the moment of inertia tensor is assumed to be diagonal.
-template <typename T, typename U>
+template <typename T>
 __HOSTDEVICE__ Kinematics<T>
-               RigidBody<T, U>::computeMomentum(const Vector3<T>& omega,
-                                     Torce<T> const&   t) const
+               RigidBody<T>::computeMomentum(const Vector3<T>& omega,
+                                  const Torce<T>&   t) const
 {
     // Translational momentum
     Vector3<T> transMomentum(t.getForce() / m_mass);
@@ -263,8 +265,8 @@ __HOSTDEVICE__ Kinematics<T>
 // -----------------------------------------------------------------------------
 // Computes the acceleration of the rigid body given the angular velocity and a
 // torce in the space-fixed coordinate system
-template <typename T, typename U>
-__HOSTDEVICE__ Kinematics<T> RigidBody<T, U>::computeMomentum(
+template <typename T>
+__HOSTDEVICE__ Kinematics<T> RigidBody<T>::computeMomentum(
     const Vector3<T>& omega, const Torce<T>& t, const Quaternion<T>& q) const
 {
     // Angular momentum
@@ -308,6 +310,5 @@ __HOSTDEVICE__ Kinematics<T> RigidBody<T, U>::computeMomentum(
 
 // -----------------------------------------------------------------------------
 // Explicit instantiation
-template class RigidBody<float, float>;
-template class RigidBody<double, float>;
-template class RigidBody<double, double>;
+template class RigidBody<float>;
+template class RigidBody<double>;

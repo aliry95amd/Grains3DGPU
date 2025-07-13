@@ -7,6 +7,7 @@
 
 #include "Basic.hh"
 #include "ComponentManager.hh"
+#include "GrainsMemBuffer.hh"
 #include "ReaderXML.hh"
 
 // PostProcessingWriter types
@@ -30,7 +31,7 @@ protected:
     /** @name Constructors */
     //@{
     /** @brief Default constructor */
-    __HOST__
+
     PostProcessingWriter();
     //@}
 
@@ -38,13 +39,13 @@ public:
     /** @name Constructors */
     //@{
     /** @brief Destructor */
-    __HOST__
+
     virtual ~PostProcessingWriter();
     //@}
 
     /** @name Get methods */
     //@{
-    __HOST__
+
     virtual PostProcessingWriterType getPostProcessingWriterType() const = 0;
     //@}
 
@@ -53,29 +54,30 @@ public:
     /** @brief Removes post-processing files already in the directory
      @param directory directory of the files to be removed
      @param patterns Regex patterns of the files to be removed */
-    __HOST__
+
     void
         clearPostProcessingFiles(const std::filesystem::path&   directory,
                                  const std::vector<std::regex>& patterns) const;
 
     /** @brief Initializes the post-processing writer */
-    __HOST__
+
     virtual void PostProcessing_start() = 0;
 
     /** @brief Writes post-processing data
-     @param particleRB Arrays of particles rigid bodies
-     @param obstacleRB Arrays of obstacles rigid bodies
-     @param cm component manager
-     @param currentTime Current simulation time */
-    __HOST__
-    virtual void PostProcessing(RigidBody<T, T> const* const* particleRB,
-                                RigidBody<T, T> const* const* obstacleRB,
-                                const ComponentManager<T>*    cm,
-                                const T                       currentTime)
+        @param particleRB Arrays of particles rigid bodies
+        @param obstacleRB Arrays of obstacles rigid bodies
+        @param cm Component manager
+        @param currentTime Current simulation time */
+
+    virtual void
+        PostProcessing(const GrainsMemBuffer<RigidBody<T>*>&       particleRB,
+                       const GrainsMemBuffer<RigidBody<T>*>&       obstacleRB,
+                       const std::unique_ptr<ComponentManager<T>>& cm,
+                       const T                                     currentTime)
         = 0;
 
     /** @brief Finalizes writing data */
-    __HOST__
+
     virtual void PostProcessing_end() = 0;
     //@}
 };

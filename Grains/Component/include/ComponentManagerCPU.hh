@@ -11,43 +11,29 @@
     @author A.Yazdani - 2024 - Construction */
 // =============================================================================
 template <typename T>
-class ComponentManagerCPU : public ComponentManager<T>
+class ComponentManagerCPU : public ComponentManager<T, MemType::HOST>
 {
-protected:
-    /** @name Parameters */
-    //@{
-    /** \brief Particles rigid body Id */
-    std::vector<uint> m_rigidBodyId;
-    /** \brief Obsatcles rigid body Id */
-    std::vector<uint> m_obstacleRigidBodyId;
-    /** \brief Particles transformation */
-    std::vector<Transform3<T>> m_transform;
-    /** \brief Obstacles transformation */
-    std::vector<Transform3<T>> m_obstacleTransform;
-    /** \brief Particles velocities */
-    std::vector<Kinematics<T>> m_velocity;
-    /** \brief Particles torce */
-    std::vector<Torce<T>> m_torce;
-    /** \brief Particles Id */
-    std::vector<uint> m_particleId;
-    /** \brief Particles cell hash */
-    std::vector<uint> m_particleCellHash;
-    /** \brief Cells and particle Ids each cell contains */
-    std::vector<std::vector<uint>> m_cell;
-    /** \brief Number of particles in manager */
-    uint m_nParticles;
-    /** \brief Number of obstacles in manager */
-    uint m_nObstacles;
-    /** \brief Number of cells in manager */
-    uint m_nCells;
+    using CM = ComponentManager<T, MemType::HOST>;
+    using CM::m_nObstacles;
+    using CM::m_nPairs;
+    using CM::m_nParticles;
 
-    // /**< components neighbor Id */
-    // std::vector<uint> m_neighborsId;
-    // /**< components neighbor count */
-    // std::vector<uint> m_neighborsCount;
-    /**< array of components activity in the simulation */
-    // std::vector<bool> m_isActive;
-    //@}
+    using CM::m_obstacleRB;
+    using CM::m_obstacleRigidBodyId;
+    using CM::m_obstacleTransform;
+    using CM::m_obstacleVelocity;
+
+    using CM::m_particleId;
+    using CM::m_particleRB;
+    using CM::m_quaternion;
+    using CM::m_rigidBodyId;
+    using CM::m_torce;
+    using CM::m_transform;
+    using CM::m_velocity;
+
+    using CM::m_contactInfo;
+    using CM::m_neighborList;
+    using CM::m_relTransform;
 
 public:
     /** @name Constructors */
@@ -55,9 +41,16 @@ public:
     /** @brief Default constructor */
     ComponentManagerCPU();
 
-    /** @brief Constructor with the number of particles, obstacles, and
-        cells. All other data members are set to default. */
-    ComponentManagerCPU(uint nParticles, uint nObstacles, uint nCells);
+    /** @brief Constructor with the number of particles, and obstacles. 
+        @param particleRB Pointer to the particles rigid body buffer
+        @param obstacleRB Pointer to the obstacles rigid body buffer
+        @param nParticles Number of particles
+        @param nObstacles Number of obstacles */
+    ComponentManagerCPU(
+        GrainsMemBuffer<RigidBody<T>*, MemType::HOST>* particleRB,
+        GrainsMemBuffer<RigidBody<T>*, MemType::HOST>* obstacleRB,
+        uint                                           nParticles,
+        uint                                           nObstacles);
 
     /** @brief Destructor */
     ~ComponentManagerCPU();
@@ -65,145 +58,51 @@ public:
 
     /** @name Get methods */
     //@{
-    /** @brief Gets particles rigid body Id */
-    std::vector<uint> getRigidBodyId() const final;
-
-    /** @brief Gets obstacles rigid body Id */
-    std::vector<uint> getRigidBodyIdObstacles() const final;
-
-    /** @brief Gets particles transformation */
-    std::vector<Transform3<T>> getTransform() const final;
-
-    /** @brief Gets obstacles transformation */
-    std::vector<Transform3<T>> getTransformObstacles() const final;
-
-    /** @brief Gets particles velocities */
-    std::vector<Kinematics<T>> getVelocity() const final;
-
-    /** @brief Gets particles torces */
-    std::vector<Torce<T>> getTorce() const final;
-
-    /** @brief Gets the array of particles Ids */
-    std::vector<uint> getParticleId() const final;
-
-    /** @brief Gets the number of particles in manager */
-    uint getNumberOfParticles() const final;
-
-    /** @brief Gets the number of obstacles in manager */
-    uint getNumberOfObstacles() const final;
-
-    /** @brief Gets the number of cells in manager */
-    uint getNumberOfCells() const final;
-
-    // /** @brief Gets the array of components neighbor Id */
-    // std::vector<uint> getNeighborsId() const;
-
-    // /** @brief Gets the array of components neighbor count */
-    // std::vector<uint> getNeighborsCount() const;
     //@}
 
     /** @name Set methods */
     //@{
-    /** @brief Sets the array of particles rigid body Ids */
-    void setRigidBodyId(std::vector<uint> const& id) final;
+    //@}
 
-    /** @brief Sets the array of obstacles rigid body Ids */
-    void setRigidBodyIdObstacles(std::vector<uint> const& id) final;
+    /** @name Manager methods */
+    //@{
+    /** @brief Allocates memory for the component manager */
+    void allocate();
 
-    /** @brief Sets particles transformations */
-    void setTransform(std::vector<Transform3<T>> const& t) final;
-
-    /** @brief Sets obstacles transformations */
-    void setTransformObstacles(std::vector<Transform3<T>> const& t) final;
-
-    /** @brief Sets particles velocities */
-    void setVelocity(std::vector<Kinematics<T>> const& v) final;
-
-    /** @brief Sets particles torces */
-    void setTorce(std::vector<Torce<T>> const& t) final;
-
-    /** @brief Sets the array of particles Ids */
-    void setParticleId(std::vector<uint> const& id) final;
-
-    // /** @brief Sets the array of components neighbor Id */
-    // void setNeighborsId( std::vector<uint> const& id );
-
-    // /** @brief Sets the array of components neighbor count */
-    // void setNeighborsCount( std::vector<uint> const& count );
+    /** @brief Initializes data members to default values */
+    void initialize();
     //@}
 
     /** @name Methods */
     //@{
-    /** @brief Initializes transformations for obstacles in the simulation
-        @param initTr initial transformation of obstacles */
-    void initializeObstacles(std::vector<Transform3<T>> initTr) final;
+    /** @brief Updates neighbor list */
+    void updateNeighborList() final;
 
-    /** @brief Initializes the transformations for particles in the simulation
-        @param initTr initial transformation of particles */
-    void initializeParticles(std::vector<Transform3<T>> initTr) final;
+    /** @brief Computes the relative transformations */
+    void computeRelativeTransformations() final;
 
-    /** @brief Inserts particles according to a given insertion policy
-        @param ins insertion policy */
-    void insertParticles(Insertion<T>* ins) final;
+    /** @brief Detects collisions between particles and obstacles */
+    void detectCollisionsObstacles() final;
 
-    // /** @brief Sorts particles based on a Z-curve */
-    // void sortParticles();
+    /** @brief Detects collisions between particles and particles */
+    void detectCollisionsParticles() final;
 
-    // /** @brief Creates a neighbor list */
-    // void createNeighborList();
+    /** @brief Detects collision between particles and particles and */
+    void detectCollisions() final;
 
-    /** @brief Updates links between particles and linked cell
-        @param LC linked cell */
-    void updateLinks(LinkedCell<T> const* const* LC) final;
-
-    /** @brief Detects collision between particles and obstacles and 
-        // computes forces
-        @param particleRB array of rigid bodies for particles
-        @param obstacleRB array of rigid bodies for obstacles
+    /** @brief Computes contact forces between different components
         @param CF array of all contact force models */
-    void detectCollisionAndComputeContactForcesObstacles(
-        RigidBody<T, T> const* const*      particleRB,
-        RigidBody<T, T> const* const*      obstacleRB,
-        ContactForceModel<T> const* const* CF) final;
+    void computeContactForces(
+        const GrainsMemBuffer<ContactForceModel<T>*, MemType::HOST>& CF) final;
 
-    /** @brief Detects collision between particles and particles and 
-        // computes forces
-        @param particleRB array of rigid bodies for particles
-        @param LC linked cell
-        @param CF array of all contact force models */
-    void detectCollisionAndComputeContactForcesParticles(
-        RigidBody<T, T> const* const*      particleRB,
-        LinkedCell<T> const* const*        LC,
-        ContactForceModel<T> const* const* CF,
-        int*                               result) final;
-
-    /** @brief Detects collision between components and computes forces
-        @param particleRB array of rigid bodies for particles
-        @param obstacleRB array of rigid bodies for obstacles
-        @param LC linked cell
-        @param CF array of all contact force models */
-    void detectCollisionAndComputeContactForces(
-        RigidBody<T, T> const* const*      particleRB,
-        RigidBody<T, T> const* const*      obstacleRB,
-        LinkedCell<T> const* const*        LC,
-        ContactForceModel<T> const* const* CF,
-        int*                               result) final;
-
-    /** @brief Adds external forces such as gravity
-        @param particleRB array of rigid bodies for particles
-        @param g gravity field */
-    void addExternalForces(RigidBody<T, T> const* const* particleRB,
-                           const Vector3<T>&             g) final;
+    /** @brief Adds external forces such as gravity */
+    void addExternalForces() final;
 
     /** @brief Updates the position and velocities of particles
-        @param particleRB array of rigid bodies for particles
         @param TI time integration scheme */
-    void moveParticles(RigidBody<T, T> const* const*   particleRB,
-                       TimeIntegrator<T> const* const* TI) final;
+    void moveParticles(
+        const GrainsMemBuffer<TimeIntegrator<T>*, MemType::HOST>& TI) final;
     //@}
 };
-
-typedef ComponentManagerCPU<float>  ComponentManagerCPU_d;
-typedef ComponentManagerCPU<double> ComponentManagerCPU_f;
 
 #endif

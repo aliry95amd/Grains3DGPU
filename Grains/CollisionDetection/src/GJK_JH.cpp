@@ -217,10 +217,53 @@ void catch_me()
 /* ========================================================================== */
 /*                             High-Level Methods                             */
 /* ========================================================================== */
+// Returns whether 2 convex shapes intersect using the GJK algorithm - relative
+// transformation
+template <typename T>
+__HOSTDEVICE__ bool intersectGJK(const Convex<T>&     a,
+                                 const Convex<T>&     b,
+                                 const Transform3<T>& b2a)
+{
+    uint       bits     = 0; // identifies current simplex
+    uint       last     = 0; // identifies last found support point
+    uint       last_bit = 0; // last_bit = 1<<last
+    uint       all_bits = 0; // all_bits = bits|last_bit
+    Vector3<T> y[4]; // support points of A-B in world
+    T          det[16][4] = {T(0)}; // cached sub-determinants
+    T          dp[4][4]   = {T(0)};
+
+    Vector3<T> v(b2a.getOrigin());
+    Vector3<T> w;
+    T          prod;
+
+    do
+    {
+        last     = 0;
+        last_bit = 1;
+        while(bits & last_bit)
+        {
+            ++last;
+            last_bit <<= 1;
+        }
+        w    = a.support(-v) - b2a(b.support(v * b2a.getBasis()));
+        prod = v * w;
+        if(prod > T(0) || fabs(prod) < HIGHEPS<T>)
+            return (false);
+        if(degenerate(all_bits, y, w))
+            return (false);
+        y[last]  = w;
+        all_bits = bits | last_bit;
+        if(!closest(bits, last, last_bit, all_bits, y, dp, det, v))
+            return (false);
+    } while(bits < 15 && !v.isApproxZero());
+    return (true);
+}
+
+// -----------------------------------------------------------------------------
 // Returns whether 2 convex shapes intersect using the GJK algorithm
 template <typename T>
-__HOSTDEVICE__ bool intersectGJK(Convex<T> const&     a,
-                                 Convex<T> const&     b,
+__HOSTDEVICE__ bool intersectGJK(const Convex<T>&     a,
+                                 const Convex<T>&     b,
                                  const Transform3<T>& a2w,
                                  const Transform3<T>& b2w)
 {
@@ -261,59 +304,16 @@ __HOSTDEVICE__ bool intersectGJK(Convex<T> const&     a,
 }
 
 // -----------------------------------------------------------------------------
-// Returns whether 2 convex shapes intersect using the GJK algorithm - relative
+// Returns the minimal distance between 2 convex shapes and a point per convex
+// shape that represents the tips of the minimal distance segment -- relative
 // transformation
 template <typename T>
-__HOSTDEVICE__ bool intersectGJK(Convex<T> const&     a,
-                                 Convex<T> const&     b,
-                                 const Transform3<T>& b2a)
-{
-    uint       bits     = 0; // identifies current simplex
-    uint       last     = 0; // identifies last found support point
-    uint       last_bit = 0; // last_bit = 1<<last
-    uint       all_bits = 0; // all_bits = bits|last_bit
-    Vector3<T> y[4]; // support points of A-B in world
-    T          det[16][4] = {T(0)}; // cached sub-determinants
-    T          dp[4][4]   = {T(0)};
-
-    Vector3<T> v(b2a.getOrigin());
-    Vector3<T> w;
-    T          prod;
-
-    do
-    {
-        last     = 0;
-        last_bit = 1;
-        while(bits & last_bit)
-        {
-            ++last;
-            last_bit <<= 1;
-        }
-        w    = a.support(-v) - b2a(b.support(v * b2a.getBasis()));
-        prod = v * w;
-        if(prod > T(0) || fabs(prod) < HIGHEPS<T>)
-            return (false);
-        if(degenerate(all_bits, y, w))
-            return (false);
-        y[last]  = w;
-        all_bits = bits | last_bit;
-        if(!closest(bits, last, last_bit, all_bits, y, dp, det, v))
-            return (false);
-    } while(bits < 15 && !v.isApproxZero());
-    return (true);
-}
-
-// -----------------------------------------------------------------------------
-// Returns the minimal distance between 2 convex shapes and a point per convex
-// shape that represents the tips of the minimal distance segment
-template <typename T>
-__HOSTDEVICE__ T computeClosestPoints_GJK_JH(Convex<T> const&     a,
-                                             Convex<T> const&     b,
-                                             const Transform3<T>& a2w,
-                                             const Transform3<T>& b2w,
+__HOSTDEVICE__ T computeClosestPoints_GJK_JH(const Convex<T>&     a,
+                                             const Convex<T>&     b,
+                                             const Transform3<T>& b2a,
                                              Vector3<T>&          pa,
                                              Vector3<T>&          pb,
-                                             int&                 nbIter)
+                                             uint&                nbIter)
 {
     // GJK variables
     uint       bits     = 0; // identifies current simplex
@@ -329,22 +329,17 @@ __HOSTDEVICE__ T computeClosestPoints_GJK_JH(Convex<T> const&     a,
     T          dp[4][4]      = {T(0)};
 
     // Misc variables, e.g. tolerance, ...
-    // T relError = GrainsExec::m_colDetTolerance;             // rel error for opt gap
-    // T absError = T( 1.e-4 ) * relError;                     // abs error for optimality gap
     // relative tolerance
     constexpr T relError = LOWEPS<T>;
     // absolute tolerance
     constexpr T absError = 1.e-4 * relError;
-    // bool acceleration = GrainsExec::m_colDetAcceleration;   // isAcceleration?
-    // T momentum = T( 0 ), oneMinusMomentum = T( 1 );         // in case we use acceleration
-
-    // compute b2a transformation and store in register
-    Transform3<T> b2a(a2w, b2w);
+    // isAcceleration?
+    // bool acceleration = GrainsExec::m_colDetAcceleration;
+    // in case we use acceleration
+    // T momentum = T( 0 ), oneMinusMomentum = T( 1 );
 
     // Initializing vectors
-    // Vector3<T> v = a2w( a.support( zeroVector3T ) ) -
-    //                b2w( b.support( zeroVector3T ) );
-    Vector3<T> v(a.support(zeroVector3T) - b2a(b.support(zeroVector3T)));
+    Vector3<T> v(-b2a.getOrigin());
     Vector3<T> w;
     T          dist = v.norm();
 
@@ -359,9 +354,6 @@ __HOSTDEVICE__ T computeClosestPoints_GJK_JH(Convex<T> const&     a,
             last_bit <<= 1;
         }
 
-        // p[last] = a.support( ( -v ) * a2w.getBasis() );
-        // q[last] = b.support( v * b2w.getBasis() );
-        // w = a2w( p[last] ) - b2w( q[last] );
         p[last] = a.support((-v));
         q[last] = b.support((v)*b2a.getBasis());
         w       = p[last] - b2a(q[last]);
@@ -391,82 +383,109 @@ __HOSTDEVICE__ T computeClosestPoints_GJK_JH(Convex<T> const&     a,
 }
 
 // -----------------------------------------------------------------------------
-// // Returns the minimal distance between 2 convex shapes and a point per convex
-// // shape that represents the tips of the minimal distance segment - relative
-// // transformation
-// __HOSTDEVICE__
-// double closestPointsGJK( Convex const& a,
-//                          Convex const& b,
-//                          Transform3d const& b2a,
-//                          Vec3& pa,
-//                          Vec3& pb,
-//                          int& nbIter )
-// {
-//     uint bits = 0;           // identifies current simplex
-//     uint last = 0;           // identifies last found support point
-//     uint last_bit = 0;       // last_bit = 1<<last
-//     uint all_bits = 0;       // all_bits = bits|last_bit
-//     Vec3 p[4];                      // support points of A in local
-//     Vec3 q[4];                      // support points of B in local
-//     Vec3 y[4];                      // support points of A-B in world
-//     double det[16][4] = { 0. };      // cached sub-determinants
-//     double dp[4][4] = { 0. };
+// Returns the minimal distance between 2 convex shapes and a point per convex
+// shape that represents the tips of the minimal distance segment
+template <typename T>
+__HOSTDEVICE__ T computeClosestPoints_GJK_JH(const Convex<T>&     a,
+                                             const Convex<T>&     b,
+                                             const Transform3<T>& a2w,
+                                             const Transform3<T>& b2w,
+                                             Vector3<T>&          pa,
+                                             Vector3<T>&          pb,
+                                             uint&                nbIter)
+{
+    // GJK variables
+    uint       bits     = 0; // identifies current simplex
+    uint       last     = 0; // identifies last found support point
+    uint       last_bit = 0; // last_bit = 1<<last
+    uint       all_bits = 0; // all_bits = bits|last_bit
+    Vector3<T> p[4]; // support points of A in local
+    Vector3<T> q[4]; // support points of B in local
+    Vector3<T> y[4]; // support points of A-B in world
+    T          mu            = 0.; // optimality gap
+    int        numIterations = 0; // No. iterations
+    T          det[16][4]    = {T(0)}; // cached sub-determinants
+    T          dp[4][4]      = {T(0)};
 
-//     Vec3 v = a2w( a.support( Vec3( 0., 0., 0. ) ) ) -
-//               b2w( b.support( Vec3( 0., 0., 0. ) ) );
-//     Vec3 w;
-//     double dist = v.norm();
-//     double mu = 0;
-//     uint num_iterations = 0;
+    // Misc variables, e.g. tolerance, ...
+    // relative tolerance
+    constexpr T relError = LOWEPS<T>;
+    // absolute tolerance
+    constexpr T absError = 1.e-4 * relError;
+    // isAcceleration?
+    // bool acceleration = GrainsExec::m_colDetAcceleration;
+    // in case we use acceleration
+    // T momentum = T( 0 ), oneMinusMomentum = T( 1 );
 
-//     while ( bits < 15 && dist > abs_error && num_iterations < 1000 )
-//     {
-//         last = 0;
-//         last_bit = 1;
-//         while (bits & last_bit)
-//         {
-//             ++last;
-//             last_bit <<= 1;
-//         }
-//         p[last] = a.support( ( -v ) * a2w.getBasis() );
-//         q[last] = b.support( v * b2w.getBasis() );
-//         w = a2w( p[last] ) - b2w( q[last] );
-//         set_max( mu, v * w / dist );
-//         if ( dist - mu <= dist * EPSILON )
-//             break;
-//         if ( degenerate( all_bits, y, w ) )
-//             break;
-//         y[last] = w;
-//         all_bits = bits | last_bit;
-//         ++num_iterations;
-//         if ( !closest( bits, last, last_bit, all_bits, y, dp, det, v ) )
-//             break;
-//         dist = v.norm();
-//     }
-//     computePoints( bits, det, pa, pb );
-//     if ( num_iterations > 1000 )
-//         catch_me();
-//     else
-//         nbIter = num_iterations;
-//     return ( dist );
-// }
+    // Initializing vectors
+    Vector3<T> v(a2w.getOrigin() - b2w.getOrigin());
+    Vector3<T> w;
+    T          dist = v.norm();
+
+    while(bits < 15 && dist > HIGHEPS<T> && numIterations < 1000)
+    {
+        // Updating the bits, ...
+        last     = 0;
+        last_bit = 1;
+        while(bits & last_bit)
+        {
+            ++last;
+            last_bit <<= 1;
+        }
+
+        p[last] = a.support((-v) * a2w.getBasis());
+        q[last] = b.support(v * b2w.getBasis());
+        w       = a2w(p[last]) - b2w(q[last]);
+
+        // termination criteria -- optimiality gap
+        set_max(mu, v * w / dist);
+        if(dist - mu <= dist * relError || mu < absError)
+            break;
+        // termination criteria -- degenerate case
+        if(degenerate(all_bits, y, w))
+            break;
+
+        // if not terminated, get ready for the next iteration
+        y[last]  = w;
+        all_bits = bits | last_bit;
+        ++numIterations;
+        if(!closest(bits, last, last_bit, all_bits, y, dp, det, v))
+            break;
+        dist = v.norm();
+    }
+    computePoints(bits, det, p, q, pa, pb);
+    if(numIterations > 1000)
+        catch_me();
+    else
+        nbIter = numIterations;
+    return (dist);
+}
 
 // -----------------------------------------------------------------------------
 // Explicit instantiation
 #define X(T)                                                             \
-    template __HOSTDEVICE__ bool intersectGJK(Convex<T> const&     a,    \
-                                              Convex<T> const&     b,    \
+    template __HOSTDEVICE__ bool intersectGJK(const Convex<T>&     a,    \
+                                              const Convex<T>&     b,    \
+                                              const Transform3<T>& b2a); \
+    template __HOSTDEVICE__ bool intersectGJK(const Convex<T>&     a,    \
+                                              const Convex<T>&     b,    \
                                               const Transform3<T>& a2w,  \
                                               const Transform3<T>& b2w); \
-                                                                         \
+    template __HOSTDEVICE__ T    computeClosestPoints_GJK_JH(            \
+           const Convex<T>&     a,                                       \
+           const Convex<T>&     b,                                       \
+           const Transform3<T>& b2a,                                     \
+           Vector3<T>&          pa,                                      \
+           Vector3<T>&          pb,                                      \
+           uint&                nbIter);                                                \
     template __HOSTDEVICE__ T computeClosestPoints_GJK_JH(               \
-        Convex<T> const&     a,                                          \
-        Convex<T> const&     b,                                          \
+        const Convex<T>&     a,                                          \
+        const Convex<T>&     b,                                          \
         const Transform3<T>& a2w,                                        \
         const Transform3<T>& b2w,                                        \
         Vector3<T>&          pa,                                         \
         Vector3<T>&          pb,                                         \
-        int&                 nbIter);
+        uint&                nbIter);
 X(float)
 X(double)
 #undef X

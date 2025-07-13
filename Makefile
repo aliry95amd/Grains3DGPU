@@ -1,14 +1,14 @@
 # ----------------
 # Standard targets
 # ----------------
-update: githook
+update: apply-clang-format
 	cd Main/src; \
 	make; \
 	cd ../..;
 	@echo 'Grains is updated!'
 
-install: xerces createarch createdepend depend update dtd
-	@echo 'Full Grains platform built!'
+install: xerces createarch createdepend depend update dtd install-githook
+	@echo 'Grains platform installed!'
 
 updatedev: clean cleandepend createdepend update 
 

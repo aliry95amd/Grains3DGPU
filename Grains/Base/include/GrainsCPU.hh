@@ -1,9 +1,7 @@
 #ifndef _GRAINSCPU_HH_
 #define _GRAINSCPU_HH_
 
-#include "ComponentManagerCPU.hh"
 #include "Grains.hh"
-#include "ReaderXML.hh"
 
 // =============================================================================
 /** @brief The class GrainsCPU.
@@ -18,8 +16,6 @@ class GrainsCPU : public Grains<T>
 protected:
     /** @name Parameters */
     //@{
-    /** \brief linked cell for broad-phase */
-    // TimeIntegration<T>* m_timeIntegration;
     //@}
 
 public:

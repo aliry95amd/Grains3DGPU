@@ -96,7 +96,7 @@ __HOSTDEVICE__ void Torce<T>::addForce(const Vector3<T>& f, const Vector3<T>& p)
 // -----------------------------------------------------------------------------
 // Output operator
 template <typename T>
-__HOST__ std::ostream& operator<<(std::ostream& fileOut, Torce<T> const& t)
+__HOST__ std::ostream& operator<<(std::ostream& fileOut, const Torce<T>& t)
 {
     fileOut << t.getTorque() << std::endl << t.getForce();
     return (fileOut);
@@ -122,7 +122,7 @@ template class Torce<double>;
 
 #define X(T)                                                      \
     template std::ostream& operator<< <T>(std::ostream & fileOut, \
-                                          Torce<T> const& t);     \
+                                          const Torce<T>& t);     \
                                                                   \
     template std::istream& operator>> <T>(std::istream & fileIn, Torce<T> & t);
 X(float)

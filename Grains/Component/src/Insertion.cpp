@@ -20,10 +20,7 @@ __HOST__ static INLINE InsertionInfo<T> readDataRand(DOMNode* root)
         if(val)
             rgs = RGS_UDEF;
         else
-        {
-            Gout("Seed value is not provided. Aborting Grains!");
-            exit(1);
-        }
+            GAbort("Seed value is not provided. Aborting Grains!");
         GoutWI(12, "Random initialization with", std::to_string(val), "seed.");
     }
     else if(seedString == "Random")
@@ -70,10 +67,7 @@ __HOST__ static INLINE InsertionInfo<T> readDataFile(DOMNode* root)
         GoutWI(12, "File initialization with path" + fileName + ".");
     }
     else
-    {
-        Gout(12, "File does not exist. Aborting Grains!");
-        exit(1);
-    }
+        GAbort("File does not exist. Aborting Grains!");
 
     return (file);
 }
@@ -149,10 +143,7 @@ __HOST__ Insertion<T>::Insertion(DOMNode* dn)
             data = readDataZero<T>(root);
         }
         else
-        {
-            Gout("Unknown Type in ParticleInsertion! Aborting Grains!");
-            exit(1);
-        }
+            GAbort("Unknown Type in ParticleInsertion! Aborting Grains!");
     };
 
     DOMNode* nIP = ReaderXML::getNode(dn, "InitialPosition");

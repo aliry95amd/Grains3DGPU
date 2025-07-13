@@ -26,9 +26,7 @@ uint GrainsParameters<T>::m_numParticles = 0;
 template <typename T>
 uint GrainsParameters<T>::m_numObstacles = 0;
 template <typename T>
-uint GrainsParameters<T>::m_numCells = 0;
-template <typename T>
-T GrainsParameters<T>::m_sizeLC = T(0);
+T GrainsParameters<T>::m_maxRadius = T(0);
 
 /* Physical */
 template <typename T>
@@ -48,16 +46,25 @@ std::queue<T> GrainsParameters<T>::m_tSave;
 template <typename T>
 bool GrainsParameters<T>::m_isGPU = false;
 template <typename T>
-uint GrainsParameters<T>::m_numThreadsPerBlock = 0;
+cudaDeviceProp GrainsParameters<T>::m_GPU = {};
+
+/* Collision Detection */
 template <typename T>
-uint GrainsParameters<T>::m_numBlocksPerGrid = 0;
-
-/* MPI */
-// template <typename T> bool GrainsParameters<T>::m_isMPI = false;
-// template <typename T> int GrainsParameters<T>::m_nProcs;
-
-/* Booleans */
-// template <typename T> bool GrainsParameters<T>::m_isDouble = true;
+uint GrainsParameters<T>::m_neighborListType = 0;
+template <typename T>
+uint GrainsParameters<T>::m_neighborListFrequency = 0;
+template <typename T>
+uint GrainsParameters<T>::m_linkedCellType = 0;
+template <typename T>
+uint GrainsParameters<T>::m_linkedCellSizeFactor = 0;
+template <typename T>
+uint GrainsParameters<T>::m_sortingFrequency = 0;
+template <typename T>
+uint GrainsParameters<T>::m_numCells = 0;
+template <typename T>
+uint GrainsParameters<T>::m_boundingVolumeType = 0;
+template <typename T>
+uint GrainsParameters<T>::m_narrowPhaseType = 0;
 
 // -----------------------------------------------------------------------------
 // Explicit instantiation

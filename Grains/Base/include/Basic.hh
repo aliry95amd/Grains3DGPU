@@ -2,9 +2,14 @@
 #define _BASIC_HH_
 
 #define __STDCPP_WANT_MATH_SPEC_FUNCS__ 1
+#include <algorithm>
 #include <bits/stdc++.h>
+#include <cassert>
 #include <chrono>
 #include <cmath>
+#include <cstdlib>
+#include <cstring>
+#include <execution>
 #include <float.h>
 #include <ios>
 #include <iostream>
@@ -13,6 +18,7 @@
 #include <list>
 #include <new>
 #include <ostream>
+#include <random>
 #include <stdio.h>
 #include <string>
 
@@ -20,14 +26,20 @@
 #include <cuda_runtime.h>
 #include <curand.h>
 #include <curand_kernel.h>
+#include <omp.h>
+
+#include "ReaderXML.hh"
+#include "WriterXML.hh"
 
 // =============================================================================
 /** @brief Various constants and type definitions.
 
     @author A.Yazdani - 2023 - Construction */
 // =============================================================================
-/** @name Compiler macros */
+/** @name Macros */
 //@{
+/** @brief Compiler macros */
+// -----------------------------------------------------------------------------
 #ifdef __NVCC__
 #define __HOST__ __host__
 #define __DEVICE__ __device__
@@ -43,35 +55,25 @@
 #define INLINE inline
 #define __RESTRICT__ restrict
 #endif
+
+// -----------------------------------------------------------------------------
+/** @brief Type macros */
+#define zeroVector3T Vector3<T>(T(0), T(0), T(0))
+#define zeroVector3D Vector3D(0., 0., 0.)
+#define zeroVector3F Vector3F(0.f, 0.f, 0.f)
+#define noContact ContactInfo<T>(zeroVector3T, zeroVector3T, T(0))
 //@}
 
-/** @name CUDA error handling */
+/** @name Typedefs */
 //@{
-// Macro for outputting CUDA errors
-#define cudaErrCheck(ans)                      \
-    {                                          \
-        cudaAssert((ans), __FILE__, __LINE__); \
-    }
-
-/** @brief Returns CUDA error */
-static INLINE void
-    cudaAssert(cudaError_t code, const char* file, int line, bool abort = false)
-{
-    if(code != cudaSuccess)
-    {
-        fprintf(stderr,
-                "GPUassert: %s %s %d\n",
-                cudaGetErrorString(code),
-                file,
-                line);
-        if(abort)
-            exit(code);
-    }
-}
+// -----------------------------------------------------------------------------
+/** @brief Unsigned integer type */
+using uint = unsigned int;
 //@}
 
 /** @name Enumerations */
 //@{
+// -----------------------------------------------------------------------------
 /** @brief Space dimensions */
 enum Direction
 {
@@ -82,6 +84,7 @@ enum Direction
     NONE // no direction
 };
 
+// -----------------------------------------------------------------------------
 /** @brief Matrix dimensions */
 enum MatDirection
 {
@@ -99,48 +102,46 @@ enum MatDirection
 
 /** @name Constant expressions at compile-time */
 //@{
+// -----------------------------------------------------------------------------
 /** \brief PI value */
 template <class T>
 constexpr T PI = T(3.1415926535897932385L);
+
+// -----------------------------------------------------------------------------
 /** \brief 2*PI value */
 template <class T>
 constexpr T TWO_PI = T(6.28318530717958623200L);
+
+// -----------------------------------------------------------------------------
 /** \brief Degree per radian value */
 template <class T>
 constexpr T DEGS_PER_RAD = T(57.29577951308232286465L);
+
+// -----------------------------------------------------------------------------
 /** \brief Radian per degree value */
 template <class T>
 constexpr T RADS_PER_DEG = T(0.01745329251994329547L);
+
+// -----------------------------------------------------------------------------
 /** \brief High (Machine) epsilon value */
 template <class T>
 constexpr T HIGHEPS = T(1.e-15);
 template <>
 constexpr float HIGHEPS<float> = float(1.e-08);
+
+// -----------------------------------------------------------------------------
 /** \brief Epsilon value */
 template <class T>
 constexpr T EPS = T(1.e-10);
 template <>
 constexpr float EPS<float> = float(1.e-05);
+
+// -----------------------------------------------------------------------------
 /** \brief Low epsilon value */
 template <class T>
 constexpr T LOWEPS = T(1.e-05);
 template <>
 constexpr float LOWEPS<float> = float(1.e-03);
-
-// #define shiftString0   ""
-// #define shiftString1   " "
-// #define shiftString2   "  "
-// #define shiftString3   "   "
-// #define shiftString6   "      "
-// #define shiftString9   "         "
-// #define shiftString12  "            "
-// #define shiftString15  "               "
-#define zeroVector3T Vector3<T>(T(0), T(0), T(0))
-#define zeroVector3D Vector3D(0., 0., 0.)
-#define zeroVector3F Vector3F(0.f, 0.f, 0.f)
-#define noContact ContactInfo<T>(zeroVector3T, zeroVector3T, T(0))
 //@}
-
-using uint = uint;
 
 #endif

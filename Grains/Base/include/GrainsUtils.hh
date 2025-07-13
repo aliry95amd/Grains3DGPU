@@ -1,6 +1,7 @@
 #ifndef _GRAINSUTILS_HH_
 #define _GRAINSUTILS_HH_
 
+#include "Basic.hh"
 #include "Vector3.hh"
 
 // =============================================================================
@@ -10,6 +11,65 @@
 // =============================================================================
 /** @name Miscellaneous functions and utilities for Grains */
 //@{
+// Macro for outputting CUDA errors
+#define cudaErrCheck(ans) cudaAssert((ans), __FILE__, __LINE__);
+
+/** @brief Returns CUDA error
+@param code the error code
+@param file the file name
+@param line the line number
+@param abort whether to abort the program */
+__HOST__ static INLINE void
+    cudaAssert(cudaError_t code, const char* file, int line, bool abort = false)
+{
+    if(code != cudaSuccess)
+    {
+        fprintf(stderr,
+                "GPUassert: %s %s %d\n",
+                cudaGetErrorString(code),
+                file,
+                line);
+        if(abort)
+            exit(code);
+    }
+}
+
+// -----------------------------------------------------------------------------
+/** @brief computes the optimal number of threads and blocks for a given number
+    of elements and an architecture
+    @param numElements the number of elements
+    @param numThreads the number of threads per block
+    @param numBlocks the minimum number of blocks
+    @param prop the device properties */
+__HOST__ static INLINE void
+    computeOptimalThreadsAndBlocks(const uint            numElements,
+                                   const cudaDeviceProp& prop,
+                                   uint&                 numThreads,
+                                   uint&                 numBlocks)
+{
+    constexpr uint maxThreads = 256; // Avoid 1024 unless necessary
+    constexpr uint minThreads = 32;
+    const uint     minBlocks  = 2 * prop.multiProcessorCount;
+
+    // Start with 128 threads and compute how many blocks we need
+    numThreads = 128;
+    numBlocks  = (numElements + numThreads - 1) / numThreads;
+
+    // If we’re not filling the SMs enough, reduce threads
+    if(numBlocks < minBlocks && numThreads > minThreads)
+    {
+        numBlocks  = minBlocks;
+        numThreads = minThreads;
+    }
+    // If we're oversubscribing the SMs too much, increase thread count
+    if(numBlocks > 4 * prop.multiProcessorCount && numThreads < maxThreads)
+    {
+        numThreads = maxThreads;
+        numBlocks  = (numElements + numThreads - 1) / numThreads;
+    }
+}
+
+// -----------------------------------------------------------------------------
 /** @brief Writes a real number with a prescribed number of digits in a string
 @param figure the float number
 @param size number of digits */
@@ -67,8 +127,7 @@ __HOST__ static constexpr INLINE void Gout(const Args&... args)
 
 // -----------------------------------------------------------------------------
 /** @brief Writes a message to stdout with Indent (WI)
- @param numShift the number of shift characters at the beginning
-@param nextLine if going to the next line is required
+@param numShift the number of shift characters at the beginning
 @param args the output messages */
 template <typename... Args>
 __HOST__ INLINE void GoutWI(const int numShift, const Args&... args)
@@ -79,6 +138,26 @@ __HOST__ INLINE void GoutWI(const int numShift, const Args&... args)
     std::cout << shift(numShift);
     ((std::cout << args << " "), ...);
     std::cout << std::endl;
+}
+
+// -----------------------------------------------------------------------------
+/** @brief Writes a message to stdout with Indent (WI)
+@param numShift the number of shift characters at the beginning
+@param args the output messages */
+template <typename... Args>
+__HOSTDEVICE__ INLINE void GAbort(const Args&... args)
+{
+#ifdef __CUDA_ARCH__
+    printf("[DEVICE] ");
+    (printf("%s ", args), ...);
+    printf("\n");
+    __trap(); // aborts the kernel
+#else
+    std::cerr << "[HOST] ";
+    ((std::cerr << args << " "), ...);
+    std::cerr << std::endl;
+    std::abort();
+#endif
 }
 
 #endif

@@ -55,6 +55,10 @@ public:
     /** @brief Returns the time integrator type */
     __HOSTDEVICE__
     virtual TimeIntegratorType getTimeIntegratorType() const = 0;
+
+    /** @brief Returns the time step */
+    __HOSTDEVICE__
+    T getTimeStep() const;
     //@}
 
     /** @name Methods */
@@ -75,7 +79,7 @@ public:
 		@param transMotion translational motion over dt
 		@param rotMotion rotational motion over dt */
     __HOSTDEVICE__
-    virtual void Move(Kinematics<T> const& momentum,
+    virtual void Move(const Kinematics<T>& momentum,
                       Kinematics<T>&       velocity,
                       Vector3<T>&          transMotion,
                       Quaternion<T>&       rotMotion) const

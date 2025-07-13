@@ -1,13 +1,24 @@
 // TODO: CHANGE THE FORMAT FROM HH TO CUH LATER.
-#ifndef _COMPONENTMANAGERGPU_KERNLES_HH_
-#define _COMPONENTMANAGERGPU_KERNLES_HH_
+#ifndef _COMPONENTMANAGERGPU_KERNLES_CUH_
+#define _COMPONENTMANAGERGPU_KERNLES_CUH_
 
+#include "thrust/device_ptr.h"
+#include "thrust/for_each.h"
+#include "thrust/iterator/zip_iterator.h"
+#include "thrust/sort.h"
+#include <cooperative_groups.h>
+
+#include "CollisionDetection.hh"
+#include "ComponentManagerCommon.hh"
 #include "ContactForceModel.hh"
-#include "LinkedCell.hh"
+#include "ContactForceModelFactory.hh"
+#include "GrainsParameters.hh"
+#include "NeighborList.hh"
 #include "RigidBody.hh"
 #include "TimeIntegrator.hh"
 #include "Transform3.hh"
 #include "Vector3.hh"
+#include "VectorMath.hh"
 
 // =============================================================================
 /** @brief The header for GPU kernels used in the ComponentManagerGPU class.
@@ -18,108 +29,183 @@
 // =============================================================================
 /** @name ComponentManagerGPU_Kernels : External methods */
 //@{
-/** @brief Zeros out the array
-@param array array to be zero-ed out
-@param numElements number of elements in the array */
-__GLOBAL__
-void zeroOutArray_kernel(uint* array, uint numElements);
-
-/** @brief Returns the start Id for each hash value in cellStart
-@param componentCellHash sorted array of cell hash values
-@param numComponents number of components
-@param cellStartAndEnd start and end indices as s1, e1, s2, e2, ... */
-__GLOBAL__
-void sortComponentsAndFindCellStart_kernel(uint const* componentCellHash,
-                                           uint        numComponents,
-                                           uint*       cellStart,
-                                           uint*       cellEnd);
-
-/** @brief Detects collision between particles and obstacles and computes forces
-@param particleRB array of rigid bodies for particles
-@param obstacleRB array of rigid bodies for obstacles
-@param CF array of all contact force models
-@param rigidBodyId array of rigid body IDs for particles
-@param transform array of particles transformations
-@param velocity array of particles velocities
-@param torce array of particles torces
-@param obstacleTransform array of obstacles transformations
-@param nParticles number of particles
-@param nObstacles number of obstacles */
-template <typename T, typename U>
-__GLOBAL__ void detectCollisionAndComputeContactForcesObstacles_kernel(
-    RigidBody<T, U> const* const*      particleRB,
-    RigidBody<T, U> const* const*      obstacleRB,
-    ContactForceModel<T> const* const* CF,
-    uint*                              rigidBodyId,
-    Transform3<T> const*               transform,
-    Kinematics<T> const*               velocity,
-    Torce<T>*                          torce,
-    uint*                              obstacleRigidBodyId,
-    Transform3<T> const*               obstacleTransform,
-    int                                nParticles,
-    int                                nObstacles);
-
-/** @brief Detects collision between particles and particles and computes forces
-@param particleRB array of rigid bodies for particles
-@param LC linked cell
-@param CF array of all contact force models
-@param rigidBodyId array of rigid body IDs for particles
-@param transform array of particles transformations
-@param velocity array of particles velocities
-@param torce array of particles torces
-@param particleId array of particles ids
-@param particleCellHash array of particles cell hashes
-@param cellHashStart array of cells starting index
-@param cellHashEnd array of cells ending index
-@param nParticles number of particles */
-template <typename T, typename U>
-__GLOBAL__ void detectCollisionAndComputeContactForcesParticles_kernel(
-    RigidBody<T, U> const* const*      particleRB,
-    LinkedCell<T> const* const*        LC,
-    ContactForceModel<T> const* const* CF,
-    uint*                              rigidBodyId,
-    Transform3<T> const*               transform,
-    Kinematics<T> const*               velocity,
-    Torce<T>*                          torce,
-    uint*                              particleId,
-    uint*                              particleCellHash,
-    uint*                              cellHashStart,
-    uint*                              cellHashEnd,
-    int                                nParticles,
-    int*                               result);
-
-/** @brief Adds external forces such as gravity
-@param particleRB array of rigid bodies for particles
-@param rigidBodyId array of rigid body IDs for particles
-@param torce array of particles torces
-@param g the gravity field
-@param nParticles number of particles */
-template <typename T, typename U>
+// -----------------------------------------------------------------------------
+/** @brief Computes the relative transformations between pairs of components
+    @param pairList list of pairs of components
+    @param transform array of transformations for components
+    @param relativeTransform array to store the relative transformations
+    @param nPairs number of pairs */
+template <typename T>
 __GLOBAL__ void
-    addExternalForces_kernel(RigidBody<T, U> const* const* particleRB,
-                             uint*                         rigidBodyId,
-                             Torce<T>*                     torce,
-                             T                             gX,
-                             T                             gY,
-                             T                             gZ,
-                             int                           nParticles);
+    computeRelativeTransformations_Kernel(const uint2*         pairList,
+                                          const Transform3<T>* transform,
+                                          Transform3<T>* relativeTransform,
+                                          const uint     nPairs)
+{
+    uint tID = blockIdx.x * blockDim.x + threadIdx.x;
 
+    if(tID >= nPairs)
+        return;
+
+    computeRelativeTransformations_common(pairList,
+                                          transform,
+                                          relativeTransform,
+                                          tID);
+}
+
+// -----------------------------------------------------------------------------
+/** @brief Detects collisions between particles and obstacles
+    @param pairList list of pairs of components
+    @param particleRB array of rigid bodies for particles
+    @param obstacleRB array of rigid bodies for obstacles
+    @param transform array of transformations for particles
+    @param obstacleTransform array of transformations for obstacles
+    @param contactInfo array to store contact information
+    @param nPairs number of pairs */
+template <typename T>
+__GLOBAL__ void
+    detectCollisionsObstacles_Kernel(const uint2*               pairList,
+                                     const RigidBody<T>* const* particleRB,
+                                     const RigidBody<T>* const* obstacleRB,
+                                     const Transform3<T>*       transform,
+                                     const Transform3<T>* obstacleTransform,
+                                     ContactInfo<T>*      contactInfo,
+                                     const uint           nPairs)
+{
+    uint tID = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if(tID >= nPairs)
+        return;
+
+    detectCollisionsObstacles_common(pairList,
+                                     particleRB,
+                                     obstacleRB,
+                                     transform,
+                                     obstacleTransform,
+                                     contactInfo,
+                                     tID);
+}
+
+// -----------------------------------------------------------------------------
+/** @brief Detects collisions between particles and particles
+    @param pairList list of pairs of components
+    @param particleRB array of rigid bodies for particles
+    @param relTransform array of relative transformations for particles
+    @param contactInfo array to store contact information
+    @param nPairs number of pairs */
+template <typename T>
+__GLOBAL__ void
+    detectCollisionsParticles_Kernel(const uint2*               pairList,
+                                     const RigidBody<T>* const* particleRB,
+                                     const Transform3<T>*       relTransform,
+                                     ContactInfo<T>*            contactInfo,
+                                     const uint                 nPairs)
+{
+    uint tID = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if(tID >= nPairs)
+        return;
+
+    detectCollisionsParticles_common(pairList,
+                                     particleRB,
+                                     relTransform,
+                                     contactInfo,
+                                     tID);
+}
+
+// -----------------------------------------------------------------------------
+/** @brief Computes the contact forces
+    @param CF contact force models
+    @param pairList list of rigid bodies pairs
+    @param contactInfo contact information
+    @param particleRB rigid body of particles
+    @param velocity kinematics of the particles
+    @param torce torce acting on the particles
+    @param relTransform transformation of the particles */
+template <typename T>
+__GLOBAL__ void
+    computeContactForces_Kernel(const ContactForceModel<T>* const* CF,
+                                const uint2*                       pairList,
+                                const ContactInfo<T>*              contactInfo,
+                                const RigidBody<T>* const*         particleRB,
+                                const Kinematics<T>*               velocity,
+                                Torce<T>*                          torce,
+                                const Transform3<T>*               relTransform,
+                                const uint                         nPairs)
+{
+    uint tID = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if(tID >= nPairs)
+        return;
+
+    computeContactForces_common(CF,
+                                pairList,
+                                contactInfo,
+                                particleRB,
+                                velocity,
+                                torce,
+                                relTransform,
+                                tID);
+}
+
+// -----------------------------------------------------------------------------
+/** @brief Adds external forces such as gravity
+    @param gx the gravity field - the x component
+    @param gy the gravity field - the y component
+    @param gz the gravity field - the z component
+    @param particleRB array of rigid bodies for particles
+    @param torce array of particles torces
+    @param nParticles number of particles */
+template <typename T>
+__GLOBAL__ void addExternalForces_Kernel(const T                    gX,
+                                         const T                    gY,
+                                         const T                    gZ,
+                                         const RigidBody<T>* const* particleRB,
+                                         Torce<T>*                  torce,
+                                         const uint                 nParticles)
+{
+    uint pID = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if(pID >= nParticles)
+        return;
+
+    addExternalForces_common(Vector3<T>(gX, gY, gZ), particleRB, torce, pID);
+}
+
+// -----------------------------------------------------------------------------
 /** @brief Updates the position and velocities of particles
-@param particleRB array of rigid bodies for particles
-@param TI time integrator scheme
-@param rigidBodyId array of rigid body IDs for particles
-@param transform array of particles transformations
-@param velocity array of particles velocities
-@param torce array of particles torces
-@param nParticles number of particles */
-template <typename T, typename U>
-__GLOBAL__ void moveParticles_kernel(RigidBody<T, U> const* const*   particleRB,
-                                     TimeIntegrator<T> const* const* TI,
-                                     uint*          rigidBodyId,
-                                     Transform3<T>* transform,
-                                     Kinematics<T>* velocity,
-                                     Torce<T>*      torce,
-                                     int            nParticles);
+    @param TI time integrator scheme
+    @param particleRB array of rigid bodies for particles
+    @param transform array of particles transformations
+    @param quaternion array of particles quaternions
+    @param velocity array of particles velocities
+    @param torce array of particles torces
+    @param rigidBodyId array of rigid body IDs for particles
+    @param nParticles number of particles */
+template <typename T>
+__GLOBAL__ void moveParticles_Kernel(const TimeIntegrator<T>* const* TI,
+                                     const RigidBody<T>* const*      particleRB,
+                                     Transform3<T>*                  transform,
+                                     Quaternion<T>*                  quaternion,
+                                     Kinematics<T>*                  velocity,
+                                     Torce<T>*                       torce,
+                                     const uint* rigidBodyId,
+                                     int         nParticles)
+{
+    uint pID = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if(pID >= nParticles)
+        return;
+
+    moveParticles_common(TI,
+                         particleRB,
+                         transform,
+                         quaternion,
+                         velocity,
+                         torce,
+                         rigidBodyId,
+                         pID);
+}
 //@}
 
 #endif

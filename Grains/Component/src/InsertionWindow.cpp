@@ -74,10 +74,7 @@ __HOST__ InsertionWindow<T>::InsertionWindow(DOMNode*            dn,
         GoutWI(12, "Reading insertion window completed!");
     }
     else
-    {
-        Gout("Insertion window type is not supported");
-        exit(1);
-    }
+        GAbort("Insertion window type is not supported");
 }
 
 // -----------------------------------------------------------------------------

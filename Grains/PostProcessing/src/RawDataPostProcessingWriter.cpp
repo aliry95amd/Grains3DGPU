@@ -4,15 +4,15 @@
 // -----------------------------------------------------------------------------
 // Default constructor
 template <typename T>
-__HOST__ RawDataPostProcessingWriter<T>::RawDataPostProcessingWriter()
+RawDataPostProcessingWriter<T>::RawDataPostProcessingWriter()
 {
 }
 
 // -----------------------------------------------------------------------------
 // Constructor with XML node
 template <typename T>
-__HOST__
-    RawDataPostProcessingWriter<T>::RawDataPostProcessingWriter(DOMNode* dn)
+
+RawDataPostProcessingWriter<T>::RawDataPostProcessingWriter(DOMNode* dn)
     : m_ndigits(6)
 {
     m_directory = ReaderXML::getNodeAttr_String(dn, "Directory");
@@ -25,14 +25,14 @@ __HOST__
 // -----------------------------------------------------------------------------
 // Destructor
 template <typename T>
-__HOST__ RawDataPostProcessingWriter<T>::~RawDataPostProcessingWriter()
+RawDataPostProcessingWriter<T>::~RawDataPostProcessingWriter()
 {
 }
 
 // -----------------------------------------------------------------------------
 // Gets the post-processing writer type
 template <typename T>
-__HOST__ PostProcessingWriterType
+PostProcessingWriterType
     RawDataPostProcessingWriter<T>::getPostProcessingWriterType() const
 {
     return (RAW);
@@ -41,7 +41,7 @@ __HOST__ PostProcessingWriterType
 // ----------------------------------------------------------------------------
 // Removes post-processing files already in the directory
 template <typename T>
-__HOST__ void RawDataPostProcessingWriter<T>::clearPostProcessingFiles() const
+void RawDataPostProcessingWriter<T>::clearPostProcessingFiles() const
 {
     std::string              directory = m_directory;
     std::vector<std::string> patternsStr
@@ -60,7 +60,7 @@ __HOST__ void RawDataPostProcessingWriter<T>::clearPostProcessingFiles() const
 // -----------------------------------------------------------------------------
 // Initializes the post-processing writer
 template <typename T>
-__HOST__ void RawDataPostProcessingWriter<T>::PostProcessing_start()
+void RawDataPostProcessingWriter<T>::PostProcessing_start()
 {
     // Open files
     ios_base::openmode mode = ios::app;
@@ -72,23 +72,24 @@ __HOST__ void RawDataPostProcessingWriter<T>::PostProcessing_start()
 // -----------------------------------------------------------------------------
 // Writes data -- Particles come first, followed by obtacles
 template <typename T>
-__HOST__ void RawDataPostProcessingWriter<T>::PostProcessing(
-    RigidBody<T, T> const* const* particleRB,
-    RigidBody<T, T> const* const* obstacleRB,
-    const ComponentManager<T>*    cm,
-    const T                       currentTime)
+void RawDataPostProcessingWriter<T>::PostProcessing(
+    const GrainsMemBuffer<RigidBody<T>*>&       particleRB,
+    const GrainsMemBuffer<RigidBody<T>*>&       obstacleRB,
+    const std::unique_ptr<ComponentManager<T>>& cm,
+    const T                                     currentTime)
 {
     // Particles
-    uint                       numParticles = cm->getNumberOfParticles();
-    std::vector<uint>          rbParticle   = cm->getRigidBodyId();
-    std::vector<Transform3<T>> tParticle    = cm->getTransform();
-    std::vector<Kinematics<T>> kParticle    = cm->getVelocity();
+    uint                         numParticles = cm->getNumberOfParticles();
+    const GrainsMemBuffer<uint>& rbParticle   = cm->getRigidBodyId();
+    const GrainsMemBuffer<Transform3<T>>& tParticle = cm->getTransform();
+    const GrainsMemBuffer<Kinematics<T>>& kParticle = cm->getVelocity();
     // Obstacles
-    uint                       numObstacles = cm->getNumberOfObstacles();
-    std::vector<uint>          rbObstacle   = cm->getRigidBodyIdObstacles();
-    std::vector<Transform3<T>> tObstacle    = cm->getTransformObstacles();
-    // TODO:
-    std::vector<Kinematics<T>> kObstacle(numObstacles);
+    uint                         numObstacles = cm->getNumberOfObstacles();
+    const GrainsMemBuffer<uint>& rbObstacle   = cm->getObstaclesRigidBodyId();
+    const GrainsMemBuffer<Transform3<T>>& tObstacle
+        = cm->getObstaclesTransform();
+    const GrainsMemBuffer<Kinematics<T>>& kObstacle
+        = cm->getObstaclesVelocity();
     // Aux. variables
     Vector3<T>  centre;
     Vector3<T>  velT;
@@ -215,7 +216,7 @@ __HOST__ void RawDataPostProcessingWriter<T>::PostProcessing(
 // -----------------------------------------------------------------------------
 // Finalizes writing data
 template <typename T>
-__HOST__ void RawDataPostProcessingWriter<T>::PostProcessing_end()
+void RawDataPostProcessingWriter<T>::PostProcessing_end()
 {
     m_gc_coordinates_x.close();
     m_gc_coordinates_y.close();
@@ -233,8 +234,7 @@ __HOST__ void RawDataPostProcessingWriter<T>::PostProcessing_end()
 // -----------------------------------------------------------------------------
 // Creates output files and open streams
 template <typename T>
-__HOST__ void
-    RawDataPostProcessingWriter<T>::prepareResultFiles(ios_base::openmode mode)
+void RawDataPostProcessingWriter<T>::prepareResultFiles(ios_base::openmode mode)
 {
     std::string fileName(m_directory + "/" + m_rootName);
     string      file;

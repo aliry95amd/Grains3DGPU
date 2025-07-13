@@ -7,13 +7,14 @@
 /* ========================================================================== */
 // Writes obstacles data
 template <typename T>
-__HOST__ void writeObstacles_Paraview(RigidBody<T, T> const* const* obstacleRB,
-                                      const ComponentManager<T>*    cm,
-                                      const std::string&            obsFileName)
+void writeObstacles_Paraview(const GrainsMemBuffer<RigidBody<T>*>& obstacleRB,
+                             const std::unique_ptr<ComponentManager<T>>& cm,
+                             const std::string& obsFileName)
 {
-    ofstream                         f((obsFileName).c_str(), ios::out);
-    const uint                       numObstacles = cm->getNumberOfObstacles();
-    const std::vector<Transform3<T>> tr           = cm->getTransformObstacles();
+    ofstream   f((obsFileName).c_str(), ios::out);
+    const uint numObstacles                   = cm->getNumberOfObstacles();
+    const GrainsMemBuffer<Transform3<T>>& tr  = cm->getObstaclesTransform();
+    const GrainsMemBuffer<Kinematics<T>>& kin = cm->getObstaclesVelocity();
 
     f << "<VTKFile type=\"UnstructuredGrid\" version=\"0.1\" "
       << "byte_order=\"LittleEndian\" ";
@@ -95,14 +96,14 @@ __HOST__ void writeObstacles_Paraview(RigidBody<T, T> const* const* obstacleRB,
 // -----------------------------------------------------------------------------
 // Writes particles data
 template <typename T>
-__HOST__ void writeParticles_Paraview(RigidBody<T, T> const* const* particleRB,
-                                      const ComponentManager<T>*    cm,
-                                      const std::string&            parFileName)
+void writeParticles_Paraview(const GrainsMemBuffer<RigidBody<T>*>& particleRB,
+                             const std::unique_ptr<ComponentManager<T>>& cm,
+                             const std::string& parFileName)
 {
-    ofstream                         f((parFileName).c_str(), ios::out);
-    const uint                       numParticles = cm->getNumberOfParticles();
-    const std::vector<Transform3<T>> tr           = cm->getTransform();
-    const std::vector<Kinematics<T>> kin          = cm->getVelocity();
+    ofstream   f((parFileName).c_str(), ios::out);
+    const uint numParticles                   = cm->getNumberOfParticles();
+    const GrainsMemBuffer<Transform3<T>>& tr  = cm->getTransform();
+    const GrainsMemBuffer<Kinematics<T>>& kin = cm->getVelocity();
 
     f << "<VTKFile type=\"UnstructuredGrid\" version=\"0.1\" "
       << "byte_order=\"LittleEndian\" ";
@@ -217,15 +218,15 @@ __HOST__ void writeParticles_Paraview(RigidBody<T, T> const* const* particleRB,
 /* ========================================================================== */
 // Default constructor
 template <typename T>
-__HOST__ ParaviewPostProcessingWriter<T>::ParaviewPostProcessingWriter()
+ParaviewPostProcessingWriter<T>::ParaviewPostProcessingWriter()
 {
 }
 
 // -----------------------------------------------------------------------------
 // Constructor with XML node, rank and number of processes as input parameters
 template <typename T>
-__HOST__
-    ParaviewPostProcessingWriter<T>::ParaviewPostProcessingWriter(DOMNode* dn)
+
+ParaviewPostProcessingWriter<T>::ParaviewPostProcessingWriter(DOMNode* dn)
 {
     m_rootName  = ReaderXML::getNodeAttr_String(dn, "RootName");
     m_directory = ReaderXML::getNodeAttr_String(dn, "Directory");
@@ -239,14 +240,14 @@ __HOST__
 // -----------------------------------------------------------------------------
 // Destructor
 template <typename T>
-__HOST__ ParaviewPostProcessingWriter<T>::~ParaviewPostProcessingWriter()
+ParaviewPostProcessingWriter<T>::~ParaviewPostProcessingWriter()
 {
 }
 
 // ----------------------------------------------------------------------------
 // Gets the post-processing writer type
 template <typename T>
-__HOST__ PostProcessingWriterType
+PostProcessingWriterType
     ParaviewPostProcessingWriter<T>::getPostProcessingWriterType() const
 {
     return (PARAVIEW);
@@ -255,7 +256,7 @@ __HOST__ PostProcessingWriterType
 // ----------------------------------------------------------------------------
 // Removes post-processing files already in the directory
 template <typename T>
-__HOST__ void ParaviewPostProcessingWriter<T>::clearPostProcessingFiles() const
+void ParaviewPostProcessingWriter<T>::clearPostProcessingFiles() const
 {
     std::string              directory   = m_directory;
     std::vector<std::string> patternsStr = {"^" + m_rootName + R"(_.*\.pvd$)",
@@ -272,7 +273,7 @@ __HOST__ void ParaviewPostProcessingWriter<T>::clearPostProcessingFiles() const
 
 // -----------------------------------------------------------------------------
 template <typename T>
-__HOST__ void ParaviewPostProcessingWriter<T>::PostProcessing_start()
+void ParaviewPostProcessingWriter<T>::PostProcessing_start()
 {
     clearPostProcessingFiles();
     // Obstacles
@@ -299,11 +300,11 @@ __HOST__ void ParaviewPostProcessingWriter<T>::PostProcessing_start()
 // -----------------------------------------------------------------------------
 // Writes data
 template <typename T>
-__HOST__ void ParaviewPostProcessingWriter<T>::PostProcessing(
-    RigidBody<T, T> const* const* particleRB,
-    RigidBody<T, T> const* const* obstacleRB,
-    const ComponentManager<T>*    cm,
-    const T                       currentTime)
+void ParaviewPostProcessingWriter<T>::PostProcessing(
+    const GrainsMemBuffer<RigidBody<T>*>&       particleRB,
+    const GrainsMemBuffer<RigidBody<T>*>&       obstacleRB,
+    const std::unique_ptr<ComponentManager<T>>& cm,
+    const T                                     currentTime)
 {
     // list<string> Scalars;
     // Scalars.push_back("NormU");
@@ -350,7 +351,7 @@ __HOST__ void ParaviewPostProcessingWriter<T>::PostProcessing(
 // ----------------------------------------------------------------------------
 // Finalizes writing data
 template <typename T>
-__HOST__ void ParaviewPostProcessingWriter<T>::PostProcessing_end()
+void ParaviewPostProcessingWriter<T>::PostProcessing_end()
 {
 }
 

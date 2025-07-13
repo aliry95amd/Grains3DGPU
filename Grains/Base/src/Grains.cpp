@@ -1,11 +1,9 @@
-#include <numeric>
-
-#include "ComponentManagerCPU.hh"
-#include "ContactForceModelBuilderFactory.hh"
 #include "Grains.hh"
-#include "GrainsUtils.hh"
-#include "PostProcessingWriterBuilderFactory.hh"
-#include "TimeIntegratorBuilderFactory.hh"
+#include "ComponentManagerCPU.hh"
+#include "ContactForceModelFactory.hh"
+#include "PostProcessingWriterFactory.hh"
+#include "RigidBodyFactory.hh"
+#include "TimeIntegratorFactory.hh"
 #include "VectorMath.hh"
 
 /* ========================================================================== */
@@ -25,10 +23,6 @@ Grains<T>::Grains()
 template <typename T>
 Grains<T>::~Grains()
 {
-    // TODO
-    for(auto ptr : m_postProcessor)
-        delete ptr;
-    delete m_insertion;
 }
 
 // -----------------------------------------------------------------------------
@@ -48,24 +42,48 @@ void Grains<T>::initialize(DOMElement* rootElement)
     Gout(std::string(80, '='));
 
     // Post-processing start
-    for(auto pp : m_postProcessor)
+    for(auto& pp : m_postProcessor)
         pp->PostProcessing_start();
 }
 
 // -----------------------------------------------------------------------------
-// Performs post-processing
+// Performs post-processing on the host
 template <typename T>
-void Grains<T>::postProcess(ComponentManager<T> const* cm) const
+void Grains<T>::postProcess(
+    const std::unique_ptr<ComponentManager<T, MemType::HOST>>& cm) const
 {
     using GP = GrainsParameters<T>;
 
     if(GP::m_tSave.front() - GP::m_time < 0.01 * GP::m_dt)
     {
         GP::m_tSave.pop();
-        for(auto pp : m_postProcessor)
+        for(auto& pp : m_postProcessor)
             pp->PostProcessing(m_particleRigidBodyList,
                                m_obstacleRigidBodyList,
                                cm,
+                               GP::m_time);
+    }
+    // In case we get past the saveTime, we need to remove it from the queue
+    if(GP::m_time > GP::m_tSave.front())
+        GP::m_tSave.pop();
+}
+
+// -----------------------------------------------------------------------------
+// Performs post-processing on the device
+template <typename T>
+void Grains<T>::postProcess(
+    const std::unique_ptr<ComponentManager<T, MemType::DEVICE>>& cm)
+{
+    using GP = GrainsParameters<T>;
+
+    if(GP::m_tSave.front() - GP::m_time < 0.01 * GP::m_dt)
+    {
+        GP::m_tSave.pop();
+        cm->copyTo_PostProcessing(m_components);
+        for(auto& pp : m_postProcessor)
+            pp->PostProcessing(m_particleRigidBodyList,
+                               m_obstacleRigidBodyList,
+                               m_components,
                                GP::m_time);
     }
     // In case we get past the saveTime, we need to remove it from the queue
@@ -78,7 +96,7 @@ void Grains<T>::postProcess(ComponentManager<T> const* cm) const
 template <typename T>
 void Grains<T>::finalize()
 {
-    for(auto pp : m_postProcessor)
+    for(auto& pp : m_postProcessor)
         pp->PostProcessing_end();
 }
 
@@ -98,26 +116,23 @@ void Grains<T>::Construction(DOMElement* rootElement)
     // Checking if Construction node is available
     DOMNode* root = ReaderXML::getNode(rootElement, "Construction");
     if(!root)
-    {
-        Gout("Construction node is mandatory!");
-        exit(1);
-    }
+        GAbort("Construction node is mandatory!");
 
     // -------------------------------------------------------------------------
     // Domain size: origin, max coordinates and periodicity
-    DOMNode* nDomain = ReaderXML::getNode(root, "LinkedCell");
-    GP::m_maxCoordinate.setValue(
-        T(ReaderXML::getNodeAttr_Double(nDomain, "MX")),
-        T(ReaderXML::getNodeAttr_Double(nDomain, "MY")),
-        T(ReaderXML::getNodeAttr_Double(nDomain, "MZ")));
-
     DOMNode* nOrigin = ReaderXML::getNode(root, "Origin");
     if(nOrigin)
-        GP::m_origin.setValue(T(ReaderXML::getNodeAttr_Double(nOrigin, "OX")),
-                              T(ReaderXML::getNodeAttr_Double(nOrigin, "OY")),
-                              T(ReaderXML::getNodeAttr_Double(nOrigin, "OZ")));
+        GP::m_origin.setValue(T(ReaderXML::getNodeAttr_Double(nOrigin, "X")),
+                              T(ReaderXML::getNodeAttr_Double(nOrigin, "Y")),
+                              T(ReaderXML::getNodeAttr_Double(nOrigin, "Z")));
     else
         GP::m_origin.setValue(T(0), T(0), T(0));
+
+    DOMNode* nDomain = ReaderXML::getNode(root, "MaxCoordinate");
+    GP::m_maxCoordinate.setValue(
+        T(ReaderXML::getNodeAttr_Double(nDomain, "X")),
+        T(ReaderXML::getNodeAttr_Double(nDomain, "Y")),
+        T(ReaderXML::getNodeAttr_Double(nDomain, "Z")));
 
     // if the simulation is periodic
     DOMNode* nPeriodicity = ReaderXML::getNode(root, "Periodicity");
@@ -127,65 +142,60 @@ void Grains<T>::Construction(DOMElement* rootElement)
         int PY = ReaderXML::getNodeAttr_Int(nPeriodicity, "PY");
         int PZ = ReaderXML::getNodeAttr_Int(nPeriodicity, "PZ");
         if(PX * PY * PZ != 0)
-        {
-            Gout("Periodicity is not implemented!");
-            exit(1);
-        }
+            GAbort("Periodicity is not implemented!");
         GP::m_isPeriodic = false;
     }
 
     // -------------------------------------------------------------------------
     // Particles
-    DOMNode*     particles    = ReaderXML::getNode(root, "Particles");
-    DOMNodeList* allParticles = ReaderXML::getNodes(rootElement, "Particle");
-    // Number of unique shapes (rigid bodies) in the simulation
-    uint numUniqueParticles = allParticles->getLength();
-    // In the first traverse, we find the total number of particles
-    std::vector<uint> numEachUniqueParticle(numUniqueParticles);
+    DOMNode* particles = ReaderXML::getNode(root, "Particles");
+
+    GrainsMemBuffer<RigidBody<T>*, MemType::HOST> m_refParticleRigidBodyList;
+    GrainsMemBuffer<Transform3<T>, MemType::HOST> refParticlesInitialTransform;
+    GrainsMemBuffer<uint, MemType::HOST>          numEachRefParticle;
+    uint                                          numParticles = 0;
     if(particles)
     {
-        for(int i = 0; i < numUniqueParticles; i++)
-        {
-            DOMNode* nParticle       = allParticles->item(i);
-            numEachUniqueParticle[i] = static_cast<uint>(
-                ReaderXML::getNodeAttr_Int(nParticle, "Number"));
-        }
-    }
-    // Total number of particles in the simulation
-    uint numParticles = std::accumulate(numEachUniqueParticle.begin(),
-                                        numEachUniqueParticle.end(),
-                                        0);
-    // We also store the initial transformations of the rigid bodies to pass to
-    // the ComponentManager to create particles with the initial transformation
-    // required.
-    std::vector<Transform3<T>> particlesInitialTransform(numParticles);
-    // Memory allocation for m_rigidBodyList with respect to the number of
-    // shapes in the simulation.
-    m_particleRigidBodyList
-        = (RigidBody<T, T>**)malloc(numParticles * sizeof(RigidBody<T, T>*));
-    if(numParticles)
-    {
-        GoutWI(6, "Reading new particle types ...");
-        // Populating the array with different kind of rigid bodies in the XML
-        // file
-        uint offset = 0;
-        for(uint i = 0; i < numUniqueParticles; i++)
-        {
-            DOMNode* nParticle = allParticles->item(i);
-            for(uint j = 0; j < numEachUniqueParticle[i]; j++)
-            {
-                // Create the Rigid Body
-                m_particleRigidBodyList[offset + j]
-                    = new RigidBody<T, T>(nParticle);
-                // Initial transformation of the rigid body
-                particlesInitialTransform[offset + j]
-                    = Transform3<T>(nParticle);
-            }
-            // Increment the starting position
-            offset += numEachUniqueParticle[i];
-        }
+        GoutWI(6, "Reading particle types ...");
+        RigidBodyFactory<T>::create(particles,
+                                    m_refParticleRigidBodyList,
+                                    refParticlesInitialTransform,
+                                    numEachRefParticle,
+                                    numParticles);
         GoutWI(6, "Reading particle types completed!");
     }
+
+    m_particleRigidBodyList.reserve(numParticles);
+    GrainsMemBuffer<Transform3<T>, MemType::HOST> particlesInitialTransform;
+    particlesInitialTransform.allocate(numParticles);
+    if(numParticles)
+    {
+        uint offset = 0;
+        for(uint i = 0; i < m_refParticleRigidBodyList.getSize(); ++i)
+        {
+            for(uint j = 0; j < numEachRefParticle[i]; j++)
+            {
+                // Deep copy of the rigid body
+                m_particleRigidBodyList[offset + j]
+                    = new RigidBody<T>(*m_refParticleRigidBodyList[i]);
+                // Initial transformation of the rigid body
+                particlesInitialTransform[offset + j]
+                    = refParticlesInitialTransform[i];
+            }
+            // Increment the starting position
+            offset += numEachRefParticle[i];
+        }
+    }
+    GP::m_numParticles = numParticles;
+
+    // Finding max circumscribed radius among all particles.
+    T maxRadius = T(0);
+    for(uint i = 0; i < m_refParticleRigidBodyList.getSize(); ++i)
+    {
+        if(m_refParticleRigidBodyList[i]->getCircumscribedRadius() > maxRadius)
+            maxRadius = m_refParticleRigidBodyList[i]->getCircumscribedRadius();
+    }
+    GP::m_maxRadius = maxRadius;
 
     // -------------------------------------------------------------------------
     // Obstacles
@@ -196,11 +206,11 @@ void Grains<T>::Construction(DOMElement* rootElement)
     // We also store the initial transformations of the rigid bodies to pass to
     // the ComponentManager to create particles with the initial transformation
     // required.
-    std::vector<Transform3<T>> obstaclesInitialTransform(numObstacles);
+    GrainsMemBuffer<Transform3<T>, MemType::HOST> obstaclesInitialTransform;
+    obstaclesInitialTransform.allocate(numObstacles);
     // Memory allocation for m_rigidBodyList with respect to the number of
     // shapes in the simulation.
-    m_obstacleRigidBodyList
-        = (RigidBody<T, T>**)malloc(numObstacles * sizeof(RigidBody<T, T>*));
+    m_obstacleRigidBodyList.reserve(numObstacles);
     if(numObstacles)
     {
         GoutWI(6, "Reading obstacles types ...");
@@ -208,55 +218,97 @@ void Grains<T>::Construction(DOMElement* rootElement)
         {
             DOMNode* nObstacle = allObstacles->item(i);
             // Create the Rigid Body
-            m_obstacleRigidBodyList[i] = new RigidBody<T, T>(nObstacle);
+            m_obstacleRigidBodyList[i] = new RigidBody<T>(nObstacle);
             // Initial transformation of the rigid body
             // One draw back is we might end up with the same rigid body shape,
             // but with different initial transformation.
-            obstaclesInitialTransform[i] = Transform3<T>(nObstacle);
+            DOMNode* tr = ReaderXML::getNode(nObstacle, "Transformation");
+            obstaclesInitialTransform[i] = Transform3<T>(tr);
         }
         GoutWI(6, "Reading obstacles types completed!");
     }
 
     // -------------------------------------------------------------------------
-    // LinkedCell
-    GoutWI(6, "Constructing linked cell ...");
-    // Finding the size of each cell -- max circumscribed radius among all
-    // particles. Note that we loop until numParticles, because we do not care
-    // about the circumscribed radius of the obstacles.
-    T LCSize = T(0);
-    for(int i = 0; i < numParticles; i++)
+    // Setting up collision detection
+    GoutWI(6, "Reading collision detection ...");
+    DOMNode* collisionDetection
+        = ReaderXML::getNode(root, "CollisionDetection");
+    if(!collisionDetection)
+        GAbort("CollisionDetection node is mandatory!");
+    // Neighbor list
+    DOMNode* nNeighborList
+        = ReaderXML::getNode(collisionDetection, "NeighborList");
+    if(!nNeighborList)
+        GAbort("NeighborList node not found");
+    std::string neighborListType
+        = ReaderXML::getNodeAttr_String(nNeighborList, "Type");
+    if(neighborListType == "BruteForce")
+        GP::m_neighborListType = 0;
+    else if(neighborListType == "LinkedCell")
+        GP::m_neighborListType = 1;
+    else
+        GAbort("Unknown NeighborList type! Aborting Grains!");
+    GP::m_neighborListFrequency
+        = ReaderXML::getNodeAttr_Int(nNeighborList, "UpdateFrequency");
+    GoutWI(9,
+           "NeighborList generation with " + neighborListType
+               + " and frequency " + std::to_string(GP::m_neighborListFrequency)
+               + " ...");
+    // Linked cell
+    if(GP::m_neighborListType == 1)
     {
-        if(m_particleRigidBodyList[i]->getCircumscribedRadius() > LCSize)
-            LCSize = m_particleRigidBodyList[i]->getCircumscribedRadius();
+        DOMNode* nLinkedCell
+            = ReaderXML::getNode(collisionDetection, "LinkedCell");
+        if(!nLinkedCell)
+            GAbort("LinkedCell node is mandatory when using LinkedCell "
+                   "neighbor list!");
+        std::string linkedCellType
+            = ReaderXML::getNodeAttr_String(nLinkedCell, "Type");
+        if(linkedCellType == "MemoryEfficient")
+            GP::m_linkedCellType = 1;
+        else
+            GAbort("Unknown LinkedCell type! Aborting Grains!");
+        GP::m_linkedCellSizeFactor
+            = T(ReaderXML::getNodeAttr_Double(nLinkedCell, "CellSizeFactor"));
+        GP::m_sortingFrequency
+            = ReaderXML::getNodeAttr_Int(nLinkedCell, "SortingFrequency");
+        GoutWI(9,
+               linkedCellType + " LinkedCell" + " with cell size factor: "
+                   + std::to_string(GP::m_linkedCellSizeFactor)
+                   + " and sorting frequency "
+                   + std::to_string(GP::m_sortingFrequency) + " ...");
     }
-    // Scaling coefficient of linked cell size
-    T        LC_coeff = T(1);
-    DOMNode* nLC      = ReaderXML::getNode(root, "LinkedCell");
-    if(ReaderXML::hasNodeAttr(nLC, "CellSizeFactor"))
-        LC_coeff = T(ReaderXML::getNodeAttr_Double(nLC, "CellSizeFactor"));
-    if(LC_coeff < T(1))
-        LC_coeff = T(1);
-    GoutWI(9, "Cell size factor =", std::to_string(LC_coeff));
-
-    // Creating linked cell
-    GP::m_sizeLC = LC_coeff * T(2) * LCSize;
-    m_linkedCell = (LinkedCell<T>**)malloc(sizeof(LinkedCell<T>*));
-    *m_linkedCell
-        = new LinkedCell<T>(GP::m_origin, GP::m_maxCoordinate, GP::m_sizeLC);
-    GP::m_numCells = (*m_linkedCell)->getNumCells();
-    GoutWI(9, "LinkedCell with", GP::m_numCells, "cells is created on host.");
-    GoutWI(6, "Constructing linked cell completed!");
-
-    // -------------------------------------------------------------------------
-    // Setting up the component managers
-    GP::m_numParticles = numParticles;
-    GP::m_numObstacles = numObstacles;
-    m_components       = new ComponentManagerCPU<T>(GP::m_numParticles,
-                                              GP::m_numObstacles,
-                                              GP::m_numCells);
-    // Initialize the particles and obstacles
-    m_components->initializeParticles(particlesInitialTransform);
-    m_components->initializeObstacles(obstaclesInitialTransform);
+    // Bounding volume
+    DOMNode* nBoundingVolume
+        = ReaderXML::getNode(collisionDetection, "BoundingVolume");
+    if(nBoundingVolume)
+    {
+        std::string boundingVolumeType
+            = ReaderXML::getNodeAttr_String(nBoundingVolume, "Type");
+        if(boundingVolumeType == "OFF")
+            GP::m_boundingVolumeType = 0;
+        else if(boundingVolumeType == "OBB")
+            GP::m_boundingVolumeType = 1;
+        else if(boundingVolumeType == "OBC")
+            GP::m_boundingVolumeType = 2;
+        else
+            GAbort("Unknown bounding volume type! Aborting Grains!");
+        GoutWI(9, boundingVolumeType + " Bounding volume ...");
+    }
+    // Narrow phase detection
+    DOMNode* nNarrowPhase
+        = ReaderXML::getNode(collisionDetection, "NarrowPhase");
+    if(nNarrowPhase)
+    {
+        std::string narrowPhaseType
+            = ReaderXML::getNodeAttr_String(nNarrowPhase, "Type");
+        if(narrowPhaseType == "GJK")
+            GP::m_narrowPhaseType = 0;
+        else
+            GAbort("Unknown narrow phase type! Aborting Grains!");
+        GoutWI(9, narrowPhaseType + " Narrow phase detection ...");
+    }
+    GoutWI(6, "Reading collision detection completed!");
 
     // -------------------------------------------------------------------------
     // Contact force models
@@ -268,10 +320,9 @@ void Grains<T>::Construction(DOMElement* rootElement)
     DOMNode* contacts     = ReaderXML::getNode(root, "ContactForceModels");
     if(contacts)
     {
-        GoutWI(6, "Reading the contact force model ...");
-        m_contactForce
-            = ContactForceModelBuilderFactory<T>::create(rootElement);
-        GoutWI(6, "Reading the contact force model completed!");
+        GoutWI(6, "Reading contact force models ...");
+        ContactForceModelFactory<T>::create(rootElement, m_contactForce);
+        GoutWI(6, "Reading contact force models completed!");
     }
 
     // -------------------------------------------------------------------------
@@ -289,14 +340,24 @@ void Grains<T>::Construction(DOMElement* rootElement)
         DOMNode* nTI    = ReaderXML::getNode(tempSetting, "TimeIntegration");
         if(nTI)
         {
-            GoutWI(6, "Reading the time integration model ...");
-            m_timeIntegrator
-                = (TimeIntegrator<T>**)malloc(sizeof(TimeIntegrator<T>*));
-            *m_timeIntegrator
-                = TimeIntegratorBuilderFactory<T>::create(nTI, GP::m_dt);
-            GoutWI(6, "Reading the time integration model completed!");
+            GoutWI(6, "Reading time integration model ...");
+            TimeIntegratorFactory<T>::create(nTI, GP::m_dt, m_timeIntegrator);
+            GoutWI(6, "Reading time integration model completed!");
         }
     }
+
+    // -------------------------------------------------------------------------
+    // Setting up the component managers
+    GP::m_numParticles = numParticles;
+    GP::m_numObstacles = numObstacles;
+    m_components
+        = std::make_unique<ComponentManagerCPU<T>>(&m_particleRigidBodyList,
+                                                   &m_obstacleRigidBodyList,
+                                                   GP::m_numParticles,
+                                                   GP::m_numObstacles);
+    // Initialize the particles and obstacles
+    m_components->initializeParticles(particlesInitialTransform);
+    m_components->initializeObstacles(obstaclesInitialTransform);
 }
 
 // -----------------------------------------------------------------------------
@@ -328,10 +389,7 @@ void Grains<T>::Forces(DOMElement* rootElement)
                    Vector3ToString(GrainsParameters<T>::m_gravity));
         }
         else
-        {
-            GoutWI(6, "Gravity is mandatory!");
-            exit(1);
-        }
+            GAbort("Gravity is mandatory!");
     }
 }
 
@@ -347,21 +405,18 @@ void Grains<T>::AdditionalFeatures(DOMElement* rootElement)
     assert(rootElement != NULL);
     DOMNode* root = ReaderXML::getNode(rootElement, "Simulation");
     if(!root)
-    {
-        GoutWI(6, "Simulation node is mandatory!");
-        exit(1);
-    }
+        GAbort("Simulation node is mandatory!");
 
     // -------------------------------------------------------------------------
     // Insertion policies
     DOMNode* nInsertion = ReaderXML::getNode(root, "ParticleInsertion");
     GoutWI(6, "Reading insertion policies ...");
     if(nInsertion)
-        m_insertion = new Insertion<T>(nInsertion);
+        m_insertion = std::make_unique<Insertion<T>>(nInsertion);
     else
     {
         GoutWI(9, "No policy found, setting the insertion policy to default");
-        m_insertion = new Insertion<T>();
+        m_insertion = std::make_unique<Insertion<T>>();
     }
     GoutWI(6, "Reading insertion policies completed.");
 
@@ -391,7 +446,8 @@ void Grains<T>::AdditionalFeatures(DOMElement* rootElement)
             {
                 DOMNode* nPPW = allPPW->item(i);
                 m_postProcessor.push_back(
-                    PostProcessingWriterBuilderFactory<T>::create(nPPW));
+                    std::unique_ptr<PostProcessingWriter<T>>(
+                        PostProcessingWriterFactory<T>::create(nPPW)));
             }
             GoutWI(6, "Reading the post processing writers completed!");
         }

@@ -93,7 +93,7 @@ __HOSTDEVICE__ Vector3<T>
 // -----------------------------------------------------------------------------
 // Output operator
 template <typename T>
-__HOST__ std::ostream& operator<<(std::ostream& fileOut, Kinematics<T> const& k)
+__HOST__ std::ostream& operator<<(std::ostream& fileOut, const Kinematics<T>& k)
 {
     fileOut << k.getTranslationalComponent() << std::endl
             << k.getAngularComponent();
@@ -120,7 +120,7 @@ template class Kinematics<double>;
 
 #define X(T)                                                       \
     template std::ostream& operator<< <T>(std::ostream & fileOut,  \
-                                          Kinematics<T> const& k); \
+                                          const Kinematics<T>& k); \
                                                                    \
     template std::istream& operator>> <T>(std::istream & fileIn,   \
                                           Kinematics<T> & k);

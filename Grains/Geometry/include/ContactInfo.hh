@@ -77,16 +77,4 @@ public:
     //@}
 };
 
-typedef ContactInfo<double> ContactInfoD;
-typedef ContactInfo<float>  ContactInfoF;
-
-// __HOSTDEVICE__
-// static ContactInfoD noContact( Vec3d( 0., 0., 0. ),
-//                               Vec3d( 0., 0., 0. ),
-//                               1.e20 );
-// __HOSTDEVICE__
-// static ContactInfoF noContactF( Vec3f( 0., 0., 0. ),
-//                                 Vec3f( 0., 0., 0. ),
-//                                 1.e20 );
-
 #endif

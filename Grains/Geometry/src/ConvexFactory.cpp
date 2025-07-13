@@ -1,8 +1,9 @@
-#include "ConvexBuilderFactory.hh"
+#include "ConvexFactory.hh"
 #include "Box.hh"
 #include "Cone.hh"
 #include "Convex.hh"
 #include "Cylinder.hh"
+#include "GrainsUtils.hh"
 #include "Rectangle.hh"
 #include "Sphere.hh"
 #include "Superquadric.hh"
@@ -10,7 +11,7 @@
 // -----------------------------------------------------------------------------
 // Construct a convex with an XML node as an input parameter
 template <typename T>
-Convex<T>* ConvexBuilderFactory<T>::create(DOMNode* root)
+Convex<T>* ConvexFactory<T>::create(DOMNode* root)
 {
     Convex<T>* convex;
     DOMNode*   element = ReaderXML::getNodeNext(root);
@@ -29,10 +30,7 @@ Convex<T>* ConvexBuilderFactory<T>::create(DOMNode* root)
     else if(type == "Rectangle")
         convex = new Rectangle<T>(element);
     else
-    {
-        cout << "Invalid convex type: " << type.c_str() << endl;
-        exit(1);
-    }
+        GAbort("Invalid convex type:", type.c_str(), "Aborting Grains!");
 
     return (convex); // returns the host-side pointer to convex object
 }
@@ -40,7 +38,7 @@ Convex<T>* ConvexBuilderFactory<T>::create(DOMNode* root)
 // -----------------------------------------------------------------------------
 // Construct a convex with a type and a input stream as input parameters
 template <typename T>
-Convex<T>* ConvexBuilderFactory<T>::create(string& type, istream& fileIn)
+Convex<T>* ConvexFactory<T>::create(string& type, istream& fileIn)
 {
     Convex<T>* convex = NULL;
     if(type == "Sphere")
@@ -56,15 +54,12 @@ Convex<T>* ConvexBuilderFactory<T>::create(string& type, istream& fileIn)
     else if(type == "Rectangle")
         convex = new Rectangle<T>(fileIn);
     else
-    {
-        cout << "Invalid convex type: " << type.c_str() << endl;
-        exit(1);
-    }
+        GAbort("Invalid convex type:", type.c_str(), "Aborting Grains!");
 
     return (convex);
 }
 
 // -----------------------------------------------------------------------------
 // Explicit instantiation
-template class ConvexBuilderFactory<float>;
-template class ConvexBuilderFactory<double>;
+template class ConvexFactory<float>;
+template class ConvexFactory<double>;

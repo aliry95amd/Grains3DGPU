@@ -70,12 +70,9 @@ __HOST__ Transform3<T>::Transform3(DOMNode* root)
         inValues >> mat;
         setBasis(mat);
         // Check that the matrix is a rotation matrix
-        if(!m_basis.isRotation())
-        {
-            cout << "A matrix in one of the AngularPosition XML nodes is"
-                 << " not a rotation matrix !!!" << endl;
-            exit(1);
-        }
+        // if(!m_basis.isRotation())
+        //     GAbort("A matrix in one of the AngularPosition XML nodes is"
+        //            " not a rotation matrix !!!");
     }
     else if(type == "Angles")
     {
@@ -172,7 +169,7 @@ __HOSTDEVICE__ void Transform3<T>::setOrigin(const Vector3<T>& v)
 // -----------------------------------------------------------------------------
 // Sets the transformation to the identity
 template <typename T>
-__HOSTDEVICE__ void Transform3<T>::setIdentity()
+__HOSTDEVICE__ void Transform3<T>::setIDentity()
 {
     m_basis.setValue(T(1), T(0), T(0), T(0), T(1), T(0), T(0), T(0), T(1));
     m_origin.setValue(T(0), T(0), T(0));

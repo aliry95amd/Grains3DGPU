@@ -82,7 +82,7 @@ public:
         @param delFT tangential force
         @param delM torque */
     __HOSTDEVICE__
-    void performForcesCalculus(ContactInfo<T> const& contactInfos,
+    void performForcesCalculus(const ContactInfo<T>& contactInfos,
                                const Vector3<T>&     relVelocityAtContact,
                                const Vector3<T>&     relAngVelocity,
                                T                     m1,
@@ -96,17 +96,19 @@ public:
         @param relVelocityAtContact relative velocity at the contact point
         @param relAngVelocity relative angular velocity
         @param m1 mass of the first component (Particle)
-        @param m2 mass of the second component (Particle ou Obstacle)
-        @param torce computed force and torque */
-    // @param nbContact number of contact points for composite particles */
+        @param m2 mass of the second component (Particle or Obstacle)
+        @param trOrigin transformation origin
+        @param torceA computed force and torque for the first component
+        @param torceB computed force and torque for the second component */
     __HOSTDEVICE__
-    void computeForces(ContactInfo<T> const& contactInfos,
+    void computeForces(const ContactInfo<T>& contactInfos,
                        const Vector3<T>&     relVelocityAtContact,
                        const Vector3<T>&     relAngVelocity,
                        T                     m1,
                        T                     m2,
                        const Vector3<T>&     trOrigin,
-                       Torce<T>&             torce) const final;
+                       Torce<T>&             torceA,
+                       Torce<T>&             torceB) const final;
     //@}
 };
 
