@@ -129,6 +129,8 @@ void RawDataPostProcessingWriter<T>::PostProcessing(
                                            centre[Z]);
 
         // Translational velocity
+        std::cout << "Writing post-processing data to " << fileName
+                  << std::endl;
         velT = kParticle[i].getTranslationalComponent();
         m_translational_velocity_x
             << " " << realToString(ios::scientific, m_ndigits, velT[X]);

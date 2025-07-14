@@ -54,6 +54,9 @@ void Grains<T>::postProcess(
 {
     using GP = GrainsParameters<T>;
 
+    if(GP::m_tSave.empty())
+        return;
+
     if(GP::m_tSave.front() - GP::m_time < 0.01 * GP::m_dt)
     {
         GP::m_tSave.pop();
@@ -75,6 +78,9 @@ void Grains<T>::postProcess(
     const std::unique_ptr<ComponentManager<T, MemType::DEVICE>>& cm)
 {
     using GP = GrainsParameters<T>;
+
+    if(GP::m_tSave.empty())
+        return;
 
     if(GP::m_tSave.front() - GP::m_time < 0.01 * GP::m_dt)
     {
@@ -273,7 +279,7 @@ void Grains<T>::Construction(DOMElement* rootElement)
         GP::m_sortingFrequency
             = ReaderXML::getNodeAttr_Int(nLinkedCell, "SortingFrequency");
         GoutWI(9,
-               linkedCellType + " LinkedCell" + " with cell size factor: "
+               linkedCellType + " LinkedCell" + " with cell size factor "
                    + std::to_string(GP::m_linkedCellSizeFactor)
                    + " and sorting frequency "
                    + std::to_string(GP::m_sortingFrequency) + " ...");

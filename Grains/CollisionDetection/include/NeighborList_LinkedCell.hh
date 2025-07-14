@@ -30,6 +30,7 @@ class NeighborList_LinkedCell : public NeighborList<T, M>
 
     using NL = NeighborList<T, M>;
     using NL::m_needsUpdate;
+    using NL::m_pairCount;
     using NL::m_pairList;
 
 protected:
@@ -72,6 +73,7 @@ public:
                                                        cellSize,
                                                        nParticles);
         }
+        m_pairCount.allocate(1);
         // TODO: reserve the max for now, but we can optimize this later
         m_pairList.reserve(nParticles * (nParticles - 1) / 2);
         m_needsUpdate = true; // Initially, we need to create the list
@@ -98,7 +100,10 @@ public:
             LC_host->updateLinkedCells(transforms);
             updateNeighborList_LC_Host(LC_host->getCellParticles(),
                                        LC_host->getCellNeighborsList(),
-                                       m_pairList.getData());
+                                       m_pairList.getData(),
+                                       m_pairCount.getData());
+            // Update the actual size of the pair list
+            m_pairList.setSize(m_pairCount[0]);
         }
         else if constexpr(M == MemType::DEVICE || M == MemType::MANAGED)
         {
@@ -106,7 +111,7 @@ public:
                 = static_cast<LinkedCell_SortBased<T>*>(m_LinkedCell);
             LC_device->updateLinkedCells(transforms);
             uint numBlocks, numThreads;
-            computeOptimalThreadsAndBlocks(m_pairList.getSize(),
+            computeOptimalThreadsAndBlocks(transforms.getSize(),
                                            GrainsParameters<T>::m_GPU,
                                            numBlocks,
                                            numThreads);
@@ -116,7 +121,16 @@ public:
                 LC_device->getCellNeighborsList(),
                 LC_device->getCellStartIDs(),
                 transforms.getSize(),
-                m_pairList.getData());
+                m_pairList.getData(),
+                m_pairCount.getData());
+
+            // Copy back the actual pair count and update size
+            uint h_pairCount;
+            cudaErrCheck(cudaMemcpy(&h_pairCount,
+                                    m_pairCount.getData(),
+                                    sizeof(uint),
+                                    cudaMemcpyDeviceToHost));
+            m_pairList.setSize(h_pairCount);
         }
 
         m_needsUpdate = true;

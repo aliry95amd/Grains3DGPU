@@ -48,7 +48,11 @@ template <typename T>
 void ComponentManagerCPU<T>::updateNeighborList()
 {
     if(m_neighborList->needsUpdate())
+    {
         m_neighborList->updateNeighborList(m_transform);
+        // Resize pair-dependent buffers to match actual number of pairs
+        this->resizePairBuffers();
+    }
 }
 
 // -----------------------------------------------------------------------------
@@ -56,7 +60,8 @@ void ComponentManagerCPU<T>::updateNeighborList()
 template <typename T>
 void ComponentManagerCPU<T>::computeRelativeTransformations()
 {
-    for(uint pID = 0; pID < m_nPairs; ++pID)
+    uint nPairs = m_neighborList->getSize();
+    for(uint pID = 0; pID < nPairs; ++pID)
     {
         computeRelativeTransformations_common(m_neighborList->getData(),
                                               m_transform.getData(),
@@ -77,7 +82,8 @@ void ComponentManagerCPU<T>::detectCollisionsObstacles()
 template <typename T>
 void ComponentManagerCPU<T>::detectCollisionsParticles()
 {
-    for(uint i = 0; i < m_nPairs; ++i)
+    uint nPairs = m_neighborList->getSize();
+    for(uint i = 0; i < nPairs; ++i)
     {
         detectCollisionsParticles_common(m_neighborList->getData(),
                                          m_particleRB->getData(),
@@ -111,7 +117,8 @@ template <typename T>
 void ComponentManagerCPU<T>::computeContactForces(
     const GrainsMemBuffer<ContactForceModel<T>*, MemType::HOST>& CF)
 {
-    for(uint i = 0; i < m_nPairs; ++i)
+    uint nPairs = m_neighborList->getSize();
+    for(uint i = 0; i < nPairs; ++i)
     {
         computeContactForces_common(CF.getData(),
                                     m_neighborList->getData(),

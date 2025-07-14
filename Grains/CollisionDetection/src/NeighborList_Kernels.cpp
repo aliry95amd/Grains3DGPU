@@ -28,10 +28,11 @@ __GLOBAL__ void updateNeighborList_Nsq_Device(const uint nParticles,
 __HOST__ void updateNeighborList_LC_Host(
     const std::vector<std::list<uint>>& cellParticles,
     const uint*                         cellNeighborsList,
-    uint2*                              pairList)
+    uint2*                              pairList,
+    uint*                               pairCount)
 {
     constexpr uint NUM_NEIGHBOR_CELLS = 14; // Number of neighboring cells
-    uint           pairCount          = 0;
+    uint           counter            = 0;
     // Iterate through all cells
     for(uint cellID = 0; cellID < cellParticles.size(); ++cellID)
     {
@@ -47,9 +48,9 @@ __HOST__ void updateNeighborList_LC_Host(
             for(auto it2 = std::next(it1); it2 != currentCellParticles.end();
                 ++it2)
             {
-                uint particleID1      = *it1;
-                uint particleID2      = *it2;
-                pairList[pairCount++] = make_uint2(particleID1, particleID2);
+                uint particleID1    = *it1;
+                uint particleID2    = *it2;
+                pairList[counter++] = make_uint2(particleID1, particleID2);
             }
         }
         // Loop over all neighboring cells
@@ -60,16 +61,17 @@ __HOST__ void updateNeighborList_LC_Host(
             // Get the neighboring cell hash
             uint c = neighborCells[nCellID];
             // Check if the neighboring cell is valid
-            if(c == UINT_MAX)
+            if(c == UINT_MAX || c == cellID)
                 continue;
             const auto& neighborCellParticles = cellParticles[c];
             // Check all particle pairs between current cell and neighbor cell
             for(uint particleID1 : currentCellParticles)
                 for(uint particleID2 : neighborCellParticles)
-                    pairList[pairCount++]
-                        = make_uint2(particleID1, particleID2);
+                    pairList[counter++] = make_uint2(particleID1, particleID2);
         }
     }
+
+    *pairCount = counter;
 }
 
 // -----------------------------------------------------------------------------
@@ -79,7 +81,8 @@ __GLOBAL__ void updateNeighborList_LC_Device(const uint* particleID,
                                              const uint* cellNeighborsList,
                                              const uint* cellStartID,
                                              const uint  nParticles,
-                                             uint2*      pairList)
+                                             uint2*      pairList,
+                                             uint*       pairCount)
 {
     // constexpr variables
     constexpr uint MAX_PAIRS_PER_PARTICLE = 64; // Maximum pairs per particle
@@ -92,7 +95,8 @@ __GLOBAL__ void updateNeighborList_LC_Device(const uint* particleID,
     const uint  i             = particleID[tID];
     const uint  cell          = particleHash[i];
     const uint* neighborCells = &cellNeighborsList[NUM_NEIGHBOR_CELLS * cell];
-    uint        c, cellStart, cellEnd, numParticlesInCell, j, index;
+    uint        c, cellStart, cellEnd, numParticlesInCell, j;
+
     // Loop over all neighboring cells
     for(uint cID = 0; cID < NUM_NEIGHBOR_CELLS; ++cID)
     {
@@ -108,9 +112,11 @@ __GLOBAL__ void updateNeighborList_LC_Device(const uint* particleID,
         for(uint p = 0; p < numParticlesInCell; ++p)
         {
             j = particleID[cellStart + p];
-            if(i < j)
+            if(c == cell && i < j || c != cell)
             {
-                pairList[index++] = make_uint2(i, j);
+                // Use atomic operation to get unique index
+                uint globalIndex      = atomicAdd(pairCount, 1);
+                pairList[globalIndex] = make_uint2(i, j);
             }
         }
     }

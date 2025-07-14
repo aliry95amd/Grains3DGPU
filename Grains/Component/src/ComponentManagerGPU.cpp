@@ -47,7 +47,11 @@ template <typename T>
 void ComponentManagerGPU<T>::updateNeighborList()
 {
     if(m_neighborList->needsUpdate())
+    {
         m_neighborList->updateNeighborList(m_transform);
+        // Resize pair-dependent buffers to match actual number of pairs
+        this->resizePairBuffers();
+    }
 }
 
 // -----------------------------------------------------------------------------
@@ -55,8 +59,9 @@ void ComponentManagerGPU<T>::updateNeighborList()
 template <typename T>
 void ComponentManagerGPU<T>::computeRelativeTransformations()
 {
+    uint nPairs = m_neighborList->getSize();
     uint numThreads, numBlocks;
-    computeOptimalThreadsAndBlocks(m_neighborList->getSize(),
+    computeOptimalThreadsAndBlocks(nPairs,
                                    GrainsParameters<T>::m_GPU,
                                    numBlocks,
                                    numThreads);
@@ -65,7 +70,7 @@ void ComponentManagerGPU<T>::computeRelativeTransformations()
         m_neighborList->getData(),
         m_transform.getData(),
         m_relTransform.getData(),
-        m_nPairs);
+        nPairs);
 }
 
 // -----------------------------------------------------------------------------
@@ -99,8 +104,9 @@ void ComponentManagerGPU<T>::detectCollisionsObstacles()
 template <typename T>
 void ComponentManagerGPU<T>::detectCollisionsParticles()
 {
+    uint nPairs = m_neighborList->getSize();
     uint numThreads, numBlocks;
-    computeOptimalThreadsAndBlocks(m_neighborList->getSize(),
+    computeOptimalThreadsAndBlocks(nPairs,
                                    GrainsParameters<T>::m_GPU,
                                    numBlocks,
                                    numThreads);
@@ -110,7 +116,7 @@ void ComponentManagerGPU<T>::detectCollisionsParticles()
         m_particleRB->getData(),
         m_relTransform.getData(),
         m_contactInfo.getData(),
-        m_nPairs);
+        nPairs);
 }
 
 // -----------------------------------------------------------------------------
@@ -137,8 +143,9 @@ template <typename T>
 void ComponentManagerGPU<T>::computeContactForces(
     const GrainsMemBuffer<ContactForceModel<T>*, MemType::DEVICE>& CF)
 {
+    uint nPairs = m_neighborList->getSize();
     uint numThreads, numBlocks;
-    computeOptimalThreadsAndBlocks(m_neighborList->getSize(),
+    computeOptimalThreadsAndBlocks(nPairs,
                                    GrainsParameters<T>::m_GPU,
                                    numBlocks,
                                    numThreads);
@@ -151,7 +158,7 @@ void ComponentManagerGPU<T>::computeContactForces(
         m_velocity.getData(),
         m_torce.getData(),
         m_relTransform.getData(),
-        m_nPairs);
+        nPairs);
 }
 
 // -----------------------------------------------------------------------------

@@ -50,21 +50,6 @@ $(OBJDIR)/%.o : %.cpp
 	@echo 'Compiling '$<
 	$(GRAINS_GPU_COMPILER) $(COMPFLAGS) -c $< -o $@
 
-
-# DEPENDENCIES
-UTLDIR  := $(GRAINS_HOME)/Tools/Perl
-DEPEND  := -I$(GRAINSINC) $(GRAINS_SYSINC:%=-I%)
-
-depend :
-	@echo 'Generating dependencies'
-	touch ./Maketmp
-	makedepend -f ./Maketmp $(DEPEND) $(MAINSRC)
-	$(UTLDIR)/makeadd.pl $(OBJDIR)/ ./Maketmp ./Makedepend
-	rm -f ./Maketmp ./Maketmp.bak
-
-include ./Makedepend      # DO NOT DELETE
-
-# CLEAN
 clean :
 	( cd ../../Grains; make clean; cd ../Main/src )
 	@echo 'Main   : deleting binary and object files ...'

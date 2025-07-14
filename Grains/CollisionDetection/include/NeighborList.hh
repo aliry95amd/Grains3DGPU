@@ -27,6 +27,8 @@ protected:
     //@{
     /** \brief Pair list */
     GrainsMemBuffer<uint2, M> m_pairList;
+    /** \brief Pair count */
+    GrainsMemBuffer<uint, M> m_pairCount;
     /** \brief If neighbor list needs update */
     bool m_needsUpdate;
     //@}

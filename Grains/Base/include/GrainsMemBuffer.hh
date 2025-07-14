@@ -153,6 +153,23 @@ public:
     }
     //@}
 
+    /** @name Set methods */
+    //@{
+    // -------------------------------------------------------------------------
+    /** @brief Sets the size of the buffer without reallocation
+    @param new_size new size of the buffer (must be <= capacity) */
+    void setSize(size_t new_size)
+    {
+        if(new_size > m_capacity)
+        {
+            std::cerr
+                << "GrainsMemBuffer::setSize() new size exceeds capacity\n";
+            return;
+        }
+        m_size = new_size;
+    }
+    //@}
+
     /** @name Methods */
     //@{
     // -------------------------------------------------------------------------

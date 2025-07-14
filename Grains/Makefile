@@ -174,29 +174,17 @@ XML   : $(OBJS_XML)
 	@echo
 
 
-$(OBJDIR)/%.o : %.cpp
+$(OBJDIR)/%.o : %.cpp | $(OBJDIR)
+	mkdir -p $(OBJDIR)
 	@echo 'Compiling '$<
 	$(GRAINS_GPU_COMPILER) $(COMPFLAGS) -MMD -MP -D_XML $< -o $@
 # $(GRAINS_GPU_COMPILER) $(COMPFLAGS) -D_XML $< -o $@
-
-
-# DEPENDENCIES
-DEPEND  := $(INCDIR:%=-I%) $(GRAINS_SYSINC:%=-I%)
-
-depend:
-	@echo 'Generating dependencies'
-	touch ./Maketmp
-	makedepend -f ./Maketmp $(DEPEND) \
-	$(SRCFILES_WP_BASE) $(SRCFILES_WP_COLL) $(SRCFILES_WP_COMP) \
-	$(SRCFILES_WP_CONT) $(SRCFILES_WP_GEOM) $(SRCFILES_WP_PP) \ 
-	$(SRCFILES_WP_TIME) $(SRCFILES_WP_XML) 
-	rm -f ./Maketmp ./Maketmp.bak
 
 # CLEAN
 clean : 
 	@echo 'Grains : Deleting object and library files ...'
 	rm -f $(INCDIROUT)/*
 	rm -f $(OBJDIR)/*.o
-	rm -f $(LIBDIR)/*
 	rm -f $(OBJDIR)/*.d
+	rm -f $(LIBDIR)/*
 	@echo 'Grains : Deleted.'

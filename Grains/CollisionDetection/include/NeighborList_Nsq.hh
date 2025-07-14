@@ -23,6 +23,7 @@ class NeighborList_Nsq : public NeighborList<T, M>
 {
     using NL = NeighborList<T, M>;
     using NL::m_needsUpdate;
+    using NL::m_pairCount;
     using NL::m_pairList;
 
 public:
@@ -38,6 +39,7 @@ public:
     NeighborList_Nsq(const uint nParticles)
     {
         m_pairList.reserve(nParticles * (nParticles - 1) / 2);
+        m_pairCount.allocate(1);
         m_needsUpdate = true; // Initially, we need to create the list
     }
 
@@ -56,10 +58,11 @@ public:
         if(!m_needsUpdate)
             return;
 
+        uint nParticles = transforms.getSize();
+
         if constexpr(M == MemType::HOST || M == MemType::PINNED)
         {
-            updateNeighborList_Nsq_Host(transforms.getSize(),
-                                        m_pairList.getData());
+            updateNeighborList_Nsq_Host(nParticles, m_pairList.getData());
         }
         else if constexpr(M == MemType::DEVICE || M == MemType::MANAGED)
         {
@@ -69,13 +72,12 @@ public:
                                            numBlocks,
                                            numThreads);
             updateNeighborList_Nsq_Device<<<numBlocks, numThreads>>>(
-                transforms.getSize(),
+                nParticles,
                 m_pairList.getData());
         }
-        else
-            GAbort("Unsupported memory type for "
-                   "NeighborList_Nsq::updateNeighborList()");
 
+        // Update the actual size of the pair list
+        m_pairList.setSize(nParticles * (nParticles - 1) / 2);
         m_needsUpdate = false;
     }
     //@}

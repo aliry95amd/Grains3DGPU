@@ -1,50 +1,44 @@
 # ----------------
 # Standard targets
 # ----------------
+install: xerces createarch update dtd install-githook
+	@echo 'Grains platform installed!'
+
+updatedev: clean update 
+
 update: apply-clang-format
+	cd Grains; \
+    make; \
+    cd ..
 	cd Main/src; \
 	make; \
 	cd ../..;
 	@echo 'Grains is updated!'
-
-install: xerces createarch createdepend depend update dtd install-githook
-	@echo 'Grains platform installed!'
-
-updatedev: clean cleandepend createdepend update 
-
-depend:
-	cd Grains; \
-	make depend; \
-	cd ..;
-	cd Main/src; \
-	make depend; \
-	cd ../..;
 	
+cleanall: cleanxerces clean deletearch cleandtd
+	@echo 'Full Grains platform cleaned!'
+
 clean:
 	cd Main/src; \
 	make clean; \
 	cd ../..;
-	@echo 'Grains platform cleaned'
+	@echo 'Grains platform cleaned!'
 	
-cleanall: cleanxerces clean cleandepend deletearch cleandtd
-	@echo 'Full Grains platform cleaned!'		
-
-
 # -----------------
 # Low level targets
 # -----------------
-apply-clang-format:
-	@echo "Formatting all source files according to .clang-format ..."
-	find ./Grains/ -name "*.cpp" -o -name "*.hh" | \
-	xargs clang-format -i --style=file:./.clang-format --verbose; \
-	echo "Formatting complete.";
-
 # Rule to install the pre-commit hook
 install-githook:
 	@echo "Installing pre-commit hook..."
 	cp .githooks/pre-commit .git/hooks/pre-commit && \
 	chmod +x .git/hooks/pre-commit && \
 	echo "Pre-commit hook installed successfully."; \
+
+apply-clang-format:
+	@echo "Formatting all source files according to .clang-format ..."
+	find ./Grains/ -name "*.cpp" -o -name "*.hh" | \
+	xargs clang-format -i --style=file:./.clang-format --verbose; \
+	echo "Formatting complete.";
 
 githook:
 	@echo '----------------------'
@@ -68,15 +62,6 @@ dtd:
 createarch:
 	./makeARCH create
 	
-createdepend:
-	cd Grains; \
-	$(TOUCH) Makedepend; \
-	cd ..;
-	cd Main/src; \
-	$(TOUCH) Makedepend; \
-	cd ../..;
-	
-
 # --------------------------
 # Low level cleaning targets
 # --------------------------
@@ -98,42 +83,30 @@ cleandtd:
 deletearch:
 	./makeARCH delete
 
-cleandepend:
-	cd Grains; \
-	$(RM) Makedepend; \
-	cd ..
-	cd Main/src; \
-	$(RM) Makedepend; \
-	cd ../..
-	
-
 # ----	
 # Help
 # ----		
 help:
 	@echo 'Below are the various targets:'
 	@echo '   STANDARD TARGETS:'
+	@echo '      install          $(BANG) perform the following sequence of targets: xerces createarch update dtd'
 	@echo '      update (default) $(BANG) compile Grains3D source files, create library, main exe file and pre/post exe files'
-	@echo '      install          $(BANG) perform the following sequence of targets: xerces createarch createdepend depend update dtd'
-	@echo '      depend           $(BANG) generate all dependency files'	
 	@echo '      clean            $(BANG) delete all Grains library and exe files'		
-	@echo '      cleanall         $(BANG) perform the following sequence of targets: cleanxerces clean cleandepend deletearch cleandtd'			
+	@echo '      cleanall         $(BANG) perform the following sequence of targets: cleanxerces clean deletearch cleandtd'			
 	@echo
 	@echo '   LOW-LEVEL TARGETS:'
 	@echo '      xerces           $(BANG) compile the XERCES library'
 	@echo '      dtd              $(BANG) install the DTD files'
 	@echo '      createarch       $(BANG) create all directories for obj, lib and exe files using the arch name defined in the env file '	
-	@echo '      createdepend     $(BANG) create all Makedepend files (empty if they do not yet exist)'
 	@echo		
 	@echo '   LOW-LEVEL CLEANING TARGETS:'
 	@echo '      cleanxerces      $(BANG) delete all XERCES lib and obj files/directories (undoes target xerces)'
 	@echo '      cleandtd         $(BANG) delete the path specific DTD files (undoes target dtd)'
 	@echo '      deletearch       $(BANG) delete all architecture specific obj, lib and exe files/directories (undoes target createarch)'	
-	@echo '      cleandepend      $(BANG) delete all Makedepend files (undoes target createdepend)'	
 	@echo
 	@echo '   DEVELOPER TARGETS:'	
 	@echo '      dev              $(BANG) compile Grains3D source files and create library'
-	@echo '      updatedev        $(BANG) perform the following sequence of targets: clean cleandepend createdepend update'	
+	@echo '      updatedev        $(BANG) perform the following sequence of targets: clean update'
 
 	
 ##################################################################

@@ -60,8 +60,6 @@ protected:
     uint m_nParticles;
     /** \brief Number of obstacles in manager */
     uint m_nObstacles;
-    /** \brief Number of pairs in manager */
-    uint m_nPairs;
 
     /** \brief Neighbor list object */
     NeighborList<T, M>* m_neighborList;
@@ -96,7 +94,6 @@ public:
         , m_nObstacles(nObstacles)
     {
         NeighborListFactory<T, M>::create(m_neighborList);
-        m_nPairs = m_neighborList->getSize();
         initializeToDefault();
     }
 
@@ -419,6 +416,15 @@ public:
     /** @name Manager methods */
     //@{
     // -------------------------------------------------------------------------
+    /** @brief Resizes pair-dependent buffers based on current neighbor list size */
+    void resizePairBuffers()
+    {
+        uint pairCount = m_neighborList->getSize();
+        m_relTransform.setSize(pairCount);
+        m_contactInfo.setSize(pairCount);
+    }
+
+    // -------------------------------------------------------------------------
     /** @brief Initializes (and reserves memory) the members to default */
     void initializeToDefault()
     {
@@ -433,8 +439,11 @@ public:
         initDefault(m_obstacleTransform, m_nObstacles);
         initDefault(m_obstacleVelocity, m_nObstacles);
 
-        initDefault(m_relTransform, m_nPairs);
-        initDefault(m_contactInfo, m_nPairs);
+        // Initialize with maximum possible pairs for dynamic sizing
+        // TODO: Make this dynamic
+        uint maxPairs = m_nParticles * (m_nParticles - 1) / 2;
+        initDefault(m_relTransform, maxPairs);
+        initDefault(m_contactInfo, maxPairs);
     }
 
     // -------------------------------------------------------------------------

@@ -15,7 +15,6 @@ class ComponentManagerGPU : public ComponentManager<T, MemType::DEVICE>
 {
     using CM = ComponentManager<T, MemType::DEVICE>;
     using CM::m_nObstacles;
-    using CM::m_nPairs;
     using CM::m_nParticles;
 
     using CM::m_obstacleRB;

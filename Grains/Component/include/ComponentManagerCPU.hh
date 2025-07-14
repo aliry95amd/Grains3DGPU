@@ -15,7 +15,6 @@ class ComponentManagerCPU : public ComponentManager<T, MemType::HOST>
 {
     using CM = ComponentManager<T, MemType::HOST>;
     using CM::m_nObstacles;
-    using CM::m_nPairs;
     using CM::m_nParticles;
 
     using CM::m_obstacleRB;
