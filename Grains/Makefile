@@ -120,13 +120,20 @@ MAKEFLAGS += -j$(shell nproc)
 
 all : grains
 
-grains : MESS CPINC BASE COLL COMP CONT GEOM PP TIME XML
+$(OBJDIR):
+	mkdir -p $(OBJDIR)
+
+$(LIBDIR):
+	mkdir -p $(LIBDIR)
+
+grains : MESS CPINC PACKAGES | $(LIBDIR)
 		$(GRAINS_GPU_COMPILER) -shared -Xcompiler \"-Wl,-soname,libgrains.so\" \
 		$(LINKFLAGS) \
 		-o $(LIBDIR)/libgrains.so \
 		$(OBJS_BASE) $(OBJS_COLL) $(OBJS_COMP) $(OBJS_CONT) $(OBJS_GEOM) \
 		$(OBJS_PP) $(OBJS_TIME) $(OBJS_XML) 
 	@echo 'Compilation is complete'
+	@echo
 
 MESS   :
 	@echo '***********************************************************'
@@ -136,55 +143,44 @@ MESS   :
 	$(GRAINS_GPU_COMPILER_DIST)-$(GRAINS_GPU_COMPILER_VERSION)
 	@echo '***********************************************************'
 
-CPINC  : 
-	@echo 'Copy include files from subdirectories to' $(INCDIROUT)
+CPINC  :
+	mkdir -p $(INCDIROUT)
+	@echo 'Copying include files to' $(INCDIROUT) '...'
 	rm -f $(INCDIROUT)/*
-	cp $(ALLINC) $(INCDIROUT)/ 	
+	cp $(ALLINC) $(INCDIROUT)/
+	@echo 'Include files copied to' $(INCDIROUT)'!'
+	sleep 3
 
-BASE  : $(OBJS_BASE)
-	@echo '*** Package Base compiled'
-	@echo
+# This target depends on CPINC and runs all compilation targets in parallel
+PACKAGES : BASE COLL COMP CONT GEOM PP TIME XML
 
-COLL  : $(OBJS_COLL)
-	@echo '*** Package Collision compiled'
-	@echo
+# Make all compilation targets depend on CPINC
+BASE  : $(OBJS_BASE) | CPINC
+    
+COLL  : $(OBJS_COLL) | CPINC
+    
+COMP  : $(OBJS_COMP) | CPINC
+    
+CONT  : $(OBJS_CONT) | CPINC
+    
+GEOM  : $(OBJS_GEOM) | CPINC
 
-COMP  : $(OBJS_COMP)
-	@echo '*** Package Component compiled'
-	@echo
-
-CONT  : $(OBJS_CONT)
-	@echo '*** Package Contact compiled'
-	@echo
-	
-GEOM  : $(OBJS_GEOM)
-	@echo '*** Package Geometry compiled'
-	@echo
-
-PP    : $(OBJS_PP)
-	@echo '*** Package PostProcessing compiled'
-	@echo
-
-TIME  : $(OBJS_TIME)
-	@echo '*** Package TimeIntegration compiled'
-	@echo
-
-XML   : $(OBJS_XML)
-	@echo '*** Package XML compiled'
-	@echo
-
+PP    : $(OBJS_PP) | CPINC
+    
+TIME  : $(OBJS_TIME) | CPINC
+    
+XML   : $(OBJS_XML) | CPINC
 
 $(OBJDIR)/%.o : %.cpp | $(OBJDIR)
-	mkdir -p $(OBJDIR)
 	@echo 'Compiling '$<
-	$(GRAINS_GPU_COMPILER) $(COMPFLAGS) -MMD -MP -D_XML $< -o $@
-# $(GRAINS_GPU_COMPILER) $(COMPFLAGS) -D_XML $< -o $@
+	$(GRAINS_GPU_COMPILER) $(COMPFLAGS) -MMD -MP -D_XML -c $< -o $@
 
 # CLEAN
 clean : 
-	@echo 'Grains : Deleting object and library files ...'
+	@echo 'Grains: Deleting object and library files ...'
 	rm -f $(INCDIROUT)/*
 	rm -f $(OBJDIR)/*.o
 	rm -f $(OBJDIR)/*.d
 	rm -f $(LIBDIR)/*
-	@echo 'Grains : Deleted.'
+	@echo 'Grains: Deleted.'
+	@echo

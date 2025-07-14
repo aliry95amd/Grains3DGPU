@@ -85,8 +85,8 @@ __GLOBAL__ void updateNeighborList_LC_Device(const uint* particleID,
                                              uint*       pairCount)
 {
     // constexpr variables
-    constexpr uint MAX_PAIRS_PER_PARTICLE = 64; // Maximum pairs per particle
-    constexpr uint NUM_NEIGHBOR_CELLS     = 14; // Number of neighboring cells
+    // constexpr uint MAX_PAIRS_PER_PARTICLE = 64; // Maximum pairs per particle
+    constexpr uint NUM_NEIGHBOR_CELLS = 14; // Number of neighboring cells
 
     uint tID = blockIdx.x * blockDim.x + threadIdx.x;
     if(tID >= nParticles)

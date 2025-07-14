@@ -6,6 +6,10 @@ OBJDIR := ../obj$(GRAINS_FULL_EXT)
 # Source and object files
 MAINSRC := main.cpp
 MAINOBJ := $(MAINSRC:%.cpp=$(OBJDIR)/%.o)
+DEPS := $(MAINOBJ:.o=.d)
+
+# Include dependencies
+-include $(DEPS)
 
 
 # Include and library from Grains
@@ -26,14 +30,18 @@ LINKFLAGS := $(GRAINS_GPU_LINKER_FLAGS) $(GRAINS_Z_FLAGS) $(GRAINS_XERCES_FLAGS)
 
 all : grains
 
-# EXECUTABLE
-grains : MESS $(EXEDIR)/grains
-	@echo '----------------------'
-	@echo 'Software grains built!'
-	@echo '----------------------'
+$(EXEDIR):
+	mkdir -p $(EXEDIR)
 
-$(EXEDIR)/grains : app
-	@echo 'Building software Grains'
+$(OBJDIR):
+	mkdir -p $(OBJDIR)
+
+grains : MESS $(EXEDIR)/grains
+	@echo 'Software grains built!'
+	@echo
+
+$(EXEDIR)/grains : app | $(EXEDIR)
+	@echo 'Building software Grains ...'
 	$(GRAINS_GPU_COMPILER) $(MAINOBJ) -o $@ $(LINKFLAGS)
 
 MESS   :
@@ -46,13 +54,14 @@ app    :  Grains $(MAINOBJ)
 Grains :
 	( cd ../../Grains; make; cd ../Main/src )
 
-$(OBJDIR)/%.o : %.cpp
+$(OBJDIR)/%.o : %.cpp | $(OBJDIR)
 	@echo 'Compiling '$<
-	$(GRAINS_GPU_COMPILER) $(COMPFLAGS) -c $< -o $@
+	$(GRAINS_GPU_COMPILER) $(COMPFLAGS) -MMD -MP -c $< -o $@
 
 clean :
-	( cd ../../Grains; make clean; cd ../Main/src )
-	@echo 'Main   : deleting binary and object files ...'
+	@echo 'Main: deleting binary and object files ...'
 	rm -f $(MAINOBJ)
+	rm -f $(OBJDIR)/*.d
 	rm -f $(EXEDIR)/*
-	@echo 'Main   : Deleted.'
+	@echo 'Main: Deleted!'
+	@echo
