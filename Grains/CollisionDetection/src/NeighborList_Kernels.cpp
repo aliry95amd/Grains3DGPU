@@ -31,7 +31,7 @@ __HOST__ void updateNeighborList_LC_Host(
     uint2*                              pairList,
     uint*                               pairCount)
 {
-    constexpr uint NUM_NEIGHBOR_CELLS = 14; // Number of neighboring cells
+    constexpr uint NUM_NEIGHBOR_CELLS = 27; // Number of neighboring cells
     uint           counter            = 0;
     // Iterate through all cells
     for(uint cellID = 0; cellID < cellParticles.size(); ++cellID)
@@ -61,7 +61,7 @@ __HOST__ void updateNeighborList_LC_Host(
             // Get the neighboring cell hash
             uint c = neighborCells[nCellID];
             // Check if the neighboring cell is valid
-            if(c == UINT_MAX || c == cellID)
+            if(c == UINT_MAX || c == cellID || c < cellID)
                 continue;
             const auto& neighborCellParticles = cellParticles[c];
             // Check all particle pairs between current cell and neighbor cell
@@ -86,7 +86,7 @@ __GLOBAL__ void updateNeighborList_LC_Device(const uint* particleID,
 {
     // constexpr variables
     // constexpr uint MAX_PAIRS_PER_PARTICLE = 64; // Maximum pairs per particle
-    constexpr uint NUM_NEIGHBOR_CELLS = 14; // Number of neighboring cells
+    constexpr uint NUM_NEIGHBOR_CELLS = 27; // Number of neighboring cells
 
     uint tID = blockIdx.x * blockDim.x + threadIdx.x;
     if(tID >= nParticles)
@@ -103,7 +103,7 @@ __GLOBAL__ void updateNeighborList_LC_Device(const uint* particleID,
         // Get the neighboring cell hash
         c = neighborCells[cID];
         // Check if the neighboring cell is valid
-        if(c == UINT_MAX)
+        if(c == UINT_MAX || c < cell)
             continue;
         // Get the particle IDs in the cell
         cellStart          = cellStartID[c];

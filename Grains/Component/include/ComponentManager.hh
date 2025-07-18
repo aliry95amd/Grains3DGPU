@@ -90,11 +90,27 @@ public:
                      uint                               nObstacles)
         : m_particleRB(particleRB)
         , m_obstacleRB(obstacleRB)
+        , m_rigidBodyId(nParticles)
+        , m_transform(nParticles)
+        , m_velocity(nParticles)
+        , m_torce(nParticles)
+        , m_quaternion(nParticles)
+        , m_particleId(nParticles)
+        , m_obstacleRigidBodyId(nObstacles)
+        , m_obstacleTransform(nObstacles)
+        , m_obstacleVelocity(nObstacles)
         , m_nParticles(nParticles)
         , m_nObstacles(nObstacles)
     {
         NeighborListFactory<T, M>::create(m_neighborList);
-        initializeToDefault();
+
+        // Initialize with maximum possible pairs for dynamic sizing
+        // TODO: Make this dynamic
+        uint maxPairs = m_nParticles * (m_nParticles - 1) / 2;
+        m_relTransform.allocate(maxPairs);
+        m_relTransform.fill();
+        m_contactInfo.allocate(maxPairs);
+        m_contactInfo.fill();
     }
 
     // -------------------------------------------------------------------------
@@ -422,28 +438,6 @@ public:
         uint pairCount = m_neighborList->getSize();
         m_relTransform.setSize(pairCount);
         m_contactInfo.setSize(pairCount);
-    }
-
-    // -------------------------------------------------------------------------
-    /** @brief Initializes (and reserves memory) the members to default */
-    void initializeToDefault()
-    {
-        initDefault(m_rigidBodyId, m_nParticles);
-        initDefault(m_transform, m_nParticles);
-        initDefault(m_velocity, m_nParticles);
-        initDefault(m_torce, m_nParticles);
-        initDefault(m_quaternion, m_nParticles);
-        initDefault(m_particleId, m_nParticles);
-
-        initDefault(m_obstacleRigidBodyId, m_nObstacles);
-        initDefault(m_obstacleTransform, m_nObstacles);
-        initDefault(m_obstacleVelocity, m_nObstacles);
-
-        // Initialize with maximum possible pairs for dynamic sizing
-        // TODO: Make this dynamic
-        uint maxPairs = m_nParticles * (m_nParticles - 1) / 2;
-        initDefault(m_relTransform, maxPairs);
-        initDefault(m_contactInfo, maxPairs);
     }
 
     // -------------------------------------------------------------------------

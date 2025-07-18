@@ -132,7 +132,7 @@ grains : MESS CPINC PACKAGES | $(LIBDIR)
 		-o $(LIBDIR)/libgrains.so \
 		$(OBJS_BASE) $(OBJS_COLL) $(OBJS_COMP) $(OBJS_CONT) $(OBJS_GEOM) \
 		$(OBJS_PP) $(OBJS_TIME) $(OBJS_XML) 
-	@echo 'Compilation is complete'
+	@echo 'Compilation completed!'
 	@echo
 
 MESS   :
@@ -182,5 +182,5 @@ clean :
 	rm -f $(OBJDIR)/*.o
 	rm -f $(OBJDIR)/*.d
 	rm -f $(LIBDIR)/*
-	@echo 'Grains: Deleted.'
+	@echo 'Grains: Deleted!'
 	@echo

@@ -11,7 +11,13 @@ void writeObstacles_Paraview(const GrainsMemBuffer<RigidBody<T>*>& obstacleRB,
                              const std::unique_ptr<ComponentManager<T>>& cm,
                              const std::string& obsFileName)
 {
-    ofstream   f((obsFileName).c_str(), ios::out);
+    std::ofstream f(obsFileName, std::ios::out);
+    if(!f.is_open())
+    {
+        std::cerr << "Failed to open file: " << obsFileName << std::endl;
+        throw std::runtime_error("Cannot open file for writing: "
+                                 + obsFileName);
+    }
     const uint numObstacles                   = cm->getNumberOfObstacles();
     const GrainsMemBuffer<Transform3<T>>& tr  = cm->getObstaclesTransform();
     const GrainsMemBuffer<Kinematics<T>>& kin = cm->getObstaclesVelocity();
@@ -100,7 +106,13 @@ void writeParticles_Paraview(const GrainsMemBuffer<RigidBody<T>*>& particleRB,
                              const std::unique_ptr<ComponentManager<T>>& cm,
                              const std::string& parFileName)
 {
-    ofstream   f((parFileName).c_str(), ios::out);
+    std::ofstream f(parFileName, std::ios::out);
+    if(!f.is_open())
+    {
+        std::cerr << "Failed to open file: " << parFileName << std::endl;
+        throw std::runtime_error("Cannot open file for writing: "
+                                 + parFileName);
+    }
     const uint numParticles                   = cm->getNumberOfParticles();
     const GrainsMemBuffer<Transform3<T>>& tr  = cm->getTransform();
     const GrainsMemBuffer<Kinematics<T>>& kin = cm->getVelocity();
@@ -321,8 +333,15 @@ void ParaviewPostProcessingWriter<T>::PostProcessing(
                                  << "\" " << "group=\"\" part=\"0\" file=\""
                                  << obsFileName << "\"/>\n";
 
-    ofstream f((m_directory + "/" + m_rootName + "_Obstacles.pvd").c_str(),
-               ios::out);
+    std::string obstacleFile
+        = m_directory + "/" + m_rootName + "_Obstacles.pvd";
+    std::ofstream f(obstacleFile, std::ios::out);
+    if(!f.is_open())
+    {
+        std::cerr << "Failed to open file: " << obstacleFile << std::endl;
+        throw std::runtime_error("Cannot open file for writing: "
+                                 + obstacleFile);
+    }
     f << m_Paraview_saveObstacles_pvd.str();
     f << "</Collection>" << endl;
     f << "</VTKFile>" << endl;
@@ -337,8 +356,15 @@ void ParaviewPostProcessingWriter<T>::PostProcessing(
                                      << "\" " << "group=\"\" part=\"0\" file=\""
                                      << parFileName << "\"/>\n";
 
-    ofstream g((m_directory + "/" + m_rootName + "_Particles.pvd").c_str(),
-               ios::out);
+    std::string particlesPvdFile
+        = m_directory + "/" + m_rootName + "_Particles.pvd";
+    std::ofstream g(particlesPvdFile, std::ios::out);
+    if(!g.is_open())
+    {
+        std::cerr << "Failed to open file: " << particlesPvdFile << std::endl;
+        throw std::runtime_error("Cannot open file for writing: "
+                                 + particlesPvdFile);
+    }
     g << m_Paraview_saveParticles_pvd[0]->str();
     g << "</Collection>" << endl;
     g << "</VTKFile>" << endl;

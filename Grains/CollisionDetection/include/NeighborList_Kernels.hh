@@ -14,20 +14,6 @@
 // =============================================================================
 /** @name NeighborList_Kernels: External Kernels */
 //@{
-/** @brief Zeros out the array
-    @param array array to be zero-ed out
-    @param numElements number of elements in the array */
-__GLOBAL__ void zeroOut_Kernel(uint* array, uint numElements);
-
-/** @brief Kernel to find the start of each cell
-    The cellStart array will contain the start index for each cell hash,
-    @param particleHash Array of particle hashes
-    @param numParticles Number of particles
-    @param cellStart Output array to store start indices for each cell hash */
-__GLOBAL__ void computeCellStart_Kernel(const uint* particleHash,
-                                        uint        numParticles,
-                                        uint*       cellStart);
-
 /** @brief Updates the neighbor list on host using an O(n^2) algorithm
     @param nParticles number of particles
     @param pairList array of pairs */

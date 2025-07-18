@@ -27,38 +27,6 @@
 // =============================================================================
 /** @name ComponentManager common functions between host and device */
 //@{
-/** @brief Initializes a buffer to default 
-    @param buffer the buffer to be initialized
-    @param size the size of the buffer */
-template <typename T>
-__GLOBAL__ void initDefault_Kernel(T* buffer, size_t size)
-{
-    size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if(idx >= size)
-        return;
-    buffer[idx] = T();
-}
-
-// -----------------------------------------------------------------------------
-/** @brief Initializes a buffer to default
-    @param buffer the buffer to be initialized
-    @param size the size of the buffer */
-template <typename T, MemType M>
-void initDefault(GrainsMemBuffer<T, M>& buffer, size_t size)
-{
-    buffer.reserve(size);
-    if constexpr(M == MemType::HOST || M == MemType::PINNED)
-    {
-        for(size_t i = 0; i < size; ++i)
-            buffer[i] = T();
-    }
-    else if constexpr(M == MemType::DEVICE)
-    {
-        initDefault_Kernel<<<(size + 255) / 256, 256>>>(buffer.getData(), size);
-    }
-}
-
-// -----------------------------------------------------------------------------
 /** @brief Computes relative transformations per pair
     @param pairList list of rigid bodies pairs
     @param transform transformation of the rigid bodies

@@ -67,6 +67,10 @@ public:
         m_particleIteratorMap.reserve(nParticles);
         // Initialize old particle hashes buffer
         m_oldParticleHashes.reserve(nParticles);
+        // Initialize old particle hashes to UINT_MAX, maybe faster than fill
+        std::fill(m_oldParticleHashes.getData(),
+                  m_oldParticleHashes.getData() + nParticles,
+                  UINT_MAX);
     }
 
     // -------------------------------------------------------------------------

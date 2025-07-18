@@ -22,6 +22,10 @@
 template <typename T, MemType M>
 class NeighborList
 {
+    static_assert(
+        M == MemType::HOST || M == MemType::DEVICE,
+        "NeighborList only supports MemType::HOST or MemType::DEVICE");
+
 protected:
     /** @name Parameters */
     //@{
@@ -29,6 +33,8 @@ protected:
     GrainsMemBuffer<uint2, M> m_pairList;
     /** \brief Pair count */
     GrainsMemBuffer<uint, M> m_pairCount;
+    /** \brief Pair count */
+    GrainsMemBuffer<uint, MemType::HOST> m_hPairCount;
     /** \brief If neighbor list needs update */
     bool m_needsUpdate;
     //@}
@@ -65,7 +71,10 @@ public:
     /** @brief Gets size of pair list */
     uint getSize() const
     {
-        return m_pairList.getSize();
+        if constexpr(M == MemType::HOST)
+            return m_pairCount[0];
+        else if constexpr(M == MemType::DEVICE)
+            return m_hPairCount[0];
     }
     //@}
 

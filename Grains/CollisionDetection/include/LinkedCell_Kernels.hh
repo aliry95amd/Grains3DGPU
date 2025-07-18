@@ -1,6 +1,8 @@
 #ifndef _LINKEDCELL_KERNELS_HH_
 #define _LINKEDCELL_KERNELS_HH_
 
+#include "Basic.hh"
+
 // =============================================================================
 /** @brief The class LinkedCell_Kernels.
 
@@ -11,11 +13,6 @@
 // =============================================================================
 /** @name LinkedCell_Kernels: External Kernels */
 //@{
-/** @brief Zeros out the array
-    @param array array to be zero-ed out
-    @param numElements number of elements in the array */
-__GLOBAL__ void zeroOut_Kernel(uint* array, uint numElements);
-
 /** @brief Kernel to find the start of each cell
     The cellStart array will contain the start index for each cell hash,
     @param particleHash Array of particle hashes

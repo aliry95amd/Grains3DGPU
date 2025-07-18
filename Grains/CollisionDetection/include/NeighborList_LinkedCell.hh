@@ -24,11 +24,8 @@
 template <typename T, MemType M>
 class NeighborList_LinkedCell : public NeighborList<T, M>
 {
-    static_assert(M == MemType::HOST || M == MemType::DEVICE,
-                  "NeighborList_LinkedCell only supports MemType::HOST or "
-                  "MemType::DEVICE");
-
     using NL = NeighborList<T, M>;
+    using NL::m_hPairCount;
     using NL::m_needsUpdate;
     using NL::m_pairCount;
     using NL::m_pairList;
@@ -59,23 +56,28 @@ public:
                             const uint        nParticles)
     {
         // Initialize the LinkedCell buffer
-        if constexpr(M == MemType::HOST || M == MemType::PINNED)
+        if constexpr(M == MemType::HOST)
         {
             m_LinkedCell = new LinkedCell_Host<T>(minCorner,
                                                   maxCorner,
                                                   cellSize,
                                                   nParticles);
         }
-        else if constexpr(M == MemType::DEVICE || M == MemType::MANAGED)
+        else if constexpr(M == MemType::DEVICE)
         {
             m_LinkedCell = new LinkedCell_SortBased<T>(minCorner,
                                                        maxCorner,
                                                        cellSize,
                                                        nParticles);
         }
+
+        // TODO: Reduce init size
+        m_pairList.allocate(nParticles * (nParticles - 1) / 2);
+        m_pairList.fill();
         m_pairCount.allocate(1);
-        // TODO: reserve the max for now, but we can optimize this later
-        m_pairList.reserve(nParticles * (nParticles - 1) / 2);
+        m_pairCount.fill(0);
+        m_hPairCount.allocate(1);
+        m_hPairCount.fill(0);
         m_needsUpdate = true; // Initially, we need to create the list
     }
 
@@ -94,7 +96,7 @@ public:
         if(!m_needsUpdate)
             return;
 
-        if constexpr(M == MemType::HOST || M == MemType::PINNED)
+        if constexpr(M == MemType::HOST)
         {
             auto* LC_host = static_cast<LinkedCell_Host<T>*>(m_LinkedCell);
             LC_host->updateLinkedCells(transforms);
@@ -105,7 +107,7 @@ public:
             // Update the actual size of the pair list
             m_pairList.setSize(m_pairCount[0]);
         }
-        else if constexpr(M == MemType::DEVICE || M == MemType::MANAGED)
+        else if constexpr(M == MemType::DEVICE)
         {
             auto* LC_device
                 = static_cast<LinkedCell_SortBased<T>*>(m_LinkedCell);
@@ -125,12 +127,8 @@ public:
                 m_pairCount.getData());
 
             // Copy back the actual pair count and update size
-            uint h_pairCount;
-            cudaErrCheck(cudaMemcpy(&h_pairCount,
-                                    m_pairCount.getData(),
-                                    sizeof(uint),
-                                    cudaMemcpyDeviceToHost));
-            m_pairList.setSize(h_pairCount);
+            m_pairCount.copyTo(m_hPairCount);
+            m_pairList.setSize(m_hPairCount[0]);
         }
 
         m_needsUpdate = true;

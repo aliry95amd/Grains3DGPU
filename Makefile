@@ -8,7 +8,7 @@ updatedev: clean update
 
 update: apply-clang-format
 	@cd Grains; \
-    make; \
+    make grains; \
     cd ..;
 	@cd Main/src; \
 	make; \

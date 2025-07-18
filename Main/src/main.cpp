@@ -44,11 +44,9 @@ int main(int argc, char* argv[])
             Grains<float>* grains = nullptr;
             grains                = GrainsFactory<float>::create(rootNode);
 
-            // Initial output message
-            // grains->initialOutputMessage();
-
             // Tasks to perform before time-stepping
             grains->initialize(rootNode);
+            rootNode->getOwnerDocument()->release();
             ReaderXML::terminate();
 
             // Delete the temporary input file
@@ -75,11 +73,9 @@ int main(int argc, char* argv[])
             Grains<double>* grains = nullptr;
             grains                 = GrainsFactory<double>::create(rootNode);
 
-            // Initial output message
-            // grains->initialOutputMessage();
-
             // Tasks to perform before time-stepping
             grains->initialize(rootNode);
+            rootNode->getOwnerDocument()->release();
             ReaderXML::terminate();
 
             // Delete the temporary input file

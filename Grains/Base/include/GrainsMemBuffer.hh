@@ -1,7 +1,11 @@
 #ifndef _GRAINSMEMBUFFER_HH_
 #define _GRAINSMEMBUFFER_HH_
 
+#include <type_traits>
+
+#include "GrainsParameters.hh"
 #include "GrainsUtils.hh"
+#include "Misc_Kernels.hh"
 
 enum class MemType
 {
@@ -49,6 +53,17 @@ public:
     GrainsMemBuffer(size_t size)
     {
         allocate(size);
+        fill();
+    }
+
+    // -------------------------------------------------------------------------
+    /** @brief Constructor with the size and default value
+        @param size size of the buffer
+        @param value default value to fill the buffer */
+    GrainsMemBuffer(size_t size, const T& value)
+    {
+        allocate(size);
+        fill(value);
     }
 
     // -------------------------------------------------------------------------
@@ -380,16 +395,16 @@ public:
     /** @brief Copy to another buffer (host/device aware)
     @param dest destination buffer */
     template <MemType destM>
-    void copyTo(GrainsMemBuffer<T, destM>& dest) const
+    void copyTo(GrainsMemBuffer<T, destM>& dest)
     {
         if(m_size == 0 || !m_ptr)
             return;
 
-        if(dest.m_size < m_size)
+        if(dest.getSize() < m_size)
             GAbort("Destination buffer too small for copy");
 
         if constexpr(M == MemType::HOST && destM == MemType::HOST)
-            std::memcpy(dest.m_ptr, m_ptr, getBytes());
+            std::memcpy(dest.getData(), m_ptr, getBytes());
         else
         {
             cudaMemcpyKind kind    = getMemcpyKind<M, destM>();
@@ -461,6 +476,42 @@ public:
         m_d_ptr    = nullptr;
         m_size     = 0;
         m_capacity = 0;
+    }
+
+    // -------------------------------------------------------------------------
+    /** @brief Fills the buffer with default values */
+    void fill()
+    {
+        if constexpr(M == MemType::HOST || M == MemType::PINNED)
+        {
+            for(size_t i = 0; i < m_size; ++i)
+            {
+                m_ptr[i] = T();
+            }
+        }
+        else if constexpr(M == MemType::DEVICE || M == MemType::MANAGED)
+        {
+            fill_Kernel<<<(m_size + 255) / 256, 256>>>(m_ptr, m_size);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    /** @brief Fills the buffer with a user-provided value
+        @param count number of elements
+        @param value value to initialize with */
+    void fill(const T& value)
+    {
+        if constexpr(M == MemType::HOST || M == MemType::PINNED)
+        {
+            for(size_t i = 0; i < m_size; ++i)
+                m_ptr[i] = value;
+        }
+        else if constexpr(M == MemType::DEVICE || M == MemType::MANAGED)
+        {
+            static_assert(std::is_fundamental<T>::value,
+                          "T must be a primitive type for device init");
+            fill_Kernel<<<(m_size + 255) / 256, 256>>>(m_ptr, m_size, value);
+        }
     }
     //@}
 

@@ -72,8 +72,7 @@ __HOSTDEVICE__ uint Cells<T>::getNumCells() const
 template <typename T>
 __HOSTDEVICE__ uint Cells<T>::getSizeOfNeighborCells() const
 {
-    // 3 cells above, 1 cell to the right, 9 cells behind, 1 cell itself
-    return (14 * m_numCells.w);
+    return (27 * m_numCells.w);
 }
 
 // -----------------------------------------------------------------------------
@@ -95,7 +94,7 @@ __HOSTDEVICE__ void Cells<T>::generateNeighborCells(uint* neighborCells) const
     // clang-format off
     for(uint cellHash = 0; cellHash < m_numCells.w; ++cellHash)
     {
-        offset       = 14 * cellHash;
+        offset       = 27 * cellHash;
         uint3 cellId = { cellHash % m_numCells.x,
                         (cellHash / m_numCells.x) % m_numCells.y,
                          cellHash / (m_numCells.x * m_numCells.y)};

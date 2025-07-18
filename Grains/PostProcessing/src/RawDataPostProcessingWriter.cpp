@@ -96,8 +96,9 @@ void RawDataPostProcessingWriter<T>::PostProcessing(
     Vector3<T>  velR;
     uint        type;
     std::string fileName(m_directory + "/" + m_rootName);
-    m_particle_class.open((fileName + "_particleType.dat").c_str(), ios::out);
-
+    // This is broken
+    // std::string particleTypeFile = fileName + "_particleType.dat";
+    // m_particle_class.open(particleTypeFile.c_str(), ios::out);
     // Writing current time at the beginning of each line
     std::string stime = realToString(ios::scientific, 6, currentTime);
     m_gc_coordinates_x << stime;
@@ -129,8 +130,6 @@ void RawDataPostProcessingWriter<T>::PostProcessing(
                                            centre[Z]);
 
         // Translational velocity
-        std::cout << "Writing post-processing data to " << fileName
-                  << std::endl;
         velT = kParticle[i].getTranslationalComponent();
         m_translational_velocity_x
             << " " << realToString(ios::scientific, m_ndigits, velT[X]);
@@ -152,7 +151,7 @@ void RawDataPostProcessingWriter<T>::PostProcessing(
         // m_coordination_number << " " << pp->getCoordinationNumber();
 
         // Particle type
-        type = particleRB[rbParticle[i]]->getConvex()->getConvexType();
+        // type = particleRB[rbParticle[i]]->getConvex()->getConvexType();
         // m_particle_class << type << " " ;
     }
 
@@ -239,7 +238,7 @@ template <typename T>
 void RawDataPostProcessingWriter<T>::prepareResultFiles(ios_base::openmode mode)
 {
     std::string fileName(m_directory + "/" + m_rootName);
-    string      file;
+    std::string file;
     file = fileName + "_position_x.dat";
     m_gc_coordinates_x.open(file.c_str(), mode);
     file = fileName + "_position_y.dat";

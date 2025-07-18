@@ -22,6 +22,7 @@ template <typename T, MemType M>
 class NeighborList_Nsq : public NeighborList<T, M>
 {
     using NL = NeighborList<T, M>;
+    using NL::m_hPairCount;
     using NL::m_needsUpdate;
     using NL::m_pairCount;
     using NL::m_pairList;
@@ -39,7 +40,11 @@ public:
     NeighborList_Nsq(const uint nParticles)
     {
         m_pairList.reserve(nParticles * (nParticles - 1) / 2);
+        m_pairList.fill();
         m_pairCount.allocate(1);
+        m_pairCount.fill(0);
+        m_hPairCount.allocate(1);
+        m_hPairCount.fill(0);
         m_needsUpdate = true; // Initially, we need to create the list
     }
 
@@ -63,6 +68,7 @@ public:
         if constexpr(M == MemType::HOST || M == MemType::PINNED)
         {
             updateNeighborList_Nsq_Host(nParticles, m_pairList.getData());
+            m_pairCount[0] = nParticles * (nParticles - 1) / 2;
         }
         else if constexpr(M == MemType::DEVICE || M == MemType::MANAGED)
         {
@@ -74,10 +80,9 @@ public:
             updateNeighborList_Nsq_Device<<<numBlocks, numThreads>>>(
                 nParticles,
                 m_pairList.getData());
+            m_hPairCount[0] = nParticles * (nParticles - 1) / 2;
         }
 
-        // Update the actual size of the pair list
-        m_pairList.setSize(nParticles * (nParticles - 1) / 2);
         m_needsUpdate = false;
     }
     //@}

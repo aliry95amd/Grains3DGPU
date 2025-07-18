@@ -9,6 +9,7 @@
 #include "GrainsMemBuffer.hh"
 #include "LinkedCell.hh"
 #include "LinkedCell_Kernels.hh"
+#include "Misc_Kernels.hh"
 
 // =============================================================================
 /** @brief The class LinkedCell_SortBased.
@@ -103,8 +104,7 @@ public:
                                        GrainsParameters<T>::m_GPU,
                                        numBlocks,
                                        numThreads);
-        zeroOut_Kernel<<<numBlocks, numThreads>>>(m_cellStartID.getData(),
-                                                  m_numCells);
+        m_cellStartID.fill();
         computeOptimalThreadsAndBlocks(numParticles,
                                        GrainsParameters<T>::m_GPU,
                                        numBlocks,

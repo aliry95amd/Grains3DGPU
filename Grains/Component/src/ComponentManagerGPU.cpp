@@ -49,6 +49,7 @@ void ComponentManagerGPU<T>::updateNeighborList()
     if(m_neighborList->needsUpdate())
     {
         m_neighborList->updateNeighborList(m_transform);
+
         // Resize pair-dependent buffers to match actual number of pairs
         this->resizePairBuffers();
     }

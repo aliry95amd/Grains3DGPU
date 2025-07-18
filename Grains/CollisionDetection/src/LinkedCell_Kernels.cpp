@@ -3,18 +3,6 @@
 #include "Basic.hh"
 
 // -----------------------------------------------------------------------------
-// Zeros out the array
-__GLOBAL__ void zeroOut_Kernel(uint* array, uint numElements)
-{
-    uint tID = blockIdx.x * blockDim.x + threadIdx.x;
-
-    if(tID >= numElements)
-        return;
-
-    array[tID] = 0;
-}
-
-// -----------------------------------------------------------------------------
 // Kernel to find the start of each cell
 __GLOBAL__ void computeCellStart_Kernel(const uint* particleHash,
                                         uint        numParticles,

@@ -57,14 +57,16 @@ public:
                const Vector3<T>& maxCorner,
                const T           cellSize,
                const uint        nParticles)
+        : m_particleID(nParticles)
+        , m_particleHash(nParticles, UINT_MAX)
     {
         // Initialize the LinkedCell buffer
         m_cells.reserve(1);
-        if constexpr(M == MemType::HOST || M == MemType::PINNED)
+        if constexpr(M == MemType::HOST)
         {
             CellsFactory<T>::create(m_cells, &m_numCells);
         }
-        else if constexpr(M == MemType::DEVICE || M == MemType::MANAGED)
+        else if constexpr(M == MemType::DEVICE)
         {
             GrainsMemBuffer<Cells<T>*, MemType::HOST> h_cells;
             CellsFactory<T>::create(h_cells, &m_numCells);
@@ -72,8 +74,17 @@ public:
             // Free the host buffer
             delete h_cells[0];
         }
-        m_particleID.reserve(nParticles);
-        m_particleHash.reserve(nParticles);
+        m_neighborCells.reserve(m_numCells * 27); // 26 neighbors + self
+        m_neighborCells.fill(UINT_MAX);
+        if constexpr(M == MemType::HOST)
+        {
+            m_cells[0]->generateNeighborCells(m_neighborCells.getData());
+        }
+        else if constexpr(M == MemType::DEVICE)
+        {
+            getCellNeighborsList_Device<<<1, 1>>>(m_cells.getData(),
+                                                  m_neighborCells.getData());
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -81,12 +92,12 @@ public:
     virtual ~LinkedCell()
     {
         // Clean up the Cells object
-        if constexpr(M == MemType::HOST || M == MemType::PINNED)
+        if constexpr(M == MemType::HOST)
         {
             if(m_cells.getSize() > 0 && m_cells[0] != nullptr)
                 delete m_cells[0];
         }
-        else if constexpr(M == MemType::DEVICE || M == MemType::MANAGED)
+        else if constexpr(M == MemType::DEVICE)
         {
             if(m_cells.getSize() > 0 && m_cells.getData()[0] != nullptr)
                 cudaFree(m_cells.getData()[0]);
@@ -104,28 +115,6 @@ public:
     }
 
     // -------------------------------------------------------------------------
-    /** @brief Gets neighbor cells */
-    uint* getCellNeighborsList()
-    {
-        // First, ask the Cells object to specify the size required for neighbor
-        // cells.
-        uint numNeighborCells = 0;
-        if constexpr(M == MemType::HOST || M == MemType::PINNED)
-        {
-            numNeighborCells = m_cells[0]->getSizeOfNeighborCells();
-            m_neighborCells.reserve(numNeighborCells);
-            m_cells[0]->generateNeighborCells(m_neighborCells.getData());
-        }
-        else if constexpr(M == MemType::DEVICE || M == MemType::MANAGED)
-        {
-            m_neighborCells.reserve(14 * m_numCells);
-            getCellNeighborsList_Device<<<1, 1>>>(m_cells.getData(),
-                                                  m_neighborCells.getData());
-        }
-        return m_neighborCells.getData();
-    }
-
-    // -------------------------------------------------------------------------
     /** @brief Gets particle IDs */
     const uint* getParticleIDs() const
     {
@@ -138,6 +127,13 @@ public:
     {
         return m_particleHash.getData();
     }
+
+    // -------------------------------------------------------------------------
+    /** @brief Gets neighbor cells */
+    uint* getCellNeighborsList()
+    {
+        return m_neighborCells.getData();
+    }
     //@}
 
     /** @name Methods */
@@ -147,14 +143,14 @@ public:
     @param transforms buffer of transformations */
     void updateParticlesHash(GrainsMemBuffer<Transform3<T>, M>& transforms)
     {
-        if constexpr(M == MemType::HOST || M == MemType::PINNED)
+        if constexpr(M == MemType::HOST)
         {
             computeHash_Host(m_cells.getData(),
                              transforms.getData(),
                              transforms.getSize(),
                              m_particleHash.getData());
         }
-        else if constexpr(M == MemType::DEVICE || M == MemType::MANAGED)
+        else if constexpr(M == MemType::DEVICE)
         {
             uint numBlocks, numThreads;
             computeOptimalThreadsAndBlocks(transforms.getSize(),
