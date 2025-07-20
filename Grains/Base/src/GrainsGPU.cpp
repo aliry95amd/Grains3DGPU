@@ -154,7 +154,6 @@ void GrainsGPU<T>::Construction(DOMElement* rootElement)
                                                    &m_d_obstacleRigidBodyList,
                                                    GP::m_numParticles,
                                                    GP::m_numObstacles);
-    // m_d_components->copyFrom(Grains<T>::m_components);
 
     // -------------------------------------------------------------------------
     // Contact force models

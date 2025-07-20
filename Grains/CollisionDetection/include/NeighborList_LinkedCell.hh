@@ -123,10 +123,11 @@ public:
                 LC_device->getCellNeighborsList(),
                 LC_device->getCellStartIDs(),
                 transforms.getSize(),
+                LC_device->getNumCells(),
                 m_pairList.getData(),
                 m_pairCount.getData());
 
-            // Copy back the actual pair count and update size
+            // Copy the actual pair count and update size
             m_pairCount.copyTo(m_hPairCount);
             m_pairList.setSize(m_hPairCount[0]);
         }

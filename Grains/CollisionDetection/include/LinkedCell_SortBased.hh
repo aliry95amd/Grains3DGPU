@@ -61,8 +61,8 @@ public:
                          const uint        nParticles)
         : LinkedCell<T, MemType::DEVICE>(
               minCorner, maxCorner, cellSize, nParticles)
+        , m_cellStartID(m_numCells)
     {
-        m_cellStartID.reserve(m_numCells);
     }
 
     // -------------------------------------------------------------------------
@@ -99,12 +99,8 @@ public:
             thrust::device_ptr<uint>(m_particleID.getData()));
 
         // Finding the start of each cell
+        m_cellStartID.fill(UINT_MAX);
         uint numBlocks, numThreads;
-        computeOptimalThreadsAndBlocks(m_numCells,
-                                       GrainsParameters<T>::m_GPU,
-                                       numBlocks,
-                                       numThreads);
-        m_cellStartID.fill();
         computeOptimalThreadsAndBlocks(numParticles,
                                        GrainsParameters<T>::m_GPU,
                                        numBlocks,

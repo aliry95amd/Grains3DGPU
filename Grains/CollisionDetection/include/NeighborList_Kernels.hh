@@ -42,14 +42,16 @@ __HOST__ void updateNeighborList_LC_Host(
     @param particleHash array of particle hashes (cells they belong to)
     @param cellNeighborsList array of neighboring cells for each cell
     @param cellStartID array of start IDs for each cell
-    @param nParticles number of particles
+    @param numParticles number of particles
+    @param numCells number of cells
     @param pairList array of pairs
     @param pairCount pointer to device memory for storing the total pair count */
 __GLOBAL__ void updateNeighborList_LC_Device(const uint* particleID,
                                              const uint* particleHash,
                                              const uint* cellNeighborsList,
                                              const uint* cellStartID,
-                                             const uint  nParticles,
+                                             const uint  numParticles,
+                                             const uint  numCells,
                                              uint2*      pairList,
                                              uint*       pairCount);
 

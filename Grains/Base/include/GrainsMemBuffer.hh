@@ -492,6 +492,7 @@ public:
         else if constexpr(M == MemType::DEVICE || M == MemType::MANAGED)
         {
             fill_Kernel<<<(m_size + 255) / 256, 256>>>(m_ptr, m_size);
+            cudaDeviceSynchronize();
         }
     }
 
@@ -511,6 +512,59 @@ public:
             static_assert(std::is_fundamental<T>::value,
                           "T must be a primitive type for device init");
             fill_Kernel<<<(m_size + 255) / 256, 256>>>(m_ptr, m_size, value);
+            cudaDeviceSynchronize();
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    /** @brief Fills the buffer incrementally with values starting from 0 */
+    void fillIncremental()
+    {
+        if constexpr(M == MemType::HOST || M == MemType::PINNED)
+        {
+            for(size_t i = 0; i < m_size; ++i)
+                m_ptr[i] = static_cast<T>(i);
+        }
+        else if constexpr(M == MemType::DEVICE || M == MemType::MANAGED)
+        {
+            static_assert(std::is_fundamental<T>::value,
+                          "T must be a primitive type for device init");
+            fillIncremental_Kernel<<<(m_size + 255) / 256, 256>>>(m_ptr,
+                                                                  m_size);
+            cudaDeviceSynchronize();
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    /** @brief Prints the buffer contents (host/pinned/device/managed) */
+    void print(const std::string& label = "") const
+    {
+        if constexpr(M == MemType::HOST || M == MemType::PINNED)
+        {
+            if(!label.empty())
+                std::cout << label << ": ";
+            for(size_t i = 0; i < m_size; ++i)
+                std::cout << m_ptr[i] << " ";
+            std::cout << std::endl;
+        }
+        else if constexpr(M == MemType::DEVICE || M == MemType::MANAGED)
+        {
+            // Copy to host and print
+            std::vector<T> hostBuf(m_size);
+            cudaErrCheck(cudaMemcpy(hostBuf.data(),
+                                    m_ptr,
+                                    getBytes(),
+                                    cudaMemcpyDeviceToHost));
+            if(!label.empty())
+                std::cout << label << ": ";
+            for(size_t i = 0; i < m_size; ++i)
+                std::cout << hostBuf[i] << " ";
+            std::cout << std::endl;
+        }
+        else
+        {
+            std::cerr << "print() unsupported for this memory type"
+                      << std::endl;
         }
     }
     //@}

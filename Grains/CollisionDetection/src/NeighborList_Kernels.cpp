@@ -80,7 +80,8 @@ __GLOBAL__ void updateNeighborList_LC_Device(const uint* particleID,
                                              const uint* particleHash,
                                              const uint* cellNeighborsList,
                                              const uint* cellStartID,
-                                             const uint  nParticles,
+                                             const uint  numParticles,
+                                             const uint  numCells,
                                              uint2*      pairList,
                                              uint*       pairCount)
 {
@@ -89,8 +90,12 @@ __GLOBAL__ void updateNeighborList_LC_Device(const uint* particleID,
     constexpr uint NUM_NEIGHBOR_CELLS = 27; // Number of neighboring cells
 
     uint tID = blockIdx.x * blockDim.x + threadIdx.x;
-    if(tID >= nParticles)
+    if(tID >= numParticles)
         return;
+
+    // Initialize the pair count
+    if(tID == 0)
+        pairCount[0] = 0;
 
     const uint  i             = particleID[tID];
     const uint  cell          = particleHash[i];
@@ -102,22 +107,39 @@ __GLOBAL__ void updateNeighborList_LC_Device(const uint* particleID,
     {
         // Get the neighboring cell hash
         c = neighborCells[cID];
-        // Check if the neighboring cell is valid
+
+        // Check if the neighboring cell is valid (not a boundary cell)
         if(c == UINT_MAX || c < cell)
             continue;
+
         // Get the particle IDs in the cell
-        cellStart          = cellStartID[c];
-        cellEnd            = cellStartID[c + 1];
+        cellStart = cellStartID[c];
+
+        // Skip empty cells
+        if(cellStart == UINT_MAX)
+            continue;
+
+        // Get the end of the cell
+        uint k = c;
+        do
+        {
+            ++k;
+            cellEnd = cellStartID[k];
+        } while(cellEnd == UINT_MAX && k < numCells);
+        // Last cell case
+        if(k == numCells)
+            cellEnd = numParticles;
+
+        // Number of particles in the cell
         numParticlesInCell = cellEnd - cellStart;
         for(uint p = 0; p < numParticlesInCell; ++p)
         {
             j = particleID[cellStart + p];
-            if(c == cell && i < j || c != cell)
-            {
-                // Use atomic operation to get unique index
-                uint globalIndex      = atomicAdd(pairCount, 1);
-                pairList[globalIndex] = make_uint2(i, j);
-            }
+            if(i >= j)
+                continue; // Avoid duplicates and self-pairs
+            // Use atomic operation to get unique index
+            uint globalIndex      = atomicAdd(pairCount, 1);
+            pairList[globalIndex] = make_uint2(i, j);
         }
     }
 }

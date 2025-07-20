@@ -15,10 +15,10 @@
 #define cudaErrCheck(ans) cudaAssert((ans), __FILE__, __LINE__);
 
 /** @brief Returns CUDA error
-@param code the error code
-@param file the file name
-@param line the line number
-@param abort whether to abort the program */
+    @param code the error code
+    @param file the file name
+    @param line the line number
+    @param abort whether to abort the program */
 __HOST__ static INLINE void
     cudaAssert(cudaError_t code, const char* file, int line, bool abort = false)
 {
@@ -70,9 +70,20 @@ __HOST__ static INLINE void
 }
 
 // -----------------------------------------------------------------------------
+/** @brief Writes a uint2 object in a string
+    @param os the output stream
+    @param v the uint2 object */
+__HOST__ static INLINE std::ostream& operator<<(std::ostream& os,
+                                                const uint2&  v)
+{
+    os << "(" << v.x << ", " << v.y << ")";
+    return os;
+}
+
+// -----------------------------------------------------------------------------
 /** @brief Writes a real number with a prescribed number of digits in a string
-@param figure the float number
-@param size number of digits */
+    @param figure the float number
+    @param size number of digits */
 template <typename T>
 __HOST__ static constexpr INLINE std::string realToString(const T&  figure,
                                                           const int size)
@@ -85,10 +96,10 @@ __HOST__ static constexpr INLINE std::string realToString(const T&  figure,
 
 // -----------------------------------------------------------------------------
 /** @brief Writes a float number with a prescribed format and a prescribed 
-number of digits after the decimal point in a string
-@param format the format
-@param digits number of digits after the decimal point
-@param number the float number */
+    number of digits after the decimal point in a string
+    @param format the format
+    @param digits number of digits after the decimal point
+    @param number the float number */
 template <typename T>
 __HOST__ static constexpr INLINE std::string realToString(
     std::ios_base::fmtflags format, const int digits, const T& number)
@@ -105,7 +116,7 @@ __HOST__ static constexpr INLINE std::string realToString(
 
 // -----------------------------------------------------------------------------
 /** @brief Writes a vector3 object in a string
-@param vec the vector3 object */
+    @param vec the vector3 object */
 template <typename T>
 __HOST__ static constexpr INLINE std::string
                                  Vector3ToString(const Vector3<T>& vec)
@@ -117,7 +128,7 @@ __HOST__ static constexpr INLINE std::string
 
 // -----------------------------------------------------------------------------
 /** @brief Writes a message to stdout
-@param args the output messages */
+    @param args the output messages */
 template <typename... Args>
 __HOST__ static constexpr INLINE void Gout(const Args&... args)
 {
@@ -127,8 +138,8 @@ __HOST__ static constexpr INLINE void Gout(const Args&... args)
 
 // -----------------------------------------------------------------------------
 /** @brief Writes a message to stdout with Indent (WI)
-@param numShift the number of shift characters at the beginning
-@param args the output messages */
+    @param numShift the number of shift characters at the beginning
+    @param args the output messages */
 template <typename... Args>
 __HOST__ INLINE void GoutWI(const int numShift, const Args&... args)
 {
@@ -142,8 +153,8 @@ __HOST__ INLINE void GoutWI(const int numShift, const Args&... args)
 
 // -----------------------------------------------------------------------------
 /** @brief Writes a message to stdout with Indent (WI)
-@param numShift the number of shift characters at the beginning
-@param args the output messages */
+    @param numShift the number of shift characters at the beginning
+    @param args the output messages */
 template <typename... Args>
 __HOSTDEVICE__ INLINE void GAbort(const Args&... args)
 {

@@ -57,8 +57,7 @@ public:
                const Vector3<T>& maxCorner,
                const T           cellSize,
                const uint        nParticles)
-        : m_particleID(nParticles)
-        , m_particleHash(nParticles, UINT_MAX)
+        : m_particleHash(nParticles, UINT_MAX)
     {
         // Initialize the LinkedCell buffer
         m_cells.reserve(1);
@@ -74,6 +73,10 @@ public:
             // Free the host buffer
             delete h_cells[0];
         }
+        // m_particleID is initialized to 0, 1, 2, 3, ...
+        m_particleID.reserve(nParticles);
+        m_particleID.fillIncremental();
+        // Neighbor cells are initialized to UINT_MAX
         m_neighborCells.reserve(m_numCells * 27); // 26 neighbors + self
         m_neighborCells.fill(UINT_MAX);
         if constexpr(M == MemType::HOST)
@@ -133,6 +136,13 @@ public:
     uint* getCellNeighborsList()
     {
         return m_neighborCells.getData();
+    }
+
+    // -------------------------------------------------------------------------
+    /** @brief Gets number of cells */
+    uint getNumCells() const
+    {
+        return m_numCells;
     }
     //@}
 

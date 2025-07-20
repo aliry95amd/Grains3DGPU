@@ -26,6 +26,21 @@ __GLOBAL__ void fill_Kernel(T* buffer, const size_t size, const T& value = T())
         return;
     buffer[idx] = value;
 }
+
+// -----------------------------------------------------------------------------
+/** @brief fills a buffer to incremental unsigned i
+    @param cells pointer to the Cells object
+    @param transforms buffer of transformations
+    @param size size of the buffer
+    @param particleHash output buffer for particle hashes */
+template <typename T>
+__GLOBAL__ void fillIncremental_Kernel(T* buffer, const size_t size)
+{
+    size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if(idx >= size)
+        return;
+    buffer[idx] = static_cast<T>(idx);
+}
 //@}
 
 #endif
