@@ -34,8 +34,9 @@
     @param pairID ID of the pair */
 template <typename T>
 __HOSTDEVICE__ static INLINE void
-    computeRelativeTransformations_common(const uint2*         pairList,
-                                          const Transform3<T>* transform,
+    computeRelativeTransformations_common(const uint2*               pairList,
+                                          const rigidBody<T>* const* particleRB,
+                                          const Transform3<T>*       transform,
                                           Transform3<T>* relativeTransform,
                                           const uint     pairID)
 {

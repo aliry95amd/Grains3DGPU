@@ -155,6 +155,7 @@ template <typename T>
 __HOSTDEVICE__ void Matrix3<T>::scale(const Vector3<T>& v)
 {
     T const* b = v.getBuffer();
+    m_comp[XX] *= b[0];
     m_comp[XY] *= b[1];
     m_comp[XZ] *= b[2];
     m_comp[YX] *= b[0];

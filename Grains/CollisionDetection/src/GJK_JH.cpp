@@ -359,13 +359,32 @@ __HOSTDEVICE__ T computeClosestPoints_GJK_JH(const Convex<T>&     a,
         w       = p[last] - b2a(q[last]);
 
         // termination criteria -- optimiality gap
-        set_max(mu, v * w / dist);
-        if(dist - mu <= dist * relError || mu < absError)
+        // set_max(mu, v * w / dist);
+        mu = dist - v * w / dist;
+        if(mu <= dist * relError || mu < absError)
+        {
+            printf("GJK_JH: Optimality gap reached: %d, %f, %f, %f, %f\n",
+                   numIterations,
+                   dist,
+                   v[X],
+                   v[Y],
+                   v[Z]);
+            printf("GJK_JH: Optimality gap reached: %e < %e\n",
+                   mu,
+                   dist * relError);
+            printf("GJK_JH: Optimality gap reached: %e < %e\n", mu, absError);
             break;
+        }
         // termination criteria -- degenerate case
         if(degenerate(all_bits, y, w))
+        {
+            printf("GJK_JH: Degenerate case detected\n");
+            printf("GJK_JH: w = (%f, %f, %f)\n",
+                   w.getBuffer()[0],
+                   w.getBuffer()[1],
+                   w.getBuffer()[2]);
             break;
-
+        }
         // if not terminated, get ready for the next iteration
         y[last]  = w;
         all_bits = bits | last_bit;

@@ -180,6 +180,10 @@ __HOSTDEVICE__ void closestPointsRigidBodies(const RigidBody<T>&  rbA,
                                              ptB,
                                              nbIterGJK);
 
+    printf("GJK_JH: nbIterGJK = %d, ctSum = %f, distance = %f\n",
+           nbIterGJK,
+           ctSum,
+           distance);
     // Computation of the actual overlap
     // distance = distance - crustA - crustB
     // If actual overlap distance < 0 => contact otherwise no contact
