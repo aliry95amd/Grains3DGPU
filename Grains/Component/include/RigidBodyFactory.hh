@@ -31,15 +31,16 @@ public:
 		XML node
         @param root XML node
         @param refRB Memory buffer for storing the reference rigid bodies
-		@param initTransform Memory buffer for storing the initial 
-		transformations
+		@param initPositions Memory buffer for storing the initial positions
+		@param initOrientations Memory buffer for storing the initial orientations
 		@param numEachRefParticle Memory buffer for storing the number of each 
 		reference particle
 		@param numParticles Total number of particles in the simulation */
     static void
         create(DOMNode*                                       root,
                GrainsMemBuffer<RigidBody<T>*, MemType::HOST>& refRB,
-               GrainsMemBuffer<Transform3<T>, MemType::HOST>& initTransform,
+               GrainsMemBuffer<Vector3<T>, MemType::HOST>&    initPositions,
+               GrainsMemBuffer<Quaternion<T>, MemType::HOST>& initOrientations,
                GrainsMemBuffer<uint, MemType::HOST>& numEachRefParticle,
                uint&                                 numParticles);
 

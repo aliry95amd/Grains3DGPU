@@ -424,7 +424,7 @@ __HOSTDEVICE__ T computeClosestPoints_GJK_AY(Convex<T> const&     a,
     Vector3<T> v(a.support(zeroVector3T) - b2a(b.support(zeroVector3T)));
     Vector3<T> w;
     // Vector3<T> d( v );
-    T dist = v.norm();
+    T dist = norm(v);
 
     while(bits < 15 && dist > HIGHEPS<T> && numIterations < 1000)
     {
@@ -460,7 +460,7 @@ __HOSTDEVICE__ T computeClosestPoints_GJK_AY(Convex<T> const&     a,
         bits |= (1 << last);
         ++numIterations;
         sv_subalgorithm(y, bits, lambdas, v);
-        dist = v.norm();
+        dist = norm(v);
     }
     // compute witness points
     computePoints(bits, p, q, lambdas, pa, pb);

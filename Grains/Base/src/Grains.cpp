@@ -157,23 +157,31 @@ void Grains<T>::Construction(DOMElement* rootElement)
     DOMNode* particles = ReaderXML::getNode(root, "Particles");
 
     GrainsMemBuffer<RigidBody<T>*, MemType::HOST> m_refParticleRigidBodyList;
-    GrainsMemBuffer<Transform3<T>, MemType::HOST> refParticlesInitialTransform;
-    GrainsMemBuffer<uint, MemType::HOST>          numEachRefParticle;
-    uint                                          numParticles = 0;
+    GrainsMemBuffer<Vector3<T>, MemType::HOST>    refParticlesInitialPosition;
+    GrainsMemBuffer<Quaternion<T>, MemType::HOST>
+                                         refParticlesInitialOrientation;
+    GrainsMemBuffer<uint, MemType::HOST> numEachRefParticle;
+    uint                                 numParticles = 0;
     if(particles)
     {
         GoutWI(6, "Reading particle types ...");
         RigidBodyFactory<T>::create(particles,
                                     m_refParticleRigidBodyList,
-                                    refParticlesInitialTransform,
+                                    refParticlesInitialPosition,
+                                    refParticlesInitialOrientation,
                                     numEachRefParticle,
                                     numParticles);
         GoutWI(6, "Reading particle types completed!");
     }
 
     m_particleRigidBodyList.reserve(numParticles);
-    GrainsMemBuffer<Transform3<T>, MemType::HOST> particlesInitialTransform;
-    particlesInitialTransform.allocate(numParticles);
+    GrainsMemBuffer<Vector3<T>, MemType::HOST>    particlesInitialPosition;
+    GrainsMemBuffer<Quaternion<T>, MemType::HOST> particlesInitialOrientation;
+    particlesInitialPosition.allocate(numParticles);
+    particlesInitialOrientation.allocate(numParticles);
+
+    // GrainsMemBuffer<Transform3<T>, MemType::HOST> particlesInitialTransform;
+    // particlesInitialTransform.allocate(numParticles);
     if(numParticles)
     {
         uint offset = 0;
@@ -185,8 +193,10 @@ void Grains<T>::Construction(DOMElement* rootElement)
                 m_particleRigidBodyList[offset + j]
                     = new RigidBody<T>(*m_refParticleRigidBodyList[i]);
                 // Initial transformation of the rigid body
-                particlesInitialTransform[offset + j]
-                    = refParticlesInitialTransform[i];
+                particlesInitialPosition[offset + j]
+                    = refParticlesInitialPosition[i];
+                particlesInitialOrientation[offset + j]
+                    = refParticlesInitialOrientation[i];
             }
             // Increment the starting position
             offset += numEachRefParticle[i];
@@ -362,8 +372,10 @@ void Grains<T>::Construction(DOMElement* rootElement)
                                                    GP::m_numParticles,
                                                    GP::m_numObstacles);
     // Initialize the particles and obstacles
-    m_components->initializeParticles(particlesInitialTransform);
-    m_components->initializeObstacles(obstaclesInitialTransform);
+    m_components->initializeParticles(particlesInitialPosition,
+                                      particlesInitialOrientation);
+    m_components->initializeObstacles(obstaclesInitialPosition,
+                                      obstaclesInitialOrientation);
 }
 
 // -----------------------------------------------------------------------------

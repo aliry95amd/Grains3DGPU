@@ -34,7 +34,7 @@ __HOSTDEVICE__ static INLINE void
     T          rB    = rbB.getCircumscribedRadius();
     Vector3<T> vecBA = b2a.getOrigin();
     // We calculate the overlap, and then normalize the distance vector.
-    T overlap = vecBA.norm() - rA - rB;
+    T overlap = norm(vecBA) - rA - rB;
     contactInfo.setOverlapDistance(overlap);
     if(overlap < T(0))
     {
@@ -60,7 +60,7 @@ __HOSTDEVICE__ static INLINE void
     Vector3<T> cenA  = a2w.getOrigin();
     Vector3<T> vecBA = b2w.getOrigin() - cenA;
     // We calculate the overlap, and then normalize the distance vector.
-    T overlap = vecBA.norm() - rA - rB;
+    T overlap = norm(vecBA) - rA - rB;
     contactInfo.setOverlapDistance(overlap);
     if(overlap < T(0))
     {

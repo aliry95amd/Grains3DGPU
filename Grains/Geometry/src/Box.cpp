@@ -111,7 +111,7 @@ __HOSTDEVICE__ void Box<T>::computeInertia(T (&inertia)[6],
 template <typename T>
 __HOSTDEVICE__ T Box<T>::computeCircumscribedRadius() const
 {
-    return (m_extent.norm());
+    return (norm(m_extent));
 }
 
 // -----------------------------------------------------------------------------

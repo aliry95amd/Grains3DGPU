@@ -489,9 +489,12 @@ public:
     //@{
     // -------------------------------------------------------------------------
     /** @brief Initializes transformations for particles in the simulation
-        @param initTr initial transformation of particles */
+        @param initPos initial position of particles
+        @param initOrient initial orientation of particles */
     template <MemType srcM>
-    void initializeParticles(const GrainsMemBuffer<Transform3<T>, srcM>& initTr)
+    void initializeParticles(
+        const GrainsMemBuffer<Vector3<T>, srcM>&    initPos,
+        const GrainsMemBuffer<Quaternion<T>, srcM>& initOrient)
     {
         // We can only initialize on host
         static_assert(
@@ -500,21 +503,25 @@ public:
             "initializing on host first, and copy to device. Aborting Grains!");
         // Making sure that we have data for all particles and the number of
         // initial TR matches the number of RBs
-        assert(initTr.getSize() == m_nParticles);
+        assert(initPos.getSize() == m_nParticles
+               && initOrient.getSize() == m_nParticles);
 
         // Assigning
         for(uint i = 0; i < m_nParticles; ++i)
         {
-            m_transform[i]  = initTr[i];
-            m_quaternion[i] = Quaternion<T>(initTr[i].getBasis());
+            m_position[i]   = initPos[i];
+            m_quaternion[i] = initOrient[i];
         }
     }
 
     // -------------------------------------------------------------------------
     /** @brief Initializes transformations for obstacles in the simulation
-        @param initTr initial transformation of obstacles */
+        @param initPos initial positions of obstacles
+        @param initOrient initial orientations of obstacles */
     template <MemType srcM>
-    void initializeObstacles(const GrainsMemBuffer<Transform3<T>, srcM>& initTr)
+    void initializeObstacles(
+        const GrainsMemBuffer<Vector3<T>, srcM>&    initPos,
+        const GrainsMemBuffer<Quaternion<T>, srcM>& initOrient)
     {
         // We can only initialize on host
         static_assert(
@@ -523,12 +530,14 @@ public:
             "initializing on host first, and copy to device. Aborting Grains!");
         // Making sure that we have data for all obstacles and the number of
         // initial TR matches the number of RBs
-        assert(initTr.getSize() == m_nObstacles);
+        assert(initPos.getSize() == m_nObstacles
+               && initOrient.getSize() == m_nObstacles);
 
         // Assigning
         for(uint i = 0; i < m_nObstacles; ++i)
         {
-            m_obstacleTransform[i] = initTr[i];
+            m_obstaclePosition[i]    = initPos[i];
+            m_obstacleOrientation[i] = initOrient[i];
         }
     }
 

@@ -25,24 +25,44 @@ public:
     /** @brief Default constructor
         @param def value of all 3 components */
     __HOSTDEVICE__
-    Vector3(T def = T());
+    Vector3(T def = T()) noexcept;
 
     /** @brief Constructor with the buffer
         @param buffer buffer */
     __HOSTDEVICE__
-    Vector3(const T* buffer);
+    Vector3(const T* buffer) noexcept;
 
     /** @brief Constructor with 3 components as inputs
         @param x 1st component
         @param y 2nd component
         @param z 3rd component*/
     __HOSTDEVICE__
-    Vector3(T x, T y, T z);
+    Vector3(T x, T y, T z) noexcept;
 
     /** @brief Copy constructor
         @param vec copied Vector3 object */
     __HOSTDEVICE__
-    Vector3(const Vector3<T>& vec);
+    Vector3(const Vector3<T>& vec) noexcept;
+
+    /** @brief Assign operator to another Vector3 object
+        @param vec rhs Vector3 object */
+    __HOSTDEVICE__
+    Vector3<T>& operator=(const Vector3<T>& vec) noexcept;
+
+    /** @brief Move constructor
+        @param vec moved Vector3 object */
+    __HOSTDEVICE__
+    Vector3(Vector3<T>&& vec) noexcept;
+
+    /** @brief Move assignment operator
+        @param vec moved Vector3 object */
+    __HOSTDEVICE__
+    Vector3<T>& operator=(Vector3<T>&& vec) noexcept;
+
+    /** @brief Constructor from an XML node
+        @param root XML node */
+    __HOST__
+    Vector3(DOMNode* root) noexcept;
 
     /** @brief Destructor */
     __HOSTDEVICE__
@@ -53,7 +73,7 @@ public:
     //@{
     /** @brief Gets the pointer to the buffer */
     __HOSTDEVICE__
-    const T* getBuffer() const;
+    const T* getBuffer() const noexcept;
     //@}
 
     /** @name Set methods */
@@ -61,114 +81,51 @@ public:
     /** @brief Sets the vector to a 1D array of 3 values as input
         @param buffer the 1D array of values ordered as: 0=Vx, 1=Vy, 2=Vz */
     __HOSTDEVICE__
-    void setValue(const T* buffer);
+    void setValue(const T* buffer) noexcept;
 
     /** @brief Sets the components
         @param x the x component
         @param y the y component
         @param z the z component */
     __HOSTDEVICE__
-    void setValue(T x, T y, T z);
+    void setValue(const T x, const T y, const T z) noexcept;
     //@}
 
     /** @name Methods */
     //@{
     /** @brief Unitary nomalization operator */
     __HOSTDEVICE__
-    void normalize();
+    void normalize() noexcept;
 
     /** @brief Returns a vector corresponding to the normalized vector */
     __HOSTDEVICE__
-    Vector3<T> normalized() const;
-
-    /** @brief Returns the norm of the vector */
-    __HOSTDEVICE__
-    T norm() const;
-
-    /** @brief Returns the norm squared of the vector */
-    __HOSTDEVICE__
-    T norm2() const;
-
-    /** @brief Returns whether the vector norm is less than a given tol
-        @param tol tolerance -- HIGHEPS defined in Basic.hh is the default */
-    __HOSTDEVICE__
-    bool isApproxZero(T tol = HIGHEPS<T>) const;
+    Vector3<T> normalized() const noexcept;
 
     /** @brief Rounds components to +-tol
         @param tol tolerance -- EPS defined in Basic.hh is the default */
     __HOSTDEVICE__
-    void round(T tol = EPS<T>);
+    void round(T tol = EPS<T>) noexcept;
 
     /** @brief set all components to zero */
     __HOSTDEVICE__
-    void reset();
+    void reset() noexcept;
     //@}
 
     /** @name Operators */
     //@{
-    /** @brief Operator +=
-        @param vec 2nd Vector3 object */
-    __HOSTDEVICE__
-    Vector3<T>& operator+=(const Vector3<T>& vec);
-
-    /** @brief Operator -=
-        @param vec 2nd Vector3 object */
-    __HOSTDEVICE__
-    Vector3<T>& operator-=(const Vector3<T>& vec);
-
-    /** @brief Unitary operator *= by a scalar
-        @param d multiplication factor */
-    __HOSTDEVICE__
-    Vector3<T>& operator*=(T d);
-
-    /** @brief Unitary operator /= by a scalar
-        @param d division factor */
-    __HOSTDEVICE__
-    Vector3<T>& operator/=(T d);
-
     /** @brief ith component accessor
         @param i component index */
     __HOSTDEVICE__
-    T const& operator[](size_t i) const;
+    T const& operator[](size_t i) const noexcept;
 
     /** @brief ith component accessor - modifiable lvalue
         @param i component index */
     __HOSTDEVICE__
-    T& operator[](size_t i);
-
-    /** @brief Assign operator to another Vector3 object
-        @param vec rhs Vector3 object */
-    __HOSTDEVICE__
-    Vector3<T>& operator=(const Vector3<T>& vec);
-
-    /** @brief Unitary operator -. Returns an object with negative 
-        components */
-    __HOSTDEVICE__
-    Vector3<T> operator-() const;
-
-    /** @brief Comparaison operator
-        @param vec 2nd Vector3 object */
-    __HOSTDEVICE__
-    bool operator==(const Vector3<T>& vec) const;
-
-    /** @brief Difference operator
-        @param vec 2nd Vector3 object */
-    __HOSTDEVICE__
-    bool operator!=(const Vector3<T>& vec) const;
+    T& operator[](size_t i) noexcept;
 
     /** @brief Conversion operator float */
     __HOSTDEVICE__
-    operator Vector3<float>() const;
-    //@}
-
-    /** @name Static Methods */
-    //@{
-    /** @brief Returns a Vector3 object with all components set to zero */
-    __HOSTDEVICE__
-    static Vector3<T> NULLVECTOR()
-    {
-        return Vector3<T>(T(0), T(0), T(0));
-    }
+    operator Vector3<float>() const noexcept;
     //@}
 };
 

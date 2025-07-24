@@ -2,7 +2,6 @@
 #define _CELLS_HH_
 
 #include "GrainsMemBuffer.hh"
-#include "Transform3.hh"
 #include "Vector3.hh"
 
 // =============================================================================

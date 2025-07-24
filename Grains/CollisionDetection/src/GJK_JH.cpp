@@ -180,7 +180,7 @@ __HOSTDEVICE__ static INLINE bool closest(uint&            bits,
             {
                 Vector3<T> u;
                 computeVector(s, y, det, u);
-                T dist2 = u.norm2();
+                T dist2 = norm2(u);
                 if(dist2 < min_dist2)
                 {
                     min_dist2 = dist2;
@@ -255,7 +255,7 @@ __HOSTDEVICE__ bool intersectGJK(const Convex<T>&     a,
         all_bits = bits | last_bit;
         if(!closest(bits, last, last_bit, all_bits, y, dp, det, v))
             return (false);
-    } while(bits < 15 && !v.isApproxZero());
+    } while(bits < 15 && !isApproxZero(v));
     return (true);
 }
 
@@ -299,7 +299,7 @@ __HOSTDEVICE__ bool intersectGJK(const Convex<T>&     a,
         all_bits = bits | last_bit;
         if(!closest(bits, last, last_bit, all_bits, y, dp, det, v))
             return (false);
-    } while(bits < 15 && !v.isApproxZero());
+    } while(bits < 15 && !isApproxZero(v));
     return (true);
 }
 
@@ -341,7 +341,7 @@ __HOSTDEVICE__ T computeClosestPoints_GJK_JH(const Convex<T>&     a,
     // Initializing vectors
     Vector3<T> v(-b2a.getOrigin());
     Vector3<T> w;
-    T          dist = v.norm();
+    T          dist = norm(v);
 
     while(bits < 15 && dist > HIGHEPS<T> && numIterations < 1000)
     {
@@ -391,7 +391,7 @@ __HOSTDEVICE__ T computeClosestPoints_GJK_JH(const Convex<T>&     a,
         ++numIterations;
         if(!closest(bits, last, last_bit, all_bits, y, dp, det, v))
             break;
-        dist = v.norm();
+        dist = norm(v);
     }
     computePoints(bits, det, p, q, pa, pb);
     if(numIterations > 1000)
@@ -439,7 +439,7 @@ __HOSTDEVICE__ T computeClosestPoints_GJK_JH(const Convex<T>&     a,
     // Initializing vectors
     Vector3<T> v(a2w.getOrigin() - b2w.getOrigin());
     Vector3<T> w;
-    T          dist = v.norm();
+    T          dist = norm(v);
 
     while(bits < 15 && dist > HIGHEPS<T> && numIterations < 1000)
     {
@@ -470,7 +470,7 @@ __HOSTDEVICE__ T computeClosestPoints_GJK_JH(const Convex<T>&     a,
         ++numIterations;
         if(!closest(bits, last, last_bit, all_bits, y, dp, det, v))
             break;
-        dist = v.norm();
+        dist = norm(v);
     }
     computePoints(bits, det, p, q, pa, pb);
     if(numIterations > 1000)

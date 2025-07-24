@@ -72,7 +72,8 @@ template <typename T>
 __HOST__ void RigidBodyFactory<T>::create(
     DOMNode*                                       root,
     GrainsMemBuffer<RigidBody<T>*, MemType::HOST>& refRB,
-    GrainsMemBuffer<Transform3<T>, MemType::HOST>& initTransform,
+    GrainsMemBuffer<Vector3<T>, MemType::HOST>&    initPositions,
+    GrainsMemBuffer<Quaternion<T>, MemType::HOST>& initOrientations,
     GrainsMemBuffer<uint, MemType::HOST>&          numEachRefParticle,
     uint&                                          numParticles)
 {
@@ -91,7 +92,29 @@ __HOST__ void RigidBodyFactory<T>::create(
             ReaderXML::getNodeAttr_Int(nParticle, "Number"));
         refRB[i]            = new RigidBody<T>(nParticle);
         DOMNode* nTransform = ReaderXML::getNode(nParticle, "Transformation");
-        initTransform[i]    = Transform3<T>(nTransform);
+        if(nTransform)
+        {
+            DOMNode* nCentre = ReaderXML::getNode(nParticle, "Centre");
+            if(nCentre)
+                Vector3<T> centre(nCentre);
+            else
+                Vector3<T> centre(T(0), T(0), T(0));
+
+            DOMNode* nRotation
+                = ReaderXML::getNode(nParticle, "AngularPosition");
+            if(nRotation)
+                Quaternion<T> rotation(nRotation);
+            else
+                Quaternion<T> rotation(T(0), T(0), T(0), T(1));
+
+            initPositions[i]    = centre;
+            initOrientations[i] = rotation;
+        }
+        else
+        {
+            initPositions[i]    = Vector3<T>(T(0), T(0), T(0));
+            initOrientations[i] = Quaternion<T>(T(0), T(0), T(0), T(1));
+        }
         numParticles += numEachRefParticle[i];
     }
 }

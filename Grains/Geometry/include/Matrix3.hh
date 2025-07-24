@@ -25,14 +25,13 @@ public:
     /** @brief Default constructor. Matrix is initialized to the identity
         matrix */
     __HOSTDEVICE__
-    Matrix3();
+    Matrix3() noexcept;
 
     /** @brief Constructor with a 1D array of values as input
         @param buffer the 1D array of values containing the matrix components 
-        ordered as 0=Mxx, 1=Mxy, 2=Mxz, 3=Myx, 4=Myy, 5=Myz, 6=Mzx, 7=Mzy, 8=Mzz 
-        */
+        ordered 0=Mxx, 1=Mxy, 2=Mxz, 3=Myx, 4=Myy, 5=Myz, 6=Mzx, 7=Mzy, 8=Mzz */
     __HOSTDEVICE__
-    Matrix3(T const* buffer);
+    Matrix3(T const* buffer) noexcept;
 
     /** @brief Constructor with 9 components as inputs
         @param xx (1,1) coefficient
@@ -45,12 +44,32 @@ public:
         @param zy (3,2) coefficient
         @param zz (3,3) coefficient */
     __HOSTDEVICE__
-    Matrix3(T xx, T xy, T xz, T yx, T yy, T yz, T zx, T zy, T zz);
+    Matrix3(T xx, T xy, T xz, T yx, T yy, T yz, T zx, T zy, T zz) noexcept;
 
     /** @brief Copy constructor
         @param mat the copied matrix */
     __HOSTDEVICE__
-    Matrix3(const Matrix3<T>& mat);
+    Matrix3(const Matrix3<T>& mat) noexcept;
+
+    /** @brief Assign operator to another matrix
+        @param mat rhs Matrix3 object */
+    __HOSTDEVICE__
+    Matrix3<T>& operator=(const Matrix3<T>& mat) noexcept;
+
+    /** @brief Move constructor
+        @param mat the moved matrix */
+    __HOSTDEVICE__
+    Matrix3(Matrix3<T>&& mat) noexcept;
+
+    /** @brief Move assignment operator
+        @param mat rhs Matrix3 object */
+    __HOSTDEVICE__
+    Matrix3<T>& operator=(Matrix3<T>&& mat) noexcept;
+
+    /** @brief Constructor with an XML node
+        @param root XML node */
+    __HOST__
+    Matrix3(DOMNode* root) noexcept;
 
     /** @brief Destructor */
     __HOSTDEVICE__
@@ -86,66 +105,13 @@ public:
     void setValue(T xx, T xy, T xz, T yx, T yy, T yz, T zx, T zy, T zz);
     //@}
 
-    /** @name Methods */
+    /** @name Operators */
     //@{
-    /** @brief Returns a matrix with positive components */
-    __HOSTDEVICE__
-    Matrix3<T> absolute() const;
-
-    /** @brief Returns the determinant of the matrix */
-    __HOSTDEVICE__
-    T determinant() const;
-
-    /** @brief Returns the inverse of the matrix */
-    __HOSTDEVICE__
-    Matrix3<T> inverse() const;
-
-    /** @brief Returns the transposed matrix */
-    __HOSTDEVICE__
-    Matrix3<T> transpose() const;
-
-    /** @brief Scales the matrix by a vector
-        @param v Vector3 object */
-    __HOSTDEVICE__
-    void scale(const Vector3<T>& v);
-    //@}
-
-    /**@name Operators */
-    //@{
-    /** @brief Operator +=
-        @param mat 2nd Matrix3 object */
-    __HOSTDEVICE__
-    Matrix3<T>& operator+=(const Matrix3<T>& mat);
-
-    /** @brief Operator -=
-        @param mat 2nd Matrix3 object */
-    __HOSTDEVICE__
-    Matrix3<T>& operator-=(const Matrix3<T>& mat);
-
-    /** @brief Unitary operator *= by a scalar
-        @param d multiplication factor */
-    __HOSTDEVICE__
-    Matrix3<T>& operator*=(T d);
-
-    /** @brief Operator *= by a matrix
-        @param mat 2nd Matrix3 object */
-    __HOSTDEVICE__
-    Matrix3<T>& operator*=(const Matrix3<T>& mat);
-
     /** @brief i-th row accessor
         @param i row number */
     __HOSTDEVICE__
     Vector3<T>& operator[](uint i) const;
-
-    /** @brief Assign operator to another matrix
-        @param mat rhs Matrix3 object */
-    __HOSTDEVICE__
-    Matrix3<T>& operator=(const Matrix3<T>& mat);
-
-    /** @brief Unitary operator -. Returns an object with negative 
-        components */
-    __HOSTDEVICE__
-    Matrix3<T>& operator-();
+    //@}
 };
 
 /** @name External Methods - I/O methods */
@@ -162,8 +128,5 @@ __HOST__ std::istream& operator>>(std::istream& fileIn, Matrix3<T>& m);
 template <typename T>
 __HOST__ std::ostream& operator<<(std::ostream& fileOut, const Matrix3<T>& m);
 //@}
-
-typedef Matrix3<float>  Mat3F;
-typedef Matrix3<double> Mat3D;
 
 #endif

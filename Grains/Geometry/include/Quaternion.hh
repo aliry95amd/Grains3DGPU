@@ -16,7 +16,7 @@
     @author A.Yazdani - 2024 - Major modification */
 // =============================================================================
 template <typename T>
-class Quaternion
+class alignas(16) Quaternion
 {
 protected:
     /**@name Parameters */
@@ -30,55 +30,84 @@ public:
     //@{
     /** @brief Default constructor */
     __HOSTDEVICE__
-    Quaternion();
+    Quaternion() noexcept;
 
     /** @brief Constructor with 2 scalar as input parameters q and d.
 		Quaternion is initialized as [ d, (q,q,q) ]
-		@param q value of all 3 components of the vector
-		@param d value of the scalar */
+        @param q value of all 3 components of the vector
+        @param w value of the scalar */
     __HOSTDEVICE__
-    Quaternion(T q, T d = T(0));
+    Quaternion(T q, T w = T(0)) noexcept;
 
     /** @brief Constructor with a Vector3 vec and a scalar d. Quaternion is
 		initialized as [ d, vec ]
 		@param vec the Vector3 vector
-		@param d value of the scalar */
+		@param w value of the scalar */
     __HOSTDEVICE__
-    Quaternion(const Vector3<T>& vec, T d = T(0));
+    Quaternion(const Vector3<T>& vec, T w = T(0)) noexcept;
 
     /** @brief Constructor with a vector given by its 3 components (x,y,z) 
 		and a scalar d. Quaternion is initialized as [ d, (x,y,z) ]
 		@param x x-component of the vector
 		@param y y-component of the vector
 		@param z z-component of the vector
-		@param d value of the scalar */
+		@param w value of the scalar */
     __HOSTDEVICE__
-    Quaternion(T x, T y, T z, T d);
+    Quaternion(T x, T y, T z, T w) noexcept;
+
+    /** @brief Constructor with a buffer
+        @param buffer buffer */
+    __HOSTDEVICE__
+    Quaternion(const T* buffer) noexcept;
 
     /** @brief Constructor with a rotation matrix 		
 		@param rot rotation matrix */
     __HOSTDEVICE__
-    Quaternion(const Matrix3<T>& rot);
+    Quaternion(const Matrix3<T>& rot) noexcept;
 
     /** @brief Copy constructor
 		@param q copied Quaternion object */
     __HOSTDEVICE__
-    Quaternion(const Quaternion<T>& q);
+    Quaternion(const Quaternion<T>& q) noexcept;
+
+    /** @brief Assign operator to another Quaternion object
+        @param q rhs Quaternion object */
+    __HOSTDEVICE__
+    Quaternion<T>& operator=(const Quaternion<T>& q) noexcept;
+
+    /** @brief Move constructor
+        @param q moved Quaternion object */
+    __HOSTDEVICE__
+    Quaternion(Quaternion<T>&& q) noexcept;
+
+    /** @brief Move assignment operator
+        @param q moved Quaternion object */
+    __HOSTDEVICE__
+    Quaternion<T>& operator=(Quaternion<T>&& q) noexcept;
+
+    /** @brief Constructor from an XML node
+        @param root XML node */
+    __HOST__
+    Quaternion(DOMNode* root) noexcept;
 
     /** @brief Destructor */
     __HOSTDEVICE__
-    ~Quaternion();
+    ~Quaternion() noexcept;
     //@}
 
     /**@name Get methods */
     //@{
+    /** @brief Returns the pointer to the buffer */
+    __HOSTDEVICE__
+    const T* getBuffer() const noexcept;
+
     /** @brief Returns the vectorial part of the quaternion */
     __HOSTDEVICE__
-    const Vector3<T>& getVector() const;
+    const Vector3<T>& getVector() const noexcept;
 
     /** @brief Returns the value of the scalar part of the quaternion */
     __HOSTDEVICE__
-    const T getScalar() const;
+    const T& getScalar() const noexcept;
     //@}
 
     /**@name Set methods */
@@ -86,110 +115,55 @@ public:
     /** @brief Sets the vectorial part of the quaternion
 		@param vec the Vector3 vector */
     __HOSTDEVICE__
-    void setVector(const Vector3<T>& vec);
+    void setVector(const Vector3<T>& vec) noexcept;
 
     /** @brief Sets the scalar part of the quaternion
-		@param d value of the scalar */
+		@param w value of the scalar */
     __HOSTDEVICE__
-    void setScalar(T d);
+    void setScalar(T w) noexcept;
 
     /** @brief Sets the quaternion with a Vector3 vector vec and a scalar d.
 		Quaternion is set to [ d, vec ]
 		@param vec the Vector3 vector
-		@param d value of the scalar */
+		@param w value of the scalar */
     __HOSTDEVICE__
-    void setQuaternion(const Vector3<T>& vec, T d);
+    void setQuaternion(const Vector3<T>& vec, T w) noexcept;
 
     /** @brief Sets the quaternion with a vector given by its 3 components
 		(x,y,z) and a scalar d. Quaternion is set to [ d, (x,y,z) ]
 		@param x x-component of the vector
 		@param y y-component of the vector
 		@param z z-component of the vector
-		@param d value of the scalar */
+		@param w value of the scalar */
     __HOSTDEVICE__
-    void setQuaternion(T x, T y, T z, T d);
+    void setQuaternion(T x, T y, T z, T w) noexcept;
 
     /** @brief Sets the quaternion with a rotation matrix
 		@param rot rotation matrix */
     __HOSTDEVICE__
-    void setQuaternion(const Matrix3<T>& rot);
+    void setQuaternion(const Matrix3<T>& rot) noexcept;
 
     /** @brief Builds a unit quaternion representing the rotation, from
 		u to v. The input vectors need not to be normalised.
 		@param u First vector
 		@param v Second vector */
     __HOSTDEVICE__
-    void setRotFromTwoVectors(const Vector3<T>& u, const Vector3<T>& v);
+    void setRotFromTwoVectors(const Vector3<T>& u,
+                              const Vector3<T>& v) noexcept;
     //@}
 
     /**@name Methods */
     //@{
-    /** @brief Returns the norm of the quaternion
-		@param q the quaternion */
-    __HOSTDEVICE__
-    T norm() const;
-
-    /** @brief Returns the norm square of the quaternion
-		@param q the quaternion */
-    __HOSTDEVICE__
-    T norm2() const;
-
-    /** @brief Returns the conjugate of the quaternion */
-    __HOSTDEVICE__
-    Quaternion<T> conjugate() const;
-
-    /** @brief Returns the inverse of the quaternion */
-    __HOSTDEVICE__
-    Quaternion<T> inverse() const;
-
-    /** @brief Multiplies the quaternion on the left by a vector lhs, i.e.,
-		performs [ 0, lhs ] x this and return the product that is a quaternion
-		@param lhs the left hand side vector */
-    __HOSTDEVICE__
-    Quaternion<T> multLeftVec(const Vector3<T>& lhs) const;
-
     /** @brief Multiplies the quaternion on the right by another quaternion 
 		rhs, i.e., performs this x rhs, and return the vectorial part of 
 		this x rhs
 		@param q the other quaternion */
     __HOSTDEVICE__
     Vector3<T> multToVector3(const Quaternion<T>& q) const;
-
-    /** @brief Multiplies the quaternion on the right by the conjugate of
-		another quaternion rhs, i.e., perform this x rhs^t, and return the
-		vectorial part of this x rhs^t
-		@param q the other quaternion */
-    __HOSTDEVICE__
-    Vector3<T> multConjugateToVector3(const Quaternion<T>& q) const;
-
-    /** @brief Rotates a vector using the quaternion *this
-		@param v The vector to be rotated */
-    __HOSTDEVICE__
-    Vector3<T> rotateVector(const Vector3<T>& v) const;
     //@}
 
     /**@name Operators */
     //@{
-    /** @brief Operator +=
-		@param q the other quaternion */
-    __HOSTDEVICE__
-    Quaternion<T>& operator+=(const Quaternion<T>& q);
-
-    /** @brief Operator -=
-		@param q the other quaternion */
-    __HOSTDEVICE__
-    Quaternion<T>& operator-=(const Quaternion<T>& q);
-
-    /** @brief Unitary operator *= by a scalar
-		@param d multiplication factor */
-    __HOSTDEVICE__
-    Quaternion<T>& operator*=(T d);
-
-    /** @brief Operator *=
-		@param q the other quaternion */
-    __HOSTDEVICE__
-    Quaternion<T>& operator*=(const Quaternion<T>& q);
-
     /** @brief ith component accessor
         @param i component index */
     __HOSTDEVICE__
@@ -200,26 +174,6 @@ public:
 		@param i index */
     __HOSTDEVICE__
     T& operator[](size_t i);
-
-    /** @brief Assign operator to another Quaternion object
-		@param q the other Quaternion object */
-    __HOSTDEVICE__
-    Quaternion<T>& operator=(const Quaternion<T>& q);
-
-    /** @brief Unitary operator -. Return a quaternion with negative 
-		elements */
-    __HOSTDEVICE__
-    Quaternion<T> operator-();
-
-    /** @brief Comparison operator
-		@param q the other quaternion */
-    __HOSTDEVICE__
-    bool operator==(const Quaternion<T>& q);
-
-    /** @brief Difference operator
-		@param q the other quaternion */
-    __HOSTDEVICE__
-    bool operator!=(const Quaternion<T>& q);
     //@}
 };
 
@@ -237,8 +191,5 @@ std::istream& operator>>(std::istream& fileIn, Quaternion<T>& q);
 template <typename T>
 std::ostream& operator<<(std::ostream& fileOut, const Quaternion<T>& q);
 //@}
-
-typedef Quaternion<float>  QuaternionF;
-typedef Quaternion<double> QuaternionD;
 
 #endif
