@@ -18,9 +18,17 @@ void writeObstacles_Paraview(const GrainsMemBuffer<RigidBody<T>*>& obstacleRB,
         throw std::runtime_error("Cannot open file for writing: "
                                  + obsFileName);
     }
-    const uint numObstacles                   = cm->getNumberOfObstacles();
-    const GrainsMemBuffer<Transform3<T>>& tr  = cm->getObstaclesTransform();
+    const uint numObstacles                        = cm->getNumberOfObstacles();
+    const GrainsMemBuffer<Vector3<T>>&    position = cm->getObstaclesPosition();
+    const GrainsMemBuffer<Quaternion<T>>& quaternion
+        = cm->getObstaclesQuaternion();
     const GrainsMemBuffer<Kinematics<T>>& kin = cm->getObstaclesVelocity();
+    GrainsMemBuffer<Transform3<T>>&       tr;
+    for(uint i = 0; i < numObstacles; ++i)
+    {
+        // Create a transformation for each obstacle
+        tr.push_back(Transform3<T>(quaternion[i], position[i]));
+    }
 
     f << "<VTKFile type=\"UnstructuredGrid\" version=\"0.1\" "
       << "byte_order=\"LittleEndian\" ";
@@ -113,9 +121,17 @@ void writeParticles_Paraview(const GrainsMemBuffer<RigidBody<T>*>& particleRB,
         throw std::runtime_error("Cannot open file for writing: "
                                  + parFileName);
     }
-    const uint numParticles                   = cm->getNumberOfParticles();
-    const GrainsMemBuffer<Transform3<T>>& tr  = cm->getTransform();
+    const uint numParticles                        = cm->getNumberOfParticles();
+    const GrainsMemBuffer<Vector3<T>>&    position = cm->getParticlesPosition();
+    const GrainsMemBuffer<Quaternion<T>>& quaternion
+        = cm->getParticlesQuaternion();
     const GrainsMemBuffer<Kinematics<T>>& kin = cm->getVelocity();
+    GrainsMemBuffer<Transform3<T>>&       tr;
+    for(uint i = 0; i < numParticles; ++i)
+    {
+        // Create a transformation for each particle
+        tr.push_back(Transform3<T>(quaternion[i], position[i]));
+    }
 
     f << "<VTKFile type=\"UnstructuredGrid\" version=\"0.1\" "
       << "byte_order=\"LittleEndian\" ";

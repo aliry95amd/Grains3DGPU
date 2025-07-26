@@ -56,14 +56,14 @@ public:
     /** @name Methods */
     //@{
     // -------------------------------------------------------------------------
-    /** @brief Updates the neighbor list 
-    @param transforms memory buffer of transformations */
-    void updateNeighborList(GrainsMemBuffer<Transform3<T>, M>& transforms) final
+    /** @brief Updates the neighbor list
+    @param positions memory buffer of positions */
+    void updateNeighborList(GrainsMemBuffer<Vector3<T>, M>& positions) final
     {
         if(!m_needsUpdate)
             return;
 
-        uint nParticles = transforms.getSize();
+        uint nParticles = positions.getSize();
 
         if constexpr(M == MemType::HOST || M == MemType::PINNED)
         {
@@ -73,7 +73,7 @@ public:
         else if constexpr(M == MemType::DEVICE || M == MemType::MANAGED)
         {
             uint numBlocks, numThreads;
-            computeOptimalThreadsAndBlocks(m_pairList.getSize(),
+            computeOptimalThreadsAndBlocks(positions.getSize(),
                                            GrainsParameters<T>::m_GPU,
                                            numBlocks,
                                            numThreads);

@@ -89,9 +89,9 @@ public:
     /** @name Methods */
     //@{
     // -------------------------------------------------------------------------
-    /** @brief Updates the neighbor list 
-        @param transforms array of transformations */
-    void updateNeighborList(GrainsMemBuffer<Transform3<T>, M>& transforms) final
+    /** @brief Updates the neighbor list
+        @param positions array of positions */
+    void updateNeighborList(GrainsMemBuffer<Vector3<T>, M>& positions) final
     {
         if(!m_needsUpdate)
             return;
@@ -99,7 +99,7 @@ public:
         if constexpr(M == MemType::HOST)
         {
             auto* LC_host = static_cast<LinkedCell_Host<T>*>(m_LinkedCell);
-            LC_host->updateLinkedCells(transforms);
+            LC_host->updateLinkedCells(positions);
             updateNeighborList_LC_Host(LC_host->getCellParticles(),
                                        LC_host->getCellNeighborsList(),
                                        m_pairList.getData(),
@@ -111,9 +111,9 @@ public:
         {
             auto* LC_device
                 = static_cast<LinkedCell_SortBased<T>*>(m_LinkedCell);
-            LC_device->updateLinkedCells(transforms);
+            LC_device->updateLinkedCells(positions);
             uint numBlocks, numThreads;
-            computeOptimalThreadsAndBlocks(transforms.getSize(),
+            computeOptimalThreadsAndBlocks(positions.getSize(),
                                            GrainsParameters<T>::m_GPU,
                                            numBlocks,
                                            numThreads);
@@ -122,7 +122,7 @@ public:
                 LC_device->getParticleHashes(),
                 LC_device->getCellNeighborsList(),
                 LC_device->getCellStartIDs(),
-                transforms.getSize(),
+                positions.getSize(),
                 LC_device->getNumCells(),
                 m_pairList.getData(),
                 m_pairCount.getData());

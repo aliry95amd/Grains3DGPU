@@ -29,6 +29,16 @@ __HOSTDEVICE__ Transform3<T>::Transform3(T const* buffer)
 }
 
 // -----------------------------------------------------------------------------
+// Constructor with a quaternion and position
+template <typename T>
+__HOSTDEVICE__ Transform3<T>::Transform3(const Quaternion<T>& q,
+                                         const Vector3<T>&    p)
+{
+    m_basis  = q.toMatrix();
+    m_origin = p;
+}
+
+// -----------------------------------------------------------------------------
 // Constructor with a two transformations such that 'this = b2w o inv(a2w) = b2a'
 template <typename T>
 __HOSTDEVICE__ Transform3<T>::Transform3(const Transform3<T>& a2w,
@@ -36,6 +46,15 @@ __HOSTDEVICE__ Transform3<T>::Transform3(const Transform3<T>& a2w,
     : Transform3<T>(b2w)
 {
     this->relativeToTransform(a2w);
+}
+
+// -----------------------------------------------------------------------------
+// Copy constructor
+template <typename T>
+__HOSTDEVICE__ Transform3<T>::Transform3(const Transform3<T>& t)
+{
+    m_basis  = t.m_basis;
+    m_origin = t.m_origin;
 }
 
 // -----------------------------------------------------------------------------
@@ -93,19 +112,18 @@ __HOST__ Transform3<T>::Transform3(DOMNode* root)
 }
 
 // -----------------------------------------------------------------------------
-// Copy constructor
-template <typename T>
-__HOSTDEVICE__ Transform3<T>::Transform3(const Transform3<T>& t)
-{
-    m_basis  = t.m_basis;
-    m_origin = t.m_origin;
-}
-
-// -----------------------------------------------------------------------------
 // Destructor
 template <typename T>
 __HOSTDEVICE__ Transform3<T>::~Transform3()
 {
+}
+
+// -----------------------------------------------------------------------------
+// Gets the rotation of the transformation as a quaternion
+template <typename T>
+__HOSTDEVICE__ Quaternion<T> Transform3<T>::getRotation() const
+{
+    return (Quaternion<T>(m_basis));
 }
 
 // -----------------------------------------------------------------------------

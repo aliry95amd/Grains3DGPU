@@ -38,21 +38,23 @@ protected:
 
     /** \brief Particles rigid body Id */
     GrainsMemBuffer<uint, M> m_rigidBodyId;
-    /** \brief Particles transformation */
-    GrainsMemBuffer<Transform3<T>, M> m_transform;
+    /** \brief Particles position */
+    GrainsMemBuffer<Vector3<T>, M> m_position;
+    /** \brief Particles quaternion */
+    GrainsMemBuffer<Quaternion<T>, M> m_quaternion;
     /** \brief Particles velocities */
     GrainsMemBuffer<Kinematics<T>, M> m_velocity;
     /** \brief Particles torce */
     GrainsMemBuffer<Torce<T>, M> m_torce;
-    /** \brief Particles quaternion */
-    GrainsMemBuffer<Quaternion<T>, M> m_quaternion;
     /** \brief Particles Id */
     GrainsMemBuffer<uint, M> m_particleId;
 
     /** \brief Obstacles rigid body Id */
     GrainsMemBuffer<uint, M> m_obstacleRigidBodyId;
-    /** \brief Obstacles transformation */
-    GrainsMemBuffer<Transform3<T>, M> m_obstacleTransform;
+    /** \brief Obstacles position */
+    GrainsMemBuffer<Vector3<T>, M> m_obstaclePosition;
+    /** \brief Particles quaternion */
+    GrainsMemBuffer<Quaternion<T>, M> m_obstacleQuaternion;
     /** \brief Obstacles velocities */
     GrainsMemBuffer<Kinematics<T>, M> m_obstacleVelocity;
 
@@ -63,8 +65,10 @@ protected:
 
     /** \brief Neighbor list object */
     NeighborList<T, M>* m_neighborList;
-    /** \brief Relative transformation */
-    GrainsMemBuffer<Transform3<T>, M> m_relTransform;
+    /** \brief Relative position */
+    GrainsMemBuffer<Vector3<T>, M> m_relPosition;
+    /** \brief Relative quaternion */
+    GrainsMemBuffer<Quaternion<T>, M> m_relQuaternion;
     /** \brief Contact information */
     GrainsMemBuffer<ContactInfo<T>, M> m_contactInfo;
     // /** \brief Rigid bodies bounding volume */
@@ -91,13 +95,14 @@ public:
         : m_particleRB(particleRB)
         , m_obstacleRB(obstacleRB)
         , m_rigidBodyId(nParticles)
-        , m_transform(nParticles)
+        , m_position(nParticles)
+        , m_quaternion(nParticles)
         , m_velocity(nParticles)
         , m_torce(nParticles)
-        , m_quaternion(nParticles)
         , m_particleId(nParticles)
         , m_obstacleRigidBodyId(nObstacles)
-        , m_obstacleTransform(nObstacles)
+        , m_obstaclePosition(nObstacles)
+        , m_obstacleQuaternion(nObstacles)
         , m_obstacleVelocity(nObstacles)
         , m_nParticles(nParticles)
         , m_nObstacles(nObstacles)
@@ -107,8 +112,10 @@ public:
         // Initialize with maximum possible pairs for dynamic sizing
         // TODO: Make this dynamic
         uint maxPairs = m_nParticles * (m_nParticles - 1) / 2;
-        m_relTransform.allocate(maxPairs);
-        m_relTransform.fill();
+        m_relPosition.allocate(maxPairs);
+        m_relPosition.fill();
+        m_relQuaternion.allocate(maxPairs);
+        m_relQuaternion.fill();
         m_contactInfo.allocate(maxPairs);
         m_contactInfo.fill();
     }
@@ -134,12 +141,21 @@ public:
     }
 
     // -------------------------------------------------------------------------
-    /** @brief Gets particles transformations
+    /** @brief Gets particles positions
         @param buffer host buffer to copy data to */
     template <MemType destM>
-    void getTransform(GrainsMemBuffer<Transform3<T>, destM>& buffer) const
+    void getPosition(GrainsMemBuffer<Vector3<T>, destM>& buffer) const
     {
-        m_transform.copyTo(buffer);
+        m_position.copyTo(buffer);
+    }
+
+    // -------------------------------------------------------------------------
+    /** @brief Gets particles quaternions
+        @param buffer host buffer to copy data to */
+    template <MemType destM>
+    void getQuaternion(GrainsMemBuffer<Quaternion<T>, destM>& buffer) const
+    {
+        m_quaternion.copyTo(buffer);
     }
 
     // -------------------------------------------------------------------------
@@ -170,15 +186,6 @@ public:
     }
 
     // -------------------------------------------------------------------------
-    /** @brief Gets particles quaternions
-        @param buffer host buffer to copy data to */
-    template <MemType destM>
-    void getQuaternion(GrainsMemBuffer<Quaternion<T>, destM>& buffer) const
-    {
-        m_quaternion.copyTo(buffer);
-    }
-
-    // -------------------------------------------------------------------------
     /** @brief Gets obstacles rigid body Ids
         @param buffer host buffer to copy data to */
     template <MemType destM>
@@ -188,13 +195,22 @@ public:
     }
 
     // -------------------------------------------------------------------------
-    /** @brief Gets obstacles transformation
+    /** @brief Gets obstacles positions
         @param buffer host buffer to copy data to */
     template <MemType destM>
-    void getObstaclesTransform(
-        GrainsMemBuffer<Transform3<T>, destM>& buffer) const
+    void getObstaclesPosition(GrainsMemBuffer<Vector3<T>, destM>& buffer) const
     {
-        m_obstacleTransform.copyTo(buffer);
+        m_obstaclePosition.copyTo(buffer);
+    }
+
+    // -------------------------------------------------------------------------
+    /** @brief Gets obstacles quaternions
+        @param buffer host buffer to copy data to */
+    template <MemType destM>
+    void getObstaclesQuaternion(
+        GrainsMemBuffer<Quaternion<T>, destM>& buffer) const
+    {
+        m_obstacleQuaternion.copyTo(buffer);
     }
 
     // -------------------------------------------------------------------------
@@ -208,13 +224,22 @@ public:
     }
 
     // -------------------------------------------------------------------------
-    /** @brief Gets relative transformations
-     @param buffer host buffer to copy data to */
+    /** @brief Gets relative position
+        @param buffer host buffer to copy data to */
     template <MemType destM>
-    void getRelativeTransform(
-        GrainsMemBuffer<Transform3<T>, destM>& buffer) const
+    void getRelativePosition(GrainsMemBuffer<Vector3<T>, destM>& buffer) const
     {
-        m_relTransform.copyTo(buffer);
+        m_relPosition.copyTo(buffer);
+    }
+
+    // -------------------------------------------------------------------------
+    /** @brief Gets relative quaternion
+        @param buffer host buffer to copy data to */
+    template <MemType destM>
+    void getRelativeQuaternion(
+        GrainsMemBuffer<Quaternion<T>, destM>& buffer) const
+    {
+        m_relQuaternion.copyTo(buffer);
     }
 
     // -------------------------------------------------------------------------
@@ -236,12 +261,21 @@ public:
     }
 
     // -------------------------------------------------------------------------
-    /** @brief Gets particles transformations */
-    const GrainsMemBuffer<Transform3<T>, MemType::HOST>& getTransform() const
+    /** @brief Gets particles positions */
+    const GrainsMemBuffer<Vector3<T>, MemType::HOST>& getPosition() const
     {
         static_assert(M == MemType::HOST,
-                      "getTransform() only available for HOST memory");
-        return m_transform;
+                      "getPosition() only available for HOST memory");
+        return m_position;
+    }
+
+    // -------------------------------------------------------------------------
+    /** @brief Gets particles quaternions */
+    const GrainsMemBuffer<Quaternion<T>, MemType::HOST>& getQuaternion() const
+    {
+        static_assert(M == MemType::HOST,
+                      "getQuaternion() only available for HOST memory");
+        return m_quaternion;
     }
 
     // -------------------------------------------------------------------------
@@ -260,15 +294,6 @@ public:
         static_assert(M == MemType::HOST,
                       "getTorce() only available for HOST memory");
         return m_torce;
-    }
-
-    // -------------------------------------------------------------------------
-    /** @brief Gets particles quaternions */
-    const GrainsMemBuffer<Quaternion<T>, MemType::HOST>& getQuaternion() const
-    {
-        static_assert(M == MemType::HOST,
-                      "getQuaternion() only available for HOST memory");
-        return m_quaternion;
     }
 
     // -------------------------------------------------------------------------
@@ -291,13 +316,24 @@ public:
     }
 
     // -------------------------------------------------------------------------
-    /** @brief Gets obstacles transformation */
-    const GrainsMemBuffer<Transform3<T>, MemType::HOST>&
-        getObstaclesTransform() const
+    /** @brief Gets obstacles positions */
+    const GrainsMemBuffer<Vector3<T>, MemType::HOST>&
+        getObstaclesPosition() const
     {
         static_assert(M == MemType::HOST,
-                      "getObstaclesTransform() only available for HOST memory");
-        return m_obstacleTransform;
+                      "getObstaclesPosition() only available for HOST memory");
+        return m_obstaclePosition;
+    }
+
+    // -------------------------------------------------------------------------
+    /** @brief Gets obstacles quaternions */
+    const GrainsMemBuffer<Quaternion<T>, MemType::HOST>&
+        getObstaclesQuaternion() const
+    {
+        static_assert(
+            M == MemType::HOST,
+            "getObstaclesQuaternion() only available for HOST memory");
+        return m_obstacleQuaternion;
     }
 
     // -------------------------------------------------------------------------
@@ -337,12 +373,21 @@ public:
     }
 
     // -------------------------------------------------------------------------
-    /** @brief Sets particles transformations
-        @param t host buffer containing the transformations */
+    /** @brief Sets particles positions
+        @param p host buffer containing the positions */
     template <MemType srcM>
-    void setTransform(const GrainsMemBuffer<Transform3<T>, srcM>& t)
+    void setPosition(const GrainsMemBuffer<Vector3<T>, srcM>& p)
     {
-        m_transform.copyFrom(t);
+        m_position.copyFrom(p);
+    }
+
+    // -------------------------------------------------------------------------
+    /** @brief Sets particles quaternions
+        @param q host buffer containing the quaternions */
+    template <MemType srcM>
+    void setQuaternion(const GrainsMemBuffer<Quaternion<T>, srcM>& q)
+    {
+        m_quaternion.copyFrom(q);
     }
 
     // -------------------------------------------------------------------------
@@ -364,15 +409,6 @@ public:
     }
 
     // -------------------------------------------------------------------------
-    /** @brief Sets particles torces
-        @param t host buffer containing the torces */
-    template <MemType srcM>
-    void setQuaternion(const GrainsMemBuffer<Quaternion<T>, srcM>& t)
-    {
-        m_quaternion.copyFrom(t);
-    }
-
-    // -------------------------------------------------------------------------
     /** @brief Sets the array of particles Ids
         @param id host buffer containing the particles Ids */
     template <MemType srcM>
@@ -391,12 +427,21 @@ public:
     }
 
     // -------------------------------------------------------------------------
-    /** @brief Sets obstacles transformations
-        @param t host buffer containing the transformations */
+    /** @brief Sets obstacles positions
+        @param p host buffer containing the positions */
     template <MemType srcM>
-    void setObstaclesTransform(const GrainsMemBuffer<Transform3<T>, srcM>& t)
+    void setObstaclesPosition(const GrainsMemBuffer<Vector3<T>, srcM>& p)
     {
-        m_obstacleTransform.copyFrom(t);
+        m_obstaclePosition.copyFrom(p);
+    }
+
+    // -------------------------------------------------------------------------
+    /** @brief Sets obstacles quaternions
+        @param q host buffer containing the quaternions */
+    template <MemType srcM>
+    void setObstaclesQuaternion(const GrainsMemBuffer<Quaternion<T>, srcM>& q)
+    {
+        m_obstacleQuaternion.copyFrom(q);
     }
 
     // -------------------------------------------------------------------------
@@ -409,13 +454,13 @@ public:
     }
 
     // -------------------------------------------------------------------------
-    /** @brief Sets the relative transformations
-        @param relTransform host buffer containing the rel transformations */
+    /** @brief Sets the relative position
+        @param relPosition host buffer containing the relative positions */
     template <MemType srcM>
-    void setRelativeTransform(
-        const GrainsMemBuffer<Transform3<T>, srcM>& relTransform)
+    void setRelativePosition(
+        const GrainsMemBuffer<Vector3<T>, srcM>& relPosition)
     {
-        m_relTransform.copyFrom(relTransform);
+        m_relPosition.copyFrom(relPosition);
     }
 
     // -------------------------------------------------------------------------
@@ -436,7 +481,8 @@ public:
     void resizePairBuffers()
     {
         uint pairCount = m_neighborList->getSize();
-        m_relTransform.setSize(pairCount);
+        m_relPosition.setSize(pairCount);
+        m_relQuaternion.setSize(pairCount);
         m_contactInfo.setSize(pairCount);
     }
 
@@ -448,17 +494,19 @@ public:
     {
         // Particles
         other->setRigidBodyId(m_rigidBodyId);
-        other->setTransform(m_transform);
+        other->setPosition(m_position);
+        other->setQuaternion(m_quaternion);
         other->setVelocity(m_velocity);
         other->setTorce(m_torce);
-        other->setQuaternion(m_quaternion);
         other->setParticleId(m_particleId);
         // Obstacles
         other->setObstaclesRigidBodyId(m_obstacleRigidBodyId);
-        other->setObstaclesTransform(m_obstacleTransform);
+        other->setObstaclesPosition(m_obstaclePosition);
+        other->setObstaclesQuaternion(m_obstacleQuaternion);
         other->setObstaclesVelocity(m_obstacleVelocity);
         // Neighbor list
-        other->setRelativeTransform(m_relTransform);
+        other->setRelativePosition(m_relPosition);
+        other->setRelativeQuaternion(m_relQuaternion);
         other->setContactInfo(m_contactInfo);
     }
 
@@ -471,14 +519,20 @@ public:
         // RigidBodyId
         other->setRigidBodyId(m_rigidBodyId);
 
-        // Transform
-        other->setTransform(m_transform);
+        // Position
+        other->setPosition(m_position);
+
+        // Quaternion
+        other->setQuaternion(m_quaternion);
 
         // Velocity
         other->setVelocity(m_velocity);
 
-        // Obstacle Transform
-        other->setObstaclesTransform(m_obstacleTransform);
+        // Obstacle Position
+        other->setObstaclesPosition(m_obstaclePosition);
+
+        // Obstacle Quaternion
+        other->setObstaclesQuaternion(m_obstacleQuaternion);
 
         // Obstacle Velocity
         other->setObstaclesVelocity(m_obstacleVelocity);
@@ -489,12 +543,12 @@ public:
     //@{
     // -------------------------------------------------------------------------
     /** @brief Initializes transformations for particles in the simulation
-        @param initPos initial position of particles
-        @param initOrient initial orientation of particles */
+        @param initPosition initial position of particles
+        @param initOrientation initial orientation of particles */
     template <MemType srcM>
     void initializeParticles(
-        const GrainsMemBuffer<Vector3<T>, srcM>&    initPos,
-        const GrainsMemBuffer<Quaternion<T>, srcM>& initOrient)
+        const GrainsMemBuffer<Vector3<T>, srcM>&    initPosition,
+        const GrainsMemBuffer<Quaternion<T>, srcM>& initOrientation)
     {
         // We can only initialize on host
         static_assert(
@@ -509,19 +563,19 @@ public:
         // Assigning
         for(uint i = 0; i < m_nParticles; ++i)
         {
-            m_position[i]   = initPos[i];
-            m_quaternion[i] = initOrient[i];
+            m_position[i]   = initPosition[i];
+            m_quaternion[i] = initOrientation[i];
         }
     }
 
     // -------------------------------------------------------------------------
     /** @brief Initializes transformations for obstacles in the simulation
-        @param initPos initial positions of obstacles
-        @param initOrient initial orientations of obstacles */
+        @param initPosition initial positions of obstacles
+        @param initOrientation initial orientations of obstacles */
     template <MemType srcM>
     void initializeObstacles(
-        const GrainsMemBuffer<Vector3<T>, srcM>&    initPos,
-        const GrainsMemBuffer<Quaternion<T>, srcM>& initOrient)
+        const GrainsMemBuffer<Vector3<T>, srcM>&    initPosition,
+        const GrainsMemBuffer<Quaternion<T>, srcM>& initOrientation)
     {
         // We can only initialize on host
         static_assert(
@@ -536,8 +590,8 @@ public:
         // Assigning
         for(uint i = 0; i < m_nObstacles; ++i)
         {
-            m_obstaclePosition[i]    = initPos[i];
-            m_obstacleOrientation[i] = initOrient[i];
+            m_obstaclePosition[i]   = initPosition[i];
+            m_obstacleQuaternion[i] = initOrientation[i];
         }
     }
 
@@ -557,14 +611,10 @@ public:
         for(uint i = 0; i < m_nParticles; ++i)
         {
             // Fetching insertion data from ins
-            insData = ins->fetchInsertionData();
-
-            // m_transform
-            m_transform[i].composeLeftByRotation(insData.first);
-            m_transform[i].setOrigin(insData.first.getOrigin());
-
-            // m_velocity
-            m_velocity[i] = insData.second;
+            insData         = ins->fetchInsertionData();
+            m_position[i]   = insData.first.getOrigin();
+            m_quaternion[i] = insData.first.getRotation() * m_quaternion[i];
+            m_velocity[i]   = insData.second;
         }
     }
 

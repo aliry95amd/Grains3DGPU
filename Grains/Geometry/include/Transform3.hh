@@ -46,6 +46,12 @@ public:
     __HOSTDEVICE__
     Transform3(T const* buffer);
 
+    /** @brief Constructor with a quaternion and position
+         @param q the quaternion representing the rotation
+         @param p the position vector */
+    __HOSTDEVICE__
+    Transform3(const Quaternion<T>& q, const Vector3<T>& p);
+
     /** @brief Constructor with two tranformations. This constructs a 
         transformation which is equal to 't2 o inv( t1 )', representing t2 in
         local coordinate of t1.
@@ -54,15 +60,15 @@ public:
     __HOSTDEVICE__
     Transform3(const Transform3<T>& t1, const Transform3<T>& t2);
 
-    /** @brief Constructor with an XML node
-        @param root the xml node */
-    __HOST__
-    Transform3(DOMNode* root);
-
     /** @brief Copy constructor
-        @param t the transformation to be copied */
+     @param t the transformation to be copied */
     __HOSTDEVICE__
     Transform3(const Transform3<T>& t);
+
+    /** @brief Constructor with an XML node
+         @param root the xml node */
+    __HOST__
+    Transform3(DOMNode* root);
 
     /** @brief Destructor */
     __HOSTDEVICE__
@@ -71,6 +77,10 @@ public:
 
     /**@name Get methods */
     //@{
+    /** @brief Gets the rotation of the transformation */
+    __HOSTDEVICE__
+    Quaternion<T> getRotation() const;
+
     /** @brief Gets the orientation of the transformation */
     __HOSTDEVICE__
     Matrix3<T> getBasis() const;

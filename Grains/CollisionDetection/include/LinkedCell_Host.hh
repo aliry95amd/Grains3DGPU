@@ -148,11 +148,11 @@ public:
 
     // -------------------------------------------------------------------------
     /** @brief Updates the linked cells based on particle transformations
-        @param transforms buffer of transformations */
+        @param positions buffer of positions */
     void updateLinkedCells(
-        GrainsMemBuffer<Transform3<T>, MemType::HOST>& transforms) override
+        GrainsMemBuffer<Vector3<T>, MemType::HOST>& positions) override
     {
-        uint numParticles = transforms.getSize();
+        uint numParticles = positions.getSize();
 
         // Store old particle hashes before updating
         std::memcpy(m_oldParticleHashes.getData(),
@@ -160,7 +160,7 @@ public:
                     numParticles * sizeof(uint));
 
         // Update particle hashes with new positions
-        this->updateParticlesHash(transforms);
+        this->updateParticlesHash(positions);
 
         // Process each particle
         for(uint i = 0; i < numParticles; ++i)

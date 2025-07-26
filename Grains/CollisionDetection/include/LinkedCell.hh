@@ -150,36 +150,35 @@ public:
     //@{
     // -------------------------------------------------------------------------
     /** @brief Updates the particle hashes
-    @param transforms buffer of transformations */
-    void updateParticlesHash(GrainsMemBuffer<Transform3<T>, M>& transforms)
+    @param positions buffer of positions */
+    void updateParticlesHash(GrainsMemBuffer<Vector3<T>, M>& positions)
     {
         if constexpr(M == MemType::HOST)
         {
             computeHash_Host(m_cells.getData(),
-                             transforms.getData(),
-                             transforms.getSize(),
+                             positions.getData(),
+                             positions.getSize(),
                              m_particleHash.getData());
         }
         else if constexpr(M == MemType::DEVICE)
         {
             uint numBlocks, numThreads;
-            computeOptimalThreadsAndBlocks(transforms.getSize(),
+            computeOptimalThreadsAndBlocks(positions.getSize(),
                                            GrainsParameters<T>::m_GPU,
                                            numBlocks,
                                            numThreads);
             computeHash_Device<<<numBlocks, numThreads>>>(
                 m_cells.getData(),
-                transforms.getData(),
-                transforms.getSize(),
+                positions.getData(),
+                positions.getSize(),
                 m_particleHash.getData());
         }
     }
 
     // -------------------------------------------------------------------------
     /** @brief Updates the linked cells
-    @param transforms buffer of transformations */
-    virtual void
-        updateLinkedCells(GrainsMemBuffer<Transform3<T>, M>& transforms)
+    @param positions buffer of positions */
+    virtual void updateLinkedCells(GrainsMemBuffer<Vector3<T>, M>& positions)
         = 0;
     //@}
 };
@@ -203,28 +202,28 @@ __GLOBAL__ void getCellNeighborsList_Device(const Cells<T>* const* cells,
 // -----------------------------------------------------------------------------
 /** @brief Computes the cell hash for a given point
     @param cells pointer to the Cells object
-    @param tr transformations
+    @param positions buffer of positions
     @param numParticles number of particles
     @param particleHash particle hash */
 template <typename T>
 void computeHash_Host(const Cells<T>* const* cells,
-                      const Transform3<T>*   tr,
+                      const Vector3<T>*      positions,
                       uint                   numParticles,
                       uint*                  particleHash)
 {
     for(uint i = 0; i < numParticles; ++i)
-        particleHash[i] = cells[0]->computeCellHash(tr[i].getOrigin());
+        particleHash[i] = cells[0]->computeCellHash(positions[i]);
 }
 
 // -----------------------------------------------------------------------------
 /** @brief Computes the cell hash for a given point
     @param cells pointer to the Cells object
-    @param tr transformations
+    @param positions buffer of positions
     @param numParticles number of particles
     @param particleHash particle hash */
 template <typename T>
 __GLOBAL__ void computeHash_Device(const Cells<T>* const* cells,
-                                   const Transform3<T>*   tr,
+                                   const Vector3<T>*      positions,
                                    uint                   numParticles,
                                    uint*                  particleHash)
 {
@@ -233,7 +232,7 @@ __GLOBAL__ void computeHash_Device(const Cells<T>* const* cells,
     if(tID >= numParticles)
         return;
 
-    particleHash[tID] = cells[0]->computeCellHash(tr[tID].getOrigin());
+    particleHash[tID] = cells[0]->computeCellHash(positions[tID]);
 }
 
 #endif

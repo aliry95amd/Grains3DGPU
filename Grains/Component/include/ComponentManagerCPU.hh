@@ -17,17 +17,18 @@ class ComponentManagerCPU : public ComponentManager<T, MemType::HOST>
     using CM::m_nObstacles;
     using CM::m_nParticles;
 
+    using CM::m_obstaclePosition;
+    using CM::m_obstacleQuaternion;
     using CM::m_obstacleRB;
     using CM::m_obstacleRigidBodyId;
-    using CM::m_obstacleTransform;
     using CM::m_obstacleVelocity;
 
     using CM::m_particleId;
     using CM::m_particleRB;
+    using CM::m_position;
     using CM::m_quaternion;
     using CM::m_rigidBodyId;
     using CM::m_torce;
-    using CM::m_transform;
     using CM::m_velocity;
 
     using CM::m_contactInfo;

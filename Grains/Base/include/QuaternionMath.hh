@@ -242,8 +242,8 @@ __HOSTDEVICE__ static INLINE Quaternion<T>
     @param v the vector
     @param q the quaternion */
 template <typename T>
-__HOSTDEVICE__ static INLINE void operator*=(Vector3<T>&          v,
-                                             const Quaternion<T>& q) noexcept
+__HOSTDEVICE__ static INLINE void operator*=(const Vector3<T>& v,
+                                             Quaternion<T>&    q) noexcept
 {
     const T* __RESTRICT__ b1 = v.getBuffer();
     T* __RESTRICT__       b2 = const_cast<T*>(q.getBuffer());
@@ -255,6 +255,50 @@ __HOSTDEVICE__ static INLINE void operator*=(Vector3<T>&          v,
     b2[0]  = out[0];
     b2[1]  = out[1];
     b2[2]  = out[2];
+}
+
+// -----------------------------------------------------------------------------
+/** @brief Rotates a vector by a quaternion
+    @param v the vector
+    @param q the quaternion */
+template <typename T>
+__HOSTDEVICE__ static INLINE Vector3<T>
+    operator^(const Vector3<T>& v, const Quaternion<T>& q) noexcept
+{
+    // Using the formula: v' = v + 2 * (q x v) * q + (q.w^2 - |q.v|^2) * v
+    const T* __RESTRICT__ b1 = v.getBuffer();
+    const T* __RESTRICT__ b2 = q.getBuffer();
+    T __RESTRICT__        out[3];
+    // Compute t = 2 * (q_vec x v)
+    T tx = T(2) * (b2[1] * b1[2] - b2[2] * b1[1]);
+    T ty = T(2) * (b2[2] * b1[0] - b2[0] * b1[2]);
+    T tz = T(2) * (b2[0] * b1[1] - b2[1] * b1[0]);
+    // Compute v' = v + w * t + cross(q_vec, t)
+    out[0] = b1[0] + b2[3] * tx + (b2[1] * tz - b2[2] * ty);
+    out[1] = b1[1] + b2[3] * ty + (b2[2] * tx - b2[0] * tz);
+    out[2] = b1[2] + b2[3] * tz + (b2[0] * ty - b2[1] * tx);
+    return (Vector3<T>(out));
+}
+
+// -----------------------------------------------------------------------------
+/** @brief Rotates a vector by a quaternion in-place
+    @param v the vector
+    @param q the quaternion */
+template <typename T>
+__HOSTDEVICE__ static INLINE void operator^=(Vector3<T>&          v,
+                                             const Quaternion<T>& q) noexcept
+{
+    // Using the formula: v' = v + 2 * (q x v) * q + (q.w^2 - |q.v|^2) * v
+    T* __RESTRICT__       b1 = const_cast<T*>(v.getBuffer());
+    const T* __RESTRICT__ b2 = q.getBuffer();
+    // Compute t = 2 * (q_vec x v)
+    T tx = T(2) * (b2[1] * b1[2] - b2[2] * b1[1]);
+    T ty = T(2) * (b2[2] * b1[0] - b2[0] * b1[2]);
+    T tz = T(2) * (b2[0] * b1[1] - b2[1] * b1[0]);
+    // Compute v' = v + w * t + cross(q_vec, t)
+    b1[0] += b2[3] * tx + (b2[1] * tz - b2[2] * ty);
+    b1[1] += b2[3] * ty + (b2[2] * tx - b2[0] * tz);
+    b1[2] += b2[3] * tz + (b2[0] * ty - b2[1] * tx);
 }
 
 // -----------------------------------------------------------------------------

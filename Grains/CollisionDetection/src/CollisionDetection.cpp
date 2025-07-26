@@ -13,10 +13,10 @@
 template <typename T>
 __HOSTDEVICE__ static INLINE bool intersectSpheres(const RigidBody<T>& rbA,
                                                    const RigidBody<T>& rbB,
-                                                   const Vector3<T>&   b2a)
+                                                   const Vector3<T>&   v_b2a)
 {
     T radiiSum = rbA.getCircumscribedRadius() + rbB.getCircumscribedRadius();
-    T dist2    = norm2(b2a);
+    T dist2    = norm2(v_b2a);
     return (dist2 < radiiSum * radiiSum);
 }
 
@@ -25,14 +25,14 @@ __HOSTDEVICE__ static INLINE bool intersectSpheres(const RigidBody<T>& rbA,
 // shape
 template <typename T>
 __HOSTDEVICE__ static INLINE void
-    closestPointsSpheres(const RigidBody<T>&  rbA,
-                         const RigidBody<T>&  rbB,
-                         const Transform3<T>& b2a,
-                         ContactInfo<T>&      contactInfo)
+    closestPointsSpheres(const RigidBody<T>& rbA,
+                         const RigidBody<T>& rbB,
+                         const Vector3<T>&   v_b2a,
+                         ContactInfo<T>&     contactInfo)
 {
     T          rA    = rbA.getCircumscribedRadius();
     T          rB    = rbB.getCircumscribedRadius();
-    Vector3<T> vecBA = b2a.getOrigin();
+    Vector3<T> vecBA = v_b2a;
     // We calculate the overlap, and then normalize the distance vector.
     T overlap = norm(vecBA) - rA - rB;
     contactInfo.setOverlapDistance(overlap);
@@ -49,16 +49,16 @@ __HOSTDEVICE__ static INLINE void
 // shape
 template <typename T>
 __HOSTDEVICE__ static INLINE void
-    closestPointsSpheres(const RigidBody<T>&  rbA,
-                         const RigidBody<T>&  rbB,
-                         const Transform3<T>& a2w,
-                         const Transform3<T>& b2w,
-                         ContactInfo<T>&      contactInfo)
+    closestPointsSpheres(const RigidBody<T>& rbA,
+                         const RigidBody<T>& rbB,
+                         const Vector3<T>&   v_a2w,
+                         const Vector3<T>&   v_b2w,
+                         ContactInfo<T>&     contactInfo)
 {
     T          rA    = rbA.getCircumscribedRadius();
     T          rB    = rbB.getCircumscribedRadius();
-    Vector3<T> cenA  = a2w.getOrigin();
-    Vector3<T> vecBA = b2w.getOrigin() - cenA;
+    Vector3<T> cenA  = v_a2w;
+    Vector3<T> vecBA = v_b2w - cenA;
     // We calculate the overlap, and then normalize the distance vector.
     T overlap = norm(vecBA) - rA - rB;
     contactInfo.setOverlapDistance(overlap);
@@ -115,29 +115,32 @@ __HOSTDEVICE__ static INLINE void
 /* ========================================================================== */
 /*                             High-Level Methods                             */
 /* ========================================================================== */
-// Returns whether 2 rigid bodies intersect
-template <typename T>
-__HOSTDEVICE__ bool intersectRigidBodies(const RigidBody<T>&  rbA,
-                                         const RigidBody<T>&  rbB,
-                                         const Transform3<T>& a2w,
-                                         const Transform3<T>& b2w)
-{
-    const Convex<T>& convexA = *(rbA.getConvex());
-    const Convex<T>& convexB = *(rbB.getConvex());
-    return (intersectGJK(convexA, convexB, a2w, b2w));
-}
-
-// -----------------------------------------------------------------------------
 // Returns whether 2 rigid bodies intersect using the GJK algorithm - relative
 // transformation
 template <typename T>
 __HOSTDEVICE__ bool intersectRigidBodies(const RigidBody<T>&  rbA,
                                          const RigidBody<T>&  rbB,
-                                         const Transform3<T>& b2a)
+                                         const Vector3<T>&    v_b2a,
+                                         const Quaternion<T>& q_b2a)
 {
     const Convex<T>& convexA = *(rbA.getConvex());
     const Convex<T>& convexB = *(rbB.getConvex());
-    return (intersectGJK(convexA, convexB, b2a));
+    return (intersectGJK(convexA, convexB, v_b2a, q_b2a));
+}
+
+// -----------------------------------------------------------------------------
+// Returns whether 2 rigid bodies intersect
+template <typename T>
+__HOSTDEVICE__ bool intersectRigidBodies(const RigidBody<T>&  rbA,
+                                         const RigidBody<T>&  rbB,
+                                         const Vector3<T>&    v_a2w,
+                                         const Vector3<T>&    v_b2w,
+                                         const Quaternion<T>& q_a2w,
+                                         const Quaternion<T>& q_b2w)
+{
+    const Convex<T>& convexA = *(rbA.getConvex());
+    const Convex<T>& convexB = *(rbB.getConvex());
+    return (intersectGJK(convexA, convexB, v_a2w, v_b2w, q_a2w, q_b2w));
 }
 
 // -----------------------------------------------------------------------------
@@ -146,7 +149,8 @@ __HOSTDEVICE__ bool intersectRigidBodies(const RigidBody<T>&  rbA,
 template <typename T>
 __HOSTDEVICE__ void closestPointsRigidBodies(const RigidBody<T>&  rbA,
                                              const RigidBody<T>&  rbB,
-                                             const Transform3<T>& b2a,
+                                             const Vector3<T>&    v_b2a,
+                                             const Quaternion<T>& q_b2a,
                                              ContactInfo<T>&      contactInfo)
 {
     // Comment on the direction of the overlap vector
@@ -163,7 +167,7 @@ __HOSTDEVICE__ void closestPointsRigidBodies(const RigidBody<T>&  rbA,
     if(convexA.getConvexType() == ConvexType::SPHERE
        && convexB.getConvexType() == ConvexType::SPHERE)
     {
-        closestPointsSpheres(rbA, rbB, b2a, contactInfo);
+        closestPointsSpheres(rbA, rbB, v_b2a, contactInfo);
         return;
     }
 
@@ -175,15 +179,12 @@ __HOSTDEVICE__ void closestPointsRigidBodies(const RigidBody<T>&  rbA,
     uint       nbIterGJK = 0;
     T          distance  = computeClosestPoints_GJK_JH(convexA,
                                              convexB,
-                                             b2a,
+                                             v_b2a,
+                                             q_b2a,
                                              ptA,
                                              ptB,
                                              nbIterGJK);
 
-    printf("GJK_JH: nbIterGJK = %d, ctSum = %f, distance = %f\n",
-           nbIterGJK,
-           ctSum,
-           distance);
     // Computation of the actual overlap
     // distance = distance - crustA - crustB
     // If actual overlap distance < 0 => contact otherwise no contact
@@ -194,9 +195,13 @@ __HOSTDEVICE__ void closestPointsRigidBodies(const RigidBody<T>&  rbA,
         return;
 
     // Points A and B are in their respective local coordinate systems
-    // We transform ptB into the the local coordinate system of A
-    // ptA = ptA;
-    ptB = (b2a)(ptB);
+    // We transform ptB from B's coordinate system into A's coordinate system
+    // using the relative transformation from B to A
+    // ptA is already in A's coordinate system
+    // Apply quaternion rotation: ptB_rotated = q_b2a * ptB * conjugate(q_b2a)
+    ptB ^= q_b2a;
+    // Then apply translation
+    ptB += v_b2a;
 
     // Contact point definition as the mid point between ptA and ptB
     contactInfo.setContactPoint(T(0.5) * (ptA + ptB));
@@ -219,8 +224,10 @@ __HOSTDEVICE__ void closestPointsRigidBodies(const RigidBody<T>&  rbA,
 template <typename T>
 __HOSTDEVICE__ void closestPointsRigidBodies(const RigidBody<T>&  rbA,
                                              const RigidBody<T>&  rbB,
-                                             const Transform3<T>& a2w,
-                                             const Transform3<T>& b2w,
+                                             const Vector3<T>&    v_a2w,
+                                             const Vector3<T>&    v_b2w,
+                                             const Quaternion<T>& q_a2w,
+                                             const Quaternion<T>& q_b2w,
                                              ContactInfo<T>&      contactInfo)
 {
     // Comment on the direction of the overlap vector
@@ -237,7 +244,7 @@ __HOSTDEVICE__ void closestPointsRigidBodies(const RigidBody<T>&  rbA,
     if(convexA.getConvexType() == ConvexType::SPHERE
        && convexB.getConvexType() == ConvexType::SPHERE)
     {
-        closestPointsSpheres(rbA, rbB, a2w, b2w, contactInfo);
+        closestPointsSpheres(rbA, rbB, v_a2w, v_b2w, contactInfo);
         return;
     }
 
@@ -249,8 +256,10 @@ __HOSTDEVICE__ void closestPointsRigidBodies(const RigidBody<T>&  rbA,
     uint       nbIterGJK = 0;
     T          distance  = computeClosestPoints_GJK_JH(convexA,
                                              convexB,
-                                             a2w,
-                                             b2w,
+                                             v_a2w,
+                                             v_b2w,
+                                             q_a2w,
+                                             q_b2w,
                                              ptA,
                                              ptB,
                                              nbIterGJK);
@@ -266,8 +275,10 @@ __HOSTDEVICE__ void closestPointsRigidBodies(const RigidBody<T>&  rbA,
 
     // Points A and B are in their respective local coordinate systems
     // Thus we transform them into the world coordinate system
-    ptA = (a2w)(ptA);
-    ptB = (b2w)(ptB);
+    ptA ^= q_a2w;
+    ptA += v_a2w;
+    ptB ^= q_b2w;
+    ptB += v_b2w;
 
     // Contact point definition as the mid point between ptA and ptB
     contactInfo.setContactPoint(T(0.5) * (ptA + ptB));
@@ -338,22 +349,28 @@ __HOSTDEVICE__ T distanceRigidBodies(const RigidBody<T>&  rbA,
     template __HOSTDEVICE__ bool intersectRigidBodies(                      \
         const RigidBody<T>&  rbA,                                           \
         const RigidBody<T>&  rbB,                                           \
-        const Transform3<T>& b2a);                                          \
+        const Vector3<T>&    v_b2a,                                         \
+        const Quaternion<T>& q_b2a);                                        \
     template __HOSTDEVICE__ bool intersectRigidBodies(                      \
         const RigidBody<T>&  rbA,                                           \
         const RigidBody<T>&  rbB,                                           \
-        const Transform3<T>& a2w,                                           \
-        const Transform3<T>& b2w);                                          \
+        const Vector3<T>&    v_a2w,                                         \
+        const Vector3<T>&    v_b2w,                                         \
+        const Quaternion<T>& q_a2w,                                         \
+        const Quaternion<T>& q_b2w);                                        \
     template __HOSTDEVICE__ void closestPointsRigidBodies(                  \
         const RigidBody<T>&  rbA,                                           \
         const RigidBody<T>&  rbB,                                           \
-        const Transform3<T>& b2a,                                           \
+        const Vector3<T>&    v_b2a,                                         \
+        const Quaternion<T>& q_b2a,                                         \
         ContactInfo<T>&      contactInfo);                                       \
     template __HOSTDEVICE__ void closestPointsRigidBodies(                  \
         const RigidBody<T>&  rbA,                                           \
         const RigidBody<T>&  rbB,                                           \
-        const Transform3<T>& a2w,                                           \
-        const Transform3<T>& b2w,                                           \
+        const Vector3<T>&    v_a2w,                                         \
+        const Vector3<T>&    v_b2w,                                         \
+        const Quaternion<T>& q_a2w,                                         \
+        const Quaternion<T>& q_b2w,                                         \
         ContactInfo<T>&      contactInfo);                                       \
     template __HOSTDEVICE__ T distanceRigidBodies(const RigidBody<T>&  rbA, \
                                                   const RigidBody<T>&  rbB, \

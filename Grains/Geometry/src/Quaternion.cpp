@@ -319,6 +319,36 @@ __HOSTDEVICE__ void
 }
 
 // -----------------------------------------------------------------------------
+// Builds a matrix from the quaternion
+template <typename T>
+__HOSTDEVICE__ Matrix3<T> Quaternion<T>::toMatrix() const noexcept
+{
+    Matrix3<T> mat;
+    T          x2 = m_vqt[X] + m_vqt[X];
+    T          y2 = m_vqt[Y] + m_vqt[Y];
+    T          z2 = m_vqt[Z] + m_vqt[Z];
+    T          xx = m_vqt[X] * x2;
+    T          xy = m_vqt[X] * y2;
+    T          xz = m_vqt[X] * z2;
+    T          yy = m_vqt[Y] * y2;
+    T          yz = m_vqt[Y] * z2;
+    T          zz = m_vqt[Z] * z2;
+    T          wx = m_w * x2;
+    T          wy = m_w * y2;
+    T          wz = m_w * z2;
+    mat[XX]       = T(1) - (yy + zz);
+    mat[XY]       = xy - wz;
+    mat[XZ]       = xz + wy;
+    mat[YX]       = xy + wz;
+    mat[YY]       = T(1) - (xx + zz);
+    mat[YZ]       = yz - wx;
+    mat[ZX]       = xz - wy;
+    mat[ZY]       = yz + wx;
+    mat[ZZ]       = T(1) - (xx + yy);
+    return mat;
+}
+
+// -----------------------------------------------------------------------------
 // Multiplies the quaternion on the right by another quaternion rhs,
 // i.e., perform this x rhs, and return the vectorial part of this x rhs
 template <typename T>

@@ -90,31 +90,23 @@ __HOST__ void RigidBodyFactory<T>::create(
         DOMNode* nParticle    = allParticles->item(i);
         numEachRefParticle[i] = static_cast<uint>(
             ReaderXML::getNodeAttr_Int(nParticle, "Number"));
-        refRB[i]            = new RigidBody<T>(nParticle);
-        DOMNode* nTransform = ReaderXML::getNode(nParticle, "Transformation");
+        refRB[i]              = new RigidBody<T>(nParticle);
+        DOMNode*   nTransform = ReaderXML::getNode(nParticle, "Transformation");
+        Vector3<T> centre(T(0), T(0), T(0));
+        Quaternion<T> rotation(T(0), T(0), T(0), T(1));
         if(nTransform)
         {
             DOMNode* nCentre = ReaderXML::getNode(nParticle, "Centre");
             if(nCentre)
-                Vector3<T> centre(nCentre);
-            else
-                Vector3<T> centre(T(0), T(0), T(0));
+                centre = Vector3<T>(nCentre);
 
             DOMNode* nRotation
                 = ReaderXML::getNode(nParticle, "AngularPosition");
             if(nRotation)
-                Quaternion<T> rotation(nRotation);
-            else
-                Quaternion<T> rotation(T(0), T(0), T(0), T(1));
-
-            initPositions[i]    = centre;
-            initOrientations[i] = rotation;
+                rotation = Quaternion<T>(nRotation);
         }
-        else
-        {
-            initPositions[i]    = Vector3<T>(T(0), T(0), T(0));
-            initOrientations[i] = Quaternion<T>(T(0), T(0), T(0), T(1));
-        }
+        initPositions[i]    = centre;
+        initOrientations[i] = rotation;
         numParticles += numEachRefParticle[i];
     }
 }

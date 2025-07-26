@@ -154,6 +154,10 @@ public:
 
     /**@name Methods */
     //@{
+    /** @brief Converts the quaternion to a rotation matrix */
+    __HOSTDEVICE__
+    Matrix3<T> toMatrix() const noexcept;
+
     /** @brief Multiplies the quaternion on the right by another quaternion 
 		rhs, i.e., performs this x rhs, and return the vectorial part of 
 		this x rhs

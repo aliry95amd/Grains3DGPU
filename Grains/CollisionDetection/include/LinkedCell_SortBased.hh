@@ -84,13 +84,13 @@ public:
     //@{
     // -------------------------------------------------------------------------
     /** @brief Updates the linked cells based on the transformations
-    @param transforms buffer of transformations */
+    @param positions buffer of positions */
     void updateLinkedCells(
-        GrainsMemBuffer<Transform3<T>, MemType::DEVICE>& transforms)
+        GrainsMemBuffer<Vector3<T>, MemType::DEVICE>& positions)
     {
-        const uint numParticles = transforms.getSize();
+        const uint numParticles = positions.getSize();
         // Update the particle hashes
-        this->updateParticlesHash(transforms);
+        this->updateParticlesHash(positions);
 
         // Sorting the particle ids according to the cell hash
         thrust::sort_by_key(

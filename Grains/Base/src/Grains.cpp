@@ -180,8 +180,6 @@ void Grains<T>::Construction(DOMElement* rootElement)
     particlesInitialPosition.allocate(numParticles);
     particlesInitialOrientation.allocate(numParticles);
 
-    // GrainsMemBuffer<Transform3<T>, MemType::HOST> particlesInitialTransform;
-    // particlesInitialTransform.allocate(numParticles);
     if(numParticles)
     {
         uint offset = 0;
@@ -222,8 +220,10 @@ void Grains<T>::Construction(DOMElement* rootElement)
     // We also store the initial transformations of the rigid bodies to pass to
     // the ComponentManager to create particles with the initial transformation
     // required.
-    GrainsMemBuffer<Transform3<T>, MemType::HOST> obstaclesInitialTransform;
-    obstaclesInitialTransform.allocate(numObstacles);
+    GrainsMemBuffer<Vector3<T>, MemType::HOST>    obstaclesInitialPosition;
+    GrainsMemBuffer<Quaternion<T>, MemType::HOST> obstaclesInitialOrientation;
+    obstaclesInitialPosition.allocate(numObstacles);
+    obstaclesInitialOrientation.allocate(numObstacles);
     // Memory allocation for m_rigidBodyList with respect to the number of
     // shapes in the simulation.
     m_obstacleRigidBodyList.reserve(numObstacles);
@@ -238,8 +238,24 @@ void Grains<T>::Construction(DOMElement* rootElement)
             // Initial transformation of the rigid body
             // One draw back is we might end up with the same rigid body shape,
             // but with different initial transformation.
-            DOMNode* tr = ReaderXML::getNode(nObstacle, "Transformation");
-            obstaclesInitialTransform[i] = Transform3<T>(tr);
+            DOMNode*      tr = ReaderXML::getNode(nObstacle, "Transformation");
+            Vector3<T>    centre(T(0), T(0), T(0));
+            Quaternion<T> rotation(T(0), T(0), T(0), T(1));
+            if(nTransform)
+            {
+                DOMNode* nCentre = ReaderXML::getNode(nParticle, "Centre");
+                if(nCentre)
+                    centre = Vector3<T>(nCentre);
+
+                DOMNode* nRotation
+                    = ReaderXML::getNode(nParticle, "AngularPosition");
+                if(nRotation)
+                    rotation = Quaternion<T>(nRotation);
+                obstaclesInitialPosition[i]    = centre;
+                obstaclesInitialOrientation[i] = rotation;
+            }
+            else
+                GAbort("Transformation node is mandatory for obstacles!");
         }
         GoutWI(6, "Reading obstacles types completed!");
     }

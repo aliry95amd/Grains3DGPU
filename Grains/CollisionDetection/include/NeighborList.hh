@@ -81,10 +81,9 @@ public:
     /** @name Methods */
     //@{
     // -------------------------------------------------------------------------
-    /** @brief Updates the neighbor list 
-    @param transforms array of transformations */
-    virtual void
-        updateNeighborList(GrainsMemBuffer<Transform3<T>, M>& transforms)
+    /** @brief Updates the neighbor list
+    @param positions array of positions */
+    virtual void updateNeighborList(GrainsMemBuffer<Vector3<T>, M>& positions)
         = 0;
 
     // -------------------------------------------------------------------------
