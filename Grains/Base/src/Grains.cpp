@@ -238,17 +238,16 @@ void Grains<T>::Construction(DOMElement* rootElement)
             // Initial transformation of the rigid body
             // One draw back is we might end up with the same rigid body shape,
             // but with different initial transformation.
-            DOMNode*      tr = ReaderXML::getNode(nObstacle, "Transformation");
+            DOMNode*      nTR = ReaderXML::getNode(nObstacle, "Transformation");
             Vector3<T>    centre(T(0), T(0), T(0));
             Quaternion<T> rotation(T(0), T(0), T(0), T(1));
-            if(nTransform)
+            if(nTR)
             {
-                DOMNode* nCentre = ReaderXML::getNode(nParticle, "Centre");
+                DOMNode* nCentre = ReaderXML::getNode(nTR, "Centre");
                 if(nCentre)
                     centre = Vector3<T>(nCentre);
 
-                DOMNode* nRotation
-                    = ReaderXML::getNode(nParticle, "AngularPosition");
+                DOMNode* nRotation = ReaderXML::getNode(nTR, "AngularPosition");
                 if(nRotation)
                     rotation = Quaternion<T>(nRotation);
                 obstaclesInitialPosition[i]    = centre;

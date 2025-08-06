@@ -1,6 +1,10 @@
 # ----------------
 # Standard targets
 # ----------------
+
+# Declare phony targets
+.PHONY: install updatedev update clean cleanall cleandirs install-githook apply-clang-format githook xerces dtd build-tests run-tests clean-tests build-validation run-validation clean-validation cleanxerces cleandtd help
+
 install: xerces update dtd install-githook
 	@echo 'Grains platform installed!'
 
@@ -15,7 +19,7 @@ update: apply-clang-format
 	cd ../..;
 	@echo 'Grains is updated!'
 	
-cleanall: cleanxerces clean cleandirs cleandtd
+cleanall: cleanxerces clean cleandirs cleandtd clean-tests clean-validation 
 	@echo 'Full Grains platform cleaned!'
 	@echo
 
@@ -56,6 +60,10 @@ install-githook:
 apply-clang-format:
 	@echo "Formatting all source files according to .clang-format ..."
 	@find ./Grains/ -name "*.cpp" -o -name "*.hh" | \
+	xargs clang-format -i --style=file:./.clang-format;
+	@find ./Tests/ -name "*.cpp" -o -name "*.hh" | \
+	xargs clang-format -i --style=file:./.clang-format;
+	@find ./Validations/ -name "*.cpp" -o -name "*.hh" | \
 	xargs clang-format -i --style=file:./.clang-format; \
 	echo 'Formatting complete!';
 	@echo
@@ -78,6 +86,54 @@ dtd:
 	@cd Main/dtd; \
 	$(INSTALL_DTD); \
 	@cd ../..;
+
+build-tests:
+	@echo "Building tests..."
+	@cd Tests; \
+	mkdir -p build; \
+	cd build; \
+	cmake ..; \
+	make; \
+	cd ../..;
+	@echo "Tests built successfully!"
+
+run-tests: build-tests
+	@echo "Running tests..."
+	@cd Tests/build; \
+	./grains_tests; \
+	cd ../..;
+	@echo "Tests completed!"
+
+clean-tests:
+	@echo "Cleaning test build directory..."
+	@rm -rf Tests/build
+	@echo "Test build directory cleaned!"
+
+build-validation:
+	@echo "Building validation tools..."
+	@if cd Validations && $(MAKE) all; then \
+		echo "Validation tools built successfully!"; \
+	else \
+		echo "Failed to build validation tools."; \
+		echo "Please ensure the main Grains library is built first:"; \
+		echo "  make install  (for full installation)"; \
+		echo "  or make update  (for library only)"; \
+		exit 1; \
+	fi
+
+run-validation: build-validation
+	@echo "Running validation tests..."
+	@cd Validations; \
+	$(MAKE) test; \
+	cd ..;
+	@echo "Validation tests completed!"
+
+clean-validation:
+	@echo "Cleaning validation tools..."
+	@cd Validations; \
+	$(MAKE) clean; \
+	cd ..;
+	@echo "Validation tools cleaned!"
 	
 # --------------------------
 # Low level cleaning targets
@@ -112,6 +168,12 @@ help:
 	@echo '   LOW-LEVEL TARGETS:'
 	@echo '      xerces           $(BANG) compile the XERCES library'
 	@echo '      dtd              $(BANG) install the DTD files'
+	@echo '      build-tests      $(BANG) build the test suite using CMake'
+	@echo '      run-tests        $(BANG) build and run the test suite'
+	@echo '      clean-tests      $(BANG) clean the test build directory'
+	@echo '      build-validation $(BANG) build the validation tools'
+	@echo '      run-validation   $(BANG) build and run the validation tests'
+	@echo '      clean-validation $(BANG) clean the validation tools'
 	@echo		
 	@echo '   LOW-LEVEL CLEANING TARGETS:'
 	@echo '      cleanxerces      $(BANG) delete all XERCES lib and obj files/directories (undoes target xerces)'

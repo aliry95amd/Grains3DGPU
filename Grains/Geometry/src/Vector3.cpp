@@ -126,7 +126,7 @@ __HOSTDEVICE__ void
 template <typename T>
 __HOSTDEVICE__ void Vector3<T>::normalize() noexcept
 {
-    *this /= this->norm();
+    *this /= norm(*this);
 }
 
 // -----------------------------------------------------------------------------
@@ -134,17 +134,7 @@ __HOSTDEVICE__ void Vector3<T>::normalize() noexcept
 template <typename T>
 __HOSTDEVICE__ Vector3<T> Vector3<T>::normalized() const noexcept
 {
-    return (*this / this->norm());
-}
-
-// -----------------------------------------------------------------------------
-// Rounds components to +-tol
-template <typename T>
-__HOSTDEVICE__ void Vector3<T>::round(T tol) noexcept
-{
-    m_comp[X] = fabs(m_comp[X]) < tol ? T(0) : m_comp[X];
-    m_comp[Y] = fabs(m_comp[Y]) < tol ? T(0) : m_comp[Y];
-    m_comp[Z] = fabs(m_comp[Z]) < tol ? T(0) : m_comp[Z];
+    return (*this / norm(*this));
 }
 
 // -----------------------------------------------------------------------------

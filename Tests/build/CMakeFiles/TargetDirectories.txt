@@ -1,0 +1,4 @@
+/home/alireza/Desktop/Work/Codes/GrainsGPU/Tests/build/CMakeFiles/grains_tests.dir
+/home/alireza/Desktop/Work/Codes/GrainsGPU/Tests/build/CMakeFiles/test.dir
+/home/alireza/Desktop/Work/Codes/GrainsGPU/Tests/build/CMakeFiles/edit_cache.dir
+/home/alireza/Desktop/Work/Codes/GrainsGPU/Tests/build/CMakeFiles/rebuild_cache.dir

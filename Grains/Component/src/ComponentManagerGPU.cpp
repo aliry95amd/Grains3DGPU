@@ -69,8 +69,10 @@ void ComponentManagerGPU<T>::computeRelativeTransformations()
 
     computeRelativeTransformations_Kernel<<<numBlocks, numThreads>>>(
         m_neighborList->getData(),
-        m_transform.getData(),
-        m_relTransform.getData(),
+        m_position.getData(),
+        m_quaternion.getData(),
+        m_relPosition.getData(),
+        m_relQuaternion.getData(),
         nPairs);
 }
 
@@ -115,7 +117,8 @@ void ComponentManagerGPU<T>::detectCollisionsParticles()
     detectCollisionsParticles_Kernel<<<numBlocks, numThreads>>>(
         m_neighborList->getData(),
         m_particleRB->getData(),
-        m_relTransform.getData(),
+        m_relPosition.getData(),
+        m_relQuaternion.getData(),
         m_contactInfo.getData(),
         nPairs);
 }
@@ -158,7 +161,7 @@ void ComponentManagerGPU<T>::computeContactForces(
         m_particleRB->getData(),
         m_velocity.getData(),
         m_torce.getData(),
-        m_relTransform.getData(),
+        m_relPosition.getData(),
         nPairs);
 }
 
@@ -203,7 +206,7 @@ void ComponentManagerGPU<T>::moveParticles(
 
     moveParticles_Kernel<<<numBlocks, numThreads>>>(TI.getData(),
                                                     m_particleRB->getData(),
-                                                    m_transform.getData(),
+                                                    m_position.getData(),
                                                     m_quaternion.getData(),
                                                     m_velocity.getData(),
                                                     m_torce.getData(),

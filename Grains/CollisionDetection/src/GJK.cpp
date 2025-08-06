@@ -1,6 +1,7 @@
 #include "GJK.hh"
 #include "MatrixMath.hh"
 #include "MiscMath.hh"
+#include "QuaternionMath.hh"
 
 /* ========================================================================== */
 /*                         Johnson Low-Level Methods                          */
@@ -65,7 +66,7 @@ __HOSTDEVICE__ static INLINE void computeDet(const uint bits,
 // -----------------------------------------------------------------------------
 template <typename T>
 __HOSTDEVICE__ static INLINE bool
-    valid(const uint s, const uint all_bits, const T (&det)[16][4])
+    valid(const uint s, const uint all_bits, const T det[16][4])
 {
     for(uint i = 0, bit = 1; i < 4; ++i, bit <<= 1)
     {
@@ -84,54 +85,95 @@ __HOSTDEVICE__ static INLINE bool
 }
 
 // -----------------------------------------------------------------------------
-template <typename T>
+// Unified computeVector implementation that works for both algorithms
+template <typename T, typename WeightType>
 __HOSTDEVICE__ static INLINE void computeVector(const uint bits,
                                                 const Vector3<T> (&y)[4],
-                                                const T (&det)[16][4],
-                                                Vector3<T>& v)
+                                                const WeightType& weights,
+                                                Vector3<T>&       v)
 {
-    T sum = T(0);
     v.setValue(T(0), T(0), T(0));
-    for(uint i = 0, bit = 1; i < 4; ++i, bit <<= 1)
+
+    // Process based on weight type (array dimensions indicate algorithm)
+    if constexpr(std::is_pointer<WeightType>::value
+                 || (std::is_array<WeightType>::value
+                     && std::extent<WeightType, 0>::value > 4))
     {
-        if(bits & bit)
+        // Johnson algorithm (det[16][4])
+        T sum = T(0);
+        for(uint i = 0, bit = 1; i < 4; ++i, bit <<= 1)
         {
-            sum += det[bits][i];
-            v += det[bits][i] * y[i];
+            if(bits & bit)
+            {
+                sum += weights[bits][i];
+                v += weights[bits][i] * y[i];
+            }
+        }
+        v *= T(1) / sum;
+    }
+    else
+    {
+        // SignedVolume algorithm (lambdas[4])
+        for(uint i = 0; i < 4; ++i)
+        {
+            if(bits & (1 << i))
+            {
+                v += static_cast<T>(weights[i]) * y[i];
+            }
         }
     }
-    v *= T(1) / sum;
 }
 
 // -----------------------------------------------------------------------------
-template <typename T>
+// Unified computePoints implementation that handles both Johnson and
+// SignedVolume algorithms
+template <typename T, typename WeightType>
 __HOSTDEVICE__ static INLINE void computePoints(const uint bits,
                                                 const Vector3<T> (&p)[4],
                                                 const Vector3<T> (&q)[4],
-                                                const T (&det)[16][4],
-                                                Vector3<T>& p1,
-                                                Vector3<T>& p2)
+                                                const WeightType& weights,
+                                                Vector3<T>&       p1,
+                                                Vector3<T>&       p2)
 {
     T sum = T(0);
     p1.setValue(T(0), T(0), T(0));
     p2.setValue(T(0), T(0), T(0));
-    for(uint i = 0, bit = 1; i < 4; ++i, bit <<= 1)
+
+    // Process based on weight type (array dimensions indicate algorithm)
+    if constexpr(std::is_pointer<WeightType>::value
+                 || (std::is_array<WeightType>::value
+                     && std::extent<WeightType, 0>::value > 4))
     {
-        if(bits & bit)
+        // Johnson algorithm (det[16][4])
+        for(uint i = 0, bit = 1; i < 4; ++i, bit <<= 1)
         {
-            sum += det[bits][i];
-            p1 += det[bits][i] * p[i];
-            p2 += det[bits][i] * q[i];
+            if(bits & bit)
+            {
+                sum += weights[bits][i];
+                p1 += weights[bits][i] * p[i];
+                p2 += weights[bits][i] * q[i];
+            }
+        }
+        T s = T(1) / sum;
+        p1 *= s;
+        p2 *= s;
+    }
+    else // SignedVolume algorithm (lambdas[4])
+    {
+        for(uint i = 0; i < 4; ++i)
+        {
+            if(bits & (1 << i))
+            {
+                p1 += static_cast<T>(weights[i]) * p[i];
+                p2 += static_cast<T>(weights[i]) * q[i];
+            }
         }
     }
-    T s = T(1) / sum;
-    p1 *= s;
-    p2 *= s;
 }
 
 // -----------------------------------------------------------------------------
 template <typename T>
-__HOSTDEVICE__ static INLINE bool proper(const uint s, const T (&det)[16][4])
+__HOSTDEVICE__ static INLINE bool proper(const uint s, const T det[16][4])
 {
     for(uint i = 0, bit = 1; i < 4; ++i, bit <<= 1)
         if((s & bit) && det[s][i] <= EPS<T>)
@@ -156,15 +198,15 @@ __HOSTDEVICE__ static INLINE bool closest(uint&      bits,
     {
         if((s & bits) == s)
         {
-            if(valid(s | last_bit, all_bits, det))
+            if(valid<T>(s | last_bit, all_bits, det))
             {
                 bits = s | last_bit;
-                computeVector(bits, y, det, v);
+                computeVector<T>(bits, y, det, v);
                 return (true);
             }
         }
     }
-    if(valid(last_bit, all_bits, det))
+    if(valid<T>(last_bit, all_bits, det))
     {
         bits = last_bit;
         v    = y[last];
@@ -176,10 +218,10 @@ __HOSTDEVICE__ static INLINE bool closest(uint&      bits,
     {
         if((s & all_bits) == s)
         {
-            if(proper(s, det))
+            if(proper<T>(s, det))
             {
                 Vector3<T> u;
-                computeVector(s, y, det, u);
+                computeVector<T>(s, y, det, u);
                 T dist2 = norm2(u);
                 if(dist2 < min_dist2)
                 {
@@ -200,9 +242,16 @@ template <typename T>
 __HOSTDEVICE__ static INLINE bool
     degenerate(const uint bits, const Vector3<T> (&y)[4], const Vector3<T>& w)
 {
+    T err = HIGHEPS<T>;
     for(uint i = 0, bit = 1; i < 4; ++i, bit <<= 1)
-        if((bits & bit) && y[i] == w)
-            return (true);
+    {
+        if(bits & bit)
+        {
+            // Use ::fabs instead of fabs to avoid the template error
+            if(::fabs(w * y[i] - y[i] * y[i]) < err * y[i] * y[i])
+                return (true);
+        }
+    }
     return (false);
 }
 
@@ -515,42 +564,6 @@ __HOSTDEVICE__ static INLINE void
 
 // -----------------------------------------------------------------------------
 template <typename T>
-__HOSTDEVICE__ static INLINE void computeVector(const uint bits,
-                                                const Vector3<T> (&y)[4],
-                                                const T (&lambdas)[4],
-                                                Vector3<T>& v)
-{
-    v.setValue(T(0), T(0), T(0));
-    for(uint i = 0; i < 4; ++i)
-    {
-        if(bits & (1 << i))
-            v += lambdas[i] * y[i];
-    }
-}
-
-// -----------------------------------------------------------------------------
-template <typename T>
-__HOSTDEVICE__ static INLINE void computePoints(const uint bits,
-                                                const Vector3<T> (&p)[4],
-                                                const Vector3<T> (&q)[4],
-                                                const T (&lambdas)[4],
-                                                Vector3<T>& p1,
-                                                Vector3<T>& p2)
-{
-    p1.setValue(T(0), T(0), T(0));
-    p2.setValue(T(0), T(0), T(0));
-    for(uint i = 0; i < 4; ++i)
-    {
-        if(bits & (1 << i))
-        {
-            p1 += lambdas[i] * p[i];
-            p2 += lambdas[i] * q[i];
-        }
-    }
-}
-
-// -----------------------------------------------------------------------------
-template <typename T>
 __HOSTDEVICE__ static INLINE void sv_subalgorithm(const Vector3<T> (&y)[4],
                                                   uint& bits,
                                                   T (&lambdas)[4],
@@ -580,7 +593,7 @@ __HOSTDEVICE__ static INLINE void sv_subalgorithm(const Vector3<T> (&y)[4],
     else
         s3d(y, bits, lambdas);
 
-    computeVector(bits, y, lambdas, v);
+    computeVector<T>(bits, y, lambdas, v);
 }
 
 /* ========================================================================== */
@@ -673,9 +686,266 @@ __HOSTDEVICE__ bool intersectGJK(const Convex<T>&     a,
 }
 
 // -----------------------------------------------------------------------------
-// Returns the minimal distance between 2 convex shapes and a point per convex
-// shape that represents the tips of the minimal distance segment -- relative
+// Returns whether 2 convex shapes intersect using the GJK algorithm - relative
 // transformation
+template <typename T>
+__HOSTDEVICE__ bool intersectGJK(const Convex<T>&     a,
+                                 const Convex<T>&     b,
+                                 const Vector3<T>&    v_b2a,
+                                 const Quaternion<T>& q_b2a)
+{
+    uint       bits     = 0; // identifies current simplex
+    uint       last     = 0; // identifies last found support point
+    uint       last_bit = 0; // last_bit = 1<<last
+    uint       all_bits = 0; // all_bits = bits|last_bit
+    Vector3<T> y[4]; // support points of A-B in world
+    T          det[16][4] = {T(0)}; // cached sub-determinants
+    T          dp[4][4]   = {T(0)};
+
+    Vector3<T> v(v_b2a);
+    Vector3<T> w;
+    T          prod;
+
+    Vector3<T> p, q;
+    do
+    {
+        last     = 0;
+        last_bit = 1;
+        while(bits & last_bit)
+        {
+            ++last;
+            last_bit <<= 1;
+        }
+        // w = a.support(-v) - q_b2a(b.support(v ^ q_b2a));
+        p = a.support(-v);
+        q = b.support(q_b2a << v);
+        FusedMinkowskiDifference(p, q, v_b2a, q_b2a, w);
+        prod = v * w;
+        if(prod > T(0) || fabs(prod) < HIGHEPS<T>)
+            return (false);
+        if(degenerate(all_bits, y, w))
+            return (false);
+        y[last]  = w;
+        all_bits = bits | last_bit;
+        if(!closest(bits, last, last_bit, all_bits, y, dp, det, v))
+            return (false);
+    } while(bits < 15 && !isApproxZero(v));
+    return (true);
+}
+
+// -----------------------------------------------------------------------------
+// Returns whether 2 convex shapes intersect using the GJK algorithm
+template <typename T>
+__HOSTDEVICE__ bool intersectGJK(const Convex<T>&     a,
+                                 const Convex<T>&     b,
+                                 const Vector3<T>&    v_a2w,
+                                 const Vector3<T>&    v_b2w,
+                                 const Quaternion<T>& q_a2w,
+                                 const Quaternion<T>& q_b2w)
+{
+    uint       bits     = 0; // identifies current simplex
+    uint       last     = 0; // identifies last found support point
+    uint       last_bit = 0; // last_bit = 1<<last
+    uint       all_bits = 0; // all_bits = bits|last_bit
+    Vector3<T> y[4]; // support points of A-B in world
+    T          det[16][4] = {T(0)}; // cached sub-determinants
+    T          dp[4][4]   = {T(0)};
+
+    Vector3<T> v(v_b2w - v_a2w);
+    Vector3<T> w;
+    T          prod;
+
+    Vector3<T> p, q;
+    do
+    {
+        last     = 0;
+        last_bit = 1;
+        while(bits & last_bit)
+        {
+            ++last;
+            last_bit <<= 1;
+        }
+        // w = q_a2w(a.support((-v) ^ q_a2w)) - q_b2w(b.support(v ^ q_b2w));
+        p = a.support(q_a2w << (-v));
+        q = b.support(q_b2w << v);
+        FusedMinkowskiDifference(p, q, v_a2w, v_b2w, q_a2w, q_b2w, w);
+        prod = v * w;
+        if(prod > T(0) || fabs(prod) < HIGHEPS<T>)
+            return (false);
+        if(degenerate(all_bits, y, w))
+            return (false);
+        y[last]  = w;
+        all_bits = bits | last_bit;
+        if(!closest(bits, last, last_bit, all_bits, y, dp, det, v))
+            return (false);
+    } while(bits < 15 && !isApproxZero(v));
+    return (true);
+}
+
+// -----------------------------------------------------------------------------
+// Johnson implementation of closest points algorithm
+template <typename T, bool Acceleration, T Tolerance>
+__HOSTDEVICE__ T computeClosestPoints_GJK_Johnson(const Convex<T>&     a,
+                                                  const Convex<T>&     b,
+                                                  const Transform3<T>& b2a,
+                                                  Vector3<T>&          pa,
+                                                  Vector3<T>&          pb,
+                                                  uint&                nbIter)
+{
+    // Constants
+    constexpr T    relError = Tolerance; // relative tolerance
+    constexpr T    absError = T(1.e-4 * relError); // absolute tolerance
+    constexpr uint MAXITERS = 1000;
+
+    // Johnson-specific variables
+    uint       bits     = 0; // identifies current simplex
+    uint       last     = 0; // identifies last found support point
+    uint       last_bit = 0; // last_bit = 1<<last
+    uint       all_bits = 0; // all_bits = bits|last_bit
+    Vector3<T> p[4]; // support points of A in local
+    Vector3<T> q[4]; // support points of B in local
+    Vector3<T> y[4]; // support points of A-B in world
+    T          det[16][4]    = {T(0)}; // cached sub-determinants
+    T          dp[4][4]      = {T(0)}; // cached dot products
+    T          mu            = T(0); // optimality gap
+    uint       numIterations = 0; // No. iterations
+
+    // Acceleration-specific variables
+    T momentum = T(0); // Only used if Acceleration is true
+
+    // Initializing vectors
+    Vector3<T> v(-b2a.getOrigin());
+    Vector3<T> w;
+    T          dist = norm(v);
+
+    while(bits < 15 && dist > HIGHEPS<T> && numIterations < MAXITERS)
+    {
+        // Updating the bits
+        last     = 0;
+        last_bit = 1;
+        while(bits & last_bit)
+        {
+            ++last;
+            last_bit <<= 1;
+        }
+
+        // Support points
+        p[last] = a.support((-v));
+        q[last] = b.support((v)*b2a.getBasis());
+        w       = p[last] - b2a(q[last]);
+
+        // termination criteria -- optimality gap
+        mu = dist - v * w / dist;
+        if(mu <= dist * relError || mu < absError)
+            break;
+
+        // termination criteria -- degenerate case
+        if(degenerate(all_bits, y, w))
+            break;
+
+        // if not terminated, get ready for the next iteration
+        y[last]  = w;
+        all_bits = bits | last_bit;
+        if(!closest(bits, last, last_bit, all_bits, y, dp, det, v))
+            break;
+
+        ++numIterations;
+        dist = norm(v);
+    }
+
+    computePoints<T>(bits, p, q, det, pa, pb);
+
+    if(numIterations > 1000)
+        catch_me();
+    else
+        nbIter = numIterations;
+
+    return (dist);
+}
+
+// -----------------------------------------------------------------------------
+// SignedVolume implementation of closest points algorithm
+template <typename T, bool Acceleration, T Tolerance>
+__HOSTDEVICE__ T computeClosestPoints_GJK_SignedVolume(const Convex<T>&     a,
+                                                       const Convex<T>&     b,
+                                                       const Transform3<T>& b2a,
+                                                       Vector3<T>&          pa,
+                                                       Vector3<T>&          pb,
+                                                       uint& nbIter)
+{
+    // Constants
+    constexpr T    relError = Tolerance; // relative tolerance
+    constexpr T    absError = T(1.e-4 * relError); // absolute tolerance
+    constexpr uint MAXITERS = 1000; // Maximum iterations
+
+    // SignedVolume-specific variables
+    uint bits = 0; // identifies current simplex
+    uint last = 0; // identifies last found support point
+
+    Vector3<T> p[4]; // support points of A in local
+    Vector3<T> q[4]; // support points of B in local
+    Vector3<T> y[4]; // support points of A-B in world
+    T          lambdas[4] = {T(0)}; // Weights
+
+    T   mu            = T(0); // optimality gap
+    int numIterations = 0; // No. iterations
+
+    // Acceleration-specific variables
+    T momentum = T(0); // Only used if Acceleration is true
+
+    // Initializing vectors
+    Vector3<T> v(-b2a.getOrigin());
+    Vector3<T> w;
+    T          dist = norm(v);
+
+    while(bits < 15 && dist > HIGHEPS<T> && numIterations < MAXITERS)
+    {
+        // Updating the bits
+        for(uint new_index = 0; new_index < 4; ++new_index)
+        {
+            // At least one of these must be empty, otherwise overlap.
+            if(!(bits & (1 << new_index)))
+            {
+                last = new_index;
+                break;
+            }
+        }
+
+        // Support points
+        p[last] = a.support((-v));
+        q[last] = b.support((v)*b2a.getBasis());
+        w       = p[last] - b2a(q[last]);
+
+        // termination criteria -- optimality gap
+        mu = dist - v * w / dist;
+        if(mu <= dist * relError || mu < absError)
+            break;
+
+        // termination criteria -- degenerate case
+        if(degenerate(bits, y, w))
+            break;
+
+        // if not terminated, get ready for the next iteration
+        y[last] = w;
+        bits |= (1 << last);
+        sv_subalgorithm(y, bits, lambdas, v);
+
+        ++numIterations;
+        dist = norm(v);
+    }
+
+    computePoints<T>(bits, p, q, lambdas, pa, pb);
+
+    if(numIterations > 1000)
+        catch_me();
+    else
+        nbIter = numIterations;
+
+    return (dist);
+}
+
+// -----------------------------------------------------------------------------
+// Dispatcher function that routes to the appropriate implementation
 template <typename T, GJKType GJKType, bool Acceleration, T Tolerance>
 __HOSTDEVICE__ T computeClosestPoints_GJK(const Convex<T>&     a,
                                           const Convex<T>&     b,
@@ -687,125 +957,197 @@ __HOSTDEVICE__ T computeClosestPoints_GJK(const Convex<T>&     a,
     static_assert(GJKType == GJKType::JOHNSON
                       || GJKType == GJKType::SIGNEDVOLUME,
                   "GJKType must be either Johnson or SignedVolume");
-    // Common constants
+
+    if constexpr(GJKType == GJKType::JOHNSON)
+    {
+        return computeClosestPoints_GJK_Johnson<T, Acceleration, Tolerance>(
+            a,
+            b,
+            b2a,
+            pa,
+            pb,
+            nbIter);
+    }
+    else
+    {
+        return computeClosestPoints_GJK_SignedVolume<T,
+                                                     Acceleration,
+                                                     Tolerance>(a,
+                                                                b,
+                                                                b2a,
+                                                                pa,
+                                                                pb,
+                                                                nbIter);
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Johnson implementation for two transforms
+template <typename T, bool Acceleration, T Tolerance>
+__HOSTDEVICE__ T computeClosestPoints_GJK_Johnson(const Convex<T>&     a,
+                                                  const Convex<T>&     b,
+                                                  const Transform3<T>& a2w,
+                                                  const Transform3<T>& b2w,
+                                                  Vector3<T>&          pa,
+                                                  Vector3<T>&          pb,
+                                                  uint&                nbIter)
+{
+    // Constants
     constexpr T relError = Tolerance; // relative tolerance
     constexpr T absError = T(1.e-4 * relError); // absolute tolerance
 
-    // Common variables
-    uint       bits = 0; // identifies current simplex
-    uint       last = 0; // identifies last found support point
+    // Johnson-specific variables
+    uint bits     = 0; // identifies current simplex
+    uint last     = 0; // identifies last found support point
+    uint last_bit = 0; // last_bit = 1<<last
+    uint all_bits = 0; // all_bits = bits|last_bit
+
     Vector3<T> p[4]; // support points of A in local
     Vector3<T> q[4]; // support points of B in local
     Vector3<T> y[4]; // support points of A-B in world
-    T          mu            = T(0); // optimality gap
-    int        numIterations = 0; // No. iterations
+    T          det[16][4] = {T(0)}; // cached sub-determinants
+    T          dp[4][4]   = {T(0)}; // cached dot products
 
-    // Implementation-specific variables related to GJKType
-    if constexpr(GJKType == GJKType::JOHNSON)
-    {
-        uint last_bit   = 0; // last_bit = 1<<last
-        uint all_bits   = 0; // all_bits = bits|last_bit
-        T    det[16][4] = {T(0)}; // cached sub-determinants
-        T    dp[4][4]   = {T(0)}; // cached dot products
-    }
-    else if constexpr(GJKType == GJKType::SIGNEDVOLUME)
-    {
-        T lambdas[4] = {T(0)}; // Weights
-    }
+    T   mu            = T(0); // optimality gap
+    int numIterations = 0; // No. iterations
 
-    // Implementation-specific variables related to Acceleration
-    if constexpr(Acceleration)
-    {
-        T momentum = T(0);
-    }
+    // Acceleration-specific variables
+    T momentum = T(0); // Only used if Acceleration is true
 
     // Initializing vectors
-    Vector3<T> v(-b2a.getOrigin());
+    Vector3<T> v(a2w.getOrigin() - b2w.getOrigin());
     Vector3<T> w;
     T          dist = norm(v);
 
     while(bits < 15 && dist > HIGHEPS<T> && numIterations < 1000)
     {
-        if constexpr(GJKType == GJKType::JOHNSON)
+        // Updating the bits
+        last     = 0;
+        last_bit = 1;
+        while(bits & last_bit)
         {
-            // Updating the bits, ...
-            last     = 0;
-            last_bit = 1;
-            while(bits & last_bit)
-            {
-                ++last;
-                last_bit <<= 1;
-            }
-        }
-        else if constexpr(GJKType == GJKType::SIGNEDVOLUME)
-        {
-            // Updating the bits, ...
-            for(uint new_index = 0; new_index < 4; ++new_index)
-            {
-                // At least one of these must be empty, otherwise overlap.
-                if(!(bits & (1 << new_index)))
-                {
-                    last = new_index;
-                    break;
-                }
-            }
+            ++last;
+            last_bit <<= 1;
         }
 
         // Support points
-        p[last] = a.support((-v));
-        q[last] = b.support((v)*b2a.getBasis());
-        w       = p[last] - b2a(q[last]);
+        p[last] = a.support((-v) * a2w.getBasis());
+        q[last] = b.support(v * b2w.getBasis());
+        w       = a2w(p[last]) - b2w(q[last]);
 
-        // termination criteria -- optimiality gap
-        // set_max(mu, v * w / dist);
+        // termination criteria -- optimality gap
         mu = dist - v * w / dist;
         if(mu <= dist * relError || mu < absError)
             break;
+
         // termination criteria -- degenerate case
         if(degenerate(all_bits, y, w))
             break;
 
         // if not terminated, get ready for the next iteration
-        y[last] = w;
-        if constexpr(GJKType == GJKType::JOHNSON)
-        {
-            all_bits = bits | last_bit;
-            if(!closest(bits, last, last_bit, all_bits, y, dp, det, v))
-                break;
-        }
-        else if constexpr(GJKType == GJKType::SIGNEDVOLUME)
-        {
-            bits |= (1 << last);
-            sv_subalgorithm(y, bits, lambdas, v);
-        }
+        y[last]  = w;
+        all_bits = bits | last_bit;
+        if(!closest(bits, last, last_bit, all_bits, y, dp, det, v))
+            break;
 
         ++numIterations;
         dist = norm(v);
     }
-    if constexpr(GJKType == GJKType::JOHNSON)
-    {
-        computePoints(bits, p, q, det, pa, pb);
-    }
-    else if constexpr(GJKType == GJKType::SIGNEDVOLUME)
-    {
-        computePoints(bits, p, q, lambdas, pa, pb);
-    }
+
+    computePoints<T>(bits, p, q, det, pa, pb);
 
     if(numIterations > 1000)
         catch_me();
     else
         nbIter = numIterations;
+
     return (dist);
 }
 
 // -----------------------------------------------------------------------------
-// Returns the minimal distance between 2 convex shapes and a point per convex
-// shape that represents the tips of the minimal distance segment -- relative
-// transformation
-template <typename T,
-          GJKType GJKType,
-          bool    Acceleration = false,
-          T       Tolerance    = EPS<T>>
+// SignedVolume implementation for two transforms
+template <typename T, bool Acceleration, T Tolerance>
+__HOSTDEVICE__ T computeClosestPoints_GJK_SignedVolume(const Convex<T>&     a,
+                                                       const Convex<T>&     b,
+                                                       const Transform3<T>& a2w,
+                                                       const Transform3<T>& b2w,
+                                                       Vector3<T>&          pa,
+                                                       Vector3<T>&          pb,
+                                                       uint& nbIter)
+{
+    // Constants
+    constexpr T relError = Tolerance; // relative tolerance
+    constexpr T absError = T(1.e-4 * relError); // absolute tolerance
+
+    // SignedVolume-specific variables
+    uint bits = 0; // identifies current simplex
+    uint last = 0; // identifies last found support point
+
+    Vector3<T> p[4]; // support points of A in local
+    Vector3<T> q[4]; // support points of B in local
+    Vector3<T> y[4]; // support points of A-B in world
+    T          lambdas[4] = {T(0)}; // Weights
+
+    T   mu            = T(0); // optimality gap
+    int numIterations = 0; // No. iterations
+
+    // Acceleration-specific variables
+    T momentum = T(0); // Only used if Acceleration is true
+
+    // Initializing vectors
+    Vector3<T> v(a2w.getOrigin() - b2w.getOrigin());
+    Vector3<T> w;
+    T          dist = norm(v);
+
+    while(bits < 15 && dist > HIGHEPS<T> && numIterations < 1000)
+    {
+        // Updating the bits
+        for(uint new_index = 0; new_index < 4; ++new_index)
+        {
+            // At least one of these must be empty, otherwise overlap.
+            if(!(bits & (1 << new_index)))
+            {
+                last = new_index;
+                break;
+            }
+        }
+
+        // Support points
+        p[last] = a.support((-v) * a2w.getBasis());
+        q[last] = b.support(v * b2w.getBasis());
+        w       = a2w(p[last]) - b2w(q[last]);
+
+        // termination criteria -- optimality gap
+        mu = dist - v * w / dist;
+        if(mu <= dist * relError || mu < absError)
+            break;
+
+        // termination criteria -- degenerate case
+        if(degenerate(bits, y, w))
+            break;
+
+        // if not terminated, get ready for the next iteration
+        y[last] = w;
+        bits |= (1 << last);
+        sv_subalgorithm(y, bits, lambdas, v);
+
+        ++numIterations;
+        dist = norm(v);
+    }
+
+    computePoints<T>(bits, p, q, lambdas, pa, pb);
+
+    if(numIterations > 1000)
+        catch_me();
+    else
+        nbIter = numIterations;
+
+    return (dist);
+}
+
+// -----------------------------------------------------------------------------
+// Dispatcher function for two transforms
+template <typename T, GJKType GJKType, bool Acceleration, T Tolerance>
 __HOSTDEVICE__ T computeClosestPoints_GJK(const Convex<T>&     a,
                                           const Convex<T>&     b,
                                           const Transform3<T>& a2w,
@@ -817,121 +1159,199 @@ __HOSTDEVICE__ T computeClosestPoints_GJK(const Convex<T>&     a,
     static_assert(GJKType == GJKType::JOHNSON
                       || GJKType == GJKType::SIGNEDVOLUME,
                   "GJKType must be either Johnson or SignedVolume");
-    // Common constants
+
+    if constexpr(GJKType == GJKType::JOHNSON)
+    {
+        return computeClosestPoints_GJK_Johnson<T, Acceleration, Tolerance>(
+            a,
+            b,
+            a2w,
+            b2w,
+            pa,
+            pb,
+            nbIter);
+    }
+    else
+    {
+        return computeClosestPoints_GJK_SignedVolume<T,
+                                                     Acceleration,
+                                                     Tolerance>(a,
+                                                                b,
+                                                                a2w,
+                                                                b2w,
+                                                                pa,
+                                                                pb,
+                                                                nbIter);
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Johnson implementation for Vector/Quaternion
+template <typename T, bool Acceleration, T Tolerance>
+__HOSTDEVICE__ T computeClosestPoints_GJK_Johnson(const Convex<T>&     a,
+                                                  const Convex<T>&     b,
+                                                  const Vector3<T>&    v_b2a,
+                                                  const Quaternion<T>& q_b2a,
+                                                  Vector3<T>&          pa,
+                                                  Vector3<T>&          pb,
+                                                  uint&                nbIter)
+{
+    // Constants
     constexpr T relError = Tolerance; // relative tolerance
     constexpr T absError = T(1.e-4 * relError); // absolute tolerance
 
-    // Common variables
-    uint       bits = 0; // identifies current simplex
-    uint       last = 0; // identifies last found support point
+    // Johnson-specific variables
+    uint bits     = 0; // identifies current simplex
+    uint last     = 0; // identifies last found support point
+    uint last_bit = 0; // last_bit = 1<<last
+    uint all_bits = 0; // all_bits = bits|last_bit
+
     Vector3<T> p[4]; // support points of A in local
     Vector3<T> q[4]; // support points of B in local
     Vector3<T> y[4]; // support points of A-B in world
-    T          mu            = T(0); // optimality gap
-    int        numIterations = 0; // No. iterations
+    T          det[16][4] = {T(0)}; // cached sub-determinants
+    T          dp[4][4]   = {T(0)}; // cached dot products
 
-    // Implementation-specific variables related to GJKType
-    if constexpr(GJKType == GJKType::JOHNSON)
-    {
-        uint last_bit   = 0; // last_bit = 1<<last
-        uint all_bits   = 0; // all_bits = bits|last_bit
-        T    det[16][4] = {T(0)}; // cached sub-determinants
-        T    dp[4][4]   = {T(0)}; // cached dot products
-    }
-    else if constexpr(GJKType == GJKType::SIGNEDVOLUME)
-    {
-        T lambdas[4] = {T(0)}; // Weights
-    }
+    T   mu            = T(0); // optimality gap
+    int numIterations = 0; // No. iterations
 
-    // Implementation-specific variables related to Acceleration
-    if constexpr(Acceleration)
-    {
-        T momentum = T(0);
-    }
+    // Acceleration-specific variables
+    T momentum = T(0); // Only used if Acceleration is true
 
     // Initializing vectors
-    Vector3<T> v(a2w.getOrigin() - b2w.getOrigin());
+    Vector3<T> v(v_b2a);
     Vector3<T> w;
     T          dist = norm(v);
 
     while(bits < 15 && dist > HIGHEPS<T> && numIterations < 1000)
     {
-        if constexpr(GJKType == GJKType::JOHNSON)
+        // Updating the bits
+        last     = 0;
+        last_bit = 1;
+        while(bits & last_bit)
         {
-            // Updating the bits, ...
-            last     = 0;
-            last_bit = 1;
-            while(bits & last_bit)
-            {
-                ++last;
-                last_bit <<= 1;
-            }
-        }
-        else if constexpr(GJKType == GJKType::SIGNEDVOLUME)
-        {
-            // Updating the bits, ...
-            for(uint new_index = 0; new_index < 4; ++new_index)
-            {
-                // At least one of these must be empty, otherwise overlap.
-                if(!(bits & (1 << new_index)))
-                {
-                    last = new_index;
-                    break;
-                }
-            }
+            ++last;
+            last_bit <<= 1;
         }
 
         // Support points
-        p[last] = a.support((-v) * a2w.getBasis());
-        q[last] = b.support(v * b2w.getBasis());
-        w       = a2w(p[last]) - b2w(q[last]);
+        p[last] = a.support(-v);
+        q[last] = b.support(q_b2a << v);
+        FusedMinkowskiDifference(p[last], q[last], v_b2a, q_b2a, w);
 
-        // termination criteria -- optimiality gap
-        // set_max(mu, v * w / dist);
+        // termination criteria -- optimality gap
         mu = dist - v * w / dist;
         if(mu <= dist * relError || mu < absError)
             break;
+
         // termination criteria -- degenerate case
         if(degenerate(all_bits, y, w))
             break;
 
         // if not terminated, get ready for the next iteration
-        y[last] = w;
-        if constexpr(GJKType == GJKType::JOHNSON)
-        {
-            all_bits = bits | last_bit;
-            if(!closest(bits, last, last_bit, all_bits, y, dp, det, v))
-                break;
-        }
-        else if constexpr(GJKType == GJKType::SIGNEDVOLUME)
-        {
-            bits |= (1 << last);
-            sv_subalgorithm(y, bits, lambdas, v);
-        }
+        y[last]  = w;
+        all_bits = bits | last_bit;
+        if(!closest(bits, last, last_bit, all_bits, y, dp, det, v))
+            break;
 
         ++numIterations;
         dist = norm(v);
     }
-    if constexpr(GJKType == GJKType::JOHNSON)
-    {
-        computePoints(bits, p, q, det, pa, pb);
-    }
-    else if constexpr(GJKType == GJKType::SIGNEDVOLUME)
-    {
-        computePoints(bits, p, q, lambdas, pa, pb);
-    }
+
+    computePoints<T>(bits, p, q, det, pa, pb);
 
     if(numIterations > 1000)
         catch_me();
     else
         nbIter = numIterations;
+
     return (dist);
 }
 
 // -----------------------------------------------------------------------------
-// Returns the minimal distance between 2 convex shapes and a point per convex
-// shape that represents the tips of the minimal distance segment -- relative
-// transformation
+// SignedVolume implementation for Vector/Quaternion
+template <typename T, bool Acceleration, T Tolerance>
+__HOSTDEVICE__ T
+    computeClosestPoints_GJK_SignedVolume(const Convex<T>&     a,
+                                          const Convex<T>&     b,
+                                          const Vector3<T>&    v_b2a,
+                                          const Quaternion<T>& q_b2a,
+                                          Vector3<T>&          pa,
+                                          Vector3<T>&          pb,
+                                          uint&                nbIter)
+{
+    // Constants
+    constexpr T relError = Tolerance; // relative tolerance
+    constexpr T absError = T(1.e-4 * relError); // absolute tolerance
+
+    // SignedVolume-specific variables
+    uint bits = 0; // identifies current simplex
+    uint last = 0; // identifies last found support point
+
+    Vector3<T> p[4]; // support points of A in local
+    Vector3<T> q[4]; // support points of B in local
+    Vector3<T> y[4]; // support points of A-B in world
+    T          lambdas[4] = {T(0)}; // Weights
+
+    T   mu            = T(0); // optimality gap
+    int numIterations = 0; // No. iterations
+
+    // Acceleration-specific variables
+    T momentum = T(0); // Only used if Acceleration is true
+
+    // Initializing vectors
+    Vector3<T> v(v_b2a);
+    Vector3<T> w;
+    T          dist = norm(v);
+
+    while(bits < 15 && dist > HIGHEPS<T> && numIterations < 1000)
+    {
+        // Updating the bits
+        for(uint new_index = 0; new_index < 4; ++new_index)
+        {
+            // At least one of these must be empty, otherwise overlap.
+            if(!(bits & (1 << new_index)))
+            {
+                last = new_index;
+                break;
+            }
+        }
+
+        // Support points
+        p[last] = a.support(-v);
+        q[last] = b.support(q_b2a << v);
+        FusedMinkowskiDifference(p[last], q[last], v_b2a, q_b2a, w);
+
+        // termination criteria -- optimality gap
+        mu = dist - v * w / dist;
+        if(mu <= dist * relError || mu < absError)
+            break;
+
+        // termination criteria -- degenerate case
+        if(degenerate(bits, y, w))
+            break;
+
+        // if not terminated, get ready for the next iteration
+        y[last] = w;
+        bits |= (1 << last);
+        sv_subalgorithm(y, bits, lambdas, v);
+
+        ++numIterations;
+        dist = norm(v);
+    }
+
+    computePoints<T>(bits, p, q, lambdas, pa, pb);
+
+    if(numIterations > 1000)
+        catch_me();
+    else
+        nbIter = numIterations;
+
+    return (dist);
+}
+
+// -----------------------------------------------------------------------------
+// Dispatcher function for Vector/Quaternion
 template <typename T, GJKType GJKType, bool Acceleration, T Tolerance>
 __HOSTDEVICE__ T computeClosestPoints_GJK(const Convex<T>&     a,
                                           const Convex<T>&     b,
@@ -944,125 +1364,216 @@ __HOSTDEVICE__ T computeClosestPoints_GJK(const Convex<T>&     a,
     static_assert(GJKType == GJKType::JOHNSON
                       || GJKType == GJKType::SIGNEDVOLUME,
                   "GJKType must be either Johnson or SignedVolume");
-    // Common constants
+
+    if constexpr(GJKType == GJKType::JOHNSON)
+    {
+        return computeClosestPoints_GJK_Johnson<T, Acceleration, Tolerance>(
+            a,
+            b,
+            v_b2a,
+            q_b2a,
+            pa,
+            pb,
+            nbIter);
+    }
+    else
+    {
+        return computeClosestPoints_GJK_SignedVolume<T,
+                                                     Acceleration,
+                                                     Tolerance>(a,
+                                                                b,
+                                                                v_b2a,
+                                                                q_b2a,
+                                                                pa,
+                                                                pb,
+                                                                nbIter);
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Johnson implementation for Vector/Vector/Quaternion/Quaternion
+template <typename T, bool Acceleration, T Tolerance>
+__HOSTDEVICE__ T computeClosestPoints_GJK_Johnson(const Convex<T>&     a,
+                                                  const Convex<T>&     b,
+                                                  const Vector3<T>&    v_a2w,
+                                                  const Vector3<T>&    v_b2w,
+                                                  const Quaternion<T>& q_a2w,
+                                                  const Quaternion<T>& q_b2w,
+                                                  Vector3<T>&          pa,
+                                                  Vector3<T>&          pb,
+                                                  uint&                nbIter)
+{
+    // Constants
     constexpr T relError = Tolerance; // relative tolerance
     constexpr T absError = T(1.e-4 * relError); // absolute tolerance
 
-    // Common variables
-    uint       bits = 0; // identifies current simplex
-    uint       last = 0; // identifies last found support point
+    // Johnson-specific variables
+    uint bits     = 0; // identifies current simplex
+    uint last     = 0; // identifies last found support point
+    uint last_bit = 0; // last_bit = 1<<last
+    uint all_bits = 0; // all_bits = bits|last_bit
+
     Vector3<T> p[4]; // support points of A in local
     Vector3<T> q[4]; // support points of B in local
     Vector3<T> y[4]; // support points of A-B in world
-    T          mu            = T(0); // optimality gap
-    int        numIterations = 0; // No. iterations
+    T          det[16][4] = {T(0)}; // cached sub-determinants
+    T          dp[4][4]   = {T(0)}; // cached dot products
 
-    // Implementation-specific variables related to GJKType
-    if constexpr(GJKType == GJKType::JOHNSON)
-    {
-        uint last_bit   = 0; // last_bit = 1<<last
-        uint all_bits   = 0; // all_bits = bits|last_bit
-        T    det[16][4] = {T(0)}; // cached sub-determinants
-        T    dp[4][4]   = {T(0)}; // cached dot products
-    }
-    else if constexpr(GJKType == GJKType::SIGNEDVOLUME)
-    {
-        T lambdas[4] = {T(0)}; // Weights
-    }
+    T   mu            = T(0); // optimality gap
+    int numIterations = 0; // No. iterations
 
-    // Implementation-specific variables related to Acceleration
-    if constexpr(Acceleration)
-    {
-        T momentum = T(0);
-    }
+    // Acceleration-specific variables
+    T momentum = T(0); // Only used if Acceleration is true
 
     // Initializing vectors
-    Vector3<T> v(v_b2a);
+    Vector3<T> v(v_a2w - v_b2w);
     Vector3<T> w;
     T          dist = norm(v);
 
     while(bits < 15 && dist > HIGHEPS<T> && numIterations < 1000)
     {
-        if constexpr(GJKType == GJKType::JOHNSON)
+        // Updating the bits
+        last     = 0;
+        last_bit = 1;
+        while(bits & last_bit)
         {
-            // Updating the bits, ...
-            last     = 0;
-            last_bit = 1;
-            while(bits & last_bit)
-            {
-                ++last;
-                last_bit <<= 1;
-            }
-        }
-        else if constexpr(GJKType == GJKType::SIGNEDVOLUME)
-        {
-            // Updating the bits, ...
-            for(uint new_index = 0; new_index < 4; ++new_index)
-            {
-                // At least one of these must be empty, otherwise overlap.
-                if(!(bits & (1 << new_index)))
-                {
-                    last = new_index;
-                    break;
-                }
-            }
+            ++last;
+            last_bit <<= 1;
         }
 
         // Support points
-        p[last] = a.support((-v));
-        q[last] = b.support((v) ^ q_b2a.getBasis());
-        w       = p[last] - q_b2a(q[last]);
+        p[last] = a.support(q_a2w << (-v));
+        q[last] = b.support(q_b2w << v);
+        FusedMinkowskiDifference(p[last],
+                                 q[last],
+                                 v_a2w,
+                                 v_b2w,
+                                 q_a2w,
+                                 q_b2w,
+                                 w);
 
-        // termination criteria -- optimiality gap
-        // set_max(mu, v * w / dist);
+        // termination criteria -- optimality gap
         mu = dist - v * w / dist;
         if(mu <= dist * relError || mu < absError)
             break;
+
         // termination criteria -- degenerate case
         if(degenerate(all_bits, y, w))
             break;
 
         // if not terminated, get ready for the next iteration
-        y[last] = w;
-        if constexpr(GJKType == GJKType::JOHNSON)
-        {
-            all_bits = bits | last_bit;
-            if(!closest(bits, last, last_bit, all_bits, y, dp, det, v))
-                break;
-        }
-        else if constexpr(GJKType == GJKType::SIGNEDVOLUME)
-        {
-            bits |= (1 << last);
-            sv_subalgorithm(y, bits, lambdas, v);
-        }
+        y[last]  = w;
+        all_bits = bits | last_bit;
+        if(!closest(bits, last, last_bit, all_bits, y, dp, det, v))
+            break;
 
         ++numIterations;
         dist = norm(v);
     }
-    if constexpr(GJKType == GJKType::JOHNSON)
-    {
-        computePoints(bits, p, q, det, pa, pb);
-    }
-    else if constexpr(GJKType == GJKType::SIGNEDVOLUME)
-    {
-        computePoints(bits, p, q, lambdas, pa, pb);
-    }
+
+    computePoints<T>(bits, p, q, det, pa, pb);
 
     if(numIterations > 1000)
         catch_me();
     else
         nbIter = numIterations;
+
     return (dist);
 }
 
 // -----------------------------------------------------------------------------
-// Returns the minimal distance between 2 convex shapes and a point per convex
-// shape that represents the tips of the minimal distance segment -- relative
-// transformation
-template <typename T,
-          GJKType GJKType,
-          bool    Acceleration = false,
-          T       Tolerance    = EPS<T>>
+// SignedVolume implementation for Vector/Vector/Quaternion/Quaternion
+template <typename T, bool Acceleration, T Tolerance>
+__HOSTDEVICE__ T
+    computeClosestPoints_GJK_SignedVolume(const Convex<T>&     a,
+                                          const Convex<T>&     b,
+                                          const Vector3<T>&    v_a2w,
+                                          const Vector3<T>&    v_b2w,
+                                          const Quaternion<T>& q_a2w,
+                                          const Quaternion<T>& q_b2w,
+                                          Vector3<T>&          pa,
+                                          Vector3<T>&          pb,
+                                          uint&                nbIter)
+{
+    // Constants
+    constexpr T relError = Tolerance; // relative tolerance
+    constexpr T absError = T(1.e-4 * relError); // absolute tolerance
+
+    // SignedVolume-specific variables
+    uint bits = 0; // identifies current simplex
+    uint last = 0; // identifies last found support point
+
+    Vector3<T> p[4]; // support points of A in local
+    Vector3<T> q[4]; // support points of B in local
+    Vector3<T> y[4]; // support points of A-B in world
+    T          lambdas[4] = {T(0)}; // Weights
+
+    T   mu            = T(0); // optimality gap
+    int numIterations = 0; // No. iterations
+
+    // Acceleration-specific variables
+    T momentum = T(0); // Only used if Acceleration is true
+
+    // Initializing vectors
+    Vector3<T> v(v_a2w - v_b2w);
+    Vector3<T> w;
+    T          dist = norm(v);
+
+    while(bits < 15 && dist > HIGHEPS<T> && numIterations < 1000)
+    {
+        // Updating the bits
+        for(uint new_index = 0; new_index < 4; ++new_index)
+        {
+            // At least one of these must be empty, otherwise overlap.
+            if(!(bits & (1 << new_index)))
+            {
+                last = new_index;
+                break;
+            }
+        }
+
+        // Support points
+        p[last] = a.support(q_a2w << (-v));
+        q[last] = b.support(q_b2w << v);
+        FusedMinkowskiDifference(p[last],
+                                 q[last],
+                                 v_a2w,
+                                 v_b2w,
+                                 q_a2w,
+                                 q_b2w,
+                                 w);
+
+        // termination criteria -- optimality gap
+        mu = dist - v * w / dist;
+        if(mu <= dist * relError || mu < absError)
+            break;
+
+        // termination criteria -- degenerate case
+        if(degenerate(bits, y, w))
+            break;
+
+        // if not terminated, get ready for the next iteration
+        y[last] = w;
+        bits |= (1 << last);
+        sv_subalgorithm(y, bits, lambdas, v);
+
+        ++numIterations;
+        dist = norm(v);
+    }
+
+    computePoints<T>(bits, p, q, lambdas, pa, pb);
+
+    if(numIterations > 1000)
+        catch_me();
+    else
+        nbIter = numIterations;
+
+    return (dist);
+}
+
+// -----------------------------------------------------------------------------
+// Dispatcher function for Vector/Vector/Quaternion/Quaternion
+template <typename T, GJKType GJKType, bool Acceleration, T Tolerance>
 __HOSTDEVICE__ T computeClosestPoints_GJK(const Convex<T>&     a,
                                           const Convex<T>&     b,
                                           const Vector3<T>&    v_a2w,
@@ -1076,171 +1587,100 @@ __HOSTDEVICE__ T computeClosestPoints_GJK(const Convex<T>&     a,
     static_assert(GJKType == GJKType::JOHNSON
                       || GJKType == GJKType::SIGNEDVOLUME,
                   "GJKType must be either Johnson or SignedVolume");
-    // Common constants
-    constexpr T relError = Tolerance; // relative tolerance
-    constexpr T absError = T(1.e-4 * relError); // absolute tolerance
 
-    // Common variables
-    uint       bits = 0; // identifies current simplex
-    uint       last = 0; // identifies last found support point
-    Vector3<T> p[4]; // support points of A in local
-    Vector3<T> q[4]; // support points of B in local
-    Vector3<T> y[4]; // support points of A-B in world
-    T          mu            = T(0); // optimality gap
-    int        numIterations = 0; // No. iterations
-
-    // Implementation-specific variables related to GJKType
     if constexpr(GJKType == GJKType::JOHNSON)
     {
-        uint last_bit   = 0; // last_bit = 1<<last
-        uint all_bits   = 0; // all_bits = bits|last_bit
-        T    det[16][4] = {T(0)}; // cached sub-determinants
-        T    dp[4][4]   = {T(0)}; // cached dot products
+        return computeClosestPoints_GJK_Johnson<T, Acceleration, Tolerance>(
+            a,
+            b,
+            v_a2w,
+            v_b2w,
+            q_a2w,
+            q_b2w,
+            pa,
+            pb,
+            nbIter);
     }
-    else if constexpr(GJKType == GJKType::SIGNEDVOLUME)
-    {
-        T lambdas[4] = {T(0)}; // Weights
-    }
-
-    // Implementation-specific variables related to Acceleration
-    if constexpr(Acceleration)
-    {
-        T momentum = T(0);
-    }
-
-    // Initializing vectors
-    Vector3<T> v(v_a2w - v_b2w);
-    Vector3<T> w;
-    T          dist = norm(v);
-
-    while(bits < 15 && dist > HIGHEPS<T> && numIterations < 1000)
-    {
-        if constexpr(GJKType == GJKType::JOHNSON)
-        {
-            // Updating the bits, ...
-            last     = 0;
-            last_bit = 1;
-            while(bits & last_bit)
-            {
-                ++last;
-                last_bit <<= 1;
-            }
-        }
-        else if constexpr(GJKType == GJKType::SIGNEDVOLUME)
-        {
-            // Updating the bits, ...
-            for(uint new_index = 0; new_index < 4; ++new_index)
-            {
-                // At least one of these must be empty, otherwise overlap.
-                if(!(bits & (1 << new_index)))
-                {
-                    last = new_index;
-                    break;
-                }
-            }
-        }
-
-        // Support points
-        p[last] = a.support((-v) ^ q_a2w);
-        q[last] = b.support(v ^ q_b2w);
-        w       = q_a2w(p[last]) - q_b2w(q[last]);
-
-        // termination criteria -- optimiality gap
-        // set_max(mu, v * w / dist);
-        mu = dist - v * w / dist;
-        if(mu <= dist * relError || mu < absError)
-            break;
-        // termination criteria -- degenerate case
-        if(degenerate(all_bits, y, w))
-            break;
-
-        // if not terminated, get ready for the next iteration
-        y[last] = w;
-        if constexpr(GJKType == GJKType::JOHNSON)
-        {
-            all_bits = bits | last_bit;
-            if(!closest(bits, last, last_bit, all_bits, y, dp, det, v))
-                break;
-        }
-        else if constexpr(GJKType == GJKType::SIGNEDVOLUME)
-        {
-            bits |= (1 << last);
-            sv_subalgorithm(y, bits, lambdas, v);
-        }
-
-        ++numIterations;
-        dist = norm(v);
-    }
-    if constexpr(GJKType == GJKType::JOHNSON)
-    {
-        computePoints(bits, p, q, det, pa, pb);
-    }
-    else if constexpr(GJKType == GJKType::SIGNEDVOLUME)
-    {
-        computePoints(bits, p, q, lambdas, pa, pb);
-    }
-
-    if(numIterations > 1000)
-        catch_me();
     else
-        nbIter = numIterations;
-    return (dist);
+    {
+        return computeClosestPoints_GJK_SignedVolume<T,
+                                                     Acceleration,
+                                                     Tolerance>(a,
+                                                                b,
+                                                                v_a2w,
+                                                                v_b2w,
+                                                                q_a2w,
+                                                                q_b2w,
+                                                                pa,
+                                                                pb,
+                                                                nbIter);
+    }
 }
 
 // -----------------------------------------------------------------------------
 // Explicit instantiation
-#define X(T, GJK, ACC)                                                   \
-    template __HOSTDEVICE__ bool intersectGJK(const Convex<T>&     a,    \
-                                              const Convex<T>&     b,    \
-                                              const Transform3<T>& b2a); \
-    template __HOSTDEVICE__ bool intersectGJK(const Convex<T>&     a,    \
-                                              const Convex<T>&     b,    \
-                                              const Transform3<T>& a2w,  \
-                                              const Transform3<T>& b2w);
+#define X(T)                                                               \
+    template __HOSTDEVICE__ bool intersectGJK(const Convex<T>&     a,      \
+                                              const Convex<T>&     b,      \
+                                              const Transform3<T>& b2a);   \
+    template __HOSTDEVICE__ bool intersectGJK(const Convex<T>&     a,      \
+                                              const Convex<T>&     b,      \
+                                              const Transform3<T>& a2w,    \
+                                              const Transform3<T>& b2w);   \
+    template __HOSTDEVICE__ bool intersectGJK(const Convex<T>&     a,      \
+                                              const Convex<T>&     b,      \
+                                              const Vector3<T>&    v_b2a,  \
+                                              const Quaternion<T>& q_b2a); \
+    template __HOSTDEVICE__ bool intersectGJK(const Convex<T>&     a,      \
+                                              const Convex<T>&     b,      \
+                                              const Vector3<T>&    v_a2w,  \
+                                              const Vector3<T>&    v_b2w,  \
+                                              const Quaternion<T>& q_a2w,  \
+                                              const Quaternion<T>& q_b2w);
 X(float)
 X(double)
 #undef X
 
-#define X(T, GJK, ACC)                                  \
-    template __HOSTDEVICE__ T computeClosestPoints_GJK( \
-        const Convex<T>&     a,                         \
-        const Convex<T>&     b,                         \
-        const Transform3<T>& b2a,                       \
-        Vector3<T>&          pa,                        \
-        Vector3<T>&          pb,                        \
-        uint&                nbIter);                                  \
-    template __HOSTDEVICE__ T computeClosestPoints_GJK( \
-        const Convex<T>&     a,                         \
-        const Convex<T>&     b,                         \
-        const Transform3<T>& a2w,                       \
-        const Transform3<T>& b2w,                       \
-        Vector3<T>&          pa,                        \
-        Vector3<T>&          pb,                        \
-        uint&                nbIter);                                  \
-    template __HOSTDEVICE__ T computeClosestPoints_GJK( \
-        const Convex<T>&     a,                         \
-        const Convex<T>&     b,                         \
-        const Vector3<T>&    v_b2a,                     \
-        const Quaternion<T>& q_b2a,                     \
-        Vector3<T>&          pa,                        \
-        Vector3<T>&          pb,                        \
-        uint&                nbIter);                                  \
-    template __HOSTDEVICE__ T computeClosestPoints_GJK( \
-        const Convex<T>&     a,                         \
-        const Convex<T>&     b,                         \
-        const Vector3<T>&    v_a2w,                     \
-        const Vector3<T>&    v_b2w,                     \
-        const Quaternion<T>& q_a2w,                     \
-        const Quaternion<T>& q_b2w,                     \
-        Vector3<T>&          pa,                        \
-        Vector3<T>&          pb,                        \
+#define X(T, GJK, ACC, TOL)                                               \
+    template __HOSTDEVICE__ T computeClosestPoints_GJK<T, GJK, ACC, TOL>( \
+        const Convex<T>&     a,                                           \
+        const Convex<T>&     b,                                           \
+        const Transform3<T>& b2a,                                         \
+        Vector3<T>&          pa,                                          \
+        Vector3<T>&          pb,                                          \
+        uint&                nbIter);                                                    \
+    template __HOSTDEVICE__ T computeClosestPoints_GJK<T, GJK, ACC, TOL>( \
+        const Convex<T>&     a,                                           \
+        const Convex<T>&     b,                                           \
+        const Transform3<T>& a2w,                                         \
+        const Transform3<T>& b2w,                                         \
+        Vector3<T>&          pa,                                          \
+        Vector3<T>&          pb,                                          \
+        uint&                nbIter);                                                    \
+    template __HOSTDEVICE__ T computeClosestPoints_GJK<T, GJK, ACC, TOL>( \
+        const Convex<T>&     a,                                           \
+        const Convex<T>&     b,                                           \
+        const Vector3<T>&    v_b2a,                                       \
+        const Quaternion<T>& q_b2a,                                       \
+        Vector3<T>&          pa,                                          \
+        Vector3<T>&          pb,                                          \
+        uint&                nbIter);                                                    \
+    template __HOSTDEVICE__ T computeClosestPoints_GJK<T, GJK, ACC, TOL>( \
+        const Convex<T>&     a,                                           \
+        const Convex<T>&     b,                                           \
+        const Vector3<T>&    v_a2w,                                       \
+        const Vector3<T>&    v_b2w,                                       \
+        const Quaternion<T>& q_a2w,                                       \
+        const Quaternion<T>& q_b2w,                                       \
+        Vector3<T>&          pa,                                          \
+        Vector3<T>&          pb,                                          \
         uint&                nbIter);
-X(float, GJKType::JOHNSON, false)
-X(double, GJKType::JOHNSON, false)
-X(float, GJKType::JOHNSON, true)
-X(double, GJKType::JOHNSON, true)
-X(float, GJKType::SIGNEDVOLUME, false)
-X(double, GJKType::SIGNEDVOLUME, false)
-X(float, GJKType::SIGNEDVOLUME, true)
-X(double, GJKType::SIGNEDVOLUME, true)
+X(float, GJKType::JOHNSON, false, EPS<float>)
+X(double, GJKType::JOHNSON, false, EPS<double>)
+X(float, GJKType::JOHNSON, true, EPS<float>)
+X(double, GJKType::JOHNSON, true, EPS<double>)
+X(float, GJKType::SIGNEDVOLUME, false, EPS<float>)
+X(double, GJKType::SIGNEDVOLUME, false, EPS<double>)
+X(float, GJKType::SIGNEDVOLUME, true, EPS<float>)
+X(double, GJKType::SIGNEDVOLUME, true, EPS<double>)
 #undef X

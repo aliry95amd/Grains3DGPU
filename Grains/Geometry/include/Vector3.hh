@@ -66,7 +66,7 @@ public:
 
     /** @brief Destructor */
     __HOSTDEVICE__
-    ~Vector3();
+    ~Vector3() noexcept;
     //@}
 
     /** @name Get methods */
@@ -100,11 +100,6 @@ public:
     /** @brief Returns a vector corresponding to the normalized vector */
     __HOSTDEVICE__
     Vector3<T> normalized() const noexcept;
-
-    /** @brief Rounds components to +-tol
-        @param tol tolerance -- EPS defined in Basic.hh is the default */
-    __HOSTDEVICE__
-    void round(T tol = EPS<T>) noexcept;
 
     /** @brief set all components to zero */
     __HOSTDEVICE__

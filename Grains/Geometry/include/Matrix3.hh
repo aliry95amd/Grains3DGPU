@@ -73,14 +73,14 @@ public:
 
     /** @brief Destructor */
     __HOSTDEVICE__
-    ~Matrix3();
+    ~Matrix3() noexcept;
     //@}
 
     /** @name Get methods */
     //@{
     /** @brief Gets the pointer to the buffer */
     __HOSTDEVICE__
-    T const* getBuffer() const;
+    T const* getBuffer() const noexcept;
     //@}
 
     /** @name Set methods */
@@ -89,7 +89,7 @@ public:
         @param buffer the 1D array of values ordered as: 
         0=Mxx, 1=Mxy, 2=Mxz, 3=Myx, 4=Myy, 5=Myz, 6=Mzx, 7=Mzy, 8=Mzz */
     __HOSTDEVICE__
-    void setValue(T const* buffer);
+    void setValue(T const* buffer) noexcept;
 
     /** @brief Sets the matrix with all 9 components as inputs
         @param xx (1,1) coefficient
@@ -102,7 +102,8 @@ public:
         @param zy (3,2) coefficient
         @param zz (3,3) coefficient */
     __HOSTDEVICE__
-    void setValue(T xx, T xy, T xz, T yx, T yy, T yz, T zx, T zy, T zz);
+    void
+        setValue(T xx, T xy, T xz, T yx, T yy, T yz, T zx, T zy, T zz) noexcept;
     //@}
 
     /** @name Operators */
@@ -110,7 +111,34 @@ public:
     /** @brief i-th row accessor
         @param i row number */
     __HOSTDEVICE__
-    Vector3<T>& operator[](uint i) const;
+    Vector3<T>& operator[](uint i) noexcept;
+
+    /** @brief i-th row accessor
+        @param i row number */
+    __HOSTDEVICE__
+    const Vector3<T>& operator[](uint i) const noexcept;
+
+    /** @brief Element accessor
+        @param i element index (0-8) */
+    __HOSTDEVICE__
+    T& operator()(uint i) noexcept;
+
+    /** @brief Element accessor (const version)
+        @param i element index (0-8) */
+    __HOSTDEVICE__
+    const T& operator()(uint i) const noexcept;
+
+    /** @brief Element accessor
+        @param i element index (0-2)
+        @param j element index (0-2) */
+    __HOSTDEVICE__
+    T& operator()(uint i, uint j) noexcept;
+
+    /** @brief Element accessor (const version)
+        @param i element index (0-2)
+        @param j element index (0-2) */
+    __HOSTDEVICE__
+    const T& operator()(uint i, uint j) const noexcept;
     //@}
 };
 

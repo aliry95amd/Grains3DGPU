@@ -148,6 +148,33 @@ public:
 
     /** @name Methods */
     //@{
+    // // -------------------------------------------------------------------------
+    // /** @brief Updates the particle hashes
+    // @param positions buffer of positions */
+    // void updateCells(GrainsMemBuffer<Vector3<T>, M>& positions)
+    // {
+    //     if constexpr(M == MemType::HOST)
+    //     {
+    //         computeHash_Host(m_cells.getData(),
+    //                          positions.getData(),
+    //                          positions.getSize(),
+    //                          m_particleHash.getData());
+    //     }
+    //     else if constexpr(M == MemType::DEVICE)
+    //     {
+    //         uint numBlocks, numThreads;
+    //         computeOptimalThreadsAndBlocks(positions.getSize(),
+    //                                        GrainsParameters<T>::m_GPU,
+    //                                        numBlocks,
+    //                                        numThreads);
+    //         computeHash_Device<<<numBlocks, numThreads>>>(
+    //             m_cells.getData(),
+    //             positions.getData(),
+    //             positions.getSize(),
+    //             m_particleHash.getData());
+    //     }
+    // }
+
     // -------------------------------------------------------------------------
     /** @brief Updates the particle hashes
     @param positions buffer of positions */

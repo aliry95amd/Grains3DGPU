@@ -131,9 +131,33 @@ __HOSTDEVICE__ void Matrix3<T>::setValue(
 // -----------------------------------------------------------------------------
 // i-th row accessor
 template <typename T>
-__HOSTDEVICE__ Vector3<T>& Matrix3<T>::operator[](uint i) const noexcept
+__HOSTDEVICE__ Vector3<T>& Matrix3<T>::operator[](uint i) noexcept
 {
     return (*(Vector3<T>*)(m_comp + 3 * i));
+}
+
+// -----------------------------------------------------------------------------
+// i-th row accessor
+template <typename T>
+__HOSTDEVICE__ const Vector3<T>& Matrix3<T>::operator[](uint i) const noexcept
+{
+    return (*(const Vector3<T>*)(m_comp + 3 * i));
+}
+
+// -----------------------------------------------------------------------------
+// element accessor
+template <typename T>
+__HOSTDEVICE__ T& Matrix3<T>::operator()(uint i) noexcept
+{
+    return (m_comp[i]);
+}
+
+// -----------------------------------------------------------------------------
+// element accessor
+template <typename T>
+__HOSTDEVICE__ T& Matrix3<T>::operator()(uint i, uint j) noexcept
+{
+    return (m_comp[i * 3 + j]);
 }
 
 // -----------------------------------------------------------------------------

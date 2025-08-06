@@ -33,7 +33,8 @@ class ComponentManagerGPU : public ComponentManager<T, MemType::DEVICE>
 
     using CM::m_contactInfo;
     using CM::m_neighborList;
-    using CM::m_relTransform;
+    using CM::m_relPosition;
+    using CM::m_relQuaternion;
 
 public:
     /** @name Constructors */

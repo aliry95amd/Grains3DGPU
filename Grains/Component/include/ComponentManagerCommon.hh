@@ -47,7 +47,7 @@ __HOSTDEVICE__ static INLINE void
     const uint  idA            = pair.x;
     const uint  idB            = pair.y;
     relativePosition[pairID]   = position[idB] - position[idA];
-    relativeQuaternion[pairID] = quaternion[idB] * inverse(quaternion[idA]);
+    relativeQuaternion[pairID] = inverse(quaternion[idA]) * quaternion[idB];
     // TODO: apply crust thickness
 }
 

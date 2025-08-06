@@ -22,10 +22,15 @@
 #include <stdio.h>
 #include <string>
 
+#ifdef TEST_BUILD
+// Skip CUDA includes during testing to avoid GCC compatibility issues
+#else
 #include <cuda.h>
 #include <cuda_runtime.h>
 #include <curand.h>
 #include <curand_kernel.h>
+#endif
+
 #include <omp.h>
 
 #include "ReaderXML.hh"
@@ -39,8 +44,7 @@
 /** @name Macros */
 //@{
 /** @brief Compiler macros */
-// -----------------------------------------------------------------------------
-#ifdef __NVCC__
+#if defined(__NVCC__) && !defined(TEST_BUILD)
 #define __HOST__ __host__
 #define __DEVICE__ __device__
 #define __HOSTDEVICE__ __host__ __device__
@@ -48,12 +52,13 @@
 #define INLINE __inline__
 #define __RESTRICT__ __restrict__
 #else
+// For testing or non-CUDA compilation, use simplified macros
 #define __HOST__
-#define __DEVICE__ __device__
+#define __DEVICE__
 #define __HOSTDEVICE__
 #define __GLOBAL__
 #define INLINE inline
-#define __RESTRICT__ restrict
+#define __RESTRICT__
 #endif
 
 // -----------------------------------------------------------------------------

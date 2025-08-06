@@ -271,7 +271,7 @@ __HOSTDEVICE__ Kinematics<T> RigidBody<T>::computeMomentum(
 {
     // Angular momentum
     // Quaternion and rotation quaternion conjugate
-    Quaternion<T> qCon(q.conjugate());
+    Quaternion<T> qCon(conjugate(q));
     // Write omega in the body-fixed coordinates system
     Vector3<T> angVelocity(qCon.multToVector3(omega * q));
     // Write torque in the body-fixed coordinates system

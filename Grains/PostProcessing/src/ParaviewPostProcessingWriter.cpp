@@ -23,12 +23,9 @@ void writeObstacles_Paraview(const GrainsMemBuffer<RigidBody<T>*>& obstacleRB,
     const GrainsMemBuffer<Quaternion<T>>& quaternion
         = cm->getObstaclesQuaternion();
     const GrainsMemBuffer<Kinematics<T>>& kin = cm->getObstaclesVelocity();
-    GrainsMemBuffer<Transform3<T>>&       tr;
+    GrainsMemBuffer<Transform3<T>>        tr(numObstacles);
     for(uint i = 0; i < numObstacles; ++i)
-    {
-        // Create a transformation for each obstacle
-        tr.push_back(Transform3<T>(quaternion[i], position[i]));
-    }
+        tr[i] = Transform3<T>(quaternion[i], position[i]);
 
     f << "<VTKFile type=\"UnstructuredGrid\" version=\"0.1\" "
       << "byte_order=\"LittleEndian\" ";
@@ -122,16 +119,12 @@ void writeParticles_Paraview(const GrainsMemBuffer<RigidBody<T>*>& particleRB,
                                  + parFileName);
     }
     const uint numParticles                        = cm->getNumberOfParticles();
-    const GrainsMemBuffer<Vector3<T>>&    position = cm->getParticlesPosition();
-    const GrainsMemBuffer<Quaternion<T>>& quaternion
-        = cm->getParticlesQuaternion();
-    const GrainsMemBuffer<Kinematics<T>>& kin = cm->getVelocity();
-    GrainsMemBuffer<Transform3<T>>&       tr;
+    const GrainsMemBuffer<Vector3<T>>&    position = cm->getPosition();
+    const GrainsMemBuffer<Quaternion<T>>& quaternion = cm->getQuaternion();
+    const GrainsMemBuffer<Kinematics<T>>& kin        = cm->getVelocity();
+    GrainsMemBuffer<Transform3<T>>        tr(numParticles);
     for(uint i = 0; i < numParticles; ++i)
-    {
-        // Create a transformation for each particle
-        tr.push_back(Transform3<T>(quaternion[i], position[i]));
-    }
+        tr[i] = Transform3<T>(quaternion[i], position[i]);
 
     f << "<VTKFile type=\"UnstructuredGrid\" version=\"0.1\" "
       << "byte_order=\"LittleEndian\" ";

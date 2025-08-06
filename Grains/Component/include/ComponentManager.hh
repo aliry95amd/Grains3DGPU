@@ -464,6 +464,16 @@ public:
     }
 
     // -------------------------------------------------------------------------
+    /** @brief Sets the relative quaternion
+        @param relQuaternion host buffer containing the relative quaternions */
+    template <MemType srcM>
+    void setRelativeQuaternion(
+        const GrainsMemBuffer<Quaternion<T>, srcM>& relQuaternion)
+    {
+        m_relQuaternion.copyFrom(relQuaternion);
+    }
+
+    // -------------------------------------------------------------------------
     /** @brief Sets the contact information
         @param contactInfo host buffer containing the contact information */
     template <MemType srcM>
@@ -557,8 +567,8 @@ public:
             "initializing on host first, and copy to device. Aborting Grains!");
         // Making sure that we have data for all particles and the number of
         // initial TR matches the number of RBs
-        assert(initPos.getSize() == m_nParticles
-               && initOrient.getSize() == m_nParticles);
+        assert(initPosition.getSize() == m_nParticles
+               && initOrientation.getSize() == m_nParticles);
 
         // Assigning
         for(uint i = 0; i < m_nParticles; ++i)
@@ -584,8 +594,8 @@ public:
             "initializing on host first, and copy to device. Aborting Grains!");
         // Making sure that we have data for all obstacles and the number of
         // initial TR matches the number of RBs
-        assert(initPos.getSize() == m_nObstacles
-               && initOrient.getSize() == m_nObstacles);
+        assert(initPosition.getSize() == m_nObstacles
+               && initOrientation.getSize() == m_nObstacles);
 
         // Assigning
         for(uint i = 0; i < m_nObstacles; ++i)

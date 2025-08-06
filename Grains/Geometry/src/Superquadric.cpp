@@ -1,5 +1,6 @@
 #include "Superquadric.hh"
 #include "MiscMath.hh"
+#include "VectorMath.hh"
 
 // multiple of 4
 #define visuNodeNbOnPer 16

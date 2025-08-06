@@ -79,18 +79,14 @@ void RawDataPostProcessingWriter<T>::PostProcessing(
     const T                                     currentTime)
 {
     // Particles
-    uint                         numParticles    = cm->getNumberOfParticles();
-    const GrainsMemBuffer<uint>& rbParticle      = cm->getRigidBodyId();
-    const GrainsMemBuffer<Vector3<T>>& pParticle = cm->getParticlesPosition();
-    const GrainsMemBuffer<Quaternion<T>>& qParticle
-        = cm->getParticlesQuaternion();
+    uint                         numParticles = cm->getNumberOfParticles();
+    const GrainsMemBuffer<uint>& rbParticle   = cm->getRigidBodyId();
+    const GrainsMemBuffer<Vector3<T>>&    pParticle = cm->getPosition();
+    const GrainsMemBuffer<Quaternion<T>>& qParticle = cm->getQuaternion();
     const GrainsMemBuffer<Kinematics<T>>& kParticle = cm->getVelocity();
-    GrainsMemBuffer<Transform3<T>>&       tParticle;
+    GrainsMemBuffer<Transform3<T>>        tParticle(numParticles);
     for(uint i = 0; i < numParticles; ++i)
-    {
-        // Create a transformation for each particle
-        tParticle.push_back(Transform3<T>(qParticle[i], pParticle[i]));
-    }
+        tParticle[i] = Transform3<T>(qParticle[i], pParticle[i]);
     // Obstacles
     uint                         numObstacles = cm->getNumberOfObstacles();
     const GrainsMemBuffer<uint>& rbObstacle   = cm->getObstaclesRigidBodyId();
@@ -99,12 +95,9 @@ void RawDataPostProcessingWriter<T>::PostProcessing(
         = cm->getObstaclesQuaternion();
     const GrainsMemBuffer<Kinematics<T>>& kObstacle
         = cm->getObstaclesVelocity();
-    GrainsMemBuffer<Transform3<T>>& tObstacle;
+    GrainsMemBuffer<Transform3<T>> tObstacle(numObstacles);
     for(uint i = 0; i < numObstacles; ++i)
-    {
-        // Create a transformation for each obstacle
-        tObstacle.push_back(Transform3<T>(qObstacle[i], pObstacle[i]));
-    }
+        tObstacle[i] = Transform3<T>(qObstacle[i], pObstacle[i]);
     // Aux. variables
     Vector3<T>  centre;
     Vector3<T>  velT;

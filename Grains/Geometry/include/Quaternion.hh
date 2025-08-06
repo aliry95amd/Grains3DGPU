@@ -163,7 +163,7 @@ public:
 		this x rhs
 		@param q the other quaternion */
     __HOSTDEVICE__
-    Vector3<T> multToVector3(const Quaternion<T>& q) const;
+    Vector3<T> multToVector3(const Quaternion<T>& q) const noexcept;
     //@}
 
     /**@name Operators */
@@ -171,13 +171,13 @@ public:
     /** @brief ith component accessor
         @param i component index */
     __HOSTDEVICE__
-    T operator[](size_t i) const;
+    T operator[](size_t i) const noexcept;
 
     /** @brief ith-component accessor: (0,1,2) for the vector components and
 		3 for the scalar - modifiable lvalue
 		@param i index */
     __HOSTDEVICE__
-    T& operator[](size_t i);
+    T& operator[](size_t i) noexcept;
     //@}
 };
 

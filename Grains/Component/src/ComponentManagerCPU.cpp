@@ -65,8 +65,10 @@ void ComponentManagerCPU<T>::computeRelativeTransformations()
     for(uint pID = 0; pID < nPairs; ++pID)
     {
         computeRelativeTransformations_common(m_neighborList->getData(),
-                                              m_transform.getData(),
-                                              m_relTransform.getData(),
+                                              m_position.getData(),
+                                              m_quaternion.getData(),
+                                              m_relPosition.getData(),
+                                              m_relQuaternion.getData(),
                                               pID);
     }
 }
@@ -88,7 +90,8 @@ void ComponentManagerCPU<T>::detectCollisionsParticles()
     {
         detectCollisionsParticles_common(m_neighborList->getData(),
                                          m_particleRB->getData(),
-                                         m_relTransform.getData(),
+                                         m_relPosition.getData(),
+                                         m_relQuaternion.getData(),
                                          m_contactInfo.getData(),
                                          i);
     }
@@ -127,7 +130,7 @@ void ComponentManagerCPU<T>::computeContactForces(
                                     m_particleRB->getData(),
                                     m_velocity.getData(),
                                     m_torce.getData(),
-                                    m_relTransform.getData(),
+                                    m_relPosition.getData(),
                                     i);
     }
 }
@@ -158,7 +161,7 @@ void ComponentManagerCPU<T>::moveParticles(
     {
         moveParticles_common(TI.getData(),
                              m_particleRB->getData(),
-                             m_transform.getData(),
+                             m_position.getData(),
                              m_quaternion.getData(),
                              m_velocity.getData(),
                              m_torce.getData(),

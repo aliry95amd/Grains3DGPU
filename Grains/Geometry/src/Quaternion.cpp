@@ -1,4 +1,6 @@
 #include "Quaternion.hh"
+#include "GrainsUtils.hh"
+#include "MatrixMath.hh"
 #include "QuaternionMath.hh"
 #include "VectorMath.hh"
 
@@ -6,8 +8,8 @@
 // Default constructor
 template <typename T>
 __HOSTDEVICE__ Quaternion<T>::Quaternion() noexcept
-    : m_w(T(1))
-    , m_vqt(T(0))
+    : m_vqt(T(0))
+    , m_w(T(1))
 {
 }
 
@@ -17,7 +19,7 @@ __HOSTDEVICE__ Quaternion<T>::Quaternion() noexcept
 template <typename T>
 __HOSTDEVICE__ Quaternion<T>::Quaternion(T q, T w) noexcept
     : m_vqt(q)
-    , m_w(d)
+    , m_w(w)
 {
 }
 
@@ -27,7 +29,7 @@ __HOSTDEVICE__ Quaternion<T>::Quaternion(T q, T w) noexcept
 template <typename T>
 __HOSTDEVICE__ Quaternion<T>::Quaternion(const Vector3<T>& vec, T w) noexcept
     : m_vqt(vec)
-    , m_w(d)
+    , m_w(w)
 {
 }
 
@@ -37,7 +39,7 @@ __HOSTDEVICE__ Quaternion<T>::Quaternion(const Vector3<T>& vec, T w) noexcept
 template <typename T>
 __HOSTDEVICE__ Quaternion<T>::Quaternion(T x, T y, T z, T w) noexcept
     : m_vqt(Vector3<T>(x, y, z))
-    , m_w(d)
+    , m_w(w)
 {
 }
 
@@ -122,9 +124,9 @@ __HOST__ Quaternion<T>::Quaternion(DOMNode* root) noexcept
     else if(type == "Angles")
     {
         // read in radiands
-        T aX = RADS_PER_DEG<T> * T(ReaderXML::getNodeAttr_Double(angPos, "aX"));
-        T aY = RADS_PER_DEG<T> * T(ReaderXML::getNodeAttr_Double(angPos, "aY"));
-        T aZ = RADS_PER_DEG<T> * T(ReaderXML::getNodeAttr_Double(angPos, "aZ"));
+        T aX = RADS_PER_DEG<T> * T(ReaderXML::getNodeAttr_Double(root, "aX"));
+        T aY = RADS_PER_DEG<T> * T(ReaderXML::getNodeAttr_Double(root, "aY"));
+        T aZ = RADS_PER_DEG<T> * T(ReaderXML::getNodeAttr_Double(root, "aZ"));
 
         Matrix3<T> mat(cos(aZ) * cos(aY),
                        cos(aZ) * sin(aY) * sin(aX) - sin(aZ) * cos(aX),
@@ -173,7 +175,7 @@ __HOSTDEVICE__ const Vector3<T>& Quaternion<T>::getVector() const noexcept
 // -----------------------------------------------------------------------------
 // Returns the value of the scalar part of the quaternion
 template <typename T>
-__HOSTDEVICE__ const T Quaternion<T>::getScalar() const noexcept
+__HOSTDEVICE__ const T& Quaternion<T>::getScalar() const noexcept
 {
     return (m_w);
 }
@@ -191,7 +193,7 @@ __HOSTDEVICE__ void Quaternion<T>::setVector(const Vector3<T>& vec) noexcept
 template <typename T>
 __HOSTDEVICE__ void Quaternion<T>::setScalar(const T w) noexcept
 {
-    m_w = d;
+    m_w = w;
 }
 
 // -----------------------------------------------------------------------------
@@ -199,10 +201,10 @@ __HOSTDEVICE__ void Quaternion<T>::setScalar(const T w) noexcept
 // Quaternion is set to [ d, vec ]
 template <typename T>
 __HOSTDEVICE__ void Quaternion<T>::setQuaternion(const Vector3<T>& vec,
-                                                 const T           d) noexcept
+                                                 const T           w) noexcept
 {
     m_vqt = vec;
-    m_w   = d;
+    m_w   = w;
 }
 
 // -----------------------------------------------------------------------------
@@ -217,7 +219,7 @@ __HOSTDEVICE__ void Quaternion<T>::setQuaternion(const T x,
     m_vqt[X] = x;
     m_vqt[Y] = y;
     m_vqt[Z] = z;
-    m_w      = d;
+    m_w      = w;
 }
 
 // -----------------------------------------------------------------------------
@@ -315,7 +317,7 @@ __HOSTDEVICE__ void
     }
 
     Quaternion<T> qq(vect[0], vect[1], vect[2], real_part);
-    *this = (T(1) / qq.norm()) * qq;
+    *this = (T(1) / norm(qq)) * qq;
 }
 
 // -----------------------------------------------------------------------------
@@ -323,29 +325,27 @@ __HOSTDEVICE__ void
 template <typename T>
 __HOSTDEVICE__ Matrix3<T> Quaternion<T>::toMatrix() const noexcept
 {
-    Matrix3<T> mat;
-    T          x2 = m_vqt[X] + m_vqt[X];
-    T          y2 = m_vqt[Y] + m_vqt[Y];
-    T          z2 = m_vqt[Z] + m_vqt[Z];
-    T          xx = m_vqt[X] * x2;
-    T          xy = m_vqt[X] * y2;
-    T          xz = m_vqt[X] * z2;
-    T          yy = m_vqt[Y] * y2;
-    T          yz = m_vqt[Y] * z2;
-    T          zz = m_vqt[Z] * z2;
-    T          wx = m_w * x2;
-    T          wy = m_w * y2;
-    T          wz = m_w * z2;
-    mat[XX]       = T(1) - (yy + zz);
-    mat[XY]       = xy - wz;
-    mat[XZ]       = xz + wy;
-    mat[YX]       = xy + wz;
-    mat[YY]       = T(1) - (xx + zz);
-    mat[YZ]       = yz - wx;
-    mat[ZX]       = xz - wy;
-    mat[ZY]       = yz + wx;
-    mat[ZZ]       = T(1) - (xx + yy);
-    return mat;
+    T x2 = m_vqt[X] + m_vqt[X];
+    T y2 = m_vqt[Y] + m_vqt[Y];
+    T z2 = m_vqt[Z] + m_vqt[Z];
+    T xx = m_vqt[X] * x2;
+    T xy = m_vqt[X] * y2;
+    T xz = m_vqt[X] * z2;
+    T yy = m_vqt[Y] * y2;
+    T yz = m_vqt[Y] * z2;
+    T zz = m_vqt[Z] * z2;
+    T wx = m_w * x2;
+    T wy = m_w * y2;
+    T wz = m_w * z2;
+    return (Matrix3<T>(T(1) - (yy + zz),
+                       xy - wz,
+                       xz + wy,
+                       xy + wz,
+                       T(1) - (xx + zz),
+                       yz - wx,
+                       xz - wy,
+                       yz + wx,
+                       T(1) - (xx + yy)));
 }
 
 // -----------------------------------------------------------------------------
@@ -379,7 +379,7 @@ __HOSTDEVICE__ T& Quaternion<T>::operator[](size_t i) noexcept
 // -----------------------------------------------------------------------------
 // Output operator
 template <typename T>
-std::ostream& operator<<(std::ostream& fileOut, const Quaternion<T>& q) noexcept
+std::ostream& operator<<(std::ostream& fileOut, const Quaternion<T>& q)
 {
     fileOut << q.getScalar() << "\t" << q.getVector();
     return (fileOut);

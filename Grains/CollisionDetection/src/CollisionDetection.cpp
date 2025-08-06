@@ -1,10 +1,9 @@
 #include "CollisionDetection.hh"
-#include "GJK_AY.hh"
-#include "GJK_JH.hh"
-#include "GJK_SV.hh"
+#include "GJK.hh"
 #include "MatrixMath.hh"
 #include "MiscMath.hh"
 #include "OBB.hh"
+#include "QuaternionMath.hh"
 
 /* ========================================================================== */
 /*                             Low-Level Methods                              */
@@ -120,6 +119,32 @@ __HOSTDEVICE__ static INLINE void
 template <typename T>
 __HOSTDEVICE__ bool intersectRigidBodies(const RigidBody<T>&  rbA,
                                          const RigidBody<T>&  rbB,
+                                         const Transform3<T>& b2a)
+{
+    const Convex<T>& convexA = *(rbA.getConvex());
+    const Convex<T>& convexB = *(rbB.getConvex());
+    return (intersectGJK(convexA, convexB, b2a));
+}
+
+// -----------------------------------------------------------------------------
+// Returns whether 2 rigid bodies intersect
+template <typename T>
+__HOSTDEVICE__ bool intersectRigidBodies(const RigidBody<T>&  rbA,
+                                         const RigidBody<T>&  rbB,
+                                         const Transform3<T>& a2w,
+                                         const Transform3<T>& b2w)
+{
+    const Convex<T>& convexA = *(rbA.getConvex());
+    const Convex<T>& convexB = *(rbB.getConvex());
+    return (intersectGJK(convexA, convexB, a2w, b2w));
+}
+
+// -----------------------------------------------------------------------------
+// Returns whether 2 rigid bodies intersect using the GJK algorithm - relative
+// transformation
+template <typename T>
+__HOSTDEVICE__ bool intersectRigidBodies(const RigidBody<T>&  rbA,
+                                         const RigidBody<T>&  rbB,
                                          const Vector3<T>&    v_b2a,
                                          const Quaternion<T>& q_b2a)
 {
@@ -141,6 +166,152 @@ __HOSTDEVICE__ bool intersectRigidBodies(const RigidBody<T>&  rbA,
     const Convex<T>& convexA = *(rbA.getConvex());
     const Convex<T>& convexB = *(rbB.getConvex());
     return (intersectGJK(convexA, convexB, v_a2w, v_b2w, q_a2w, q_b2w));
+}
+
+// -----------------------------------------------------------------------------
+// Returns the contact information (if any) for 2 rigid bodies - relative
+// transformation
+template <typename T>
+__HOSTDEVICE__ void closestPointsRigidBodies(const RigidBody<T>&  rbA,
+                                             const RigidBody<T>&  rbB,
+                                             const Transform3<T>& b2a,
+                                             ContactInfo<T>&      contactInfo)
+{
+    // Comment on the direction of the overlap vector
+    // Assuming A and B are the centers of the 2 convex bodies
+    // overlap_vector = overlap * Vector3(A to B)
+    // If contact, overlap is negative and overlap_vector is from B to A
+    // If no contact, overlap is positive and we do not care about the direction
+    // of overlap_vector
+
+    const Convex<T>& convexA = *(rbA.getConvex());
+    const Convex<T>& convexB = *(rbB.getConvex());
+
+    // If both convexes are spheres, we use a specific method
+    if(convexA.getConvexType() == ConvexType::SPHERE
+       && convexB.getConvexType() == ConvexType::SPHERE)
+    {
+        closestPointsSpheres(rbA, rbB, b2a.getOrigin(), contactInfo);
+        return;
+    }
+
+    // General case for convexes
+    // Sum of crust thicknesses
+    T ctSum = rbA.getCrustThickness() + rbB.getCrustThickness();
+
+    Vector3<T> ptA, ptB;
+    uint       nbIterGJK = 0;
+    T          distance
+        = computeClosestPoints_GJK<T, GJKType::JOHNSON, false>(convexA,
+                                                               convexB,
+                                                               b2a,
+                                                               ptA,
+                                                               ptB,
+                                                               nbIterGJK);
+
+    // Computation of the actual overlap
+    // distance = distance - crustA - crustB
+    // If actual overlap distance < 0 => contact otherwise no contact
+    distance -= ctSum;
+    // TODO: What if too much overlap?
+    contactInfo.setOverlapDistance(distance);
+    if(distance > T(0))
+        return;
+
+    // Points A and B are in their respective local coordinate systems
+    // We transform ptB into the the local coordinate system of A
+    // ptA = ptA;
+    ptB = (b2a)(ptB);
+
+    // Contact point definition as the mid point between ptA and ptB
+    contactInfo.setContactPoint(T(0.5) * (ptA + ptB));
+
+    // Computation of the actual overlap vector
+    // If contact, crustA + crustB - distance > 0, the overlap vector is
+    // directed from B to A
+    // If no contact, crustA + crustB - distance < 0 and we do not care
+    // about the direction of the overlap vector
+    Vector3<T> contactVec(ptA - ptB);
+    contactVec.normalize();
+    round(contactVec);
+    contactVec *= -distance;
+    contactInfo.setContactVector(contactVec);
+    return;
+}
+
+// -----------------------------------------------------------------------------
+// Returns the contact information (if any) for 2 rigid bodies
+template <typename T>
+__HOSTDEVICE__ void closestPointsRigidBodies(const RigidBody<T>&  rbA,
+                                             const RigidBody<T>&  rbB,
+                                             const Transform3<T>& a2w,
+                                             const Transform3<T>& b2w,
+                                             ContactInfo<T>&      contactInfo)
+{
+    // Comment on the direction of the overlap vector
+    // Assuming A and B are the centers of the 2 convex bodies
+    // overlap_vector = overlap * Vector3(A to B)
+    // If contact, overlap is negative and overlap_vector is from B to A
+    // If no contact, overlap is positive and we do not care about the direction
+    // of overlap_vector
+
+    const Convex<T>& convexA = *(rbA.getConvex());
+    const Convex<T>& convexB = *(rbB.getConvex());
+
+    // If both convexes are spheres, we use a specific method
+    if(convexA.getConvexType() == ConvexType::SPHERE
+       && convexB.getConvexType() == ConvexType::SPHERE)
+    {
+        closestPointsSpheres(rbA,
+                             rbB,
+                             a2w.getOrigin(),
+                             b2w.getOrigin(),
+                             contactInfo);
+        return;
+    }
+
+    // General case for convexes
+    // Sum of crust thicknesses
+    T ctSum = rbA.getCrustThickness() + rbB.getCrustThickness();
+
+    Vector3<T> ptA, ptB;
+    uint       nbIterGJK = 0;
+    T          distance
+        = computeClosestPoints_GJK<T, GJKType::JOHNSON, false>(convexA,
+                                                               convexB,
+                                                               a2w,
+                                                               b2w,
+                                                               ptA,
+                                                               ptB,
+                                                               nbIterGJK);
+
+    // Computation of the actual overlap
+    // distance = distance - crustA - crustB
+    // If actual overlap distance < 0 => contact otherwise no contact
+    distance -= ctSum;
+    // TODO: What if too much overlap?
+    contactInfo.setOverlapDistance(distance);
+    if(distance > T(0))
+        return;
+
+    // Points A and B are in their respective local coordinate systems
+    // Thus we transform them into the world coordinate system
+    ptA = (a2w)(ptA);
+    ptB = (b2w)(ptB);
+
+    // Contact point definition as the mid point between ptA and ptB
+    contactInfo.setContactPoint(T(0.5) * (ptA + ptB));
+
+    // Computation of the actual overlap vector
+    // If contact, crustA + crustB - distance > 0, the overlap vector is
+    // directed from B to A
+    // If no contact, crustA + crustB - distance < 0 and we do not care
+    // about the direction of the overlap vector
+    Vector3<T> contactVec = ptA - ptB;
+    contactVec.normalize();
+    round(contactVec);
+    contactVec *= -distance;
+    contactInfo.setContactVector(contactVec);
 }
 
 // -----------------------------------------------------------------------------
@@ -177,13 +348,14 @@ __HOSTDEVICE__ void closestPointsRigidBodies(const RigidBody<T>&  rbA,
 
     Vector3<T> ptA, ptB;
     uint       nbIterGJK = 0;
-    T          distance  = computeClosestPoints_GJK_JH(convexA,
-                                             convexB,
-                                             v_b2a,
-                                             q_b2a,
-                                             ptA,
-                                             ptB,
-                                             nbIterGJK);
+    T          distance
+        = computeClosestPoints_GJK<T, GJKType::JOHNSON, false>(convexA,
+                                                               convexB,
+                                                               v_b2a,
+                                                               q_b2a,
+                                                               ptA,
+                                                               ptB,
+                                                               nbIterGJK);
 
     // Computation of the actual overlap
     // distance = distance - crustA - crustB
@@ -198,10 +370,8 @@ __HOSTDEVICE__ void closestPointsRigidBodies(const RigidBody<T>&  rbA,
     // We transform ptB from B's coordinate system into A's coordinate system
     // using the relative transformation from B to A
     // ptA is already in A's coordinate system
-    // Apply quaternion rotation: ptB_rotated = q_b2a * ptB * conjugate(q_b2a)
-    ptB ^= q_b2a;
-    // Then apply translation
-    ptB += v_b2a;
+    // Apply quaternion rotation and translation
+    transform(q_b2a, v_b2a, ptB);
 
     // Contact point definition as the mid point between ptA and ptB
     contactInfo.setContactPoint(T(0.5) * (ptA + ptB));
@@ -213,7 +383,7 @@ __HOSTDEVICE__ void closestPointsRigidBodies(const RigidBody<T>&  rbA,
     // about the direction of the overlap vector
     Vector3<T> contactVec(ptA - ptB);
     contactVec.normalize();
-    contactVec.round();
+    round(contactVec);
     contactVec *= -distance;
     contactInfo.setContactVector(contactVec);
     return;
@@ -254,15 +424,16 @@ __HOSTDEVICE__ void closestPointsRigidBodies(const RigidBody<T>&  rbA,
 
     Vector3<T> ptA, ptB;
     uint       nbIterGJK = 0;
-    T          distance  = computeClosestPoints_GJK_JH(convexA,
-                                             convexB,
-                                             v_a2w,
-                                             v_b2w,
-                                             q_a2w,
-                                             q_b2w,
-                                             ptA,
-                                             ptB,
-                                             nbIterGJK);
+    T          distance
+        = computeClosestPoints_GJK<T, GJKType::JOHNSON, false>(convexA,
+                                                               convexB,
+                                                               v_a2w,
+                                                               v_b2w,
+                                                               q_a2w,
+                                                               q_b2w,
+                                                               ptA,
+                                                               ptB,
+                                                               nbIterGJK);
 
     // Computation of the actual overlap
     // distance = distance - crustA - crustB
@@ -275,10 +446,8 @@ __HOSTDEVICE__ void closestPointsRigidBodies(const RigidBody<T>&  rbA,
 
     // Points A and B are in their respective local coordinate systems
     // Thus we transform them into the world coordinate system
-    ptA ^= q_a2w;
-    ptA += v_a2w;
-    ptB ^= q_b2w;
-    ptB += v_b2w;
+    transform(q_a2w, v_a2w, ptA);
+    transform(q_b2w, v_b2w, ptB);
 
     // Contact point definition as the mid point between ptA and ptB
     contactInfo.setContactPoint(T(0.5) * (ptA + ptB));
@@ -290,7 +459,7 @@ __HOSTDEVICE__ void closestPointsRigidBodies(const RigidBody<T>&  rbA,
     // about the direction of the overlap vector
     Vector3<T> contactVec = ptA - ptB;
     contactVec.normalize();
-    contactVec.round();
+    round(contactVec);
     contactVec *= -distance;
     contactInfo.setContactVector(contactVec);
 }
@@ -312,13 +481,13 @@ __HOSTDEVICE__ T distanceRigidBodies(const RigidBody<T>&  rbA,
     T          distance  = 0;
     // if ( method == 1 )
     // {
-    distance = computeClosestPoints_GJK_JH(*convexA,
-                                           *convexB,
-                                           a2w,
-                                           b2w,
-                                           ptA,
-                                           ptB,
-                                           nbIterGJK);
+    distance = computeClosestPoints_GJK<T, GJKType::JOHNSON, false>(*convexA,
+                                                                    *convexB,
+                                                                    a2w,
+                                                                    b2w,
+                                                                    ptA,
+                                                                    ptB,
+                                                                    nbIterGJK);
     // }
     // else if ( method == 2 )
     // {
@@ -349,6 +518,15 @@ __HOSTDEVICE__ T distanceRigidBodies(const RigidBody<T>&  rbA,
     template __HOSTDEVICE__ bool intersectRigidBodies(                      \
         const RigidBody<T>&  rbA,                                           \
         const RigidBody<T>&  rbB,                                           \
+        const Transform3<T>& b2a);                                          \
+    template __HOSTDEVICE__ bool intersectRigidBodies(                      \
+        const RigidBody<T>&  rbA,                                           \
+        const RigidBody<T>&  rbB,                                           \
+        const Transform3<T>& a2w,                                           \
+        const Transform3<T>& b2w);                                          \
+    template __HOSTDEVICE__ bool intersectRigidBodies(                      \
+        const RigidBody<T>&  rbA,                                           \
+        const RigidBody<T>&  rbB,                                           \
         const Vector3<T>&    v_b2a,                                         \
         const Quaternion<T>& q_b2a);                                        \
     template __HOSTDEVICE__ bool intersectRigidBodies(                      \
@@ -358,6 +536,17 @@ __HOSTDEVICE__ T distanceRigidBodies(const RigidBody<T>&  rbA,
         const Vector3<T>&    v_b2w,                                         \
         const Quaternion<T>& q_a2w,                                         \
         const Quaternion<T>& q_b2w);                                        \
+    template __HOSTDEVICE__ void closestPointsRigidBodies(                  \
+        const RigidBody<T>&  rbA,                                           \
+        const RigidBody<T>&  rbB,                                           \
+        const Transform3<T>& b2a,                                           \
+        ContactInfo<T>&      contactInfo);                                       \
+    template __HOSTDEVICE__ void closestPointsRigidBodies(                  \
+        const RigidBody<T>&  rbA,                                           \
+        const RigidBody<T>&  rbB,                                           \
+        const Transform3<T>& a2w,                                           \
+        const Transform3<T>& b2w,                                           \
+        ContactInfo<T>&      contactInfo);                                       \
     template __HOSTDEVICE__ void closestPointsRigidBodies(                  \
         const RigidBody<T>&  rbA,                                           \
         const RigidBody<T>&  rbB,                                           \

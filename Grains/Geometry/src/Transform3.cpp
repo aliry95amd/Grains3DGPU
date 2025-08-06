@@ -200,9 +200,9 @@ __HOSTDEVICE__ void Transform3<T>::setToInverseTransform(const Transform3<T>& t,
                                                          bool isRotation)
 {
     if(isRotation)
-        m_basis = t.m_basis.transpose();
+        m_basis = transpose(t.m_basis);
     else
-        m_basis = t.m_basis.inverse();
+        m_basis = inverse(t.m_basis);
     m_origin.setValue((-m_basis * t.m_origin).getBuffer());
 }
 
@@ -223,7 +223,7 @@ __HOSTDEVICE__ void
 template <typename T>
 __HOSTDEVICE__ void Transform3<T>::composeWithScaling(const Vector3<T>& v)
 {
-    m_basis.scale(v);
+    scale(m_basis, v);
 }
 
 // -----------------------------------------------------------------------------
@@ -327,7 +327,7 @@ __HOSTDEVICE__ void
 template <typename T>
 __HOSTDEVICE__ void Transform3<T>::relativeToTransform(const Transform3<T>& t)
 {
-    Matrix3<T> const inverseRotation = (t.m_basis).transpose();
+    Matrix3<T> const inverseRotation = transpose(t.m_basis);
     m_basis                          = inverseRotation * m_basis;
     m_origin = inverseRotation * (m_origin - t.m_origin);
 }

@@ -32,15 +32,19 @@
 // -----------------------------------------------------------------------------
 /** @brief Computes the relative transformations between pairs of components
     @param pairList list of pairs of components
-    @param transform array of transformations for components
-    @param relativeTransform array to store the relative transformations
+    @param position array of positions for components
+    @param quaternion array of quaternions for components
+    @param relPosition array of relative positions for particles
+    @param relQuaternion array of relative quaternions for particles
     @param nPairs number of pairs */
 template <typename T>
 __GLOBAL__ void
     computeRelativeTransformations_Kernel(const uint2*         pairList,
-                                          const Transform3<T>* transform,
-                                          Transform3<T>* relativeTransform,
-                                          const uint     nPairs)
+                                          const Vector3<T>*    position,
+                                          const Quaternion<T>* quaternion,
+                                          Vector3<T>*          relPosition,
+                                          Quaternion<T>*       relQuaternion,
+                                          const uint           nPairs)
 {
     uint tID = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -48,8 +52,10 @@ __GLOBAL__ void
         return;
 
     computeRelativeTransformations_common(pairList,
-                                          transform,
-                                          relativeTransform,
+                                          position,
+                                          quaternion,
+                                          relPosition,
+                                          relQuaternion,
                                           tID);
 }
 
@@ -90,14 +96,16 @@ __GLOBAL__ void
 /** @brief Detects collisions between particles and particles
     @param pairList list of pairs of components
     @param particleRB array of rigid bodies for particles
-    @param relTransform array of relative transformations for particles
+    @param relPosition array of relative positions for particles
+    @param relQuaternion array of relative quaternions for particles
     @param contactInfo array to store contact information
     @param nPairs number of pairs */
 template <typename T>
 __GLOBAL__ void
     detectCollisionsParticles_Kernel(const uint2*               pairList,
                                      const RigidBody<T>* const* particleRB,
-                                     const Transform3<T>*       relTransform,
+                                     const Vector3<T>*          relPosition,
+                                     const Quaternion<T>*       relQuaternion,
                                      ContactInfo<T>*            contactInfo,
                                      const uint                 nPairs)
 {
@@ -108,7 +116,8 @@ __GLOBAL__ void
 
     detectCollisionsParticles_common(pairList,
                                      particleRB,
-                                     relTransform,
+                                     relPosition,
+                                     relQuaternion,
                                      contactInfo,
                                      tID);
 }
@@ -121,7 +130,7 @@ __GLOBAL__ void
     @param particleRB rigid body of particles
     @param velocity kinematics of the particles
     @param torce torce acting on the particles
-    @param relTransform transformation of the particles */
+    @param relPosition relative position of the particles */
 template <typename T>
 __GLOBAL__ void
     computeContactForces_Kernel(const ContactForceModel<T>* const* CF,
@@ -130,7 +139,7 @@ __GLOBAL__ void
                                 const RigidBody<T>* const*         particleRB,
                                 const Kinematics<T>*               velocity,
                                 Torce<T>*                          torce,
-                                const Transform3<T>*               relTransform,
+                                const Vector3<T>*                  relPosition,
                                 const uint                         nPairs)
 {
     uint tID = blockIdx.x * blockDim.x + threadIdx.x;
@@ -144,7 +153,7 @@ __GLOBAL__ void
                                 particleRB,
                                 velocity,
                                 torce,
-                                relTransform,
+                                relPosition,
                                 tID);
 }
 
@@ -176,7 +185,7 @@ __GLOBAL__ void addExternalForces_Kernel(const T                    gX,
 /** @brief Updates the position and velocities of particles
     @param TI time integrator scheme
     @param particleRB array of rigid bodies for particles
-    @param transform array of particles transformations
+    @param position the position of the particle
     @param quaternion array of particles quaternions
     @param velocity array of particles velocities
     @param torce array of particles torces
@@ -185,7 +194,7 @@ __GLOBAL__ void addExternalForces_Kernel(const T                    gX,
 template <typename T>
 __GLOBAL__ void moveParticles_Kernel(const TimeIntegrator<T>* const* TI,
                                      const RigidBody<T>* const*      particleRB,
-                                     Transform3<T>*                  transform,
+                                     Vector3<T>*                     position,
                                      Quaternion<T>*                  quaternion,
                                      Kinematics<T>*                  velocity,
                                      Torce<T>*                       torce,
@@ -199,7 +208,7 @@ __GLOBAL__ void moveParticles_Kernel(const TimeIntegrator<T>* const* TI,
 
     moveParticles_common(TI,
                          particleRB,
-                         transform,
+                         position,
                          quaternion,
                          velocity,
                          torce,

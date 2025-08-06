@@ -102,22 +102,28 @@ __HOSTDEVICE__ static INLINE Matrix3<T> inverse(const Matrix3<T>& m) noexcept
 {
     const T* __RESTRICT__ b = m.getBuffer();
     T __RESTRICT__        out[9];
+
+    // Calculate cofactor matrix
     out[XX] = (b[YY] * b[ZZ] - b[YZ] * b[ZY]);
+    out[XY] = (b[XZ] * b[ZY] - b[XY] * b[ZZ]);
+    out[XZ] = (b[XY] * b[YZ] - b[XZ] * b[YY]);
     out[YX] = (b[YZ] * b[ZX] - b[YX] * b[ZZ]);
+    out[YY] = (b[XX] * b[ZZ] - b[XZ] * b[ZX]);
+    out[YZ] = (b[XZ] * b[YX] - b[XX] * b[YZ]);
     out[ZX] = (b[YX] * b[ZY] - b[YY] * b[ZX]);
-    T det   = b[XX] * out[XX] + b[XY] * out[YX] + b[XZ] * out[ZX];
+    out[ZY] = (b[XY] * b[ZX] - b[XX] * b[ZY]);
+    out[ZZ] = (b[XX] * b[YY] - b[XY] * b[YX]);
+
+    // Calculate determinant
+    T det = b[XX] * out[XX] + b[XY] * out[YX] + b[XZ] * out[ZX];
     if(fabs(det) < HIGHEPS<T>)
         printf("Matrix is not inversible!\n");
-    T s     = T(1) / det;
-    out[ZZ] = s * (out[XX]);
-    out[XY] = s * (b[XZ] * b[ZY] - b[XY] * b[ZZ]);
-    out[XZ] = s * (b[XY] * b[YZ] - b[XZ] * b[YY]);
-    out[YX] = s * (out[XZ]);
-    out[YY] = s * (b[XX] * b[ZZ] - b[XZ] * b[ZX]);
-    out[YZ] = s * (b[XZ] * b[YY] - b[XX] * b[YZ]);
-    out[ZX] = s * (out[ZX]);
-    out[ZY] = s * (b[XY] * b[ZX] - b[XX] * b[ZY]);
-    out[ZZ] = s * (b[XX] * b[YY] - b[XY] * b[YX]);
+
+    // Scale by inverse determinant
+    T s = T(1) / det;
+    for(int i = 0; i < 9; ++i)
+        out[i] *= s;
+
     return (Matrix3<T>(out));
 }
 
@@ -129,22 +135,28 @@ __HOSTDEVICE__ static INLINE void inverse(Matrix3<T>& m) noexcept
 {
     T* __RESTRICT__ b = const_cast<T*>(m.getBuffer());
     T __RESTRICT__  out[9];
+
+    // Calculate cofactor matrix
     out[XX] = (b[YY] * b[ZZ] - b[YZ] * b[ZY]);
+    out[XY] = (b[XZ] * b[ZY] - b[XY] * b[ZZ]);
+    out[XZ] = (b[XY] * b[YZ] - b[XZ] * b[YY]);
     out[YX] = (b[YZ] * b[ZX] - b[YX] * b[ZZ]);
+    out[YY] = (b[XX] * b[ZZ] - b[XZ] * b[ZX]);
+    out[YZ] = (b[XZ] * b[YX] - b[XX] * b[YZ]);
     out[ZX] = (b[YX] * b[ZY] - b[YY] * b[ZX]);
-    T det   = b[XX] * out[XX] + b[XY] * out[YX] + b[XZ] * out[ZX];
+    out[ZY] = (b[XY] * b[ZX] - b[XX] * b[ZY]);
+    out[ZZ] = (b[XX] * b[YY] - b[XY] * b[YX]);
+
+    // Calculate determinant
+    T det = b[XX] * out[XX] + b[XY] * out[YX] + b[XZ] * out[ZX];
     if(fabs(det) < HIGHEPS<T>)
         printf("Matrix is not inversible!\n");
-    T s     = T(1) / det;
-    out[ZZ] = s * (out[XX]);
-    out[XY] = s * (b[XZ] * b[ZY] - b[XY] * b[ZZ]);
-    out[XZ] = s * (b[XY] * b[YZ] - b[XZ] * b[YY]);
-    out[YX] = s * (out[XZ]);
-    out[YY] = s * (b[XX] * b[ZZ] - b[XZ] * b[ZX]);
-    out[YZ] = s * (b[XZ] * b[YY] - b[XX] * b[YZ]);
-    out[ZX] = s * (out[ZX]);
-    out[ZY] = s * (b[XY] * b[ZX] - b[XX] * b[ZY]);
-    out[ZZ] = s * (b[XX] * b[YY] - b[XY] * b[YX]);
+
+    // Scale by inverse determinant
+    T s = T(1) / det;
+    for(int i = 0; i < 9; ++i)
+        out[i] *= s;
+
     m.setValue(out);
 }
 
@@ -423,14 +435,14 @@ __HOSTDEVICE__ static INLINE bool isRotation(const Matrix3<T>& m,
 
     // Check diagonal elements are approximately 1
     // clang-format off
-    if(fabs(inv[XX] - T(1)) > tol || 
-       fabs(inv[YY] - T(1)) > tol || 
-       fabs(inv[ZZ] - T(1)) > tol)
+    if(fabs(inv(XX) - T(1)) > tol || 
+       fabs(inv(YY) - T(1)) > tol || 
+       fabs(inv(ZZ) - T(1)) > tol)
         return false;
 
     // Check off-diagonal elements are approximately 0
-    if(fabs(inv[XY]) > tol || fabs(inv[XZ]) > tol || fabs(inv[YX]) > tol ||
-       fabs(inv[YZ]) > tol || fabs(inv[ZX]) > tol || fabs(inv[ZY]) > tol)
+    if(fabs(inv(XY)) > tol || fabs(inv(XZ)) > tol || fabs(inv(YX)) > tol ||
+       fabs(inv(YZ)) > tol || fabs(inv(ZX)) > tol || fabs(inv(ZY)) > tol)
         return false;
     // clang-format on
     return true;

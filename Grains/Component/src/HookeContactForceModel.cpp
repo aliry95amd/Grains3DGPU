@@ -107,7 +107,7 @@ __HOSTDEVICE__ void HookeContactForceModel<T>::performForcesCalculus(
 
     // Unit normal vector at contact point
     penetration /= norm(penetration);
-    penetration.round();
+    round(penetration);
 
     Vector3<T> v_n = (relVelocityAtContact * penetration) * penetration;
     Vector3<T> v_t = relVelocityAtContact - v_n;

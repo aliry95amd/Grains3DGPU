@@ -83,7 +83,8 @@ __HOST__ void RigidBodyFactory<T>::create(
     numParticles         = 0;
     uint numRefParticles = allParticles->getLength();
     refRB.allocate(numRefParticles);
-    initTransform.allocate(numRefParticles);
+    initPositions.allocate(numRefParticles);
+    initOrientations.allocate(numRefParticles);
     numEachRefParticle.allocate(numRefParticles);
     for(int i = 0; i < numRefParticles; ++i)
     {

@@ -1,4 +1,5 @@
 #include "Cylinder.hh"
+#include "VectorMath.hh"
 
 // multiple of 4
 #define visuNodeNbOnPer 32

@@ -1,0 +1,485 @@
+================================================================================ 
+GJK Performance Comparison Test 
+================================================================================ 
+
+Test Begins: 
+================================================================================ 
+Number of particles: 1000 
+Number of pairs: 2000 
+Shape type: 0 
+GPU tests:  Enabled 
+
+PERFORMANCE RESULTS 
+-------------------------------------------------------------------------------- 
+CJT time wrt CJT [-]:  1.000000 
+CST time wrt CJT [-]:  1.425260 
+CJQ time wrt CJT [-]:  0.757782 
+CSQ time wrt CJT [-]:  1.246097 
+GJT time wrt CJT [-]:  0.122950 
+GST time wrt CJT [-]:  0.109034 
+GJQ time wrt CJT [-]:  0.066155 
+GSQ time wrt CJT [-]:  0.078410 
+
+ACCURACY ANALYSIS 
+-------------------------------------------------------------------------------- 
+CJT accuracy wrt CJT [%]:  100.00 
+CST accuracy wrt CJT [%]:  100.00 
+CJQ accuracy wrt CJT [%]:  100.00 
+CSQ accuracy wrt CJT [%]:  100.00 
+GJT accuracy wrt CJT [%]:  100.00 
+GST accuracy wrt CJT [%]:  100.00 
+GJQ accuracy wrt CJT [%]:  100.00 
+GSQ accuracy wrt CJT [%]:  100.00 
+
+CONVERGENCE ANALYSIS 
+-------------------------------------------------------------------------------- 
+CJT average iterations [-]:  3.83 
+CST average iterations [-]:  3.82 
+CJQ average iterations [-]:  3.82 
+CSQ average iterations [-]:  3.83 
+GJT average iterations [-]:  3.82 
+GST average iterations [-]:  3.82 
+GJQ average iterations [-]:  3.83 
+GSQ average iterations [-]:  3.82 
+
+Test Begins: 
+================================================================================ 
+Number of particles: 2000 
+Number of pairs: 4000 
+Shape type: 0 
+GPU tests:  Enabled 
+
+PERFORMANCE RESULTS 
+-------------------------------------------------------------------------------- 
+CJT time wrt CJT [-]:  1.000000 
+CST time wrt CJT [-]:  1.515536 
+CJQ time wrt CJT [-]:  0.799472 
+CSQ time wrt CJT [-]:  1.325100 
+GJT time wrt CJT [-]:  0.014499 
+GST time wrt CJT [-]:  0.018705 
+GJQ time wrt CJT [-]:  0.013497 
+GSQ time wrt CJT [-]:  0.019793 
+
+ACCURACY ANALYSIS 
+-------------------------------------------------------------------------------- 
+CJT accuracy wrt CJT [%]:  100.00 
+CST accuracy wrt CJT [%]:  100.00 
+CJQ accuracy wrt CJT [%]:  100.00 
+CSQ accuracy wrt CJT [%]:  100.00 
+GJT accuracy wrt CJT [%]:  100.00 
+GST accuracy wrt CJT [%]:  100.00 
+GJQ accuracy wrt CJT [%]:  100.00 
+GSQ accuracy wrt CJT [%]:  100.00 
+
+CONVERGENCE ANALYSIS 
+-------------------------------------------------------------------------------- 
+CJT average iterations [-]:  3.84 
+CST average iterations [-]:  3.84 
+CJQ average iterations [-]:  3.83 
+CSQ average iterations [-]:  3.84 
+GJT average iterations [-]:  3.83 
+GST average iterations [-]:  3.84 
+GJQ average iterations [-]:  3.84 
+GSQ average iterations [-]:  3.84 
+
+Test Begins: 
+================================================================================ 
+Number of particles: 4000 
+Number of pairs: 8000 
+Shape type: 0 
+GPU tests:  Enabled 
+
+PERFORMANCE RESULTS 
+-------------------------------------------------------------------------------- 
+CJT time wrt CJT [-]:  1.000000 
+CST time wrt CJT [-]:  1.499248 
+CJQ time wrt CJT [-]:  0.793430 
+CSQ time wrt CJT [-]:  1.305712 
+GJT time wrt CJT [-]:  0.013794 
+GST time wrt CJT [-]:  0.017328 
+GJQ time wrt CJT [-]:  0.013637 
+GSQ time wrt CJT [-]:  0.017528 
+
+ACCURACY ANALYSIS 
+-------------------------------------------------------------------------------- 
+CJT accuracy wrt CJT [%]:  100.00 
+CST accuracy wrt CJT [%]:  100.00 
+CJQ accuracy wrt CJT [%]:  100.00 
+CSQ accuracy wrt CJT [%]:  100.00 
+GJT accuracy wrt CJT [%]:  100.00 
+GST accuracy wrt CJT [%]:  100.00 
+GJQ accuracy wrt CJT [%]:  100.00 
+GSQ accuracy wrt CJT [%]:  100.00 
+
+CONVERGENCE ANALYSIS 
+-------------------------------------------------------------------------------- 
+CJT average iterations [-]:  3.81 
+CST average iterations [-]:  3.81 
+CJQ average iterations [-]:  3.81 
+CSQ average iterations [-]:  3.81 
+GJT average iterations [-]:  3.81 
+GST average iterations [-]:  3.81 
+GJQ average iterations [-]:  3.80 
+GSQ average iterations [-]:  3.81 
+
+Test Begins: 
+================================================================================ 
+Number of particles: 8000 
+Number of pairs: 16000 
+Shape type: 0 
+GPU tests:  Enabled 
+
+PERFORMANCE RESULTS 
+-------------------------------------------------------------------------------- 
+CJT time wrt CJT [-]:  1.000000 
+CST time wrt CJT [-]:  1.576588 
+CJQ time wrt CJT [-]:  0.816930 
+CSQ time wrt CJT [-]:  1.336388 
+GJT time wrt CJT [-]:  0.015545 
+GST time wrt CJT [-]:  0.145999 
+GJQ time wrt CJT [-]:  0.011786 
+GSQ time wrt CJT [-]:  0.013850 
+
+ACCURACY ANALYSIS 
+-------------------------------------------------------------------------------- 
+CJT accuracy wrt CJT [%]:  100.00 
+CST accuracy wrt CJT [%]:  100.00 
+CJQ accuracy wrt CJT [%]:  100.00 
+CSQ accuracy wrt CJT [%]:  100.00 
+GJT accuracy wrt CJT [%]:  100.00 
+GST accuracy wrt CJT [%]:  100.00 
+GJQ accuracy wrt CJT [%]:  100.00 
+GSQ accuracy wrt CJT [%]:  100.00 
+
+CONVERGENCE ANALYSIS 
+-------------------------------------------------------------------------------- 
+CJT average iterations [-]:  3.82 
+CST average iterations [-]:  3.88 
+CJQ average iterations [-]:  3.82 
+CSQ average iterations [-]:  3.82 
+GJT average iterations [-]:  3.82 
+GST average iterations [-]:  3.88 
+GJQ average iterations [-]:  3.82 
+GSQ average iterations [-]:  3.82 
+
+Test Begins: 
+================================================================================ 
+Number of particles: 1000 
+Number of pairs: 2000 
+Shape type: 1 
+GPU tests:  Enabled 
+
+PERFORMANCE RESULTS 
+-------------------------------------------------------------------------------- 
+CJT time wrt CJT [-]:  1.000000 
+CST time wrt CJT [-]:  0.959563 
+CJQ time wrt CJT [-]:  0.745079 
+CSQ time wrt CJT [-]:  0.709091 
+GJT time wrt CJT [-]:  0.017521 
+GST time wrt CJT [-]:  0.015409 
+GJQ time wrt CJT [-]:  0.018913 
+GSQ time wrt CJT [-]:  0.015583 
+
+ACCURACY ANALYSIS 
+-------------------------------------------------------------------------------- 
+CJT accuracy wrt CJT [%]:  100.00 
+CST accuracy wrt CJT [%]:  100.00 
+CJQ accuracy wrt CJT [%]:  100.00 
+CSQ accuracy wrt CJT [%]:  100.00 
+GJT accuracy wrt CJT [%]:  100.00 
+GST accuracy wrt CJT [%]:  100.00 
+GJQ accuracy wrt CJT [%]:  100.00 
+GSQ accuracy wrt CJT [%]:  100.00 
+
+CONVERGENCE ANALYSIS 
+-------------------------------------------------------------------------------- 
+CJT average iterations [-]:  1.00 
+CST average iterations [-]:  1.00 
+CJQ average iterations [-]:  1.00 
+CSQ average iterations [-]:  1.00 
+GJT average iterations [-]:  1.00 
+GST average iterations [-]:  1.00 
+GJQ average iterations [-]:  1.00 
+GSQ average iterations [-]:  1.00 
+
+Test Begins: 
+================================================================================ 
+Number of particles: 2000 
+Number of pairs: 4000 
+Shape type: 1 
+GPU tests:  Enabled 
+
+PERFORMANCE RESULTS 
+-------------------------------------------------------------------------------- 
+CJT time wrt CJT [-]:  1.000000 
+CST time wrt CJT [-]:  0.861173 
+CJQ time wrt CJT [-]:  0.674316 
+CSQ time wrt CJT [-]:  0.631292 
+GJT time wrt CJT [-]:  0.010861 
+GST time wrt CJT [-]:  0.008430 
+GJQ time wrt CJT [-]:  0.010032 
+GSQ time wrt CJT [-]:  0.008066 
+
+ACCURACY ANALYSIS 
+-------------------------------------------------------------------------------- 
+CJT accuracy wrt CJT [%]:  100.00 
+CST accuracy wrt CJT [%]:  100.00 
+CJQ accuracy wrt CJT [%]:  100.00 
+CSQ accuracy wrt CJT [%]:  100.00 
+GJT accuracy wrt CJT [%]:  100.00 
+GST accuracy wrt CJT [%]:  100.00 
+GJQ accuracy wrt CJT [%]:  100.00 
+GSQ accuracy wrt CJT [%]:  100.00 
+
+CONVERGENCE ANALYSIS 
+-------------------------------------------------------------------------------- 
+CJT average iterations [-]:  1.00 
+CST average iterations [-]:  1.00 
+CJQ average iterations [-]:  1.00 
+CSQ average iterations [-]:  1.00 
+GJT average iterations [-]:  1.00 
+GST average iterations [-]:  1.00 
+GJQ average iterations [-]:  1.00 
+GSQ average iterations [-]:  1.00 
+
+Test Begins: 
+================================================================================ 
+Number of particles: 4000 
+Number of pairs: 8000 
+Shape type: 1 
+GPU tests:  Enabled 
+
+PERFORMANCE RESULTS 
+-------------------------------------------------------------------------------- 
+CJT time wrt CJT [-]:  1.000000 
+CST time wrt CJT [-]:  0.903933 
+CJQ time wrt CJT [-]:  0.690433 
+CSQ time wrt CJT [-]:  0.660784 
+GJT time wrt CJT [-]:  0.011381 
+GST time wrt CJT [-]:  0.007962 
+GJQ time wrt CJT [-]:  0.009605 
+GSQ time wrt CJT [-]:  0.007526 
+
+ACCURACY ANALYSIS 
+-------------------------------------------------------------------------------- 
+CJT accuracy wrt CJT [%]:  100.00 
+CST accuracy wrt CJT [%]:  100.00 
+CJQ accuracy wrt CJT [%]:  100.00 
+CSQ accuracy wrt CJT [%]:  100.00 
+GJT accuracy wrt CJT [%]:  100.00 
+GST accuracy wrt CJT [%]:  100.00 
+GJQ accuracy wrt CJT [%]:  100.00 
+GSQ accuracy wrt CJT [%]:  100.00 
+
+CONVERGENCE ANALYSIS 
+-------------------------------------------------------------------------------- 
+CJT average iterations [-]:  1.00 
+CST average iterations [-]:  1.00 
+CJQ average iterations [-]:  1.00 
+CSQ average iterations [-]:  1.00 
+GJT average iterations [-]:  1.00 
+GST average iterations [-]:  1.00 
+GJQ average iterations [-]:  1.00 
+GSQ average iterations [-]:  1.00 
+
+Test Begins: 
+================================================================================ 
+Number of particles: 8000 
+Number of pairs: 16000 
+Shape type: 1 
+GPU tests:  Enabled 
+
+PERFORMANCE RESULTS 
+-------------------------------------------------------------------------------- 
+CJT time wrt CJT [-]:  1.000000 
+CST time wrt CJT [-]:  0.960496 
+CJQ time wrt CJT [-]:  0.744263 
+CSQ time wrt CJT [-]:  0.699052 
+GJT time wrt CJT [-]:  0.000291 
+GST time wrt CJT [-]:  0.000103 
+GJQ time wrt CJT [-]:  0.000106 
+GSQ time wrt CJT [-]:  0.000106 
+
+ACCURACY ANALYSIS 
+-------------------------------------------------------------------------------- 
+CJT accuracy wrt CJT [%]:  100.00 
+CST accuracy wrt CJT [%]:  100.00 
+CJQ accuracy wrt CJT [%]:  100.00 
+CSQ accuracy wrt CJT [%]:  100.00 
+GJT accuracy wrt CJT [%]:  0.37 
+GST accuracy wrt CJT [%]:  0.37 
+GJQ accuracy wrt CJT [%]:  0.37 
+GSQ accuracy wrt CJT [%]:  0.37 
+
+CONVERGENCE ANALYSIS 
+-------------------------------------------------------------------------------- 
+CJT average iterations [-]:  1.00 
+CST average iterations [-]:  1.00 
+CJQ average iterations [-]:  1.00 
+CSQ average iterations [-]:  1.00 
+GJT average iterations [-]:  0.00 
+GST average iterations [-]:  0.00 
+GJQ average iterations [-]:  0.00 
+GSQ average iterations [-]:  0.00 
+
+Test Begins: 
+================================================================================ 
+Number of particles: 1000 
+Number of pairs: 2000 
+Shape type: 2 
+GPU tests:  Enabled 
+
+PERFORMANCE RESULTS 
+-------------------------------------------------------------------------------- 
+CJT time wrt CJT [-]:  1.000000 
+CST time wrt CJT [-]:  1.650538 
+CJQ time wrt CJT [-]:  0.838157 
+CSQ time wrt CJT [-]:  1.141412 
+GJT time wrt CJT [-]:  0.000404 
+GST time wrt CJT [-]:  0.000126 
+GJQ time wrt CJT [-]:  0.000130 
+GSQ time wrt CJT [-]:  0.000163 
+
+ACCURACY ANALYSIS 
+-------------------------------------------------------------------------------- 
+CJT accuracy wrt CJT [%]:  100.00 
+CST accuracy wrt CJT [%]:  98.40 
+CJQ accuracy wrt CJT [%]:  100.00 
+CSQ accuracy wrt CJT [%]:  98.40 
+GJT accuracy wrt CJT [%]:  0.40 
+GST accuracy wrt CJT [%]:  0.40 
+GJQ accuracy wrt CJT [%]:  0.40 
+GSQ accuracy wrt CJT [%]:  0.40 
+
+CONVERGENCE ANALYSIS 
+-------------------------------------------------------------------------------- 
+CJT average iterations [-]:  6.46 
+CST average iterations [-]:  8.01 
+CJQ average iterations [-]:  6.46 
+CSQ average iterations [-]:  7.04 
+GJT average iterations [-]:  7348690.78 
+GST average iterations [-]:  7348690.78 
+GJQ average iterations [-]:  7348690.78 
+GSQ average iterations [-]:  7348690.78 
+
+Test Begins: 
+================================================================================ 
+Number of particles: 2000 
+Number of pairs: 4000 
+Shape type: 2 
+GPU tests:  Enabled 
+
+PERFORMANCE RESULTS 
+-------------------------------------------------------------------------------- 
+CJT time wrt CJT [-]:  1.000000 
+CST time wrt CJT [-]:  1.547709 
+CJQ time wrt CJT [-]:  0.838822 
+CSQ time wrt CJT [-]:  1.506366 
+GJT time wrt CJT [-]:  0.000271 
+GST time wrt CJT [-]:  0.000079 
+GJQ time wrt CJT [-]:  0.000079 
+GSQ time wrt CJT [-]:  0.000063 
+
+ACCURACY ANALYSIS 
+-------------------------------------------------------------------------------- 
+CJT accuracy wrt CJT [%]:  100.00 
+CST accuracy wrt CJT [%]:  98.32 
+CJQ accuracy wrt CJT [%]:  100.00 
+CSQ accuracy wrt CJT [%]:  98.35 
+GJT accuracy wrt CJT [%]:  0.00 
+GST accuracy wrt CJT [%]:  0.00 
+GJQ accuracy wrt CJT [%]:  0.00 
+GSQ accuracy wrt CJT [%]:  0.00 
+
+CONVERGENCE ANALYSIS 
+-------------------------------------------------------------------------------- 
+CJT average iterations [-]:  6.41 
+CST average iterations [-]:  7.70 
+CJQ average iterations [-]:  6.41 
+CSQ average iterations [-]:  8.19 
+GJT average iterations [-]:  2181667271.18 
+GST average iterations [-]:  2181667271.18 
+GJQ average iterations [-]:  2181667271.18 
+GSQ average iterations [-]:  2181667271.18 
+
+Test Begins: 
+================================================================================ 
+Number of particles: 4000 
+Number of pairs: 8000 
+Shape type: 2 
+GPU tests:  Enabled 
+
+PERFORMANCE RESULTS 
+-------------------------------------------------------------------------------- 
+CJT time wrt CJT [-]:  1.000000 
+CST time wrt CJT [-]:  2.050122 
+CJQ time wrt CJT [-]:  0.838380 
+CSQ time wrt CJT [-]:  1.678304 
+GJT time wrt CJT [-]:  0.000144 
+GST time wrt CJT [-]:  0.000033 
+GJQ time wrt CJT [-]:  0.000040 
+GSQ time wrt CJT [-]:  0.000032 
+
+ACCURACY ANALYSIS 
+-------------------------------------------------------------------------------- 
+CJT accuracy wrt CJT [%]:  100.00 
+CST accuracy wrt CJT [%]:  98.09 
+CJQ accuracy wrt CJT [%]:  100.00 
+CSQ accuracy wrt CJT [%]:  98.08 
+GJT accuracy wrt CJT [%]:  0.00 
+GST accuracy wrt CJT [%]:  0.00 
+GJQ accuracy wrt CJT [%]:  0.00 
+GSQ accuracy wrt CJT [%]:  0.00 
+
+CONVERGENCE ANALYSIS 
+-------------------------------------------------------------------------------- 
+CJT average iterations [-]:  6.39 
+CST average iterations [-]:  8.93 
+CJQ average iterations [-]:  6.39 
+CSQ average iterations [-]:  8.44 
+GJT average iterations [-]:  2021952780.22 
+GST average iterations [-]:  2021952780.22 
+GJQ average iterations [-]:  2021952780.22 
+GSQ average iterations [-]:  2021952780.22 
+
+Test Begins: 
+================================================================================ 
+Number of particles: 8000 
+Number of pairs: 16000 
+Shape type: 2 
+GPU tests:  Enabled 
+
+PERFORMANCE RESULTS 
+-------------------------------------------------------------------------------- 
+CJT time wrt CJT [-]:  1.000000 
+CST time wrt CJT [-]:  1.905070 
+CJQ time wrt CJT [-]:  0.841851 
+CSQ time wrt CJT [-]:  1.708206 
+GJT time wrt CJT [-]:  0.000071 
+GST time wrt CJT [-]:  0.000025 
+GJQ time wrt CJT [-]:  0.000023 
+GSQ time wrt CJT [-]:  0.000019 
+
+ACCURACY ANALYSIS 
+-------------------------------------------------------------------------------- 
+CJT accuracy wrt CJT [%]:  100.00 
+CST accuracy wrt CJT [%]:  98.34 
+CJQ accuracy wrt CJT [%]:  100.00 
+CSQ accuracy wrt CJT [%]:  98.35 
+GJT accuracy wrt CJT [%]:  0.48 
+GST accuracy wrt CJT [%]:  0.48 
+GJQ accuracy wrt CJT [%]:  0.48 
+GSQ accuracy wrt CJT [%]:  0.48 
+
+CONVERGENCE ANALYSIS 
+-------------------------------------------------------------------------------- 
+CJT average iterations [-]:  6.37 
+CST average iterations [-]:  8.52 
+CJQ average iterations [-]:  6.37 
+CSQ average iterations [-]:  8.64 
+GJT average iterations [-]:  0.00 
+GST average iterations [-]:  0.00 
+GJQ average iterations [-]:  0.00 
+GSQ average iterations [-]:  0.00 
+
+All performance tests completed!
