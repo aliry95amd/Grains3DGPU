@@ -98,38 +98,48 @@ public:
 
         if constexpr(M == MemType::HOST)
         {
-            auto* LC_host = static_cast<LinkedCell_Host<T>*>(m_LinkedCell);
-            LC_host->updateLinkedCells(positions);
-            updateNeighborList_LC_Host(LC_host->getCellParticles(),
-                                       LC_host->getCellNeighborsList(),
-                                       m_pairList.getData(),
-                                       m_pairCount.getData());
-            // Update the actual size of the pair list
-            m_pairList.setSize(m_pairCount[0]);
+            auto* LC_host    = static_cast<LinkedCell_Host<T>*>(m_LinkedCell);
+            bool  LC_updated = LC_host->updateLinkedCells(positions);
+            // Check if the linked cell structure was updated.
+            // If not, we bypass the neighbor list update.
+            if(LC_updated)
+            {
+                updateNeighborList_LC_Host(LC_host->getCellParticles(),
+                                           LC_host->getCellNeighborsList(),
+                                           m_pairList.getData(),
+                                           m_pairCount.getData());
+                // Update the actual size of the pair list
+                m_pairList.setSize(m_pairCount[0]);
+            }
         }
         else if constexpr(M == MemType::DEVICE)
         {
             auto* LC_device
                 = static_cast<LinkedCell_SortBased<T>*>(m_LinkedCell);
-            LC_device->updateLinkedCells(positions);
-            uint numBlocks, numThreads;
-            computeOptimalThreadsAndBlocks(positions.getSize(),
-                                           GrainsParameters<T>::m_GPU,
-                                           numBlocks,
-                                           numThreads);
-            updateNeighborList_LC_Device<<<numBlocks, numThreads>>>(
-                LC_device->getParticleIDs(),
-                LC_device->getParticleHashes(),
-                LC_device->getCellNeighborsList(),
-                LC_device->getCellStartIDs(),
-                positions.getSize(),
-                LC_device->getNumCells(),
-                m_pairList.getData(),
-                m_pairCount.getData());
-
-            // Copy the actual pair count and update size
-            m_pairCount.copyTo(m_hPairCount);
-            m_pairList.setSize(m_hPairCount[0]);
+            bool LC_updated = LC_device->updateLinkedCells(positions);
+            // Check if the linked cell structure was updated.
+            // If not, we bypass the neighbor list update.
+            if(LC_updated)
+            {
+                uint numBlocks, numThreads;
+                computeOptimalThreadsAndBlocks(positions.getSize(),
+                                               GrainsParameters<T>::m_GPU,
+                                               numBlocks,
+                                               numThreads);
+                updateNeighborList_LC_Device<<<numBlocks, numThreads>>>(
+                    LC_device->getParticleIDs(),
+                    LC_device->getParticleHashes(),
+                    LC_device->getCellNeighborsList(),
+                    LC_device->getCellStartIDs(),
+                    positions.getSize(),
+                    LC_device->getNumCells(),
+                    m_pairList.getData(),
+                    m_pairCount.getData());
+                cudaDeviceSynchronize();
+                // Copy the actual pair count and update size
+                m_pairCount.copyTo(m_hPairCount);
+                m_pairList.setSize(m_hPairCount[0]);
+            }
         }
 
         m_needsUpdate = true;

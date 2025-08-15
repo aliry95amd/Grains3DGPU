@@ -1,6 +1,5 @@
 #include "CellsFactory.hh"
 #include "Cells.hh"
-#include "GrainsParameters.hh"
 
 /* ========================================================================== */
 /*                             Low-Level Methods                              */
@@ -37,14 +36,15 @@ __GLOBAL__ void createCellsKernel(Cells<T>** cells,
 // Creates and stores a LinkedCell object in the host memory.
 template <typename T>
 __HOST__ void
-    CellsFactory<T>::create(GrainsMemBuffer<Cells<T>*, MemType::HOST>& cells,
+    CellsFactory<T>::create(const Vector3<T>& minCorner,
+                            const Vector3<T>& maxCorner,
+                            const T           cellSize,
+                            GrainsMemBuffer<Cells<T>*, MemType::HOST>& cells,
                             uint*                                      numCells)
 {
-    using GP = GrainsParameters<T>;
     cells.reserve(1);
-    T cellSize  = T(2) * GP::m_maxRadius * GP::m_linkedCellSizeFactor;
-    cells[0]    = new Cells<T>(GP::m_origin, GP::m_maxCoordinate, cellSize);
-    numCells[0] = cells[0]->getNumCells();
+    cells[0]  = new Cells<T>(minCorner, maxCorner, cellSize);
+    *numCells = cells[0]->getNumCells();
     GoutWI(9, "LinkedCell with", *numCells, "cells is created on host.");
 }
 

@@ -28,9 +28,15 @@ public:
     /**@name Methods */
     //@{
     /** @brief Creates and returns a buffer of linked cells
+        @param minCorner Minimum corner of the domain
+        @param maxCorner Maximum corner of the domain
+        @param cellSize Size of each cell
         @param LC Memory buffer for storing the linked cell object(s)
         @param numCells Total number of cells in the simulation */
-    static void create(GrainsMemBuffer<Cells<T>*, MemType::HOST>& LC,
+    static void create(const Vector3<T>&                          minCorner,
+                       const Vector3<T>&                          maxCorner,
+                       const T                                    cellSize,
+                       GrainsMemBuffer<Cells<T>*, MemType::HOST>& LC,
                        uint*                                      numCells);
 
     /** @brief Cells objects must be instantiated on device, if

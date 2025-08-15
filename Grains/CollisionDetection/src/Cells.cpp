@@ -16,16 +16,8 @@ __HOSTDEVICE__
     Cells<T>::Cells(const Vector3<T>& min, const Vector3<T>& max, T cellSize)
     : m_minCorner(min)
     , m_maxCorner(max)
-    , m_cellSize(cellSize)
-    , m_cellSize_inv(T(1) / cellSize)
 {
-    Vector3<T> numCellsPerDir(EPS<T>, EPS<T>, EPS<T>);
-    numCellsPerDir += m_maxCorner - m_minCorner;
-    numCellsPerDir *= m_cellSize_inv;
-    m_numCells.x = uint(numCellsPerDir[X]);
-    m_numCells.y = uint(numCellsPerDir[Y]);
-    m_numCells.z = uint(numCellsPerDir[Z]);
-    m_numCells.w = m_numCells.x * m_numCells.y * m_numCells.z;
+    resize(cellSize);
 }
 
 // -----------------------------------------------------------------------------
@@ -76,25 +68,49 @@ __HOSTDEVICE__ uint Cells<T>::getSizeOfNeighborCells() const
 }
 
 // -----------------------------------------------------------------------------
-// Generates neighbor list for cells
-// NOTE: On device side, the list is generated using one thread. It is not
-// efficient, but it is simple. It can be parallelized by using a kernel
-// with one thread per cell, but it is not implemented yet.
-// This function is called only once, so it is not a performance bottleneck.
-// TODO: We can also expand this so each cell can have different number of
-// neighbors. My proposal would be to use another flat array that specifies the
-// number of neighbors for each cell, and then use that to allocate the neighbor
-// list.
+// Resizes the linked cells
 template <typename T>
-__HOSTDEVICE__ void Cells<T>::generateNeighborCells(uint* neighborCells) const
+__HOSTDEVICE__ void Cells<T>::resize(const T cellSize)
 {
+    T DX = m_maxCorner[X] - m_minCorner[X];
+    T DY = m_maxCorner[Y] - m_minCorner[Y];
+    T DZ = m_maxCorner[Z] - m_minCorner[Z];
+
+    m_cellSize     = cellSize;
+    m_cellSize_inv = T(1) / cellSize;
+    m_numCells.x   = uint(DX * m_cellSize_inv);
+    m_numCells.y   = uint(DY * m_cellSize_inv);
+    m_numCells.z   = uint(DZ * m_cellSize_inv);
+    m_numCells.w   = m_numCells.x * m_numCells.y * m_numCells.z;
+
+    m_minCornerLinkedCell[X] = m_minCorner[X] - (m_numCells.x * cellSize - DX);
+    m_minCornerLinkedCell[Y] = m_minCorner[Y] - (m_numCells.y * cellSize - DY);
+    m_minCornerLinkedCell[Z] = m_minCorner[Z] - (m_numCells.z * cellSize - DZ);
+}
+
+// -----------------------------------------------------------------------------
+// Generates neighbor list for cells
+// TODO: We can also improve this so each thread can take more than one cell,
+// but that would only be useful for cases where this is a bottleneck.
+// TODO: The length of the array is fixed as 27 * m_numCells.w. We can implement
+// a more dynamic approach where we first compute the maximum possible
+// number of neighbors for each cell, and then use that to allocate the neighbor
+// list. This would be more efficient in terms of memory usage.
+template <typename T>
+__HOSTDEVICE__ void Cells<T>::generateNeighborCells(uint* neighborCells,
+                                                    uint  start,
+                                                    uint  end) const
+{
+    if(end == 0)
+        end = m_numCells.w;
+    constexpr uint numNeighbors = 27;
     // Allocate memory for the flat array
     uint offset;
     // Precompute neighbors for each cell
     // clang-format off
-    for(uint cellHash = 0; cellHash < m_numCells.w; ++cellHash)
+    for(uint cellHash = start; cellHash < end; ++cellHash)
     {
-        offset       = 27 * cellHash;
+        offset       = numNeighbors * cellHash;
         uint3 cellId = { cellHash % m_numCells.x,
                         (cellHash / m_numCells.x) % m_numCells.y,
                          cellHash / (m_numCells.x * m_numCells.y)};
@@ -147,9 +163,9 @@ __HOSTDEVICE__ uint3 Cells<T>::computeCellID(const Vector3<T>& p) const
     // cellId.x = static_cast<int>((p[X] - m_minCorner[X]) * m_cellSize_inv);
     // cellId.y = static_cast<int>((p[Y] - m_minCorner[Y]) * m_cellSize_inv);
     // cellId.z = static_cast<int>((p[Z] - m_minCorner[Z]) * m_cellSize_inv);
-    cellId.x = floor((p[X] - m_minCorner[X]) * m_cellSize_inv);
-    cellId.y = floor((p[Y] - m_minCorner[Y]) * m_cellSize_inv);
-    cellId.z = floor((p[Z] - m_minCorner[Z]) * m_cellSize_inv);
+    cellId.x = floor((p[X] - m_minCornerLinkedCell[X]) * m_cellSize_inv);
+    cellId.y = floor((p[Y] - m_minCornerLinkedCell[Y]) * m_cellSize_inv);
+    cellId.z = floor((p[Z] - m_minCornerLinkedCell[Z]) * m_cellSize_inv);
     checkBound(cellId);
     return (cellId);
 }

@@ -1,11 +1,6 @@
 #ifndef _LINKEDCELL_SORTBASED_HH_
 #define _LINKEDCELL_SORTBASED_HH_
 
-#include "thrust/device_ptr.h"
-#include "thrust/for_each.h"
-#include "thrust/iterator/zip_iterator.h"
-#include "thrust/sort.h"
-
 #include "GrainsMemBuffer.hh"
 #include "LinkedCell.hh"
 #include "LinkedCell_Kernels.hh"
@@ -30,6 +25,7 @@ class LinkedCell_SortBased : public LinkedCell<T, MemType::DEVICE>
 {
     using LC = LinkedCell<T, MemType::DEVICE>;
     using LC::m_cells;
+    using LC::m_needsUpdate;
     using LC::m_neighborCells;
     using LC::m_numCells;
     using LC::m_particleHash;
@@ -85,9 +81,15 @@ public:
     // -------------------------------------------------------------------------
     /** @brief Updates the linked cells based on the transformations
     @param positions buffer of positions */
-    void updateLinkedCells(
+    bool updateLinkedCells(
         GrainsMemBuffer<Vector3<T>, MemType::DEVICE>& positions)
     {
+        this->computeMaxDisplacement(positions);
+        if(m_needsUpdate)
+            this->updateCells();
+        else
+            return false;
+
         const uint numParticles = positions.getSize();
         // Update the particle hashes
         this->updateParticlesHash(positions);
@@ -110,6 +112,8 @@ public:
             m_particleHash.getData(),
             numParticles,
             m_cellStartID.getData());
+
+        return true;
     }
 };
 

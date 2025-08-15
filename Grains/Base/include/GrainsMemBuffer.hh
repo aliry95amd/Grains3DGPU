@@ -166,6 +166,46 @@ public:
         else
             return MemType::UNKNOWN;
     }
+
+    // -------------------------------------------------------------------------
+    /** @brief Returns iterator to the beginning of the buffer */
+    T* begin()
+    {
+        static_assert(
+            M == MemType::HOST || M == MemType::PINNED || M == MemType::MANAGED,
+            "begin() only available for HOST, PINNED, or MANAGED memory");
+        return m_ptr;
+    }
+
+    // -------------------------------------------------------------------------
+    /** @brief Returns const iterator to the beginning of the buffer */
+    const T* begin() const
+    {
+        static_assert(
+            M == MemType::HOST || M == MemType::PINNED || M == MemType::MANAGED,
+            "begin() only available for HOST, PINNED, or MANAGED memory");
+        return m_ptr;
+    }
+
+    // -------------------------------------------------------------------------
+    /** @brief Returns iterator to the end of the buffer */
+    T* end()
+    {
+        static_assert(
+            M == MemType::HOST || M == MemType::PINNED || M == MemType::MANAGED,
+            "end() only available for HOST, PINNED, or MANAGED memory");
+        return m_ptr + m_size;
+    }
+
+    // -------------------------------------------------------------------------
+    /** @brief Returns const iterator to the end of the buffer */
+    const T* end() const
+    {
+        static_assert(
+            M == MemType::HOST || M == MemType::PINNED || M == MemType::MANAGED,
+            "end() only available for HOST, PINNED, or MANAGED memory");
+        return m_ptr + m_size;
+    }
     //@}
 
     /** @name Set methods */

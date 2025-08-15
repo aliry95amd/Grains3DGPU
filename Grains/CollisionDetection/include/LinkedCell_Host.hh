@@ -149,7 +149,7 @@ public:
     // -------------------------------------------------------------------------
     /** @brief Updates the linked cells based on particle transformations
         @param positions buffer of positions */
-    void updateLinkedCells(
+    bool updateLinkedCells(
         GrainsMemBuffer<Vector3<T>, MemType::HOST>& positions) override
     {
         uint numParticles = positions.getSize();
@@ -171,6 +171,8 @@ public:
             if(oldCellID != newCellID)
                 moveParticleToCell(i, newCellID);
         }
+
+        return true;
     }
     //@}
 };

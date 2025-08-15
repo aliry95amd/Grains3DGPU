@@ -21,10 +21,14 @@ class Cells
 protected:
     /** @name Parameters */
     //@{
-    /** \brief Min corner point of the linked cell */
+    /** \brief Min corner point of the domain */
     Vector3<T> m_minCorner;
-    /** \brief Max corner point of the linked cell */
+    /** \brief Max corner point of the domain */
     Vector3<T> m_maxCorner;
+    /** \brief Min corner point of the linked cell. This might be different from
+        m_minCorner since some offsets might have been applied to make the
+        domain fit symmetrically within the linked cell. */
+    Vector3<T> m_minCornerLinkedCell;
     /** \brief Number of cells per each direction + total number of cells */
     uint4 m_numCells;
     /** \brief Size of each cell */
@@ -75,10 +79,23 @@ public:
 
     /** @name Methods */
     //@{
-    /** @brief Generates neighbor list for cells
-        @param neighborCells output array for neighbor cells */
+    /** @brief Resizes the linked cells
+        @param cellSize new size of the cell */
     __HOSTDEVICE__
-    void generateNeighborCells(uint* neighborCells) const;
+    void resize(const T cellSize);
+
+    /** @brief Generates neighbor list for cells
+        @note On device side, the list is generated using a threadPerCell
+        strategy. Starting position for each cell is given by the `start`
+        parameter. On host side, there is no need for this parameter, as the
+        list is generated with a single thread.
+        @param neighborCells output array for neighbor cells
+        @param start starting index for neighbor cells
+        @param end ending index for neighbor cells */
+    __HOSTDEVICE__
+    void generateNeighborCells(uint* neighborCells,
+                               uint  start = 0,
+                               uint  end   = 0) const;
 
     /** @brief Checks if a cell Id is in range
         @param id 3D Id */
