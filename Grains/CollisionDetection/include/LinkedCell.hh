@@ -285,7 +285,7 @@ public:
         if(m_needsUpdate)
         {
             adjustSkinThickness();
-            // m_oldPosition.copyFrom(positions); // Update old positions
+            m_oldPosition.copyFrom(positions); // Update old positions
         }
     }
 
@@ -300,6 +300,7 @@ public:
                                / m_numIterationsSinceLastUpdate;
         constexpr T mu  = T(0.4); // Smoothing factor
         m_skinThickness = mu * newThickness + (1 - mu) * m_skinThickness;
+        // Cap the skin thickness at 20% of the cell size
         if(m_skinThickness > T(0.2) * m_cellSizeWithoutSkin)
             m_skinThickness = T(0.2) * m_cellSizeWithoutSkin;
     }
