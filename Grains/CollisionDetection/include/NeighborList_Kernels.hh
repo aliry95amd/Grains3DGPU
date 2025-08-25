@@ -15,15 +15,19 @@
 /** @name NeighborList_Kernels: External Kernels */
 //@{
 /** @brief Updates the neighbor list on host using an O(n^2) algorithm
+    @param nObstacles number of obstacles
     @param nParticles number of particles
     @param pairList array of pairs */
-__HOST__ void updateNeighborList_Nsq_Host(const uint nParticles,
+__HOST__ void updateNeighborList_Nsq_Host(const uint nObstacles,
+                                          const uint nParticles,
                                           uint2*     pairList);
 
 /** @brief Updates the neighbor list on device using an O(n^2) algorithm
+    @param nObstacles number of obstacles
     @param nParticles number of particles
     @param pairList array of pairs */
-__GLOBAL__ void updateNeighborList_Nsq_Device(const uint nParticles,
+__GLOBAL__ void updateNeighborList_Nsq_Device(const uint nObstacles,
+                                              const uint nParticles,
                                               uint2*     pairList);
 
 /** @brief Updates the neighbor list on host using a linked cell approach

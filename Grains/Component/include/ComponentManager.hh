@@ -31,32 +31,21 @@ protected:
     /** @name Parameters */
     //@{
     // TODO: What to do with pointers? Better design? unique_ptr?
-    /** \brief Pointer to buffer of particles rigid bodies. */
-    const GrainsMemBuffer<RigidBody<T>*, M>* m_particleRB;
-    /** \brief Pointer to buffer of obstacles rigid bodies. */
-    const GrainsMemBuffer<RigidBody<T>*, M>* m_obstacleRB;
+    /** \brief Pointer to buffer of components rigid bodies */
+    const GrainsMemBuffer<RigidBody<T>*, M>* m_rigidBody;
 
-    /** \brief Particles rigid body Id */
+    /** \brief Components rigid body Id */
     GrainsMemBuffer<uint, M> m_rigidBodyId;
-    /** \brief Particles position */
+    /** \brief Components position */
     GrainsMemBuffer<Vector3<T>, M> m_position;
-    /** \brief Particles quaternion */
+    /** \brief Components quaternion */
     GrainsMemBuffer<Quaternion<T>, M> m_quaternion;
-    /** \brief Particles velocities */
+    /** \brief Components velocities */
     GrainsMemBuffer<Kinematics<T>, M> m_velocity;
-    /** \brief Particles torce */
+    /** \brief Components torce */
     GrainsMemBuffer<Torce<T>, M> m_torce;
-    /** \brief Particles Id */
-    GrainsMemBuffer<uint, M> m_particleId;
-
-    /** \brief Obstacles rigid body Id */
-    GrainsMemBuffer<uint, M> m_obstacleRigidBodyId;
-    /** \brief Obstacles position */
-    GrainsMemBuffer<Vector3<T>, M> m_obstaclePosition;
-    /** \brief Particles quaternion */
-    GrainsMemBuffer<Quaternion<T>, M> m_obstacleQuaternion;
-    /** \brief Obstacles velocities */
-    GrainsMemBuffer<Kinematics<T>, M> m_obstacleVelocity;
+    /** \brief Components Id */
+    GrainsMemBuffer<uint, M> m_componentId;
 
     /** \brief Number of particles in manager */
     uint m_nParticles;
@@ -83,27 +72,20 @@ public:
     ComponentManager() = default;
 
     // -------------------------------------------------------------------------
-    /** @brief Constructor with the number of particles, and obstacles 
-        @param particleRB Pointer to the particles rigid body buffer
-        @param obstacleRB Pointer to the obstacles rigid body buffer
-        @param nParticles Number of particles
-        @param nObstacles Number of obstacles */
-    ComponentManager(GrainsMemBuffer<RigidBody<T>*, M>* particleRB,
-                     GrainsMemBuffer<RigidBody<T>*, M>* obstacleRB,
-                     uint                               nParticles,
-                     uint                               nObstacles)
-        : m_particleRB(particleRB)
-        , m_obstacleRB(obstacleRB)
-        , m_rigidBodyId(nParticles)
-        , m_position(nParticles)
-        , m_quaternion(nParticles)
-        , m_velocity(nParticles)
-        , m_torce(nParticles)
-        , m_particleId(nParticles)
-        , m_obstacleRigidBodyId(nObstacles)
-        , m_obstaclePosition(nObstacles)
-        , m_obstacleQuaternion(nObstacles)
-        , m_obstacleVelocity(nObstacles)
+    /** @brief Constructor with the number of particles, and obstacles
+        @param rigidBody Pointer to the components rigid body buffer
+        @param nObstacles Number of obstacles
+        @param nParticles Number of particles */
+    ComponentManager(GrainsMemBuffer<RigidBody<T>*, M>* rigidBody,
+                     uint                               nObstacles,
+                     uint                               nParticles)
+        : m_rigidBody(rigidBody)
+        , m_rigidBodyId(nParticles + nObstacles)
+        , m_position(nParticles + nObstacles)
+        , m_quaternion(nParticles + nObstacles)
+        , m_velocity(nParticles + nObstacles)
+        , m_torce(nParticles + nObstacles)
+        , m_componentId(nParticles + nObstacles)
         , m_nParticles(nParticles)
         , m_nObstacles(nObstacles)
     {
@@ -111,7 +93,8 @@ public:
 
         // Initialize with maximum possible pairs for dynamic sizing
         // TODO: Make this dynamic
-        uint maxPairs = m_nParticles * (m_nParticles - 1) / 2;
+        uint maxPairs = m_nObstacles * m_nParticles
+                        + m_nParticles * (m_nParticles - 1) / 2;
         m_relPosition.allocate(maxPairs);
         m_relPosition.fill();
         m_relQuaternion.allocate(maxPairs);
@@ -132,7 +115,7 @@ public:
     /** @name Get methods */
     //@{
     // -------------------------------------------------------------------------
-    /** @brief Gets particles rigid body Ids
+    /** @brief Gets components rigid body Ids
         @param buffer host buffer to copy data to */
     template <MemType destM>
     void getRigidBodyId(GrainsMemBuffer<uint, destM>& buffer) const
@@ -141,7 +124,7 @@ public:
     }
 
     // -------------------------------------------------------------------------
-    /** @brief Gets particles positions
+    /** @brief Gets components positions
         @param buffer host buffer to copy data to */
     template <MemType destM>
     void getPosition(GrainsMemBuffer<Vector3<T>, destM>& buffer) const
@@ -150,7 +133,7 @@ public:
     }
 
     // -------------------------------------------------------------------------
-    /** @brief Gets particles quaternions
+    /** @brief Gets components quaternions
         @param buffer host buffer to copy data to */
     template <MemType destM>
     void getQuaternion(GrainsMemBuffer<Quaternion<T>, destM>& buffer) const
@@ -159,7 +142,7 @@ public:
     }
 
     // -------------------------------------------------------------------------
-    /** @brief Gets particles velocities
+    /** @brief Gets components velocities
         @param buffer host buffer to copy data to */
     template <MemType destM>
     void getVelocity(GrainsMemBuffer<Kinematics<T>, destM>& buffer) const
@@ -168,7 +151,7 @@ public:
     }
 
     // -------------------------------------------------------------------------
-    /** @brief Gets particles torces
+    /** @brief Gets components torces
         @param buffer host buffer to copy data to */
     template <MemType destM>
     void getTorce(GrainsMemBuffer<Torce<T>, destM>& buffer) const
@@ -177,50 +160,12 @@ public:
     }
 
     // -------------------------------------------------------------------------
-    /** @brief Gets the array of particles Ids
+    /** @brief Gets components Ids
         @param buffer host buffer to copy data to */
     template <MemType destM>
-    void getParticleId(GrainsMemBuffer<uint, destM>& buffer) const
+    void getComponentId(GrainsMemBuffer<uint, destM>& buffer) const
     {
-        m_particleId.copyTo(buffer);
-    }
-
-    // -------------------------------------------------------------------------
-    /** @brief Gets obstacles rigid body Ids
-        @param buffer host buffer to copy data to */
-    template <MemType destM>
-    void getObstaclesRigidBodyId(GrainsMemBuffer<uint, destM>& buffer) const
-    {
-        m_obstacleRigidBodyId.copyTo(buffer);
-    }
-
-    // -------------------------------------------------------------------------
-    /** @brief Gets obstacles positions
-        @param buffer host buffer to copy data to */
-    template <MemType destM>
-    void getObstaclesPosition(GrainsMemBuffer<Vector3<T>, destM>& buffer) const
-    {
-        m_obstaclePosition.copyTo(buffer);
-    }
-
-    // -------------------------------------------------------------------------
-    /** @brief Gets obstacles quaternions
-        @param buffer host buffer to copy data to */
-    template <MemType destM>
-    void getObstaclesQuaternion(
-        GrainsMemBuffer<Quaternion<T>, destM>& buffer) const
-    {
-        m_obstacleQuaternion.copyTo(buffer);
-    }
-
-    // -------------------------------------------------------------------------
-    /** @brief Gets obstacles velocities
-        @param buffer host buffer to copy data to */
-    template <MemType destM>
-    void getObstaclesVelocity(
-        GrainsMemBuffer<Kinematics<T>, destM>& buffer) const
-    {
-        m_obstacleVelocity.copyTo(buffer);
+        m_componentId.copyTo(buffer);
     }
 
     // -------------------------------------------------------------------------
@@ -252,7 +197,7 @@ public:
     }
 
     // -------------------------------------------------------------------------
-    /** @brief Gets particles rigid body Ids */
+    /** @brief Gets components rigid body Ids */
     const GrainsMemBuffer<uint, MemType::HOST>& getRigidBodyId() const
     {
         static_assert(M == MemType::HOST,
@@ -261,7 +206,7 @@ public:
     }
 
     // -------------------------------------------------------------------------
-    /** @brief Gets particles positions */
+    /** @brief Gets components positions */
     const GrainsMemBuffer<Vector3<T>, MemType::HOST>& getPosition() const
     {
         static_assert(M == MemType::HOST,
@@ -270,7 +215,7 @@ public:
     }
 
     // -------------------------------------------------------------------------
-    /** @brief Gets particles quaternions */
+    /** @brief Gets components quaternions */
     const GrainsMemBuffer<Quaternion<T>, MemType::HOST>& getQuaternion() const
     {
         static_assert(M == MemType::HOST,
@@ -279,7 +224,7 @@ public:
     }
 
     // -------------------------------------------------------------------------
-    /** @brief Gets particles velocities */
+    /** @brief Gets components velocities */
     const GrainsMemBuffer<Kinematics<T>, MemType::HOST>& getVelocity() const
     {
         static_assert(M == MemType::HOST,
@@ -288,7 +233,7 @@ public:
     }
 
     // -------------------------------------------------------------------------
-    /** @brief Gets particles torces */
+    /** @brief Gets components torces */
     const GrainsMemBuffer<Torce<T>, MemType::HOST>& getTorce() const
     {
         static_assert(M == MemType::HOST,
@@ -297,53 +242,12 @@ public:
     }
 
     // -------------------------------------------------------------------------
-    /** @brief Gets the array of particles Ids */
-    const GrainsMemBuffer<uint, MemType::HOST>& getParticleId() const
+    /** @brief Gets components Ids */
+    const GrainsMemBuffer<uint, MemType::HOST>& getComponentId() const
     {
         static_assert(M == MemType::HOST,
-                      "getParticleId() only available for HOST memory");
-        return m_particleId;
-    }
-
-    // -------------------------------------------------------------------------
-    /** @brief Gets obstacles rigid body Ids */
-    const GrainsMemBuffer<uint, MemType::HOST>& getObstaclesRigidBodyId() const
-    {
-        static_assert(
-            M == MemType::HOST,
-            "getObstaclesRigidBodyId() only available for HOST memory");
-        return m_obstacleRigidBodyId;
-    }
-
-    // -------------------------------------------------------------------------
-    /** @brief Gets obstacles positions */
-    const GrainsMemBuffer<Vector3<T>, MemType::HOST>&
-        getObstaclesPosition() const
-    {
-        static_assert(M == MemType::HOST,
-                      "getObstaclesPosition() only available for HOST memory");
-        return m_obstaclePosition;
-    }
-
-    // -------------------------------------------------------------------------
-    /** @brief Gets obstacles quaternions */
-    const GrainsMemBuffer<Quaternion<T>, MemType::HOST>&
-        getObstaclesQuaternion() const
-    {
-        static_assert(
-            M == MemType::HOST,
-            "getObstaclesQuaternion() only available for HOST memory");
-        return m_obstacleQuaternion;
-    }
-
-    // -------------------------------------------------------------------------
-    /** @brief Gets obstacles velocities */
-    const GrainsMemBuffer<Kinematics<T>, MemType::HOST>&
-        getObstaclesVelocity() const
-    {
-        static_assert(M == MemType::HOST,
-                      "getObstacleVelocity() only available for HOST memory");
-        return m_obstacleVelocity;
+                      "getComponentId() only available for HOST memory");
+        return m_componentId;
     }
 
     // -------------------------------------------------------------------------
@@ -364,7 +268,7 @@ public:
     /** @name Set methods */
     //@{
     // -------------------------------------------------------------------------
-    /** @brief Sets the array of particles rigid body Ids
+    /** @brief Sets components rigid body Ids
         @param id host buffer containing the rigid body Ids */
     template <MemType srcM>
     void setRigidBodyId(const GrainsMemBuffer<uint, srcM>& id)
@@ -373,7 +277,7 @@ public:
     }
 
     // -------------------------------------------------------------------------
-    /** @brief Sets particles positions
+    /** @brief Sets components positions
         @param p host buffer containing the positions */
     template <MemType srcM>
     void setPosition(const GrainsMemBuffer<Vector3<T>, srcM>& p)
@@ -382,7 +286,7 @@ public:
     }
 
     // -------------------------------------------------------------------------
-    /** @brief Sets particles quaternions
+    /** @brief Sets components quaternions
         @param q host buffer containing the quaternions */
     template <MemType srcM>
     void setQuaternion(const GrainsMemBuffer<Quaternion<T>, srcM>& q)
@@ -391,7 +295,7 @@ public:
     }
 
     // -------------------------------------------------------------------------
-    /** @brief Sets particles velocities
+    /** @brief Sets components velocities
         @param v host buffer containing the velocities */
     template <MemType srcM>
     void setVelocity(const GrainsMemBuffer<Kinematics<T>, srcM>& v)
@@ -400,7 +304,7 @@ public:
     }
 
     // -------------------------------------------------------------------------
-    /** @brief Sets particles torces
+    /** @brief Sets components torces
         @param t host buffer containing the torces */
     template <MemType srcM>
     void setTorce(const GrainsMemBuffer<Torce<T>, srcM>& t)
@@ -409,48 +313,12 @@ public:
     }
 
     // -------------------------------------------------------------------------
-    /** @brief Sets the array of particles Ids
-        @param id host buffer containing the particles Ids */
+    /** @brief Sets the array of components Ids
+        @param id host buffer containing the components Ids */
     template <MemType srcM>
-    void setParticleId(const GrainsMemBuffer<uint, srcM>& id)
+    void setComponentId(const GrainsMemBuffer<uint, srcM>& id)
     {
-        m_particleId.copyFrom(id);
-    }
-
-    // -------------------------------------------------------------------------
-    /** @brief Sets the array of obstacles rigid body Ids
-        @param id host buffer containing the rigid body Ids */
-    template <MemType srcM>
-    void setObstaclesRigidBodyId(const GrainsMemBuffer<uint, srcM>& id)
-    {
-        m_obstacleRigidBodyId.copyFrom(id);
-    }
-
-    // -------------------------------------------------------------------------
-    /** @brief Sets obstacles positions
-        @param p host buffer containing the positions */
-    template <MemType srcM>
-    void setObstaclesPosition(const GrainsMemBuffer<Vector3<T>, srcM>& p)
-    {
-        m_obstaclePosition.copyFrom(p);
-    }
-
-    // -------------------------------------------------------------------------
-    /** @brief Sets obstacles quaternions
-        @param q host buffer containing the quaternions */
-    template <MemType srcM>
-    void setObstaclesQuaternion(const GrainsMemBuffer<Quaternion<T>, srcM>& q)
-    {
-        m_obstacleQuaternion.copyFrom(q);
-    }
-
-    // -------------------------------------------------------------------------
-    /** @brief Sets obstacles velocities
-        @param v host buffer containing the velocities */
-    template <MemType srcM>
-    void setObstaclesVelocity(const GrainsMemBuffer<Kinematics<T>, srcM>& v)
-    {
-        m_obstacleVelocity.copyFrom(v);
+        m_componentId.copyFrom(id);
     }
 
     // -------------------------------------------------------------------------
@@ -508,12 +376,7 @@ public:
         other->setQuaternion(m_quaternion);
         other->setVelocity(m_velocity);
         other->setTorce(m_torce);
-        other->setParticleId(m_particleId);
-        // Obstacles
-        other->setObstaclesRigidBodyId(m_obstacleRigidBodyId);
-        other->setObstaclesPosition(m_obstaclePosition);
-        other->setObstaclesQuaternion(m_obstacleQuaternion);
-        other->setObstaclesVelocity(m_obstacleVelocity);
+        other->setComponentId(m_componentId);
         // Neighbor list
         other->setRelativePosition(m_relPosition);
         other->setRelativeQuaternion(m_relQuaternion);
@@ -537,71 +400,36 @@ public:
 
         // Velocity
         other->setVelocity(m_velocity);
-
-        // Obstacle Position
-        other->setObstaclesPosition(m_obstaclePosition);
-
-        // Obstacle Quaternion
-        other->setObstaclesQuaternion(m_obstacleQuaternion);
-
-        // Obstacle Velocity
-        other->setObstaclesVelocity(m_obstacleVelocity);
     }
     //@}
 
     /** @name Methods */
     //@{
     // -------------------------------------------------------------------------
-    /** @brief Initializes transformations for particles in the simulation
-        @param initPosition initial position of particles
-        @param initOrientation initial orientation of particles */
+    /** @brief Initializes transformations for components in the simulation
+        @param initPosition initial position of components
+        @param initOrientation initial orientation of components */
     template <MemType srcM>
-    void initializeParticles(
+    void initializeComponents(
         const GrainsMemBuffer<Vector3<T>, srcM>&    initPosition,
         const GrainsMemBuffer<Quaternion<T>, srcM>& initOrientation)
     {
         // We can only initialize on host
         static_assert(
             M == MemType::HOST,
-            "Cannot initialize particles directly on the device. Try "
+            "Cannot initialize components directly on the device. Try "
             "initializing on host first, and copy to device. Aborting Grains!");
-        // Making sure that we have data for all particles and the number of
+        // Making sure that we have data for all components and the number of
         // initial TR matches the number of RBs
-        assert(initPosition.getSize() == m_nParticles
-               && initOrientation.getSize() == m_nParticles);
+        uint nComponents = m_nParticles + m_nObstacles;
+        assert(initPosition.getSize() == nComponents
+               && initOrientation.getSize() == nComponents);
 
         // Assigning
-        for(uint i = 0; i < m_nParticles; ++i)
+        for(uint i = 0; i < nComponents; ++i)
         {
             m_position[i]   = initPosition[i];
             m_quaternion[i] = initOrientation[i];
-        }
-    }
-
-    // -------------------------------------------------------------------------
-    /** @brief Initializes transformations for obstacles in the simulation
-        @param initPosition initial positions of obstacles
-        @param initOrientation initial orientations of obstacles */
-    template <MemType srcM>
-    void initializeObstacles(
-        const GrainsMemBuffer<Vector3<T>, srcM>&    initPosition,
-        const GrainsMemBuffer<Quaternion<T>, srcM>& initOrientation)
-    {
-        // We can only initialize on host
-        static_assert(
-            M == MemType::HOST,
-            "Cannot initialize obstacles directly on the device. Try "
-            "initializing on host first, and copy to device. Aborting Grains!");
-        // Making sure that we have data for all obstacles and the number of
-        // initial TR matches the number of RBs
-        assert(initPosition.getSize() == m_nObstacles
-               && initOrientation.getSize() == m_nObstacles);
-
-        // Assigning
-        for(uint i = 0; i < m_nObstacles; ++i)
-        {
-            m_obstaclePosition[i]   = initPosition[i];
-            m_obstacleQuaternion[i] = initOrientation[i];
         }
     }
 
@@ -620,11 +448,13 @@ public:
         // Inserting particles
         for(uint i = 0; i < m_nParticles; ++i)
         {
+            uint insertID = i + m_nObstacles;
             // Fetching insertion data from ins
-            insData         = ins->fetchInsertionData();
-            m_position[i]   = insData.first.getOrigin();
-            m_quaternion[i] = insData.first.getRotation() * m_quaternion[i];
-            m_velocity[i]   = insData.second;
+            insData              = ins->fetchInsertionData();
+            m_position[insertID] = insData.first.getOrigin();
+            m_quaternion[insertID]
+                = insData.first.getRotation() * m_quaternion[insertID];
+            m_velocity[insertID] = insData.second;
         }
     }
 
@@ -637,15 +467,11 @@ public:
     virtual void computeRelativeTransformations() = 0;
 
     // -------------------------------------------------------------------------
-    /** @brief Detects collisions between particles and obstacles */
-    virtual void detectCollisionsObstacles() = 0;
+    /** @brief Detects collisions between components */
+    virtual void detectCollisionsComponents() = 0;
 
     // -------------------------------------------------------------------------
-    /** @brief Detects collisions between particles and particles */
-    virtual void detectCollisionsParticles() = 0;
-
-    // -------------------------------------------------------------------------
-    /** @brief Detects collision between particles and particles and */
+    /** @brief Detects collision */
     virtual void detectCollisions() = 0;
 
     // -------------------------------------------------------------------------

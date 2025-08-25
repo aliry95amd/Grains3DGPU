@@ -61,10 +61,7 @@ void Grains<T>::postProcess(
     {
         GP::m_tSave.pop();
         for(auto& pp : m_postProcessor)
-            pp->PostProcessing(m_particleRigidBodyList,
-                               m_obstacleRigidBodyList,
-                               cm,
-                               GP::m_time);
+            pp->PostProcessing(m_rigidBodyList, cm, GP::m_time);
     }
     // In case we get past the saveTime, we need to remove it from the queue
     if(GP::m_time > GP::m_tSave.front())
@@ -87,10 +84,7 @@ void Grains<T>::postProcess(
         GP::m_tSave.pop();
         cm->copyTo_PostProcessing(m_components);
         for(auto& pp : m_postProcessor)
-            pp->PostProcessing(m_particleRigidBodyList,
-                               m_obstacleRigidBodyList,
-                               m_components,
-                               GP::m_time);
+            pp->PostProcessing(m_rigidBodyList, m_components, GP::m_time);
     }
     // In case we get past the saveTime, we need to remove it from the queue
     if(GP::m_time > GP::m_tSave.front())
@@ -121,8 +115,7 @@ void Grains<T>::Construction(DOMElement* rootElement)
     // -------------------------------------------------------------------------
     // Checking if Construction node is available
     DOMNode* root = ReaderXML::getNode(rootElement, "Construction");
-    if(!root)
-        GAbort("Construction node is mandatory!");
+    GAssert(root, "Construction node is mandatory!");
 
     // -------------------------------------------------------------------------
     // Domain size: origin, max coordinates and periodicity
@@ -147,59 +140,82 @@ void Grains<T>::Construction(DOMElement* rootElement)
         int PX = ReaderXML::getNodeAttr_Int(nPeriodicity, "PX");
         int PY = ReaderXML::getNodeAttr_Int(nPeriodicity, "PY");
         int PZ = ReaderXML::getNodeAttr_Int(nPeriodicity, "PZ");
-        if(PX * PY * PZ != 0)
-            GAbort("Periodicity is not implemented!");
+        GAssert(PX * PY * PZ == 0, "Periodicity is not implemented!");
         GP::m_isPeriodic = false;
     }
 
     // -------------------------------------------------------------------------
-    // Particles
+    // Components
+    // Particle variables
     DOMNode* particles = ReaderXML::getNode(root, "Particles");
+    GrainsMemBuffer<RigidBody<T>*> m_refParticleRigidBodyList;
+    GrainsMemBuffer<Vector3<T>>    refParticleInitialPosition;
+    GrainsMemBuffer<Quaternion<T>> refParticleInitialOrientation;
+    GrainsMemBuffer<uint>          numEachRefParticle;
+    uint                           numParticles = 0;
+    // Obstacle variables
+    DOMNode* obstacles = ReaderXML::getNode(root, "Obstacles");
+    GrainsMemBuffer<RigidBody<T>*> m_refObstacleRigidBodyList;
+    GrainsMemBuffer<Vector3<T>>    refObstacleInitialPosition;
+    GrainsMemBuffer<Quaternion<T>> refObstacleInitialOrientation;
+    GrainsMemBuffer<uint>          numEachRefObstacle;
+    uint                           numObstacles = 0;
+    GoutWI(6, "Reading rigid bodies ...");
+    RigidBodyFactory<T>::create(obstacles,
+                                particles,
+                                m_refObstacleRigidBodyList,
+                                m_refParticleRigidBodyList,
+                                refObstacleInitialPosition,
+                                refParticleInitialPosition,
+                                refObstacleInitialOrientation,
+                                refParticleInitialOrientation,
+                                numEachRefObstacle,
+                                numEachRefParticle,
+                                numObstacles,
+                                numParticles);
+    GoutWI(6, "Reading rigid bodies completed!");
 
-    GrainsMemBuffer<RigidBody<T>*, MemType::HOST> m_refParticleRigidBodyList;
-    GrainsMemBuffer<Vector3<T>, MemType::HOST>    refParticlesInitialPosition;
-    GrainsMemBuffer<Quaternion<T>, MemType::HOST>
-                                         refParticlesInitialOrientation;
-    GrainsMemBuffer<uint, MemType::HOST> numEachRefParticle;
-    uint                                 numParticles = 0;
-    if(particles)
-    {
-        GoutWI(6, "Reading particle types ...");
-        RigidBodyFactory<T>::create(particles,
-                                    m_refParticleRigidBodyList,
-                                    refParticlesInitialPosition,
-                                    refParticlesInitialOrientation,
-                                    numEachRefParticle,
-                                    numParticles);
-        GoutWI(6, "Reading particle types completed!");
-    }
+    m_rigidBodyList.reserve(numObstacles + numParticles);
+    GrainsMemBuffer<Vector3<T>>    initialPosition(numObstacles + numParticles);
+    GrainsMemBuffer<Quaternion<T>> initialOrientation(numObstacles
+                                                      + numParticles);
 
-    m_particleRigidBodyList.reserve(numParticles);
-    GrainsMemBuffer<Vector3<T>, MemType::HOST>    particlesInitialPosition;
-    GrainsMemBuffer<Quaternion<T>, MemType::HOST> particlesInitialOrientation;
-    particlesInitialPosition.allocate(numParticles);
-    particlesInitialOrientation.allocate(numParticles);
-
-    if(numParticles)
+    if(numObstacles + numParticles > 0)
     {
         uint offset = 0;
+        for(uint i = 0; i < m_refObstacleRigidBodyList.getSize(); ++i)
+        {
+            for(uint j = 0; j < numEachRefObstacle[i]; j++)
+            {
+                // Deep copy of the rigid body
+                m_rigidBodyList[offset + j]
+                    = new RigidBody<T>(*m_refObstacleRigidBodyList[i]);
+                // Initial transformation of the rigid body
+                initialPosition[offset + j] = refObstacleInitialPosition[i];
+                initialOrientation[offset + j]
+                    = refObstacleInitialOrientation[i];
+            }
+            // Increment the starting position
+            offset += numEachRefObstacle[i];
+        }
+
         for(uint i = 0; i < m_refParticleRigidBodyList.getSize(); ++i)
         {
             for(uint j = 0; j < numEachRefParticle[i]; j++)
             {
                 // Deep copy of the rigid body
-                m_particleRigidBodyList[offset + j]
+                m_rigidBodyList[offset + j]
                     = new RigidBody<T>(*m_refParticleRigidBodyList[i]);
                 // Initial transformation of the rigid body
-                particlesInitialPosition[offset + j]
-                    = refParticlesInitialPosition[i];
-                particlesInitialOrientation[offset + j]
-                    = refParticlesInitialOrientation[i];
+                initialPosition[offset + j] = refParticleInitialPosition[i];
+                initialOrientation[offset + j]
+                    = refParticleInitialOrientation[i];
             }
             // Increment the starting position
             offset += numEachRefParticle[i];
         }
     }
+    GP::m_numObstacles = numObstacles;
     GP::m_numParticles = numParticles;
 
     // Finding max circumscribed radius among all particles.
@@ -212,65 +228,15 @@ void Grains<T>::Construction(DOMElement* rootElement)
     GP::m_maxRadius = maxRadius;
 
     // -------------------------------------------------------------------------
-    // Obstacles
-    DOMNode*     obstacles    = ReaderXML::getNode(root, "Obstacles");
-    DOMNodeList* allObstacles = ReaderXML::getNodes(rootElement, "Obstacle");
-    // Number of unique obstacles in the simulation
-    uint numObstacles = allObstacles->getLength();
-    // We also store the initial transformations of the rigid bodies to pass to
-    // the ComponentManager to create particles with the initial transformation
-    // required.
-    GrainsMemBuffer<Vector3<T>, MemType::HOST>    obstaclesInitialPosition;
-    GrainsMemBuffer<Quaternion<T>, MemType::HOST> obstaclesInitialOrientation;
-    obstaclesInitialPosition.allocate(numObstacles);
-    obstaclesInitialOrientation.allocate(numObstacles);
-    // Memory allocation for m_rigidBodyList with respect to the number of
-    // shapes in the simulation.
-    m_obstacleRigidBodyList.reserve(numObstacles);
-    if(numObstacles)
-    {
-        GoutWI(6, "Reading obstacles types ...");
-        for(uint i = 0; i < numObstacles; i++)
-        {
-            DOMNode* nObstacle = allObstacles->item(i);
-            // Create the Rigid Body
-            m_obstacleRigidBodyList[i] = new RigidBody<T>(nObstacle);
-            // Initial transformation of the rigid body
-            // One draw back is we might end up with the same rigid body shape,
-            // but with different initial transformation.
-            DOMNode*      nTR = ReaderXML::getNode(nObstacle, "Transformation");
-            Vector3<T>    centre(T(0), T(0), T(0));
-            Quaternion<T> rotation(T(0), T(0), T(0), T(1));
-            if(nTR)
-            {
-                DOMNode* nCentre = ReaderXML::getNode(nTR, "Centre");
-                if(nCentre)
-                    centre = Vector3<T>(nCentre);
-
-                DOMNode* nRotation = ReaderXML::getNode(nTR, "AngularPosition");
-                if(nRotation)
-                    rotation = Quaternion<T>(nRotation);
-                obstaclesInitialPosition[i]    = centre;
-                obstaclesInitialOrientation[i] = rotation;
-            }
-            else
-                GAbort("Transformation node is mandatory for obstacles!");
-        }
-        GoutWI(6, "Reading obstacles types completed!");
-    }
-
-    // -------------------------------------------------------------------------
     // Setting up collision detection
     GoutWI(6, "Reading collision detection ...");
     DOMNode* collisionDetection
         = ReaderXML::getNode(root, "CollisionDetection");
-    if(!collisionDetection)
-        GAbort("CollisionDetection node is mandatory!");
+    GAssert(collisionDetection, "CollisionDetection node is mandatory!");
     // Neighbor list
     DOMNode* nNeighborList
         = ReaderXML::getNode(collisionDetection, "NeighborList");
-    if(!nNeighborList)
-        GAbort("NeighborList node not found");
+    GAssert(nNeighborList, "NeighborList node not found");
     std::string neighborListType
         = ReaderXML::getNodeAttr_String(nNeighborList, "Type");
     if(neighborListType == "BruteForce")
@@ -290,9 +256,9 @@ void Grains<T>::Construction(DOMElement* rootElement)
     {
         DOMNode* nLinkedCell
             = ReaderXML::getNode(collisionDetection, "LinkedCell");
-        if(!nLinkedCell)
-            GAbort("LinkedCell node is mandatory when using LinkedCell "
-                   "neighbor list!");
+        GAssert(nLinkedCell,
+                "LinkedCell node is mandatory when using LinkedCell "
+                "neighbor list!");
         std::string linkedCellType
             = ReaderXML::getNodeAttr_String(nLinkedCell, "Type");
         if(linkedCellType == "MemoryEfficient")
@@ -379,18 +345,13 @@ void Grains<T>::Construction(DOMElement* rootElement)
 
     // -------------------------------------------------------------------------
     // Setting up the component managers
-    GP::m_numParticles = numParticles;
     GP::m_numObstacles = numObstacles;
-    m_components
-        = std::make_unique<ComponentManagerCPU<T>>(&m_particleRigidBodyList,
-                                                   &m_obstacleRigidBodyList,
-                                                   GP::m_numParticles,
-                                                   GP::m_numObstacles);
-    // Initialize the particles and obstacles
-    m_components->initializeParticles(particlesInitialPosition,
-                                      particlesInitialOrientation);
-    m_components->initializeObstacles(obstaclesInitialPosition,
-                                      obstaclesInitialOrientation);
+    GP::m_numParticles = numParticles;
+    m_components = std::make_unique<ComponentManagerCPU<T>>(&m_rigidBodyList,
+                                                            GP::m_numObstacles,
+                                                            GP::m_numParticles);
+    // Initialize components
+    m_components->initializeComponents(initialPosition, initialOrientation);
 }
 
 // -----------------------------------------------------------------------------
@@ -409,20 +370,14 @@ void Grains<T>::Forces(DOMElement* rootElement)
     {
         // Gravity
         DOMNode* nGravity = ReaderXML::getNode(root, "Gravity");
-        if(nGravity)
-        {
-            GrainsParameters<T>::m_gravity[X]
-                = T(ReaderXML::getNodeAttr_Double(nGravity, "GX"));
-            GrainsParameters<T>::m_gravity[Y]
-                = T(ReaderXML::getNodeAttr_Double(nGravity, "GY"));
-            GrainsParameters<T>::m_gravity[Z]
-                = T(ReaderXML::getNodeAttr_Double(nGravity, "GZ"));
-            GoutWI(6,
-                   "Gravity =",
-                   Vector3ToString(GrainsParameters<T>::m_gravity));
-        }
-        else
-            GAbort("Gravity is mandatory!");
+        GAssert(nGravity, "Gravity node is mandatory!");
+        GrainsParameters<T>::m_gravity[X]
+            = T(ReaderXML::getNodeAttr_Double(nGravity, "GX"));
+        GrainsParameters<T>::m_gravity[Y]
+            = T(ReaderXML::getNodeAttr_Double(nGravity, "GY"));
+        GrainsParameters<T>::m_gravity[Z]
+            = T(ReaderXML::getNodeAttr_Double(nGravity, "GZ"));
+        GoutWI(6, "Gravity =", Vector3ToString(GrainsParameters<T>::m_gravity));
     }
 }
 
@@ -437,8 +392,7 @@ void Grains<T>::AdditionalFeatures(DOMElement* rootElement)
     // Checking if Simulation node is available
     assert(rootElement != NULL);
     DOMNode* root = ReaderXML::getNode(rootElement, "Simulation");
-    if(!root)
-        GAbort("Simulation node is mandatory!");
+    GAssert(root, "Simulation node is mandatory!");
 
     // -------------------------------------------------------------------------
     // Insertion policies

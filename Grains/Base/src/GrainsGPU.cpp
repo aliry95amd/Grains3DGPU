@@ -132,28 +132,18 @@ void GrainsGPU<T>::Construction(DOMElement* rootElement)
 
     // -------------------------------------------------------------------------
     // Particles
-    GoutWI(3, "Copying particle types to device ...");
-    m_d_particleRigidBodyList.reserve(GP::m_numParticles);
-    RigidBodyFactory<T>::copyHostToDevice(Grains<T>::m_particleRigidBodyList,
-                                          m_d_particleRigidBodyList);
-    GoutWI(3, "Copying particle types to device completed!");
-
-    // -------------------------------------------------------------------------
-    // Obstacles
-    GoutWI(3, "Copying obstacle types to device ...");
-    m_d_obstacleRigidBodyList.reserve(GP::m_numObstacles);
-    RigidBodyFactory<T>::copyHostToDevice(Grains<T>::m_obstacleRigidBodyList,
-                                          m_d_obstacleRigidBodyList);
-    cudaDeviceSynchronize();
-    GoutWI(3, "Copying obstacle types to device completed!");
+    GoutWI(3, "Copying rigid bodies to device ...");
+    m_d_rigidBodyList.reserve(GP::m_numParticles);
+    RigidBodyFactory<T>::copyHostToDevice(Grains<T>::m_rigidBodyList,
+                                          m_d_rigidBodyList);
+    GoutWI(3, "Copying rigid bodies to device completed!");
 
     // -------------------------------------------------------------------------
     // Setting up the component managers
     m_d_components
-        = std::make_unique<ComponentManagerGPU<T>>(&m_d_particleRigidBodyList,
-                                                   &m_d_obstacleRigidBodyList,
-                                                   GP::m_numParticles,
-                                                   GP::m_numObstacles);
+        = std::make_unique<ComponentManagerGPU<T>>(&m_d_rigidBodyList,
+                                                   GP::m_numObstacles,
+                                                   GP::m_numParticles);
 
     // -------------------------------------------------------------------------
     // Contact force models

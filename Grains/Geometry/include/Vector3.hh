@@ -126,17 +126,17 @@ public:
 
 /** @name External Methods - I/O methods */
 //@{
-/** @brief Input operator
-@param fileIn input stream
-@param v vector */
-template <typename T>
-__HOST__ std::istream& operator>>(std::istream& fileIn, Vector3<T>& v);
-
 /** @brief Output operator
-@param fileOut output stream
-@param v vector */
+    @param fileOut output stream
+    @param v vector */
 template <typename T>
 __HOST__ std::ostream& operator<<(std::ostream& fileOut, const Vector3<T>& v);
+
+/** @brief Input operator
+    @param fileIn input stream
+    @param v vector */
+template <typename T>
+__HOST__ std::istream& operator>>(std::istream& fileIn, Vector3<T>& v);
 //@}
 
 #endif

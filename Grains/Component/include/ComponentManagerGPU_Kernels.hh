@@ -60,66 +60,33 @@ __GLOBAL__ void
 }
 
 // -----------------------------------------------------------------------------
-/** @brief Detects collisions between particles and obstacles
+/** @brief Detects collisions between components
     @param pairList list of pairs of components
-    @param particleRB array of rigid bodies for particles
-    @param obstacleRB array of rigid bodies for obstacles
-    @param transform array of transformations for particles
-    @param obstacleTransform array of transformations for obstacles
+    @param rigidBody array of rigid bodies for components
+    @param relPosition array of relative positions for components
+    @param relQuaternion array of relative quaternions for components
     @param contactInfo array to store contact information
     @param nPairs number of pairs */
 template <typename T>
 __GLOBAL__ void
-    detectCollisionsObstacles_Kernel(const uint2*               pairList,
-                                     const RigidBody<T>* const* particleRB,
-                                     const RigidBody<T>* const* obstacleRB,
-                                     const Transform3<T>*       transform,
-                                     const Transform3<T>* obstacleTransform,
-                                     ContactInfo<T>*      contactInfo,
-                                     const uint           nPairs)
+    detectCollisionsComponents_Kernel(const uint2*               pairList,
+                                      const RigidBody<T>* const* rigidBody,
+                                      const Vector3<T>*          relPosition,
+                                      const Quaternion<T>*       relQuaternion,
+                                      ContactInfo<T>*            contactInfo,
+                                      const uint                 nPairs)
 {
     uint tID = blockIdx.x * blockDim.x + threadIdx.x;
 
     if(tID >= nPairs)
         return;
 
-    detectCollisionsObstacles_common(pairList,
-                                     particleRB,
-                                     obstacleRB,
-                                     transform,
-                                     obstacleTransform,
-                                     contactInfo,
-                                     tID);
-}
-
-// -----------------------------------------------------------------------------
-/** @brief Detects collisions between particles and particles
-    @param pairList list of pairs of components
-    @param particleRB array of rigid bodies for particles
-    @param relPosition array of relative positions for particles
-    @param relQuaternion array of relative quaternions for particles
-    @param contactInfo array to store contact information
-    @param nPairs number of pairs */
-template <typename T>
-__GLOBAL__ void
-    detectCollisionsParticles_Kernel(const uint2*               pairList,
-                                     const RigidBody<T>* const* particleRB,
-                                     const Vector3<T>*          relPosition,
-                                     const Quaternion<T>*       relQuaternion,
-                                     ContactInfo<T>*            contactInfo,
-                                     const uint                 nPairs)
-{
-    uint tID = blockIdx.x * blockDim.x + threadIdx.x;
-
-    if(tID >= nPairs)
-        return;
-
-    detectCollisionsParticles_common(pairList,
-                                     particleRB,
-                                     relPosition,
-                                     relQuaternion,
-                                     contactInfo,
-                                     tID);
+    detectCollisionsComponents_common(pairList,
+                                      rigidBody,
+                                      relPosition,
+                                      relQuaternion,
+                                      contactInfo,
+                                      tID);
 }
 
 // -----------------------------------------------------------------------------
@@ -127,16 +94,16 @@ __GLOBAL__ void
     @param CF contact force models
     @param pairList list of rigid bodies pairs
     @param contactInfo contact information
-    @param particleRB rigid body of particles
-    @param velocity kinematics of the particles
-    @param torce torce acting on the particles
-    @param relPosition relative position of the particles */
+    @param rigidBody rigid body of components
+    @param velocity kinematics of the components
+    @param torce torce acting on the components
+    @param relPosition relative position of the components */
 template <typename T>
 __GLOBAL__ void
     computeContactForces_Kernel(const ContactForceModel<T>* const* CF,
                                 const uint2*                       pairList,
                                 const ContactInfo<T>*              contactInfo,
-                                const RigidBody<T>* const*         particleRB,
+                                const RigidBody<T>* const*         rigidBody,
                                 const Kinematics<T>*               velocity,
                                 Torce<T>*                          torce,
                                 const Vector3<T>*                  relPosition,
@@ -150,7 +117,7 @@ __GLOBAL__ void
     computeContactForces_common(CF,
                                 pairList,
                                 contactInfo,
-                                particleRB,
+                                rigidBody,
                                 velocity,
                                 torce,
                                 relPosition,
@@ -162,15 +129,17 @@ __GLOBAL__ void
     @param gx the gravity field - the x component
     @param gy the gravity field - the y component
     @param gz the gravity field - the z component
-    @param particleRB array of rigid bodies for particles
-    @param torce array of particles torces
+    @param rigidBody array of rigid bodies for components
+    @param torce array of components torces
+    @param nObstacles number of obstacles
     @param nParticles number of particles */
 template <typename T>
 __GLOBAL__ void addExternalForces_Kernel(const T                    gX,
                                          const T                    gY,
                                          const T                    gZ,
-                                         const RigidBody<T>* const* particleRB,
+                                         const RigidBody<T>* const* rigidBody,
                                          Torce<T>*                  torce,
+                                         const uint                 nObstacles,
                                          const uint                 nParticles)
 {
     uint pID = blockIdx.x * blockDim.x + threadIdx.x;
@@ -178,18 +147,21 @@ __GLOBAL__ void addExternalForces_Kernel(const T                    gX,
     if(pID >= nParticles)
         return;
 
-    addExternalForces_common(Vector3<T>(gX, gY, gZ), particleRB, torce, pID);
+    addExternalForces_common(Vector3<T>(gX, gY, gZ),
+                             rigidBody,
+                             torce,
+                             nObstacles + pID);
 }
 
 // -----------------------------------------------------------------------------
 /** @brief Updates the position and velocities of particles
     @param TI time integrator scheme
-    @param particleRB array of rigid bodies for particles
-    @param position the position of the particle
-    @param quaternion array of particles quaternions
-    @param velocity array of particles velocities
-    @param torce array of particles torces
-    @param rigidBodyId array of rigid body IDs for particles
+    @param rigidBody array of rigid bodies for components
+    @param position the position of the component
+    @param quaternion array of components quaternions
+    @param velocity array of components velocities
+    @param torce array of components torces
+    @param nObstacles number of obstacles
     @param nParticles number of particles */
 template <typename T>
 __GLOBAL__ void moveParticles_Kernel(const TimeIntegrator<T>* const* TI,
@@ -198,8 +170,8 @@ __GLOBAL__ void moveParticles_Kernel(const TimeIntegrator<T>* const* TI,
                                      Quaternion<T>*                  quaternion,
                                      Kinematics<T>*                  velocity,
                                      Torce<T>*                       torce,
-                                     const uint* rigidBodyId,
-                                     int         nParticles)
+                                     const uint                      nObstacles,
+                                     const uint                      nParticles)
 {
     uint pID = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -212,8 +184,7 @@ __GLOBAL__ void moveParticles_Kernel(const TimeIntegrator<T>* const* TI,
                          quaternion,
                          velocity,
                          torce,
-                         rigidBodyId,
-                         pID);
+                         nObstacles + pID);
 }
 //@}
 

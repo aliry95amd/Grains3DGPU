@@ -1,4 +1,5 @@
 #include "Transform3.hh"
+#include "GrainsUtils.hh"
 #include "MatrixMath.hh"
 
 // -----------------------------------------------------------------------------
@@ -88,10 +89,9 @@ __HOST__ Transform3<T>::Transform3(DOMNode* root)
         std::istringstream inValues(values.c_str());
         inValues >> mat;
         setBasis(mat);
-        // Check that the matrix is a rotation matrix
-        // if(!m_basis.isRotation())
-        //     GAbort("A matrix in one of the AngularPosition XML nodes is"
-        //            " not a rotation matrix !!!");
+        GAssert(isRotation(mat),
+                "Input matrix is not a valid rotation matrix in "
+                "Quaternion::setQuaternion!");
     }
     else if(type == "Angles")
     {
@@ -391,10 +391,8 @@ __HOSTDEVICE__ Transform3<double>::operator Transform3<float>() const
 template <typename T>
 __HOST__ std::ostream& operator<<(std::ostream& fileOut, const Transform3<T>& t)
 {
-    fileOut << "Position: " << std::endl;
-    fileOut << t.getOrigin() << std::endl;
-    fileOut << "Orientation: " << std::endl;
-    fileOut << t.getBasis();
+    // Orientation first, followed by the position
+    fileOut << t.getBasis() << " " << t.getOrigin() << std::endl;
     return (fileOut);
 }
 

@@ -38,8 +38,7 @@ public:
     //@{
     // -------------------------------------------------------------------------
     /** @brief Creates and returns a buffer of NeighborList objects
-        @param NL Memory buffer for storing the neighbor list object
-        @param numParticles Total number of particles in the simulation */
+        @param NL Memory buffer for storing the neighbor list object */
     static void create(NeighborList<T, M>*& NL)
     {
         using GP = GrainsParameters<T>;
@@ -47,7 +46,8 @@ public:
         if(GP::m_neighborListType == 0)
         {
             // brute-force neighbor list
-            NL = new NeighborList_Nsq<T, M>(GP::m_numParticles);
+            NL = new NeighborList_Nsq<T, M>(GP::m_numObstacles,
+                                            GP::m_numParticles);
         }
         else if(GP::m_neighborListType == 1)
         {
@@ -56,6 +56,7 @@ public:
             NL = new NeighborList_LinkedCell<T, M>(GP::m_origin,
                                                    GP::m_maxCoordinate,
                                                    cellSize,
+                                                   GP::m_numObstacles,
                                                    GP::m_numParticles);
         }
         else

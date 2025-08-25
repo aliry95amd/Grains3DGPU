@@ -183,17 +183,17 @@ public:
 
 /** @name External Methods - I/O methods */
 //@{
-/** @brief Input operator
-@param fileIn input stream
-@param q quaternion */
-template <typename T>
-std::istream& operator>>(std::istream& fileIn, Quaternion<T>& q);
-
 /** @brief Output operator
-@param fileOut output stream
-@param q quaternion */
+    @param fileOut output stream
+    @param q quaternion object */
 template <typename T>
 std::ostream& operator<<(std::ostream& fileOut, const Quaternion<T>& q);
+
+/** @brief Input operator
+    @param fileIn input stream
+    @param q quaternion object */
+template <typename T>
+std::istream& operator>>(std::istream& fileIn, Quaternion<T>& q);
 //@}
 
 #endif

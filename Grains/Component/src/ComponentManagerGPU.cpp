@@ -11,12 +11,10 @@ ComponentManagerGPU<T>::ComponentManagerGPU() = default;
 // Constructor with the number of particles, and obstacles
 template <typename T>
 ComponentManagerGPU<T>::ComponentManagerGPU(
-    GrainsMemBuffer<RigidBody<T>*, MemType::DEVICE>* particleRB,
-    GrainsMemBuffer<RigidBody<T>*, MemType::DEVICE>* obstacleRB,
+    GrainsMemBuffer<RigidBody<T>*, MemType::DEVICE>* rigidBody,
     uint                                             nParticles,
     uint                                             nObstacles)
-    : ComponentManager<T, MemType::DEVICE>(
-          particleRB, obstacleRB, nParticles, nObstacles)
+    : ComponentManager<T, MemType::DEVICE>(rigidBody, nObstacles, nParticles)
 {
     allocate();
     initialize();
@@ -48,7 +46,9 @@ void ComponentManagerGPU<T>::updateNeighborList()
 {
     if(m_neighborList->needsUpdate())
     {
-        m_neighborList->updateNeighborList(m_position);
+        m_neighborList->updateNeighborList(m_position,
+                                           m_nObstacles,
+                                           m_nParticles);
 
         // Resize pair-dependent buffers to match actual number of pairs
         this->resizePairBuffers();
@@ -77,35 +77,9 @@ void ComponentManagerGPU<T>::computeRelativeTransformations()
 }
 
 // -----------------------------------------------------------------------------
-// Detects collision between particles and obstacles
+// Detects collisions between components
 template <typename T>
-void ComponentManagerGPU<T>::detectCollisionsObstacles()
-{
-    using GP = GrainsParameters<T>;
-    // Kernel launch parameters
-    // const uint numThreads = GP::m_numThreads;
-    // const uint numBlocks  = GP::m_numBlocks;
-
-    // Invoke the kernel
-    // detectCollisionAndComputeContactForcesObstacles_Kernel<<<numBlocks,
-    //                                                          numThreads>>>(
-    //     particleRB,
-    //     obstacleRB,
-    //     CF,
-    //     m_rigidBodyId,
-    //     m_transform,
-    //     m_velocity,
-    //     m_torce,
-    //     m_obstacleRigidBodyId,
-    //     m_obstacleTransform,
-    //     m_nParticles,
-    //     m_nObstacles);
-}
-
-// -----------------------------------------------------------------------------
-// Detects collisions between particles and particles
-template <typename T>
-void ComponentManagerGPU<T>::detectCollisionsParticles()
+void ComponentManagerGPU<T>::detectCollisionsComponents()
 {
     uint nPairs = m_neighborList->getSize();
     uint numThreads, numBlocks;
@@ -114,9 +88,9 @@ void ComponentManagerGPU<T>::detectCollisionsParticles()
                                    numBlocks,
                                    numThreads);
 
-    detectCollisionsParticles_Kernel<<<numBlocks, numThreads>>>(
+    detectCollisionsComponents_Kernel<<<numBlocks, numThreads>>>(
         m_neighborList->getData(),
-        m_particleRB->getData(),
+        m_rigidBody->getData(),
         m_relPosition.getData(),
         m_relQuaternion.getData(),
         m_contactInfo.getData(),
@@ -134,11 +108,8 @@ void ComponentManagerGPU<T>::detectCollisions()
     // Computes the relative transformations
     computeRelativeTransformations();
 
-    // Particle-particle interactions
-    detectCollisionsParticles();
-
-    // Particle-obstacle interactions
-    detectCollisionsObstacles();
+    // Interactions
+    detectCollisionsComponents();
 }
 
 // -----------------------------------------------------------------------------
@@ -158,7 +129,7 @@ void ComponentManagerGPU<T>::computeContactForces(
         CF.getData(),
         m_neighborList->getData(),
         m_contactInfo.getData(),
-        m_particleRB->getData(),
+        m_rigidBody->getData(),
         m_velocity.getData(),
         m_torce.getData(),
         m_relPosition.getData(),
@@ -187,8 +158,9 @@ void ComponentManagerGPU<T>::addExternalForces()
     addExternalForces_Kernel<<<numBlocks, numThreads>>>(gX,
                                                         gY,
                                                         gZ,
-                                                        m_particleRB->getData(),
+                                                        m_rigidBody->getData(),
                                                         m_torce.getData(),
+                                                        m_nObstacles,
                                                         m_nParticles);
 }
 
@@ -205,12 +177,12 @@ void ComponentManagerGPU<T>::moveParticles(
                                    numThreads);
 
     moveParticles_Kernel<<<numBlocks, numThreads>>>(TI.getData(),
-                                                    m_particleRB->getData(),
+                                                    m_rigidBody->getData(),
                                                     m_position.getData(),
                                                     m_quaternion.getData(),
                                                     m_velocity.getData(),
                                                     m_torce.getData(),
-                                                    m_rigidBodyId.getData(),
+                                                    m_nObstacles,
                                                     m_nParticles);
 }
 

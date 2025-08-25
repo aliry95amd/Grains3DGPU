@@ -146,10 +146,8 @@ __HOSTDEVICE__ void Cells<T>::generateNeighborCells(uint* neighborCells,
 template <typename T>
 __HOSTDEVICE__ void Cells<T>::checkBound(const uint3& id) const
 {
-    if(id.x >= m_numCells.x || id.y >= m_numCells.y || id.z >= m_numCells.z)
-    {
-        GAbort("Linked cell range exceeded!");
-    }
+    GAssert(id.x < m_numCells.x || id.y < m_numCells.y || id.z < m_numCells.z,
+            "Linked cell range exceeded!");
 }
 
 // -----------------------------------------------------------------------------

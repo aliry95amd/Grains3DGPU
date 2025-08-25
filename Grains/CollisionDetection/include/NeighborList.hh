@@ -83,7 +83,9 @@ public:
     // -------------------------------------------------------------------------
     /** @brief Updates the neighbor list
     @param positions array of positions */
-    virtual void updateNeighborList(GrainsMemBuffer<Vector3<T>, M>& positions)
+    virtual void updateNeighborList(GrainsMemBuffer<Vector3<T>, M>& positions,
+                                    const uint                      nObstacles,
+                                    const uint                      nParticles)
         = 0;
 
     // -------------------------------------------------------------------------

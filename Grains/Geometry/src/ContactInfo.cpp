@@ -1,4 +1,5 @@
 #include "ContactInfo.hh"
+#include "GrainsUtils.hh"
 
 // -----------------------------------------------------------------------------
 // Default constructor
@@ -78,6 +79,36 @@ __HOSTDEVICE__ void ContactInfo<T>::setOverlapDistance(T d)
 }
 
 // -----------------------------------------------------------------------------
+// Output operator
+template <typename T>
+__HOST__ std::ostream& operator<<(std::ostream&         fileOut,
+                                  const ContactInfo<T>& c)
+{
+    // Orientation first, followed by the position
+    fileOut << c.getContactPoint() << " " << c.getContactVector() << " "
+            << c.getOverlapDistance() << std::endl;
+    return (fileOut);
+}
+
+// -----------------------------------------------------------------------------
+// Input operator
+template <typename T>
+__HOST__ std::istream& operator>>(std::istream& fileIn, ContactInfo<T>& c)
+{
+    GAbort("Input operator for ContactInfo is not implemented yet!");
+}
+
+// -----------------------------------------------------------------------------
 // Explicit instantiation
 template class ContactInfo<float>;
 template class ContactInfo<double>;
+
+#define X(T)                                                        \
+    template std::ostream& operator<< <T>(std::ostream & fileOut,   \
+                                          const ContactInfo<T>& t); \
+                                                                    \
+    template std::istream& operator>> <T>(std::istream & fileIn,    \
+                                          ContactInfo<T> & t);
+X(float)
+X(double)
+#undef X

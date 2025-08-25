@@ -144,17 +144,17 @@ public:
 
 /** @name External Methods - I/O methods */
 //@{
-/** @brief Input operator
-@param fileIn input stream
-@param v vector */
-template <typename T>
-__HOST__ std::istream& operator>>(std::istream& fileIn, Matrix3<T>& m);
-
 /** @brief Output operator
-@param fileOut output stream
-@param v vector */
+    @param fileOut output stream
+    @param m matrix object */
 template <typename T>
 __HOST__ std::ostream& operator<<(std::ostream& fileOut, const Matrix3<T>& m);
+
+/** @brief Input operator
+    @param fileIn input stream
+    @param m matrix object */
+template <typename T>
+__HOST__ std::istream& operator>>(std::istream& fileIn, Matrix3<T>& m);
 //@}
 
 #endif

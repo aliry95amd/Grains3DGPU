@@ -16,29 +16,24 @@ __HOST__ HookeContactForceModel<T>::HookeContactForceModel(DOMNode* root)
 {
     DOMNode* parameter;
     parameter = ReaderXML::getNode(root, "kn");
-    if(!parameter)
-        GAbort("kn not defined! Aborting Grains!");
+    GAssert(parameter, "kn not defined! Aborting Grains!");
     m_kn = T(ReaderXML::getNodeValue_Double(parameter));
 
     parameter = ReaderXML::getNode(root, "en");
-    if(!parameter)
-        GAbort("en not defined! Aborting Grains!");
+    GAssert(parameter, "en not defined! Aborting Grains!");
     m_en   = T(ReaderXML::getNodeValue_Double(parameter));
     m_muen = log(m_en) / sqrt(PI<T> * PI<T> + log(m_en) * log(m_en));
 
     parameter = ReaderXML::getNode(root, "etat");
-    if(!parameter)
-        GAbort("etat not defined! Aborting Grains!");
+    GAssert(parameter, "etat not defined! Aborting Grains!");
     m_etat = T(ReaderXML::getNodeValue_Double(parameter));
 
     parameter = ReaderXML::getNode(root, "muc");
-    if(!parameter)
-        GAbort("muc not defined! Aborting Grains!");
+    GAssert(parameter, "muc not defined! Aborting Grains!");
     m_muc = T(ReaderXML::getNodeValue_Double(parameter));
 
     parameter = ReaderXML::getNode(root, "kr");
-    if(!parameter)
-        GAbort("kr not defined! Aborting Grains!");
+    GAssert(parameter, "kr not defined! Aborting Grains!");
     m_kr = T(ReaderXML::getNodeValue_Double(parameter));
 }
 

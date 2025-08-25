@@ -217,21 +217,18 @@ public:
 
 /** @name External Methods - I/O methods */
 //@{
-/** @brief Input operator
-@param fileIn input stream
-@param v vector */
-template <typename T>
-__HOST__ std::istream& operator>>(std::istream& fileIn, Transform3<T>& t);
-
 /** @brief Output operator
-@param fileOut output stream
-@param v vector */
+ @param fileOut output stream
+ @param t transform object */
 template <typename T>
 __HOST__ std::ostream& operator<<(std::ostream&        fileOut,
                                   const Transform3<T>& t);
-//@}
 
-typedef Transform3<float>  Tr3F;
-typedef Transform3<double> Tr3D;
+/** @brief Input operator
+        @param fileIn input stream
+        @param t transform object */
+template <typename T>
+__HOST__ std::istream& operator>>(std::istream& fileIn, Transform3<T>& t);
+//@}
 
 #endif

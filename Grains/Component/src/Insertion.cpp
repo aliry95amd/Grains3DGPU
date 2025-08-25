@@ -17,10 +17,8 @@ __HOST__ static INLINE InsertionInfo<T> readDataRand(DOMNode* root)
     if(seedString == "UserDefined")
     {
         uint val = ReaderXML::getNodeAttr_Int(root, "Value");
-        if(val)
-            rgs = RGS_UDEF;
-        else
-            GAbort("Seed value is not provided. Aborting Grains!");
+        GAssert(val, "Seed value is not provided. Aborting Grains!");
+        rgs = RGS_UDEF;
         GoutWI(12, "Random initialization with", std::to_string(val), "seed.");
     }
     else if(seedString == "Random")
@@ -61,13 +59,8 @@ __HOST__ static INLINE InsertionInfo<T> readDataFile(DOMNode* root)
 {
     std::string   fileName = ReaderXML::getNodeAttr_String(root, "Name");
     std::ifstream file(fileName);
-    // Check whether the file exists
-    if(file.good())
-    {
-        GoutWI(12, "File initialization with path" + fileName + ".");
-    }
-    else
-        GAbort("File does not exist. Aborting Grains!");
+    GAssert(file.good(), "File initialization failed! Aborting Grains!");
+    GoutWI(12, "File initialization with path" + fileName + ".");
 
     return (file);
 }

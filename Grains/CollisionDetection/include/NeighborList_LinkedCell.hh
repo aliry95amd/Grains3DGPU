@@ -48,11 +48,13 @@ public:
     /** @brief Constructor with parameters
         @param minCorner minimum corner of the domain
         @param maxCorner maximum corner of the domain
-        @param cellSize size of the cell 
+        @param cellSize size of the cell
+        @param nObstacles number of obstacles
         @param nParticles number of particles */
     NeighborList_LinkedCell(const Vector3<T>& minCorner,
                             const Vector3<T>& maxCorner,
                             const T           cellSize,
+                            const uint        nObstacles,
                             const uint        nParticles)
     {
         // Initialize the LinkedCell buffer
@@ -72,7 +74,8 @@ public:
         }
 
         // TODO: Reduce init size
-        m_pairList.allocate(nParticles * (nParticles - 1) / 2);
+        m_pairList.allocate(nObstacles * nParticles
+                            + nParticles * (nParticles - 1) / 2);
         m_pairList.fill();
         m_pairCount.allocate(1);
         m_pairCount.fill(0);
@@ -90,8 +93,12 @@ public:
     //@{
     // -------------------------------------------------------------------------
     /** @brief Updates the neighbor list
-        @param positions array of positions */
-    void updateNeighborList(GrainsMemBuffer<Vector3<T>, M>& positions) final
+        @param positions array of positions
+        @param nObstacles number of obstacles
+        @param nParticles number of particles */
+    void updateNeighborList(GrainsMemBuffer<Vector3<T>, M>& positions,
+                            const uint                      nObstacles,
+                            const uint                      nParticles) final
     {
         if(!m_needsUpdate)
             return;

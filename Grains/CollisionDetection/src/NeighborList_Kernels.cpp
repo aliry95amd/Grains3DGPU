@@ -2,25 +2,48 @@
 
 // -----------------------------------------------------------------------------
 // Updates the neighbor list on host using an O(n^2) algorithm
-__HOST__ void updateNeighborList_Nsq_Host(const uint nParticles,
+__HOST__ void updateNeighborList_Nsq_Host(const uint nObstacles,
+                                          const uint nParticles,
                                           uint2*     pairList)
 {
+    for(uint i = 0; i < nObstacles; ++i)
+        for(uint j = 0; j < nParticles; ++j)
+            pairList[nParticles * i + j] = make_uint2(i, nObstacles + j);
+
+    // Offset for p-p interactions.
+    uint offset = nObstacles * nParticles;
     for(uint i = 0; i < nParticles; ++i)
         for(uint j = i + 1; j < nParticles; ++j)
-            pairList[i + j * (j - 1) / 2] = make_uint2(i, j);
+            pairList[offset + i + j * (j - 1) / 2]
+                = make_uint2(nObstacles + i, nObstacles + j);
 }
 
 // -----------------------------------------------------------------------------
 // Updates the neighbor list on device using an O(n^2) algorithm
-__GLOBAL__ void updateNeighborList_Nsq_Device(const uint nParticles,
+__GLOBAL__ void updateNeighborList_Nsq_Device(const uint nObstacles,
+                                              const uint nParticles,
                                               uint2*     pairList)
 {
     uint tID = blockIdx.x * blockDim.x + threadIdx.x;
-    if(tID >= nParticles)
+    if(tID < nObstacles)
+    {
+        // Obstacle to particle pairs
+        for(uint j = 0; j < nParticles; ++j)
+            pairList[nParticles * tID + j] = make_uint2(tID, nObstacles + j);
+    }
+    else if(tID < nObstacles + nParticles)
+    {
+        // offset
+        const uint offset = nObstacles * nParticles;
+        // adjust tID to start from 0 for particles
+        tID -= nObstacles;
+        // Particle to obstacle pairs
+        for(uint j = tID + 1; j < nParticles; ++j)
+            pairList[offset + tID + j * (j - 1) / 2]
+                = make_uint2(nObstacles + tID, nObstacles + j);
+    }
+    else
         return;
-
-    for(uint j = tID + 1; j < nParticles; ++j)
-        pairList[tID + j * (j - 1) / 2] = make_uint2(tID, j);
 }
 
 // -----------------------------------------------------------------------------

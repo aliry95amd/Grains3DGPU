@@ -35,11 +35,13 @@ public:
     NeighborList_Nsq() = default;
 
     // -------------------------------------------------------------------------
-    /** @brief Constructor with number of particles
+    /** @brief Constructor with number of obstacles and particles
+        @param nObstacles number of obstacles
         @param nParticles number of particles */
-    NeighborList_Nsq(const uint nParticles)
+    NeighborList_Nsq(const uint nObstacles, const uint nParticles)
     {
-        m_pairList.reserve(nParticles * (nParticles - 1) / 2);
+        m_pairList.reserve(nObstacles * nParticles
+                           + nParticles * (nParticles - 1) / 2);
         m_pairList.fill();
         m_pairCount.allocate(1);
         m_pairCount.fill(0);
@@ -57,30 +59,41 @@ public:
     //@{
     // -------------------------------------------------------------------------
     /** @brief Updates the neighbor list
-    @param positions memory buffer of positions */
-    void updateNeighborList(GrainsMemBuffer<Vector3<T>, M>& positions) final
+        @param positions memory buffer of positions
+        @param nObstacles number of obstacles
+        @param nParticles number of particles */
+    void updateNeighborList(GrainsMemBuffer<Vector3<T>, M>& positions,
+                            const uint                      nObstacles,
+                            const uint                      nParticles) final
     {
         if(!m_needsUpdate)
             return;
 
-        uint nParticles = positions.getSize();
+        assert(positions.getSize() == nParticles + nObstacles
+               && "Positions size must match the number of particles and "
+                  "obstacles in the simulation!");
 
         if constexpr(M == MemType::HOST || M == MemType::PINNED)
         {
-            updateNeighborList_Nsq_Host(nParticles, m_pairList.getData());
-            m_pairCount[0] = nParticles * (nParticles - 1) / 2;
+            updateNeighborList_Nsq_Host(nObstacles,
+                                        nParticles,
+                                        m_pairList.getData());
+            m_pairCount[0]
+                = nObstacles * nParticles + nParticles * (nParticles - 1) / 2;
         }
         else if constexpr(M == MemType::DEVICE || M == MemType::MANAGED)
         {
             uint numBlocks, numThreads;
-            computeOptimalThreadsAndBlocks(positions.getSize(),
+            computeOptimalThreadsAndBlocks(nObstacles + nParticles,
                                            GrainsParameters<T>::m_GPU,
                                            numBlocks,
                                            numThreads);
             updateNeighborList_Nsq_Device<<<numBlocks, numThreads>>>(
+                nObstacles,
                 nParticles,
                 m_pairList.getData());
-            m_hPairCount[0] = nParticles * (nParticles - 1) / 2;
+            m_hPairCount[0]
+                = nObstacles * nParticles + nParticles * (nParticles - 1) / 2;
         }
 
         m_needsUpdate = false;

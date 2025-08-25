@@ -1,7 +1,9 @@
-#include "RigidBody.hh"
+#include <limits>
+
 #include "ConvexFactory.hh"
 #include "GrainsParameters.hh"
 #include "QuaternionMath.hh"
+#include "RigidBody.hh"
 #include "VectorMath.hh"
 
 // -----------------------------------------------------------------------------
@@ -96,12 +98,15 @@ __HOST__ RigidBody<T>::RigidBody(DOMNode* root)
     }
     else
     {
-        m_mass = T(0);
+        m_mass = std::numeric_limits<T>::max();
         for(int i = 0; i < 6; i++)
         {
             m_inertia[i]   = T(0);
             m_inertia_1[i] = T(0);
         }
+        m_inertia[0] = std::numeric_limits<T>::max();
+        m_inertia[3] = std::numeric_limits<T>::max();
+        m_inertia[5] = std::numeric_limits<T>::max();
     }
 }
 

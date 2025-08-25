@@ -440,8 +440,8 @@ public:
         if(m_size == 0 || !m_ptr)
             return;
 
-        if(dest.getSize() < m_size)
-            GAbort("Destination buffer too small for copy");
+        GAssert(dest.getSize() < m_size,
+                "Destination buffer too small for copy");
 
         if constexpr(M == MemType::HOST && destM == MemType::HOST)
             std::memcpy(dest.getData(), m_ptr, getBytes());
@@ -618,7 +618,7 @@ public:
     {
         static_assert(M == MemType::HOST || M == MemType::PINNED,
                       "operator[] only available for HOST or PINNED memory");
-        assert(i < m_size);
+        GAssert(i < m_size, "Index", i, "out of bounds for size", m_size);
         return m_ptr[i];
     }
 
@@ -629,7 +629,7 @@ public:
     {
         static_assert(M == MemType::HOST || M == MemType::PINNED,
                       "operator[] only available for HOST or PINNED memory");
-        assert(i < m_size);
+        GAssert(i < m_size, "Index", i, "out of bounds for size", m_size);
         return m_ptr[i];
     }
 

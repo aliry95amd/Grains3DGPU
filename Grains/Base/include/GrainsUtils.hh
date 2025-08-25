@@ -171,4 +171,15 @@ __HOSTDEVICE__ INLINE void GAbort(const Args&... args)
 #endif
 }
 
+// -----------------------------------------------------------------------------
+/** @brief Assert function that aborts the program if the condition is false
+    @param condition the condition to check
+    @param args the message(s) to display if the assertion fails */
+template <typename... Args>
+__HOSTDEVICE__ INLINE void GAssert(bool condition, const Args&... args)
+{
+    if(!condition)
+        GAbort("GAssert failed:", args...);
+}
+
 #endif

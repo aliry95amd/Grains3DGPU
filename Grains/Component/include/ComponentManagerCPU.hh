@@ -17,16 +17,10 @@ class ComponentManagerCPU : public ComponentManager<T, MemType::HOST>
     using CM::m_nObstacles;
     using CM::m_nParticles;
 
-    using CM::m_obstaclePosition;
-    using CM::m_obstacleQuaternion;
-    using CM::m_obstacleRB;
-    using CM::m_obstacleRigidBodyId;
-    using CM::m_obstacleVelocity;
-
-    using CM::m_particleId;
-    using CM::m_particleRB;
+    using CM::m_componentId;
     using CM::m_position;
     using CM::m_quaternion;
+    using CM::m_rigidBody;
     using CM::m_rigidBodyId;
     using CM::m_torce;
     using CM::m_velocity;
@@ -43,15 +37,13 @@ public:
     ComponentManagerCPU();
 
     /** @brief Constructor with the number of particles, and obstacles. 
-        @param particleRB Pointer to the particles rigid body buffer
-        @param obstacleRB Pointer to the obstacles rigid body buffer
-        @param nParticles Number of particles
-        @param nObstacles Number of obstacles */
+        @param rigidBody Pointer to the components rigid body buffer
+        @param nObstacles Number of obstacles
+        @param nParticles Number of particles */
     ComponentManagerCPU(
-        GrainsMemBuffer<RigidBody<T>*, MemType::HOST>* particleRB,
-        GrainsMemBuffer<RigidBody<T>*, MemType::HOST>* obstacleRB,
-        uint                                           nParticles,
-        uint                                           nObstacles);
+        GrainsMemBuffer<RigidBody<T>*, MemType::HOST>* rigidBody,
+        uint                                           nObstacles,
+        uint                                           nParticles);
 
     /** @brief Destructor */
     ~ComponentManagerCPU();
@@ -82,13 +74,10 @@ public:
     /** @brief Computes the relative transformations */
     void computeRelativeTransformations() final;
 
-    /** @brief Detects collisions between particles and obstacles */
-    void detectCollisionsObstacles() final;
+    /** @brief Detects collisions between components */
+    void detectCollisionsComponents() final;
 
-    /** @brief Detects collisions between particles and particles */
-    void detectCollisionsParticles() final;
-
-    /** @brief Detects collision between particles and particles and */
+    /** @brief Detects collision */
     void detectCollisions() final;
 
     /** @brief Computes contact forces between different components

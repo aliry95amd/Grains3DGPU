@@ -64,16 +64,13 @@ public:
     virtual void PostProcessing_start() = 0;
 
     /** @brief Writes post-processing data
-        @param particleRB Arrays of particles rigid bodies
-        @param obstacleRB Arrays of obstacles rigid bodies
+        @param rb Arrays of rigid bodies
         @param cm Component manager
         @param currentTime Current simulation time */
 
-    virtual void
-        PostProcessing(const GrainsMemBuffer<RigidBody<T>*>&       particleRB,
-                       const GrainsMemBuffer<RigidBody<T>*>&       obstacleRB,
-                       const std::unique_ptr<ComponentManager<T>>& cm,
-                       const T                                     currentTime)
+    virtual void PostProcessing(const GrainsMemBuffer<RigidBody<T>*>&       rb,
+                                const std::unique_ptr<ComponentManager<T>>& cm,
+                                const T currentTime)
         = 0;
 
     /** @brief Finalizes writing data */

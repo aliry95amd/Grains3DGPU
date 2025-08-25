@@ -66,7 +66,7 @@ export GRAINS_GPU_COMPILER_FLAGS="-t=8 -x cu -m64 \
     -use_fast_math -extra-device-vectorization -restrict --extended-lambda \
     -Xcompiler "-rdynamic,-fPIC,-fopenmp" \
     -pg -g \
-    -diag-suppress 554"
+    -diag-suppress 554 -diag-suppress 181"
 export GRAINS_GPU_LINKER_FLAGS="-O3 -dlto \
     -arch=sm_75 -lineinfo -lcudart \
     -use_fast_math -extra-device-vectorization -restrict \

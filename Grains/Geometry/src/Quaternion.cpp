@@ -228,9 +228,9 @@ template <typename T>
 __HOSTDEVICE__ void Quaternion<T>::setQuaternion(const Matrix3<T>& rot) noexcept
 {
     // Validate that input is a proper rotation matrix
-    if(!isRotation(rot))
-        GAbort("Input matrix is not a valid rotation matrix in "
-               "Quaternion::setQuaternion!");
+    GAssert(isRotation(rot),
+            "Input matrix is not a valid rotation matrix in "
+            "Quaternion::setQuaternion!");
 
     const T* b   = rot.getBuffer(); // rotation matrix buffer
     T        den = T(0);
@@ -239,9 +239,9 @@ __HOSTDEVICE__ void Quaternion<T>::setQuaternion(const Matrix3<T>& rot) noexcept
     if(b[YY] > -b[ZZ] && b[XX] > -b[YY] && b[XX] > -b[ZZ])
     {
         den = sqrt(T(1) + b[XX] + b[YY] + b[ZZ]);
-        if(den < HIGHEPS<T>)
-            GAbort("Numerical instability in Quaternion::setQuaternion - "
-                   "denominator too small!");
+        GAssert(den > HIGHEPS<T>,
+                "Numerical instability in Quaternion::setQuaternion - "
+                "denominator too small!");
         m_w      = T(0.5) * den;
         m_vqt[X] = T(0.5) * (b[ZY] - b[YZ]) / den;
         m_vqt[Y] = T(0.5) * (b[XZ] - b[ZX]) / den;
@@ -251,9 +251,9 @@ __HOSTDEVICE__ void Quaternion<T>::setQuaternion(const Matrix3<T>& rot) noexcept
     else if(b[YY] < -b[ZZ] && b[XX] > b[YY] && b[XX] > b[ZZ])
     {
         den = sqrt(T(1) + b[XX] - b[YY] - b[ZZ]);
-        if(den < HIGHEPS<T>)
-            GAbort("Numerical instability in Quaternion::setQuaternion - "
-                   "denominator too small!");
+        GAssert(den > HIGHEPS<T>,
+                "Numerical instability in Quaternion::setQuaternion - "
+                "denominator too small!");
         m_w      = T(0.5) * (b[ZY] - b[YZ]) / den;
         m_vqt[X] = T(0.5) * den;
         m_vqt[Y] = T(0.5) * (b[XY] + b[YX]) / den;
@@ -263,9 +263,9 @@ __HOSTDEVICE__ void Quaternion<T>::setQuaternion(const Matrix3<T>& rot) noexcept
     else if(b[YY] > b[ZZ] && b[XX] < b[YY] && b[XX] < -b[ZZ])
     {
         den = sqrt(T(1) - b[XX] + b[YY] - b[ZZ]);
-        if(den < HIGHEPS<T>)
-            GAbort("Numerical instability in Quaternion::setQuaternion - "
-                   "denominator too small!");
+        GAssert(den > HIGHEPS<T>,
+                "Numerical instability in Quaternion::setQuaternion - "
+                "denominator too small!");
         m_w      = T(0.5) * (b[XZ] - b[ZX]) / den;
         m_vqt[X] = T(0.5) * (b[XY] + b[YX]) / den;
         m_vqt[Y] = T(0.5) * den;
@@ -275,9 +275,9 @@ __HOSTDEVICE__ void Quaternion<T>::setQuaternion(const Matrix3<T>& rot) noexcept
     else if(b[YY] < b[ZZ] && b[XX] < -b[YY] && b[XX] < b[ZZ])
     {
         den = sqrt(T(1) - b[XX] - b[YY] + b[ZZ]);
-        if(den < HIGHEPS<T>)
-            GAbort("Numerical instability in Quaternion::setQuaternion - "
-                   "denominator too small!");
+        GAssert(den > HIGHEPS<T>,
+                "Numerical instability in Quaternion::setQuaternion - "
+                "denominator too small!");
         m_w      = T(0.5) * (b[YX] - b[XY]) / den;
         m_vqt[X] = T(0.5) * (b[ZX] + b[XZ]) / den;
         m_vqt[Y] = T(0.5) * (b[YZ] + b[ZY]) / den;
@@ -381,7 +381,7 @@ __HOSTDEVICE__ T& Quaternion<T>::operator[](size_t i) noexcept
 template <typename T>
 std::ostream& operator<<(std::ostream& fileOut, const Quaternion<T>& q)
 {
-    fileOut << q.getScalar() << "\t" << q.getVector();
+    fileOut << q.getScalar() << " " << q.getVector();
     return (fileOut);
 }
 

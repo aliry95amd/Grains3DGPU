@@ -73,31 +73,22 @@ void RawDataPostProcessingWriter<T>::PostProcessing_start()
 // Writes data -- Particles come first, followed by obtacles
 template <typename T>
 void RawDataPostProcessingWriter<T>::PostProcessing(
-    const GrainsMemBuffer<RigidBody<T>*>&       particleRB,
-    const GrainsMemBuffer<RigidBody<T>*>&       obstacleRB,
+    const GrainsMemBuffer<RigidBody<T>*>&       rb,
     const std::unique_ptr<ComponentManager<T>>& cm,
     const T                                     currentTime)
 {
-    // Particles
-    uint                         numParticles = cm->getNumberOfParticles();
-    const GrainsMemBuffer<uint>& rbParticle   = cm->getRigidBodyId();
-    const GrainsMemBuffer<Vector3<T>>&    pParticle = cm->getPosition();
-    const GrainsMemBuffer<Quaternion<T>>& qParticle = cm->getQuaternion();
-    const GrainsMemBuffer<Kinematics<T>>& kParticle = cm->getVelocity();
-    GrainsMemBuffer<Transform3<T>>        tParticle(numParticles);
-    for(uint i = 0; i < numParticles; ++i)
-        tParticle[i] = Transform3<T>(qParticle[i], pParticle[i]);
-    // Obstacles
-    uint                         numObstacles = cm->getNumberOfObstacles();
-    const GrainsMemBuffer<uint>& rbObstacle   = cm->getObstaclesRigidBodyId();
-    const GrainsMemBuffer<Vector3<T>>& pObstacle = cm->getObstaclesPosition();
-    const GrainsMemBuffer<Quaternion<T>>& qObstacle
-        = cm->getObstaclesQuaternion();
-    const GrainsMemBuffer<Kinematics<T>>& kObstacle
-        = cm->getObstaclesVelocity();
-    GrainsMemBuffer<Transform3<T>> tObstacle(numObstacles);
-    for(uint i = 0; i < numObstacles; ++i)
-        tObstacle[i] = Transform3<T>(qObstacle[i], pObstacle[i]);
+    // Components
+    uint numObstacles                          = cm->getNumberOfObstacles();
+    uint numParticles                          = cm->getNumberOfParticles();
+    uint numComponents                         = numObstacles + numParticles;
+    const GrainsMemBuffer<Vector3<T>>&    pos  = cm->getPosition();
+    const GrainsMemBuffer<Quaternion<T>>& quat = cm->getQuaternion();
+
+    GrainsMemBuffer<Transform3<T>> tr(numComponents);
+    for(uint i = 0; i < numComponents; ++i)
+        tr[i] = Transform3<T>(quat[i], pos[i]);
+    const GrainsMemBuffer<Kinematics<T>>& kin = cm->getVelocity();
+
     // Aux. variables
     Vector3<T>  centre;
     Vector3<T>  velT;
@@ -120,10 +111,10 @@ void RawDataPostProcessingWriter<T>::PostProcessing(
     m_angular_velocity_z << stime;
 
     // Writing particles data
-    for(size_t i = 0; i < numParticles; i++)
+    for(size_t i = numObstacles; i < numParticles; i++)
     {
         // Center of mass position
-        centre = tParticle[i].getOrigin();
+        centre = tr[i].getOrigin();
         m_gc_coordinates_x << " "
                            << realToString(ios::scientific,
                                            m_ndigits,
@@ -138,7 +129,7 @@ void RawDataPostProcessingWriter<T>::PostProcessing(
                                            centre[Z]);
 
         // Translational velocity
-        velT = kParticle[i].getTranslationalComponent();
+        velT = kin[i].getTranslationalComponent();
         m_translational_velocity_x
             << " " << realToString(ios::scientific, m_ndigits, velT[X]);
         m_translational_velocity_y
@@ -147,7 +138,7 @@ void RawDataPostProcessingWriter<T>::PostProcessing(
             << " " << realToString(ios::scientific, m_ndigits, velT[Z]);
 
         // Angular velocity
-        velR = kParticle[i].getAngularComponent();
+        velR = kin[i].getAngularComponent();
         m_angular_velocity_x
             << " " << realToString(ios::scientific, m_ndigits, velR[X]);
         m_angular_velocity_y
@@ -167,7 +158,7 @@ void RawDataPostProcessingWriter<T>::PostProcessing(
     for(size_t i = 0; i < numObstacles; i++)
     {
         // Center of mass position
-        centre = tObstacle[i].getOrigin();
+        centre = tr[i].getOrigin();
         m_gc_coordinates_x << " "
                            << realToString(ios::scientific,
                                            m_ndigits,
@@ -182,7 +173,7 @@ void RawDataPostProcessingWriter<T>::PostProcessing(
                                            centre[Z]);
 
         // Translational velocity
-        velT = kObstacle[i].getTranslationalComponent();
+        velT = kin[i].getTranslationalComponent();
         m_translational_velocity_x
             << " " << realToString(ios::scientific, m_ndigits, velT[X]);
         m_translational_velocity_y
@@ -191,7 +182,7 @@ void RawDataPostProcessingWriter<T>::PostProcessing(
             << " " << realToString(ios::scientific, m_ndigits, velT[Z]);
 
         // Angular velocity
-        velR = kObstacle[i].getAngularComponent();
+        velR = kin[i].getAngularComponent();
         m_angular_velocity_x
             << " " << realToString(ios::scientific, m_ndigits, velR[X]);
         m_angular_velocity_y
@@ -203,7 +194,7 @@ void RawDataPostProcessingWriter<T>::PostProcessing(
         // m_coordination_number << " " << pp->getCoordinationNumber();
 
         // Particle type
-        type = obstacleRB[rbObstacle[i]]->getConvex()->getConvexType();
+        // type = obstacleRB[rbObstacle[i]]->getConvex()->getConvexType();
         // m_particle_class << type << " " ;
     }
 
