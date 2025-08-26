@@ -79,6 +79,8 @@ __HOSTDEVICE__ bool intersectGJK(const Convex<T>&     a,
     @param b convex shape B
     @param b2a geometric transformation describing convex B in the reference  
     frame of A
+    @param crustA crust/skin thickness on A (shrinks A along search dir)
+    @param crustB crust/skin thickness on B (shrinks B along search dir)
     @param pa point representing one tip of the minimal distance segment on A
     @param pb point representing the other tip of the minimal distance segment 
     on B
@@ -90,6 +92,8 @@ template <typename T,
 __HOSTDEVICE__ T computeClosestPoints_GJK(const Convex<T>&     a,
                                           const Convex<T>&     b,
                                           const Transform3<T>& b2a,
+                                          const T              crustA,
+                                          const T              crustB,
                                           Vector3<T>&          pa,
                                           Vector3<T>&          pb,
                                           uint&                nbIter);
@@ -102,6 +106,8 @@ __HOSTDEVICE__ T computeClosestPoints_GJK(const Convex<T>&     a,
     reference frame
     @param b2w geometric transformation describing convex B in the world 
     reference frame
+    @param crustA crust/skin thickness on A (shrinks A along search dir)
+    @param crustB crust/skin thickness on B (shrinks B along search dir)
     @param pa point representing one tip of the minimal distance segment on A
     @param pb point representing the tip of the minimal distance segment on B
     @param nbIter number of iterations of GJK for convergence */
@@ -113,6 +119,8 @@ __HOSTDEVICE__ T computeClosestPoints_GJK(const Convex<T>&     a,
                                           const Convex<T>&     b,
                                           const Transform3<T>& a2w,
                                           const Transform3<T>& b2w,
+                                          const T              crustA,
+                                          const T              crustB,
                                           Vector3<T>&          pa,
                                           Vector3<T>&          pb,
                                           uint&                nbIter);
@@ -124,6 +132,8 @@ __HOSTDEVICE__ T computeClosestPoints_GJK(const Convex<T>&     a,
     @param b convex shape B
     @param v_b2a position describing convex B in the A's reference frame
     @param q_b2a rotation describing convex B in the A's reference frame
+    @param crustA crust/skin thickness on A (shrinks A along search dir)
+    @param crustB crust/skin thickness on B (shrinks B along search dir)
     @param pa point representing one tip of the minimal distance segment on A
     @param pb point representing the tip of the minimal distance segment on B
     @param nbIter number of iterations of GJK for convergence */
@@ -135,6 +145,8 @@ __HOSTDEVICE__ T computeClosestPoints_GJK(const Convex<T>&     a,
                                           const Convex<T>&     b,
                                           const Vector3<T>&    v_b2a,
                                           const Quaternion<T>& q_b2a,
+                                          const T              crustA,
+                                          const T              crustB,
                                           Vector3<T>&          pa,
                                           Vector3<T>&          pb,
                                           uint&                nbIter);
@@ -147,6 +159,8 @@ __HOSTDEVICE__ T computeClosestPoints_GJK(const Convex<T>&     a,
     @param v_b2w position describing convex B in the world reference frame
     @param q_a2w rotation describing convex A in the world reference frame
     @param q_b2w rotation describing convex B in the world reference frame
+    @param crustA crust/skin thickness on A (shrinks A along search dir)
+    @param crustB crust/skin thickness on B (shrinks B along search dir)
     @param pa point representing one tip of the minimal distance segment on A
     @param pb point representing the tip of the minimal distance segment on B
     @param nbIter number of iterations of GJK for convergence */
@@ -160,6 +174,8 @@ __HOSTDEVICE__ T computeClosestPoints_GJK(const Convex<T>&     a,
                                           const Vector3<T>&    v_b2w,
                                           const Quaternion<T>& q_a2w,
                                           const Quaternion<T>& q_b2w,
+                                          const T              crustA,
+                                          const T              crustB,
                                           Vector3<T>&          pa,
                                           Vector3<T>&          pb,
                                           uint&                nbIter);

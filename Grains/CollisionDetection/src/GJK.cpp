@@ -788,6 +788,8 @@ template <typename T, bool Acceleration, T Tolerance>
 __HOSTDEVICE__ T computeClosestPoints_GJK_Johnson(const Convex<T>&     a,
                                                   const Convex<T>&     b,
                                                   const Transform3<T>& b2a,
+                                                  const T              crustA,
+                                                  const T              crustB,
                                                   Vector3<T>&          pa,
                                                   Vector3<T>&          pb,
                                                   uint&                nbIter)
@@ -832,7 +834,7 @@ __HOSTDEVICE__ T computeClosestPoints_GJK_Johnson(const Convex<T>&     a,
         // Support points
         p[last] = a.support((-v));
         q[last] = b.support((v)*b2a.getBasis());
-        w       = p[last] - b2a(q[last]);
+        w       = p[last] - b2a(q[last]) - (crustA + crustB) / dist * v;
 
         // termination criteria -- optimality gap
         mu = dist - v * w / dist;
@@ -869,9 +871,11 @@ template <typename T, bool Acceleration, T Tolerance>
 __HOSTDEVICE__ T computeClosestPoints_GJK_SignedVolume(const Convex<T>&     a,
                                                        const Convex<T>&     b,
                                                        const Transform3<T>& b2a,
-                                                       Vector3<T>&          pa,
-                                                       Vector3<T>&          pb,
-                                                       uint& nbIter)
+                                                       const T     crustA,
+                                                       const T     crustB,
+                                                       Vector3<T>& pa,
+                                                       Vector3<T>& pb,
+                                                       uint&       nbIter)
 {
     // Constants
     constexpr T    relError = Tolerance; // relative tolerance
@@ -914,7 +918,7 @@ __HOSTDEVICE__ T computeClosestPoints_GJK_SignedVolume(const Convex<T>&     a,
         // Support points
         p[last] = a.support((-v));
         q[last] = b.support((v)*b2a.getBasis());
-        w       = p[last] - b2a(q[last]);
+        w       = p[last] - b2a(q[last]) - (crustA + crustB) / dist * v;
 
         // termination criteria -- optimality gap
         mu = dist - v * w / dist;
@@ -950,6 +954,8 @@ template <typename T, GJKType GJKType, bool Acceleration, T Tolerance>
 __HOSTDEVICE__ T computeClosestPoints_GJK(const Convex<T>&     a,
                                           const Convex<T>&     b,
                                           const Transform3<T>& b2a,
+                                          const T              crustA,
+                                          const T              crustB,
                                           Vector3<T>&          pa,
                                           Vector3<T>&          pb,
                                           uint&                nbIter)
@@ -964,6 +970,8 @@ __HOSTDEVICE__ T computeClosestPoints_GJK(const Convex<T>&     a,
             a,
             b,
             b2a,
+            crustA,
+            crustB,
             pa,
             pb,
             nbIter);
@@ -975,6 +983,8 @@ __HOSTDEVICE__ T computeClosestPoints_GJK(const Convex<T>&     a,
                                                      Tolerance>(a,
                                                                 b,
                                                                 b2a,
+                                                                crustA,
+                                                                crustB,
                                                                 pa,
                                                                 pb,
                                                                 nbIter);
@@ -988,6 +998,8 @@ __HOSTDEVICE__ T computeClosestPoints_GJK_Johnson(const Convex<T>&     a,
                                                   const Convex<T>&     b,
                                                   const Transform3<T>& a2w,
                                                   const Transform3<T>& b2w,
+                                                  const T              crustA,
+                                                  const T              crustB,
                                                   Vector3<T>&          pa,
                                                   Vector3<T>&          pb,
                                                   uint&                nbIter)
@@ -1033,7 +1045,7 @@ __HOSTDEVICE__ T computeClosestPoints_GJK_Johnson(const Convex<T>&     a,
         // Support points
         p[last] = a.support((-v) * a2w.getBasis());
         q[last] = b.support(v * b2w.getBasis());
-        w       = a2w(p[last]) - b2w(q[last]);
+        w       = a2w(p[last]) - b2w(q[last]) - (crustA + crustB) / dist * v;
 
         // termination criteria -- optimality gap
         mu = dist - v * w / dist;
@@ -1071,9 +1083,11 @@ __HOSTDEVICE__ T computeClosestPoints_GJK_SignedVolume(const Convex<T>&     a,
                                                        const Convex<T>&     b,
                                                        const Transform3<T>& a2w,
                                                        const Transform3<T>& b2w,
-                                                       Vector3<T>&          pa,
-                                                       Vector3<T>&          pb,
-                                                       uint& nbIter)
+                                                       const T     crustA,
+                                                       const T     crustB,
+                                                       Vector3<T>& pa,
+                                                       Vector3<T>& pb,
+                                                       uint&       nbIter)
 {
     // Constants
     constexpr T relError = Tolerance; // relative tolerance
@@ -1115,7 +1129,7 @@ __HOSTDEVICE__ T computeClosestPoints_GJK_SignedVolume(const Convex<T>&     a,
         // Support points
         p[last] = a.support((-v) * a2w.getBasis());
         q[last] = b.support(v * b2w.getBasis());
-        w       = a2w(p[last]) - b2w(q[last]);
+        w       = a2w(p[last]) - b2w(q[last]) - (crustA + crustB) / dist * v;
 
         // termination criteria -- optimality gap
         mu = dist - v * w / dist;
@@ -1152,6 +1166,8 @@ __HOSTDEVICE__ T computeClosestPoints_GJK(const Convex<T>&     a,
                                           const Convex<T>&     b,
                                           const Transform3<T>& a2w,
                                           const Transform3<T>& b2w,
+                                          const T              crustA,
+                                          const T              crustB,
                                           Vector3<T>&          pa,
                                           Vector3<T>&          pb,
                                           uint&                nbIter)
@@ -1167,6 +1183,8 @@ __HOSTDEVICE__ T computeClosestPoints_GJK(const Convex<T>&     a,
             b,
             a2w,
             b2w,
+            crustA,
+            crustB,
             pa,
             pb,
             nbIter);
@@ -1179,6 +1197,8 @@ __HOSTDEVICE__ T computeClosestPoints_GJK(const Convex<T>&     a,
                                                                 b,
                                                                 a2w,
                                                                 b2w,
+                                                                crustA,
+                                                                crustB,
                                                                 pa,
                                                                 pb,
                                                                 nbIter);
@@ -1192,6 +1212,8 @@ __HOSTDEVICE__ T computeClosestPoints_GJK_Johnson(const Convex<T>&     a,
                                                   const Convex<T>&     b,
                                                   const Vector3<T>&    v_b2a,
                                                   const Quaternion<T>& q_b2a,
+                                                  const T              crustA,
+                                                  const T              crustB,
                                                   Vector3<T>&          pa,
                                                   Vector3<T>&          pb,
                                                   uint&                nbIter)
@@ -1238,6 +1260,7 @@ __HOSTDEVICE__ T computeClosestPoints_GJK_Johnson(const Convex<T>&     a,
         p[last] = a.support(-v);
         q[last] = b.support(q_b2a << v);
         FusedMinkowskiDifference(p[last], q[last], v_b2a, q_b2a, w);
+        w -= (crustA + crustB) / dist * v;
 
         // termination criteria -- optimality gap
         mu = dist - v * w / dist;
@@ -1276,6 +1299,8 @@ __HOSTDEVICE__ T
                                           const Convex<T>&     b,
                                           const Vector3<T>&    v_b2a,
                                           const Quaternion<T>& q_b2a,
+                                          const T              crustA,
+                                          const T              crustB,
                                           Vector3<T>&          pa,
                                           Vector3<T>&          pb,
                                           uint&                nbIter)
@@ -1321,6 +1346,7 @@ __HOSTDEVICE__ T
         p[last] = a.support(-v);
         q[last] = b.support(q_b2a << v);
         FusedMinkowskiDifference(p[last], q[last], v_b2a, q_b2a, w);
+        w -= (crustA + crustB) / dist * v;
 
         // termination criteria -- optimality gap
         mu = dist - v * w / dist;
@@ -1357,6 +1383,8 @@ __HOSTDEVICE__ T computeClosestPoints_GJK(const Convex<T>&     a,
                                           const Convex<T>&     b,
                                           const Vector3<T>&    v_b2a,
                                           const Quaternion<T>& q_b2a,
+                                          const T              crustA,
+                                          const T              crustB,
                                           Vector3<T>&          pa,
                                           Vector3<T>&          pb,
                                           uint&                nbIter)
@@ -1372,6 +1400,8 @@ __HOSTDEVICE__ T computeClosestPoints_GJK(const Convex<T>&     a,
             b,
             v_b2a,
             q_b2a,
+            crustA,
+            crustB,
             pa,
             pb,
             nbIter);
@@ -1384,6 +1414,8 @@ __HOSTDEVICE__ T computeClosestPoints_GJK(const Convex<T>&     a,
                                                                 b,
                                                                 v_b2a,
                                                                 q_b2a,
+                                                                crustA,
+                                                                crustB,
                                                                 pa,
                                                                 pb,
                                                                 nbIter);
@@ -1399,6 +1431,8 @@ __HOSTDEVICE__ T computeClosestPoints_GJK_Johnson(const Convex<T>&     a,
                                                   const Vector3<T>&    v_b2w,
                                                   const Quaternion<T>& q_a2w,
                                                   const Quaternion<T>& q_b2w,
+                                                  const T              crustA,
+                                                  const T              crustB,
                                                   Vector3<T>&          pa,
                                                   Vector3<T>&          pb,
                                                   uint&                nbIter)
@@ -1451,6 +1485,7 @@ __HOSTDEVICE__ T computeClosestPoints_GJK_Johnson(const Convex<T>&     a,
                                  q_a2w,
                                  q_b2w,
                                  w);
+        w -= (crustA + crustB) / dist * v;
 
         // termination criteria -- optimality gap
         mu = dist - v * w / dist;
@@ -1491,6 +1526,8 @@ __HOSTDEVICE__ T
                                           const Vector3<T>&    v_b2w,
                                           const Quaternion<T>& q_a2w,
                                           const Quaternion<T>& q_b2w,
+                                          const T              crustA,
+                                          const T              crustB,
                                           Vector3<T>&          pa,
                                           Vector3<T>&          pb,
                                           uint&                nbIter)
@@ -1542,6 +1579,7 @@ __HOSTDEVICE__ T
                                  q_a2w,
                                  q_b2w,
                                  w);
+        w -= (crustA + crustB) / dist * v;
 
         // termination criteria -- optimality gap
         mu = dist - v * w / dist;
@@ -1580,6 +1618,8 @@ __HOSTDEVICE__ T computeClosestPoints_GJK(const Convex<T>&     a,
                                           const Vector3<T>&    v_b2w,
                                           const Quaternion<T>& q_a2w,
                                           const Quaternion<T>& q_b2w,
+                                          const T              crustA,
+                                          const T              crustB,
                                           Vector3<T>&          pa,
                                           Vector3<T>&          pb,
                                           uint&                nbIter)
@@ -1597,6 +1637,8 @@ __HOSTDEVICE__ T computeClosestPoints_GJK(const Convex<T>&     a,
             v_b2w,
             q_a2w,
             q_b2w,
+            crustA,
+            crustB,
             pa,
             pb,
             nbIter);
@@ -1611,6 +1653,8 @@ __HOSTDEVICE__ T computeClosestPoints_GJK(const Convex<T>&     a,
                                                                 v_b2w,
                                                                 q_a2w,
                                                                 q_b2w,
+                                                                crustA,
+                                                                crustB,
                                                                 pa,
                                                                 pb,
                                                                 nbIter);
@@ -1646,6 +1690,8 @@ X(double)
         const Convex<T>&     a,                                           \
         const Convex<T>&     b,                                           \
         const Transform3<T>& b2a,                                         \
+        const T              crustA,                                      \
+        const T              crustB,                                      \
         Vector3<T>&          pa,                                          \
         Vector3<T>&          pb,                                          \
         uint&                nbIter);                                                    \
@@ -1654,6 +1700,8 @@ X(double)
         const Convex<T>&     b,                                           \
         const Transform3<T>& a2w,                                         \
         const Transform3<T>& b2w,                                         \
+        const T              crustA,                                      \
+        const T              crustB,                                      \
         Vector3<T>&          pa,                                          \
         Vector3<T>&          pb,                                          \
         uint&                nbIter);                                                    \
@@ -1662,6 +1710,8 @@ X(double)
         const Convex<T>&     b,                                           \
         const Vector3<T>&    v_b2a,                                       \
         const Quaternion<T>& q_b2a,                                       \
+        const T              crustA,                                      \
+        const T              crustB,                                      \
         Vector3<T>&          pa,                                          \
         Vector3<T>&          pb,                                          \
         uint&                nbIter);                                                    \
@@ -1672,6 +1722,8 @@ X(double)
         const Vector3<T>&    v_b2w,                                       \
         const Quaternion<T>& q_a2w,                                       \
         const Quaternion<T>& q_b2w,                                       \
+        const T              crustA,                                      \
+        const T              crustB,                                      \
         Vector3<T>&          pa,                                          \
         Vector3<T>&          pb,                                          \
         uint&                nbIter);

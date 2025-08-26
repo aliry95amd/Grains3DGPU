@@ -103,6 +103,9 @@ void ComponentManagerCPU<T>::detectCollisions()
 
     // Interactions
     detectCollisionsComponents();
+
+    m_contactInfo.print("contact info");
+    m_relPosition.print("relative position");
 }
 
 // -----------------------------------------------------------------------------
@@ -111,8 +114,6 @@ template <typename T>
 void ComponentManagerCPU<T>::computeContactForces(
     const GrainsMemBuffer<ContactForceModel<T>*, MemType::HOST>& CF)
 {
-
-    m_contactInfo.print("contact info");
     uint nPairs = m_neighborList->getSize();
     for(uint i = 0; i < nPairs; ++i)
     {

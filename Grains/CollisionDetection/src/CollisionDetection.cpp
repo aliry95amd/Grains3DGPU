@@ -1,5 +1,6 @@
 #include "CollisionDetection.hh"
 #include "GJK.hh"
+#include "GrainsUtils.hh"
 #include "MatrixMath.hh"
 #include "MiscMath.hh"
 #include "OBB.hh"
@@ -177,13 +178,22 @@ __HOSTDEVICE__ void closestPointsRigidBodies(const RigidBody<T>&  rbA,
                                              const Transform3<T>& b2a,
                                              ContactInfo<T>&      contactInfo)
 {
-    // Comment on the direction of the overlap vector
-    // Assuming A and B are the centers of the 2 convex bodies
-    // overlap_vector = overlap * Vector3(A to B)
-    // If contact, overlap is negative and overlap_vector is from B to A
-    // If no contact, overlap is positive and we do not care about the direction
-    // of overlap_vector
+    /* -------------------------------------------------------------------------
+    Comments on the contactInfo. It applies to all variant of this function:
+    1. If actual overlap distance (GJK dist - crustA - crustB < 0), there is
+    contact otherwise no contact. Although we can enforce an early exit, but
+    other threads are most likely still running, so we continue to have
+    consistent code path.
 
+    2. ptA and ptB are in their respective local coordinate systems and 
+    represent points on the actual rigid bodies, not the shrunken versions.
+    Contact point definition as the mid point between ptA and ptB
+
+    3. If contact, overlap is negative and overlap_vector is from B to A
+    If no contact, overlap is positive and we do not care about the direction
+    of overlap_vector. Assuming A and B are the centers of the 2 convex 
+    bodies overlap_vector = overlap * Vector3(A to B)
+    ------------------------------------------------------------------------- */
     const Convex<T>& convexA = *(rbA.getConvex());
     const Convex<T>& convexB = *(rbB.getConvex());
 
@@ -195,9 +205,9 @@ __HOSTDEVICE__ void closestPointsRigidBodies(const RigidBody<T>&  rbA,
         return;
     }
 
-    // General case for convexes
-    // Sum of crust thicknesses
-    T ctSum = rbA.getCrustThickness() + rbB.getCrustThickness();
+    /* General Case --------------------------------------------------------- */
+    T crustA = rbA.getCrustThickness();
+    T crustB = rbB.getCrustThickness();
 
     Vector3<T> ptA, ptB;
     uint       nbIterGJK = 0;
@@ -205,32 +215,35 @@ __HOSTDEVICE__ void closestPointsRigidBodies(const RigidBody<T>&  rbA,
         = computeClosestPoints_GJK<T, GJKType::JOHNSON, false>(convexA,
                                                                convexB,
                                                                b2a,
+                                                               crustA,
+                                                               crustB,
                                                                ptA,
                                                                ptB,
                                                                nbIterGJK);
 
+    // If bodies are too close
+    while(distance < EPS<T>)
+    {
+        Gout("Warning: GJK too close bodies, increasing crust thicknesses.");
+        crustA *= 2;
+        crustB *= 2;
+        distance
+            = computeClosestPoints_GJK<T, GJKType::JOHNSON, false>(convexA,
+                                                                   convexB,
+                                                                   b2a,
+                                                                   crustA,
+                                                                   crustB,
+                                                                   ptA,
+                                                                   ptB,
+                                                                   nbIterGJK);
+    }
+
     // Computation of the actual overlap
-    // distance = distance - crustA - crustB
-    // If actual overlap distance < 0 => contact otherwise no contact
-    distance -= ctSum;
-    // TODO: What if too much overlap?
+    distance -= crustA + crustB;
     contactInfo.setOverlapDistance(distance);
-    if(distance > T(0))
-        return;
-
-    // Points A and B are in their respective local coordinate systems
-    // We transform ptB into the the local coordinate system of A
-    // ptA = ptA;
+    // ptA = (a2a)(ptA);
     ptB = (b2a)(ptB);
-
-    // Contact point definition as the mid point between ptA and ptB
     contactInfo.setContactPoint(T(0.5) * (ptA + ptB));
-
-    // Computation of the actual overlap vector
-    // If contact, crustA + crustB - distance > 0, the overlap vector is
-    // directed from B to A
-    // If no contact, crustA + crustB - distance < 0 and we do not care
-    // about the direction of the overlap vector
     Vector3<T> contactVec(ptA - ptB);
     contactVec.normalize();
     round(contactVec);
@@ -248,13 +261,6 @@ __HOSTDEVICE__ void closestPointsRigidBodies(const RigidBody<T>&  rbA,
                                              const Transform3<T>& b2w,
                                              ContactInfo<T>&      contactInfo)
 {
-    // Comment on the direction of the overlap vector
-    // Assuming A and B are the centers of the 2 convex bodies
-    // overlap_vector = overlap * Vector3(A to B)
-    // If contact, overlap is negative and overlap_vector is from B to A
-    // If no contact, overlap is positive and we do not care about the direction
-    // of overlap_vector
-
     const Convex<T>& convexA = *(rbA.getConvex());
     const Convex<T>& convexB = *(rbB.getConvex());
 
@@ -270,9 +276,9 @@ __HOSTDEVICE__ void closestPointsRigidBodies(const RigidBody<T>&  rbA,
         return;
     }
 
-    // General case for convexes
-    // Sum of crust thicknesses
-    T ctSum = rbA.getCrustThickness() + rbB.getCrustThickness();
+    /* General Case --------------------------------------------------------- */
+    T crustA = rbA.getCrustThickness();
+    T crustB = rbB.getCrustThickness();
 
     Vector3<T> ptA, ptB;
     uint       nbIterGJK = 0;
@@ -281,32 +287,36 @@ __HOSTDEVICE__ void closestPointsRigidBodies(const RigidBody<T>&  rbA,
                                                                convexB,
                                                                a2w,
                                                                b2w,
+                                                               crustA,
+                                                               crustB,
                                                                ptA,
                                                                ptB,
                                                                nbIterGJK);
 
-    // Computation of the actual overlap
-    // distance = distance - crustA - crustB
-    // If actual overlap distance < 0 => contact otherwise no contact
-    distance -= ctSum;
-    // TODO: What if too much overlap?
-    contactInfo.setOverlapDistance(distance);
-    if(distance > T(0))
-        return;
+    // If bodies are too close
+    while(distance < EPS<T>)
+    {
+        Gout("Warning: GJK too close bodies, increasing crust thicknesses.");
+        crustA *= 2;
+        crustB *= 2;
+        distance
+            = computeClosestPoints_GJK<T, GJKType::JOHNSON, false>(convexA,
+                                                                   convexB,
+                                                                   a2w,
+                                                                   b2w,
+                                                                   crustA,
+                                                                   crustB,
+                                                                   ptA,
+                                                                   ptB,
+                                                                   nbIterGJK);
+    }
 
-    // Points A and B are in their respective local coordinate systems
-    // Thus we transform them into the world coordinate system
+    // Computation of the actual overlap
+    distance -= crustA + crustB;
+    contactInfo.setOverlapDistance(distance);
     ptA = (a2w)(ptA);
     ptB = (b2w)(ptB);
-
-    // Contact point definition as the mid point between ptA and ptB
     contactInfo.setContactPoint(T(0.5) * (ptA + ptB));
-
-    // Computation of the actual overlap vector
-    // If contact, crustA + crustB - distance > 0, the overlap vector is
-    // directed from B to A
-    // If no contact, crustA + crustB - distance < 0 and we do not care
-    // about the direction of the overlap vector
     Vector3<T> contactVec = ptA - ptB;
     contactVec.normalize();
     round(contactVec);
@@ -324,13 +334,6 @@ __HOSTDEVICE__ void closestPointsRigidBodies(const RigidBody<T>&  rbA,
                                              const Quaternion<T>& q_b2a,
                                              ContactInfo<T>&      contactInfo)
 {
-    // Comment on the direction of the overlap vector
-    // Assuming A and B are the centers of the 2 convex bodies
-    // overlap_vector = overlap * Vector3(A to B)
-    // If contact, overlap is negative and overlap_vector is from B to A
-    // If no contact, overlap is positive and we do not care about the direction
-    // of overlap_vector
-
     const Convex<T>& convexA = *(rbA.getConvex());
     const Convex<T>& convexB = *(rbB.getConvex());
 
@@ -342,9 +345,9 @@ __HOSTDEVICE__ void closestPointsRigidBodies(const RigidBody<T>&  rbA,
         return;
     }
 
-    // General case for convexes
-    // Sum of crust thicknesses
-    T ctSum = rbA.getCrustThickness() + rbB.getCrustThickness();
+    /* General Case --------------------------------------------------------- */
+    T crustA = rbA.getCrustThickness();
+    T crustB = rbB.getCrustThickness();
 
     Vector3<T> ptA, ptB;
     uint       nbIterGJK = 0;
@@ -353,34 +356,36 @@ __HOSTDEVICE__ void closestPointsRigidBodies(const RigidBody<T>&  rbA,
                                                                convexB,
                                                                v_b2a,
                                                                q_b2a,
+                                                               crustA,
+                                                               crustB,
                                                                ptA,
                                                                ptB,
                                                                nbIterGJK);
 
+    // If bodies are too close
+    while(distance < EPS<T>)
+    {
+        Gout("Warning: GJK too close bodies, increasing crust thicknesses.");
+        crustA *= 2;
+        crustB *= 2;
+        distance
+            = computeClosestPoints_GJK<T, GJKType::JOHNSON, false>(convexA,
+                                                                   convexB,
+                                                                   v_b2a,
+                                                                   q_b2a,
+                                                                   crustA,
+                                                                   crustB,
+                                                                   ptA,
+                                                                   ptB,
+                                                                   nbIterGJK);
+    }
+
     // Computation of the actual overlap
-    // distance = distance - crustA - crustB
-    // If actual overlap distance < 0 => contact otherwise no contact
-    distance -= ctSum;
-    // TODO: What if too much overlap?
+    distance -= crustA + crustB;
     contactInfo.setOverlapDistance(distance);
-    if(distance > T(0))
-        return;
-
-    // Points A and B are in their respective local coordinate systems
-    // We transform ptB from B's coordinate system into A's coordinate system
-    // using the relative transformation from B to A
-    // ptA is already in A's coordinate system
-    // Apply quaternion rotation and translation
+    // transform(q_a2a, v_a2a, ptA);
     transform(q_b2a, v_b2a, ptB);
-
-    // Contact point definition as the mid point between ptA and ptB
     contactInfo.setContactPoint(T(0.5) * (ptA + ptB));
-
-    // Computation of the actual overlap vector
-    // If contact, crustA + crustB - distance > 0, the overlap vector is
-    // directed from B to A
-    // If no contact, crustA + crustB - distance < 0 and we do not care
-    // about the direction of the overlap vector
     Vector3<T> contactVec(ptA - ptB);
     contactVec.normalize();
     round(contactVec);
@@ -400,13 +405,6 @@ __HOSTDEVICE__ void closestPointsRigidBodies(const RigidBody<T>&  rbA,
                                              const Quaternion<T>& q_b2w,
                                              ContactInfo<T>&      contactInfo)
 {
-    // Comment on the direction of the overlap vector
-    // Assuming A and B are the centers of the 2 convex bodies
-    // overlap_vector = overlap * Vector3(A to B)
-    // If contact, overlap is negative and overlap_vector is from B to A
-    // If no contact, overlap is positive and we do not care about the direction
-    // of overlap_vector
-
     const Convex<T>& convexA = *(rbA.getConvex());
     const Convex<T>& convexB = *(rbB.getConvex());
 
@@ -418,9 +416,9 @@ __HOSTDEVICE__ void closestPointsRigidBodies(const RigidBody<T>&  rbA,
         return;
     }
 
-    // General case for convexes
-    // Sum of crust thicknesses
-    T ctSum = rbA.getCrustThickness() + rbB.getCrustThickness();
+    /* General Case --------------------------------------------------------- */
+    T crustA = rbA.getCrustThickness();
+    T crustB = rbB.getCrustThickness();
 
     Vector3<T> ptA, ptB;
     uint       nbIterGJK = 0;
@@ -431,32 +429,38 @@ __HOSTDEVICE__ void closestPointsRigidBodies(const RigidBody<T>&  rbA,
                                                                v_b2w,
                                                                q_a2w,
                                                                q_b2w,
+                                                               crustA,
+                                                               crustB,
                                                                ptA,
                                                                ptB,
                                                                nbIterGJK);
 
-    // Computation of the actual overlap
-    // distance = distance - crustA - crustB
-    // If actual overlap distance < 0 => contact otherwise no contact
-    distance -= ctSum;
-    // TODO: What if too much overlap?
-    contactInfo.setOverlapDistance(distance);
-    if(distance > T(0))
-        return;
+    // If bodies are too close
+    while(distance < EPS<T>)
+    {
+        Gout("Warning: GJK too close bodies, increasing crust thicknesses.");
+        crustA *= 2;
+        crustB *= 2;
+        distance
+            = computeClosestPoints_GJK<T, GJKType::JOHNSON, false>(convexA,
+                                                                   convexB,
+                                                                   v_a2w,
+                                                                   v_b2w,
+                                                                   q_a2w,
+                                                                   q_b2w,
+                                                                   crustA,
+                                                                   crustB,
+                                                                   ptA,
+                                                                   ptB,
+                                                                   nbIterGJK);
+    }
 
-    // Points A and B are in their respective local coordinate systems
-    // Thus we transform them into the world coordinate system
+    // Computation of the actual overlap
+    distance -= crustA + crustB;
+    contactInfo.setOverlapDistance(distance);
     transform(q_a2w, v_a2w, ptA);
     transform(q_b2w, v_b2w, ptB);
-
-    // Contact point definition as the mid point between ptA and ptB
     contactInfo.setContactPoint(T(0.5) * (ptA + ptB));
-
-    // Computation of the actual overlap vector
-    // If contact, crustA + crustB - distance > 0, the overlap vector is
-    // directed from B to A
-    // If no contact, crustA + crustB - distance < 0 and we do not care
-    // about the direction of the overlap vector
     Vector3<T> contactVec = ptA - ptB;
     contactVec.normalize();
     round(contactVec);
@@ -481,13 +485,16 @@ __HOSTDEVICE__ T distanceRigidBodies(const RigidBody<T>&  rbA,
     T          distance  = 0;
     // if ( method == 1 )
     // {
-    distance = computeClosestPoints_GJK<T, GJKType::JOHNSON, false>(*convexA,
-                                                                    *convexB,
-                                                                    a2w,
-                                                                    b2w,
-                                                                    ptA,
-                                                                    ptB,
-                                                                    nbIterGJK);
+    distance = computeClosestPoints_GJK<T, GJKType::JOHNSON, false>(
+        *convexA,
+        *convexB,
+        a2w,
+        b2w,
+        rbA.getCrustThickness(),
+        rbB.getCrustThickness(),
+        ptA,
+        ptB,
+        nbIterGJK);
     // }
     // else if ( method == 2 )
     // {

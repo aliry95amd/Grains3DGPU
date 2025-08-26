@@ -64,6 +64,8 @@ namespace GJKPerformanceCPU
                 *(rb[j]->getConvex()),
                 tr[i],
                 tr[j],
+                rb[i]->getCrustThickness(),
+                rb[j]->getCrustThickness(),
                 pa,
                 pb,
                 iter[p]);
@@ -93,6 +95,8 @@ namespace GJKPerformanceCPU
                 pos[j],
                 quat[i],
                 quat[j],
+                rb[i]->getCrustThickness(),
+                rb[j]->getCrustThickness(),
                 pa,
                 pb,
                 iter[p]);
@@ -128,6 +132,8 @@ namespace GJKPerformanceGPU
                 *(rb[j]->getConvex()),
                 tr[i],
                 tr[j],
+                rb[i]->getCrustThickness(),
+                rb[j]->getCrustThickness(),
                 pa,
                 pb,
                 iter[tID]);
@@ -161,6 +167,8 @@ namespace GJKPerformanceGPU
                 pos[j],
                 quat[i],
                 quat[j],
+                rb[i]->getCrustThickness(),
+                rb[j]->getCrustThickness(),
                 pa,
                 pb,
                 iter[tID]);

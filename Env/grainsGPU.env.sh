@@ -63,7 +63,8 @@ export GRAINS_GPU_COMPILER_FLAGS="-t=8 -x cu -m64 \
     -O3 -dlto -dc \
     -std=c++20 -arch=sm_75 -lineinfo \
     -cudart static -cudadevrt static \
-    -use_fast_math -extra-device-vectorization -restrict --extended-lambda \
+    -use_fast_math -extra-device-vectorization -restrict \
+    --extended-lambda --expt-relaxed-constexpr \
     -Xcompiler "-rdynamic,-fPIC,-fopenmp" \
     -pg -g \
     -diag-suppress 554 -diag-suppress 181"
