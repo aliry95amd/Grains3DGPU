@@ -15,7 +15,17 @@ __HOSTDEVICE__ Convex<T>::~Convex()
 }
 
 // -----------------------------------------------------------------------------
-// Destructor
+// Returns whether point p lies in the convex shape
+// @param p point
+template <typename T>
+__HOSTDEVICE__ bool Convex<T>::isInside(const Vector3<T>& p) const
+{
+    // Default implementation (for convex shapes that are not defined)
+    return true;
+}
+
+// -----------------------------------------------------------------------------
+//
 template <typename T>
 __HOST__ void
     Convex<T>::writePoints_PARAVIEW(std::ostream&        f,

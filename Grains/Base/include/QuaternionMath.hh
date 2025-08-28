@@ -444,16 +444,15 @@ __HOSTDEVICE__ static INLINE void
                              const Quaternion<T>& q,
                              Vector3<T>&          w) noexcept
 {
-    const T* __RESTRICT__ ba = a.getBuffer();
     const T* __RESTRICT__ bb = b.getBuffer();
-    const T* __RESTRICT__ bv = v.getBuffer();
     const T* __RESTRICT__ bq = q.getBuffer();
+    T                     tx = T(2) * (bq[1] * bb[2] - bq[2] * bb[1]);
+    T                     ty = T(2) * (bq[2] * bb[0] - bq[0] * bb[2]);
+    T                     tz = T(2) * (bq[0] * bb[1] - bq[1] * bb[0]);
+
+    const T* __RESTRICT__ ba = a.getBuffer();
+    const T* __RESTRICT__ bv = v.getBuffer();
     T* __RESTRICT__       bw = const_cast<T*>(w.getBuffer());
-
-    T tx = T(2) * (bq[1] * bb[2] - bq[2] * bb[1]);
-    T ty = T(2) * (bq[2] * bb[0] - bq[0] * bb[2]);
-    T tz = T(2) * (bq[0] * bb[1] - bq[1] * bb[0]);
-
     bw[0] = ba[0] - bb[0] - bq[3] * tx - bq[1] * tz + bq[2] * ty + bv[0];
     bw[1] = ba[1] - bb[1] - bq[3] * ty - bq[2] * tx + bq[0] * tz + bv[1];
     bw[2] = ba[2] - bb[2] - bq[3] * tz - bq[0] * ty + bq[1] * tx + bv[2];
@@ -481,21 +480,20 @@ __HOSTDEVICE__ static INLINE void
 {
     // w = (q_a2w >> a) - (q_b2w >> b) + v_a2w - v_b2w;
     const T* __RESTRICT__ ba  = a.getBuffer();
+    const T* __RESTRICT__ bqa = q_a2w.getBuffer();
+    T                     txa = T(2) * (bqa[1] * ba[2] - bqa[2] * ba[1]);
+    T                     tya = T(2) * (bqa[2] * ba[0] - bqa[0] * ba[2]);
+    T                     tza = T(2) * (bqa[0] * ba[1] - bqa[1] * ba[0]);
+
     const T* __RESTRICT__ bb  = b.getBuffer();
+    const T* __RESTRICT__ bqb = q_b2w.getBuffer();
+    T                     txb = T(2) * (bqb[1] * bb[2] - bqb[2] * bb[1]);
+    T                     tyb = T(2) * (bqb[2] * bb[0] - bqb[0] * bb[2]);
+    T                     tzb = T(2) * (bqb[0] * bb[1] - bqb[1] * bb[0]);
+
     const T* __RESTRICT__ bva = v_a2w.getBuffer();
     const T* __RESTRICT__ bvb = v_b2w.getBuffer();
-    const T* __RESTRICT__ bqa = q_a2w.getBuffer();
-    const T* __RESTRICT__ bqb = q_b2w.getBuffer();
     T* __RESTRICT__       bw  = const_cast<T*>(w.getBuffer());
-
-    T txa = T(2) * (bqa[1] * ba[2] - bqa[2] * ba[1]);
-    T tya = T(2) * (bqa[2] * ba[0] - bqa[0] * ba[2]);
-    T tza = T(2) * (bqa[0] * ba[1] - bqa[1] * ba[0]);
-
-    T txb = T(2) * (bqb[1] * bb[2] - bqb[2] * bb[1]);
-    T tyb = T(2) * (bqb[2] * bb[0] - bqb[0] * bb[2]);
-    T tzb = T(2) * (bqb[0] * bb[1] - bqb[1] * bb[0]);
-
     // clang format off
     bw[0] = ba[0] + bqa[3] * txa + bqa[1] * tza - bqa[2] * tya + bva[0] - bb[0]
             - bqb[3] * txb - bqb[1] * tzb + bqb[2] * tyb - bvb[0];
@@ -517,17 +515,17 @@ __HOSTDEVICE__ static INLINE void transform(const Quaternion<T>& q,
                                             Vector3<T>&          w) noexcept
 {
     const T* __RESTRICT__ bq = q.getBuffer();
-    const T* __RESTRICT__ bv = v.getBuffer();
     T* __RESTRICT__       bw = const_cast<T*>(w.getBuffer());
+    T                     tx = T(2) * (bq[1] * bw[2] - bq[2] * bw[1]);
+    T                     ty = T(2) * (bq[2] * bw[0] - bq[0] * bw[2]);
+    T                     tz = T(2) * (bq[0] * bw[1] - bq[1] * bw[0]);
 
-    T tx = T(2) * (bq[1] * bw[2] - bq[2] * bw[1]);
-    T ty = T(2) * (bq[2] * bw[0] - bq[0] * bw[2]);
-    T tz = T(2) * (bq[0] * bw[1] - bq[1] * bw[0]);
-
+    const T* __RESTRICT__ bv = v.getBuffer();
     bw[0] += bq[3] * tx + (bq[1] * tz - bq[2] * ty) + bv[0];
     bw[1] += bq[3] * ty + (bq[2] * tx - bq[0] * tz) + bv[1];
     bw[2] += bq[3] * tz + (bq[0] * ty - bq[1] * tx) + bv[2];
 }
+
 //@}
 
 #endif

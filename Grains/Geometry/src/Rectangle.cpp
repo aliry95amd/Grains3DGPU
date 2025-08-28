@@ -120,6 +120,14 @@ __HOSTDEVICE__ Vector3<T> Rectangle<T>::support(const Vector3<T>& v) const
 }
 
 // -----------------------------------------------------------------------------
+// Returns if a point is inside the rectangle
+template <typename T>
+__HOSTDEVICE__ bool Rectangle<T>::isInside(const Vector3<T>& p) const
+{
+    return (p[X] >= -m_LX && p[X] <= m_LX && p[Y] >= -m_LY && p[Y] <= m_LY);
+}
+
+// -----------------------------------------------------------------------------
 // Input operator
 template <typename T>
 __HOST__ void Rectangle<T>::readConvex(std::istream& fileIn)

@@ -5,6 +5,7 @@
 #include "MiscMath.hh"
 #include "OBB.hh"
 #include "QuaternionMath.hh"
+#include "Rectangle.hh"
 
 /* ========================================================================== */
 /*                             Low-Level Methods                              */
@@ -71,46 +72,142 @@ __HOSTDEVICE__ static INLINE void
 }
 
 // -----------------------------------------------------------------------------
-// // Returns the contact information (if any) for 2 rigid bodies if the SECOND ONE
-// // is a rectangle
-// template <typename T>
-// __HOSTDEVICE__ static INLINE ContactInfo<T>
-//                              closestPointsRectangle(const RigidBody<T>& rbA,
-//                                                     const RigidBody<T>& rbB,
-//                                                     const Transform3<T>&   a2w,
-//                                                     const Transform3<T>&   b2w)
-// {
-//     const Convex<T>& convexA = *(rbA.getConvex());
-//     const Convex<T>& convexB = *(rbB.getConvex());
+// Returns the contact information (if any) for 2 rigid bodies if the first one
+// is a rectangle
+template <typename T>
+__HOSTDEVICE__ static INLINE void
+    closestPointsRectangle(const RigidBody<T>&  rbA,
+                           const RigidBody<T>&  rbB,
+                           const Transform3<T>& b2a,
+                           ContactInfo<T>&      contactInfo)
+{
+    const Convex<T>* rect    = rbA.getConvex();
+    const Convex<T>* convexB = rbB.getConvex();
 
-//     // rectangle center
-//     const Vector3<T>& rPt = b2w.getOrigin();
-//     // rectangle normal is b2w.getBasis() * [0, 0, 1] which is the last column
-//     // of the transformation matrix
-//     Vector3<T> rNorm(b2w.getBasis()[XZ],
-//                      b2w.getBasis()[YZ],
-//                      b2w.getBasis()[ZZ]);
-//     rNorm.normalized();
-//     rNorm = copysign(T(1), rNorm * (a2w.getOrigin() - rPt)) * rNorm;
-//     // Contact point on the particle
-//     Vector3<T> pointA = (a2w)(convexA->support((-rNorm) * a2w.getBasis()));
-//     if(rNorm * (pointA - rPt) < T(0))
-//     {
-//         // The projection point on the rectangle plane
-//         Vector3<T> pointB = ((rPt - pointA) * rNorm) * rNorm + pointA;
-//         // The projection point lies on the rectangle?
-//         // TODO:
-//         // if ( ( pointB - rPt ).isInBox(  ) )
-//         // {
-//         Vector3<T> contactPt  = T(0.5) * (pointA + pointB);
-//         Vector3<T> contactVec = pointB - pointA;
-//         T          overlap    = -norm(contactVec);
-//         return (ContactInfo<T>(contactPt, contactVec, overlap));
-//         // }
-//     }
-//     else
-//         return (noContact);
-// }
+    const Vector3<T> r
+        = b2a.getOrigin()[Z] > 0 ? Vector3<T>(0, 0, -1) : Vector3<T>(0, 0, 1);
+    // Contact point on the particle
+    const Vector3<T> ptA = (b2a)(convexB->support(r * b2a.getBasis()));
+    if(ptA[Z] < T(0))
+    {
+        // The projection point on the rectangle plane
+        const Vector3<T> ptB(ptA[X], ptA[Y], T(0));
+        // The projection point lies on the rectangle?
+        if(rect->isInside(ptB))
+        {
+            contactInfo.setContactPoint(T(0.5) * (ptA + ptB));
+            contactInfo.setContactVector(ptA - ptB);
+            contactInfo.setOverlapDistance(-norm(ptA - ptB));
+        }
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Returns the contact information (if any) for 2 rigid bodies if the first one
+// is a rectangle
+template <typename T>
+__HOSTDEVICE__ static INLINE void
+    closestPointsRectangle(const RigidBody<T>&  rbA,
+                           const RigidBody<T>&  rbB,
+                           const Transform3<T>& a2w,
+                           const Transform3<T>& b2w,
+                           ContactInfo<T>&      contactInfo)
+{
+    const Convex<T>* rect    = rbA.getConvex();
+    const Convex<T>* convexB = rbB.getConvex();
+
+    // rectangle center
+    const Vector3<T>& c(a2w.getOrigin());
+    const Matrix3<T>& m(a2w.getBasis());
+    // rectangle normal is a2w.getBasis() * [0, 0, 1] which is the last column
+    // of the transform
+    Vector3<T> r(m(XZ), m(YZ), m(ZZ));
+    r.normalized();
+    r *= copysign(T(1), r * (b2w.getOrigin() - c));
+    // Contact point on the particle
+    const Vector3<T> ptA = (b2w)(convexB->support((-r) * b2w.getBasis()));
+    if(r * (ptA - c) < T(0))
+    {
+        // The projection point on the rectangle plane
+        const Vector3<T> ptB = ((c - ptA) * r) * r + ptA;
+        // The projection point lies on the rectangle?
+        if(rect->isInside(inverse(m) * (ptB - c)))
+        {
+            contactInfo.setContactPoint(T(0.5) * (ptA + ptB));
+            contactInfo.setContactVector(ptA - ptB);
+            contactInfo.setOverlapDistance(-norm(ptA - ptB));
+        }
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Returns the contact information (if any) for 2 rigid bodies if the first one
+// is a rectangle
+template <typename T>
+__HOSTDEVICE__ static INLINE void
+    closestPointsRectangle(const RigidBody<T>&  rbA,
+                           const RigidBody<T>&  rbB,
+                           const Vector3<T>&    v_b2a,
+                           const Quaternion<T>& q_b2a,
+                           ContactInfo<T>&      contactInfo)
+{
+    const Convex<T>* rect    = rbA.getConvex();
+    const Convex<T>* convexB = rbB.getConvex();
+
+    const Vector3<T> r
+        = v_b2a[Z] > 0 ? Vector3<T>(0, 0, -1) : Vector3<T>(0, 0, 1);
+    // Contact point on the particle
+    const Vector3<T> ptA = q_b2a >> convexB->support(q_b2a << r) + v_b2a;
+    if(ptA[Z] < T(0))
+    {
+        // The projection point on the rectangle plane
+        const Vector3<T> ptB(ptA[X], ptA[Y], T(0));
+        // The projection point lies on the rectangle?
+        if(rect->isInside(ptB))
+        {
+            contactInfo.setContactPoint(T(0.5) * (ptA + ptB));
+            contactInfo.setContactVector(ptA - ptB);
+            contactInfo.setOverlapDistance(-norm(ptA - ptB));
+        }
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Returns the contact information (if any) for 2 rigid bodies if the first one
+// is a rectangle
+template <typename T>
+__HOSTDEVICE__ static INLINE void
+    closestPointsRectangle(const RigidBody<T>&  rbA,
+                           const RigidBody<T>&  rbB,
+                           const Vector3<T>&    v_a2w,
+                           const Vector3<T>&    v_b2w,
+                           const Quaternion<T>& q_a2w,
+                           const Quaternion<T>& q_b2w,
+                           ContactInfo<T>&      contactInfo)
+{
+    const Convex<T>* rect    = rbA.getConvex();
+    const Convex<T>* convexB = rbB.getConvex();
+
+    // rectangle normal is a2w.getBasis() * [0, 0, 1] which is the last column
+    // of the transform
+    Vector3<T> r = q_a2w >> Vector3<T>(0, 0, 1);
+    r.normalized();
+    r *= copysign(T(1), r * (v_b2w - v_a2w));
+    // Contact point on the particle
+    const Vector3<T> ptA = q_b2w >> convexB->support(q_b2w << r) + v_b2w;
+    if(r * (ptA - v_a2w) < T(0))
+    {
+        // The projection point on the rectangle plane
+        const Vector3<T> ptB = ((v_a2w - ptA) * r) * r + ptA;
+        // The projection point lies on the rectangle?
+        if(rect->isInside(q_a2w << (ptB - v_a2w)))
+        {
+            contactInfo.setContactPoint(T(0.5) * (ptA + ptB));
+            contactInfo.setContactVector(ptA - ptB);
+            contactInfo.setOverlapDistance(-norm(ptA - ptB));
+        }
+    }
+}
 
 /* ========================================================================== */
 /*                             High-Level Methods                             */
@@ -204,6 +301,11 @@ __HOSTDEVICE__ void closestPointsRigidBodies(const RigidBody<T>&  rbA,
         closestPointsSpheres(rbA, rbB, b2a.getOrigin(), contactInfo);
         return;
     }
+    else if(convexA.getConvexType() == ConvexType::RECTANGLE)
+    {
+        closestPointsRectangle(rbA, rbB, b2a, contactInfo);
+        return;
+    }
 
     /* General Case --------------------------------------------------------- */
     T crustA = rbA.getCrustThickness();
@@ -275,6 +377,11 @@ __HOSTDEVICE__ void closestPointsRigidBodies(const RigidBody<T>&  rbA,
                              contactInfo);
         return;
     }
+    else if(convexA.getConvexType() == ConvexType::RECTANGLE)
+    {
+        closestPointsRectangle(rbA, rbB, a2w, b2w, contactInfo);
+        return;
+    }
 
     /* General Case --------------------------------------------------------- */
     T crustA = rbA.getCrustThickness();
@@ -342,6 +449,11 @@ __HOSTDEVICE__ void closestPointsRigidBodies(const RigidBody<T>&  rbA,
        && convexB.getConvexType() == ConvexType::SPHERE)
     {
         closestPointsSpheres(rbA, rbB, v_b2a, contactInfo);
+        return;
+    }
+    else if(convexA.getConvexType() == ConvexType::RECTANGLE)
+    {
+        closestPointsRectangle(rbA, rbB, v_b2a, q_b2a, contactInfo);
         return;
     }
 
@@ -413,6 +525,17 @@ __HOSTDEVICE__ void closestPointsRigidBodies(const RigidBody<T>&  rbA,
        && convexB.getConvexType() == ConvexType::SPHERE)
     {
         closestPointsSpheres(rbA, rbB, v_a2w, v_b2w, contactInfo);
+        return;
+    }
+    else if(convexA.getConvexType() == ConvexType::RECTANGLE)
+    {
+        closestPointsRectangle(rbA,
+                               rbB,
+                               v_a2w,
+                               v_b2w,
+                               q_a2w,
+                               q_b2w,
+                               contactInfo);
         return;
     }
 

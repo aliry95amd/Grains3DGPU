@@ -96,6 +96,11 @@ public:
         @param v direction */
     __HOSTDEVICE__
     Vector3<T> support(const Vector3<T>& v) const final;
+
+    /** @brief Returns whether point p lies in the rectangle
+        @param p point */
+    __HOSTDEVICE__
+    bool isInside(const Vector3<T>& p) const final;
     //@}
 
     /** @name I/O methods */

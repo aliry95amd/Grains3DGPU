@@ -184,6 +184,10 @@ void ComponentManagerGPU<T>::moveParticles(
                                                     m_torce.getData(),
                                                     m_nObstacles,
                                                     m_nParticles);
+
+    m_position.print("position");
+    m_velocity.print("velocity");
+    m_contactInfo.print("contact info");
 }
 
 // -----------------------------------------------------------------------------

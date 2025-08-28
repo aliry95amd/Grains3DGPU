@@ -103,9 +103,6 @@ void ComponentManagerCPU<T>::detectCollisions()
 
     // Interactions
     detectCollisionsComponents();
-
-    m_contactInfo.print("contact info");
-    m_relPosition.print("relative position");
 }
 
 // -----------------------------------------------------------------------------
