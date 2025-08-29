@@ -126,14 +126,9 @@ void GrainsGPU<T>::Construction(DOMElement* rootElement)
 {
     using GP = GrainsParameters<T>;
 
-    // Get the Construction block. We don't check if it exists. It has been
-    // already checked in the base class
-    DOMNode* root = ReaderXML::getNode(rootElement, "Construction");
-
     // -------------------------------------------------------------------------
     // Particles
     GoutWI(3, "Copying rigid bodies to device ...");
-    m_d_rigidBodyList.reserve(GP::m_numParticles);
     RigidBodyFactory<T>::copyHostToDevice(Grains<T>::m_rigidBodyList,
                                           m_d_rigidBodyList);
     GoutWI(3, "Copying rigid bodies to device completed!");

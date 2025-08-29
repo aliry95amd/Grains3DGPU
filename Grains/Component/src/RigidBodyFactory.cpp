@@ -56,7 +56,7 @@ __GLOBAL__ void createRigidBodyKernel(RigidBody<T>** rb,
             convex = new Superquadric<T>(args...);
     }
     GAssert(convex, "Convex is not created! Aborting Grains!");
-    rb[index] = new RigidBody<T>(convex, crustThickness, material, density);
+    rb[index] = new RigidBody<T>(convex, crustThickness, density, material);
 }
 
 /* ========================================================================== */
@@ -153,6 +153,7 @@ __HOST__ void RigidBodyFactory<T>::copyHostToDevice(
     GrainsMemBuffer<RigidBody<T>*, MemType::HOST>&   h_RB,
     GrainsMemBuffer<RigidBody<T>*, MemType::DEVICE>& d_RB)
 {
+    d_RB.reserve(h_RB.getSize());
     for(uint i = 0; i < h_RB.getSize(); ++i)
     {
         // Extracting info from the host side object

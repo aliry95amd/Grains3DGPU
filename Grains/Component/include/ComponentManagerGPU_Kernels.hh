@@ -165,7 +165,7 @@ __GLOBAL__ void addExternalForces_Kernel(const T                    gX,
     @param nParticles number of particles */
 template <typename T>
 __GLOBAL__ void moveParticles_Kernel(const TimeIntegrator<T>* const* TI,
-                                     const RigidBody<T>* const*      particleRB,
+                                     const RigidBody<T>* const*      rigidBody,
                                      Vector3<T>*                     position,
                                      Quaternion<T>*                  quaternion,
                                      Kinematics<T>*                  velocity,
@@ -179,7 +179,7 @@ __GLOBAL__ void moveParticles_Kernel(const TimeIntegrator<T>* const* TI,
         return;
 
     moveParticles_common(TI,
-                         particleRB,
+                         rigidBody,
                          position,
                          quaternion,
                          velocity,

@@ -89,6 +89,8 @@ public:
         , m_nParticles(nParticles)
         , m_nObstacles(nObstacles)
     {
+        GAssert(m_rigidBody->getSize() == m_nParticles + m_nObstacles,
+                "Rigid body size mismatch");
         NeighborListFactory<T, M>::create(m_neighborList);
 
         // Initialize with maximum possible pairs for dynamic sizing

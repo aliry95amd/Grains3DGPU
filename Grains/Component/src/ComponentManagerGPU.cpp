@@ -12,8 +12,8 @@ ComponentManagerGPU<T>::ComponentManagerGPU() = default;
 template <typename T>
 ComponentManagerGPU<T>::ComponentManagerGPU(
     GrainsMemBuffer<RigidBody<T>*, MemType::DEVICE>* rigidBody,
-    uint                                             nParticles,
-    uint                                             nObstacles)
+    uint                                             nObstacles,
+    uint                                             nParticles)
     : ComponentManager<T, MemType::DEVICE>(rigidBody, nObstacles, nParticles)
 {
     allocate();
@@ -184,10 +184,6 @@ void ComponentManagerGPU<T>::moveParticles(
                                                     m_torce.getData(),
                                                     m_nObstacles,
                                                     m_nParticles);
-
-    m_position.print("position");
-    m_velocity.print("velocity");
-    m_contactInfo.print("contact info");
 }
 
 // -----------------------------------------------------------------------------
