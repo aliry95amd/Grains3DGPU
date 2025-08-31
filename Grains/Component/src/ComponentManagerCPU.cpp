@@ -91,6 +91,24 @@ void ComponentManagerCPU<T>::detectCollisionsComponents()
 }
 
 // -----------------------------------------------------------------------------
+// Transforms contact information to world frame
+template <typename T>
+void ComponentManagerCPU<T>::transformContactInfoToWorld()
+{
+    uint nPairs = m_neighborList->getSize();
+    for(uint i = 0; i < nPairs; ++i)
+    {
+        transformContactInfo_common(m_neighborList->getData(),
+                                    m_contactInfo.getData(),
+                                    m_position.getData(),
+                                    m_quaternion.getData(),
+                                    m_contactInfoWorld.getData(),
+                                    m_activePairs.getData(),
+                                    i);
+    }
+}
+
+// -----------------------------------------------------------------------------
 // Detects collision between all components
 template <typename T>
 void ComponentManagerCPU<T>::detectCollisions()
@@ -103,6 +121,9 @@ void ComponentManagerCPU<T>::detectCollisions()
 
     // Interactions
     detectCollisionsComponents();
+
+    // Transforms contact info to world frame
+    transformContactInfoToWorld();
 }
 
 // -----------------------------------------------------------------------------
@@ -116,20 +137,13 @@ void ComponentManagerCPU<T>::computeContactForces(
     {
         computeContactForces_common(CF.getData(),
                                     m_neighborList->getData(),
-                                    m_contactInfo.getData(),
+                                    m_contactInfoWorld.getData(),
                                     m_rigidBody->getData(),
+                                    m_position.getData(),
                                     m_velocity.getData(),
                                     m_torce.getData(),
-                                    m_relPosition.getData(),
                                     i);
     }
-
-    m_position.print("Position");
-    m_quaternion.print("Orientation");
-    m_relPosition.print("Relative Position");
-    m_relQuaternion.print("Relative Quaternion");
-    m_contactInfo.print("Contact Information");
-    m_torce.print("Torce");
 }
 
 // -----------------------------------------------------------------------------

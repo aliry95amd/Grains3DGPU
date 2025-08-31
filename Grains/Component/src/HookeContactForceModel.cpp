@@ -158,9 +158,10 @@ __HOSTDEVICE__ void HookeContactForceModel<T>::computeForces(
     const ContactInfo<T>& contactInfos,
     const Vector3<T>&     relVelocityAtContact,
     const Vector3<T>&     relAngVelocity,
-    T                     m1,
-    T                     m2,
-    const Vector3<T>&     trOrigin,
+    const Vector3<T>&     vA,
+    const Vector3<T>&     vB,
+    const T               mA,
+    const T               mB,
     Torce<T>&             torceA,
     Torce<T>&             torceB) const
 {
@@ -169,16 +170,16 @@ __HOSTDEVICE__ void HookeContactForceModel<T>::computeForces(
     performForcesCalculus(contactInfos,
                           relVelocityAtContact,
                           relAngVelocity,
-                          m1,
-                          m2,
+                          mA,
+                          mB,
                           delFN,
                           delFT,
                           delM);
 
     const Vector3<T>& geometricPointOfContact = contactInfos.getContactPoint();
     delFN += delFT;
-    torceA.addForce(delFN, geometricPointOfContact);
-    torceB.addForce(-delFN, geometricPointOfContact - trOrigin);
+    torceA.addForce(delFN, geometricPointOfContact - vA);
+    torceB.addForce(-delFN, geometricPointOfContact - vB);
     if(m_kr)
     {
         torceA.addTorque(delM);

@@ -40,6 +40,16 @@ void ComponentManagerGPU<T>::initialize()
 }
 
 // -----------------------------------------------------------------------------
+// Resizes pair-dependent buffers based on current neighbor list size
+template <typename T>
+void ComponentManagerGPU<T>::resizePairBuffers()
+{
+    uint nPairs = m_neighborList->getSize();
+    m_prefixScan.setSize(nPairs);
+    m_activeIndex.setSize(nPairs);
+}
+
+// -----------------------------------------------------------------------------
 // Updates the neighbor list if needed
 template <typename T>
 void ComponentManagerGPU<T>::updateNeighborList()
@@ -50,7 +60,8 @@ void ComponentManagerGPU<T>::updateNeighborList()
                                            m_nObstacles,
                                            m_nParticles);
 
-        // Resize pair-dependent buffers to match actual number of pairs
+        // Resize pair-dependent buffers in base, then GPU-specific buffers
+        ComponentManager<T, MemType::DEVICE>::resizePairBuffers();
         this->resizePairBuffers();
     }
 }
@@ -98,6 +109,27 @@ void ComponentManagerGPU<T>::detectCollisionsComponents()
 }
 
 // -----------------------------------------------------------------------------
+// Transforms contact information to world frame
+template <typename T>
+void ComponentManagerGPU<T>::transformContactInfoToWorld()
+{
+    uint nPairs = m_neighborList->getSize();
+    uint numThreads, numBlocks;
+    computeOptimalThreadsAndBlocks(nPairs,
+                                   GrainsParameters<T>::m_GPU,
+                                   numBlocks,
+                                   numThreads);
+    transformContactInfo_Kernel<<<numBlocks, numThreads>>>(
+        m_neighborList->getData(),
+        m_contactInfo.getData(),
+        m_position.getData(),
+        m_quaternion.getData(),
+        m_contactInfoWorld.getData(),
+        m_activePairs.getData(),
+        nPairs);
+}
+
+// -----------------------------------------------------------------------------
 // Detects collision between all components
 template <typename T>
 void ComponentManagerGPU<T>::detectCollisions()
@@ -110,6 +142,9 @@ void ComponentManagerGPU<T>::detectCollisions()
 
     // Interactions
     detectCollisionsComponents();
+
+    // Transforms contact info to world frame
+    transformContactInfoToWorld();
 }
 
 // -----------------------------------------------------------------------------
@@ -119,21 +154,28 @@ void ComponentManagerGPU<T>::computeContactForces(
     const GrainsMemBuffer<ContactForceModel<T>*, MemType::DEVICE>& CF)
 {
     uint nPairs = m_neighborList->getSize();
+    // Build compact index of active pairs using the shared helper and persistent buffers
+    const uint nActive = buildCompactActiveIndex(m_activePairs.getData(),
+                                                 nPairs,
+                                                 m_prefixScan.getData(),
+                                                 m_activeIndex.getData());
+
+    // Launch compact forces kernel
     uint numThreads, numBlocks;
-    computeOptimalThreadsAndBlocks(nPairs,
+    computeOptimalThreadsAndBlocks(nActive,
                                    GrainsParameters<T>::m_GPU,
                                    numBlocks,
                                    numThreads);
-
-    computeContactForces_Kernel<<<numBlocks, numThreads>>>(
+    computeContactForcesCompact_Kernel<<<numBlocks, numThreads>>>(
         CF.getData(),
         m_neighborList->getData(),
-        m_contactInfo.getData(),
+        m_contactInfoWorld.getData(),
+        m_activeIndex.getData(),
         m_rigidBody->getData(),
+        m_position.getData(),
         m_velocity.getData(),
         m_torce.getData(),
-        m_relPosition.getData(),
-        nPairs);
+        nActive);
 }
 
 // -----------------------------------------------------------------------------

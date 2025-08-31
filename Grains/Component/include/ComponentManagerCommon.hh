@@ -79,14 +79,45 @@ __HOSTDEVICE__ static INLINE void
 }
 
 // -----------------------------------------------------------------------------
+/** @brief Flags active contacts and transforms CI from A-local to world.
+    @param pairList list of contact pairs
+    @param contactInfoLocal CI computed in A-local frame (input)
+    @param position world positions of components
+    @param quaternion world orientations of components
+    @param contactInfoWorld CI written in world frame (output, only for actives)
+    @param active flag buffer (1 if active/contact, else 0)
+    @param pairID ID of the pair */
+template <typename T>
+__HOSTDEVICE__ static INLINE void
+    transformContactInfo_common(const uint2*          pairList,
+                                const ContactInfo<T>* contactInfoLocal,
+                                const Vector3<T>*     position,
+                                const Quaternion<T>*  quaternion,
+                                ContactInfo<T>*       contactInfoWorld,
+                                uint*                 active,
+                                const uint            pairID)
+{
+    const ContactInfo<T>& ciL = contactInfoLocal[pairID];
+    active[pairID]            = (ciL.getOverlapDistance() < T(0)) ? 1 : 0;
+
+    // Transform point and vector from A-local to world using A's pose
+    const uint           idA = pairList[pairID].x;
+    ContactInfo<T>&      ciW = contactInfoWorld[pairID];
+    const Quaternion<T>& qA  = quaternion[idA];
+    ciW.setContactPoint((qA >> ciL.getContactPoint()) + position[idA]);
+    ciW.setContactVector((qA >> ciL.getContactVector()));
+    ciW.setOverlapDistance(ciL.getOverlapDistance());
+}
+
+// -----------------------------------------------------------------------------
 /** @brief Computes the contact forces
     @param CF contact force models
     @param pairList list of pairs
-    @param contactInfo contact information
+    @param contactInfo contact information in the world frame
     @param rigidBody rigid body of components
+    @param position position of the components
     @param velocity kinematics of the components
     @param torce torce acting on the components
-    @param relPosition relative position of the components
     @param pairID ID of the pair */
 template <typename T>
 __HOSTDEVICE__ static INLINE void
@@ -94,13 +125,14 @@ __HOSTDEVICE__ static INLINE void
                                 const uint2*                       pairList,
                                 const ContactInfo<T>*              contactInfo,
                                 const RigidBody<T>* const*         rigidBody,
+                                const Vector3<T>*                  position,
                                 const Kinematics<T>*               velocity,
                                 Torce<T>*                          torce,
-                                const Vector3<T>*                  relPosition,
                                 const uint                         pairID)
 {
     const ContactInfo<T>& ci = contactInfo[pairID];
     // Compute the forces
+    // On device path, this is redundant.
     if(ci.getOverlapDistance() < T(0))
     {
         const uint2         pair      = pairList[pairID];
@@ -130,9 +162,10 @@ __HOSTDEVICE__ static INLINE void
         CF[contactForceID]->computeForces(ci,
                                           relVel,
                                           relAngVel,
+                                          position[idA],
+                                          position[idB],
                                           massA,
                                           massB,
-                                          relPosition[pairID],
                                           torce[idA],
                                           torce[idB]);
     }

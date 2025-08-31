@@ -3,10 +3,14 @@
 #define _COMPONENTMANAGERGPU_KERNLES_CUH_
 
 #include "thrust/device_ptr.h"
+#include "thrust/execution_policy.h"
 #include "thrust/for_each.h"
+#include "thrust/iterator/counting_iterator.h"
 #include "thrust/iterator/zip_iterator.h"
+#include "thrust/scan.h"
 #include "thrust/sort.h"
 #include <cooperative_groups.h>
+#include <cuda_runtime.h>
 
 #include "CollisionDetection.hh"
 #include "ComponentManagerCommon.hh"
@@ -29,6 +33,51 @@
 // =============================================================================
 /** @name ComponentManagerGPU_Kernels : External methods */
 //@{
+// -----------------------------------------------------------------------------
+/** @brief Build a compact list of active pair indices using exclusive scan + 
+    scatter.
+    @param flagsDev is a device array of uint flags (0/1) of length nPairs.
+    @param prefixDev is a device array of length nPairs to store scan results.
+    @param activeIdxDev is a device array with capacity >= nPairs to receive 
+    indices. */
+inline uint buildCompactActiveIndex(const uint* flagsDev,
+                                    const uint  nPairs,
+                                    uint*       prefixDev,
+                                    uint*       activeIdxDev)
+{
+    auto flagsPtr  = thrust::device_pointer_cast(const_cast<uint*>(flagsDev));
+    auto prefixPtr = thrust::device_pointer_cast(prefixDev);
+
+    // Exclusive scan to compute output positions for active entries
+    thrust::exclusive_scan(thrust::device,
+                           flagsPtr,
+                           flagsPtr + nPairs,
+                           prefixPtr);
+
+    // Compute total active as last prefix + last flag
+    uint lastPrefix = 0u, lastFlag = 0u;
+    cudaMemcpy(&lastPrefix,
+               prefixDev + (nPairs - 1),
+               sizeof(uint),
+               cudaMemcpyDeviceToHost);
+    cudaMemcpy(&lastFlag,
+               flagsDev + (nPairs - 1),
+               sizeof(uint),
+               cudaMemcpyDeviceToHost);
+    const uint nActive = lastPrefix + lastFlag;
+
+    // Scatter indices for active entries into compact array
+    thrust::for_each_n(thrust::device,
+                       thrust::make_counting_iterator<uint>(0u),
+                       nPairs,
+                       [activeIdxDev, flagsDev, prefixDev] __device__(uint i) {
+                           if(flagsDev[i])
+                               activeIdxDev[prefixDev[i]] = i;
+                       });
+
+    return nActive;
+}
+
 // -----------------------------------------------------------------------------
 /** @brief Computes the relative transformations between pairs of components
     @param pairList list of pairs of components
@@ -90,23 +139,48 @@ __GLOBAL__ void
 }
 
 // -----------------------------------------------------------------------------
+/** @brief Transforms contact info to world and flags actives. */
+template <typename T>
+__GLOBAL__ void
+    transformContactInfo_Kernel(const uint2*          pairList,
+                                const ContactInfo<T>* contactInfoLocal,
+                                const Vector3<T>*     position,
+                                const Quaternion<T>*  quaternion,
+                                ContactInfo<T>*       contactInfoWorld,
+                                uint*                 activePairs,
+                                const uint            nPairs)
+{
+    uint tID = blockIdx.x * blockDim.x + threadIdx.x;
+    if(tID >= nPairs)
+        return;
+    transformContactInfo_common(pairList,
+                                contactInfoLocal,
+                                position,
+                                quaternion,
+                                contactInfoWorld,
+                                activePairs,
+                                tID);
+}
+
+// -----------------------------------------------------------------------------
 /** @brief Computes the contact forces
     @param CF contact force models
     @param pairList list of rigid bodies pairs
     @param contactInfo contact information
     @param rigidBody rigid body of components
+    @param position position of the components
     @param velocity kinematics of the components
     @param torce torce acting on the components
-    @param relPosition relative position of the components */
+    @param nPairs number of pairs */
 template <typename T>
 __GLOBAL__ void
     computeContactForces_Kernel(const ContactForceModel<T>* const* CF,
                                 const uint2*                       pairList,
                                 const ContactInfo<T>*              contactInfo,
                                 const RigidBody<T>* const*         rigidBody,
+                                const Vector3<T>*                  position,
                                 const Kinematics<T>*               velocity,
                                 Torce<T>*                          torce,
-                                const Vector3<T>*                  relPosition,
                                 const uint                         nPairs)
 {
     uint tID = blockIdx.x * blockDim.x + threadIdx.x;
@@ -118,10 +192,49 @@ __GLOBAL__ void
                                 pairList,
                                 contactInfo,
                                 rigidBody,
+                                position,
                                 velocity,
                                 torce,
-                                relPosition,
                                 tID);
+}
+
+// -----------------------------------------------------------------------------
+/** @brief Computes the contact forces
+    @param CF contact force models
+    @param pairList list of rigid bodies pairs
+    @param contactInfo contact information
+    @param activeIdx list of active pair indices
+    @param rigidBody rigid body of components
+    @param position position of the components
+    @param velocity kinematics of the components
+    @param torce torce acting on the components
+    @param nPairs number of pairs */
+template <typename T>
+__GLOBAL__ void
+    computeContactForcesCompact_Kernel(const ContactForceModel<T>* const* CF,
+                                       const uint2*               pairList,
+                                       const ContactInfo<T>*      contactInfo,
+                                       const uint*                activeIdx,
+                                       const RigidBody<T>* const* rigidBody,
+                                       const Vector3<T>*          position,
+                                       const Kinematics<T>*       velocity,
+                                       Torce<T>*                  torce,
+                                       const uint                 nActive)
+{
+    uint tID = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if(tID >= nActive)
+        return;
+
+    const uint i = activeIdx[tID];
+    computeContactForces_common(CF,
+                                pairList,
+                                contactInfo,
+                                rigidBody,
+                                position,
+                                velocity,
+                                torce,
+                                i);
 }
 
 // -----------------------------------------------------------------------------

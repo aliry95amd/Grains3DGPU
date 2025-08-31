@@ -25,7 +25,9 @@ class ComponentManagerCPU : public ComponentManager<T, MemType::HOST>
     using CM::m_torce;
     using CM::m_velocity;
 
+    using CM::m_activePairs;
     using CM::m_contactInfo;
+    using CM::m_contactInfoWorld;
     using CM::m_neighborList;
     using CM::m_relPosition;
     using CM::m_relQuaternion;
@@ -76,6 +78,9 @@ public:
 
     /** @brief Detects collisions between components */
     void detectCollisionsComponents() final;
+
+    /** @brief Transforms contact info to world frame and flags active pairs */
+    void transformContactInfoToWorld() final;
 
     /** @brief Detects collision */
     void detectCollisions() final;

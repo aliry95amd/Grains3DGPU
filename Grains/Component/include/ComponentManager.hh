@@ -63,6 +63,10 @@ protected:
     GrainsMemBuffer<Quaternion<T>, M> m_relQuaternion;
     /** \brief Contact information */
     GrainsMemBuffer<ContactInfo<T>, M> m_contactInfo;
+    /** \brief Contact information in world frame */
+    GrainsMemBuffer<ContactInfo<T>, M> m_contactInfoWorld;
+    /** \brief Active contact pairs */
+    GrainsMemBuffer<uint, M> m_activePairs;
     // /** \brief Rigid bodies bounding volume */
     // GrainsMemBuffer<BoundingVolume<T>, M> m_boundingVolume;
     //@}
@@ -106,6 +110,10 @@ public:
         m_relQuaternion.fill();
         m_contactInfo.allocate(maxPairs);
         m_contactInfo.fill();
+        m_contactInfoWorld.allocate(maxPairs);
+        m_contactInfoWorld.fill();
+        m_activePairs.allocate(maxPairs);
+        m_activePairs.fill();
     }
 
     // -------------------------------------------------------------------------
@@ -361,12 +369,14 @@ public:
     //@{
     // -------------------------------------------------------------------------
     /** @brief Resizes pair-dependent buffers based on current neighbor list size */
-    void resizePairBuffers()
+    virtual void resizePairBuffers()
     {
         uint pairCount = m_neighborList->getSize();
         m_relPosition.setSize(pairCount);
         m_relQuaternion.setSize(pairCount);
         m_contactInfo.setSize(pairCount);
+        m_contactInfoWorld.setSize(pairCount);
+        m_activePairs.setSize(pairCount);
     }
 
     // -------------------------------------------------------------------------
@@ -540,6 +550,10 @@ public:
     // -------------------------------------------------------------------------
     /** @brief Detects collisions between components */
     virtual void detectCollisionsComponents() = 0;
+
+    // -------------------------------------------------------------------------
+    /** @brief Transforms contact info to world frame and flags active pairs */
+    virtual void transformContactInfoToWorld() = 0;
 
     // -------------------------------------------------------------------------
     /** @brief Detects collision */

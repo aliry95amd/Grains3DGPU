@@ -25,10 +25,17 @@ class ComponentManagerGPU : public ComponentManager<T, MemType::DEVICE>
     using CM::m_torce;
     using CM::m_velocity;
 
+    using CM::m_activePairs;
     using CM::m_contactInfo;
+    using CM::m_contactInfoWorld;
     using CM::m_neighborList;
     using CM::m_relPosition;
     using CM::m_relQuaternion;
+
+private:
+    // Persistent buffers to avoid per-call allocations for compaction
+    GrainsMemBuffer<uint, MemType::DEVICE> m_prefixScan;
+    GrainsMemBuffer<uint, MemType::DEVICE> m_activeIndex;
 
 public:
     /** @name Constructors */
@@ -64,6 +71,9 @@ public:
 
     /** @brief Initializes data members to default values */
     void initialize();
+
+    /** @brief Resizes pair-dependent buffers based on current neighbor list size */
+    void resizePairBuffers();
     //@}
 
     /** @name Methods */
@@ -76,6 +86,9 @@ public:
 
     /** @brief Detects collisions between components */
     void detectCollisionsComponents() final;
+
+    /** @brief Transforms contact info to world frame and flags active pairs */
+    void transformContactInfoToWorld() final;
 
     /** @brief Detects collision */
     void detectCollisions() final;
