@@ -89,6 +89,22 @@ public:
         = 0;
 
     // -------------------------------------------------------------------------
+    /** @brief Collects potential neighbor IDs for a candidate insertion point.
+        Appends indices in [0, nObstacles + nInserted) that should be tested.
+        @param positions positions buffer
+        @param candidate candidate world-space position to insert
+        @param nObstacles number of obstacles (at start of arrays)
+        @param nInserted number of particles already inserted
+        @param out output buffer of indices (will be appended) */
+    virtual void collectPotentialNeighbors(
+        const GrainsMemBuffer<Vector3<T>, M>& positions,
+        const Vector3<T>&                     candidate,
+        const uint                            nObstacles,
+        const uint                            nInserted,
+        std::vector<uint>&                    out)
+        = 0;
+
+    // -------------------------------------------------------------------------
     /** @brief Returns true if update is needed 
     @param transforms array of transformations */
     bool needsUpdate() const

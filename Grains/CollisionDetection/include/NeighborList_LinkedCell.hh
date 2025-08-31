@@ -151,6 +151,33 @@ public:
 
         m_needsUpdate = true;
     }
+
+    // -------------------------------------------------------------------------
+    /** @brief Collect IDs from the candidate's cell and neighbors. 
+        @param positions positions buffer
+        @param candidate candidate world-space position to insert
+        @param nObstacles number of obstacles
+        @param nInserted number of particles already inserted
+        @param out output buffer of indices (will be appended) */
+    void collectPotentialNeighbors(
+        const GrainsMemBuffer<Vector3<T>, M>& positions,
+        const Vector3<T>&                     candidate,
+        const uint                            nObstacles,
+        const uint                            nInserted,
+        std::vector<uint>&                    out) final
+    {
+        if constexpr(M == MemType::HOST)
+        {
+            auto*      LC_host = static_cast<LinkedCell_Host<T>*>(m_LinkedCell);
+            const uint maxIndex = nObstacles + nInserted;
+            LC_host->collectPotentialNeighbors(candidate, maxIndex, out);
+        }
+        else if constexpr(M == MemType::DEVICE)
+        {
+            GAbort("NeighborList_LinkedCell::collectPotentialNeighbors is not "
+                   "implemented for DEVICE");
+        }
+    }
     //@}
 };
 

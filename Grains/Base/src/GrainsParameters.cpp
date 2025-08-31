@@ -56,7 +56,7 @@ uint GrainsParameters<T>::m_neighborListFrequency = 0;
 template <typename T>
 uint GrainsParameters<T>::m_linkedCellType = 0;
 template <typename T>
-uint GrainsParameters<T>::m_linkedCellSizeFactor = 0;
+T GrainsParameters<T>::m_linkedCellSizeFactor = 1;
 template <typename T>
 uint GrainsParameters<T>::m_sortingFrequency = 0;
 template <typename T>

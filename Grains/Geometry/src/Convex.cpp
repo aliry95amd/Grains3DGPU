@@ -40,29 +40,33 @@ __HOST__ void
     }
 }
 
-// // ----------------------------------------------------------------------------
-// // Input operator
-// template <typename T>
-// __HOST__
-// std::istream& Convex<T>::operator >> ( std::istream& fileIn,
-//                                        Convex<T>& convex )
-// {
-//   convex.readShape( fileIn );
-//   return ( fileIn );
-// }
+// -----------------------------------------------------------------------------
+// Output operator for Convex
+template <typename T>
+__HOST__ std::ostream& operator<<(std::ostream&    fileOut,
+                                  const Convex<T>& convex)
+{
+    convex.writeConvex(fileOut);
+    return fileOut;
+}
 
-// // ---------------------------------------------------------------------
-// // Output operator
-// template <typename T>
-// __HOST__
-// std::ostream& Convex<T>::operator << ( std::ostream& fileOut,
-//                                        Convex<T> const& convex )
-// {
-//   convex.writeShape( fileOut );
-//   return ( fileOut );
-// }
+// -----------------------------------------------------------------------------
+// Input operator for Convex
+template <typename T>
+__HOST__ std::istream& operator>>(std::istream& fileIn, Convex<T>& convex)
+{
+    convex.readConvex(fileIn);
+    return fileIn;
+}
 
 // -----------------------------------------------------------------------------
 // Explicit instantiation
 template class Convex<float>;
 template class Convex<double>;
+
+#define X(T)                                                                \
+    template std::ostream& operator<< <T>(std::ostream&, const Convex<T>&); \
+    template std::istream& operator>> <T>(std::istream&, Convex<T>&);
+X(float)
+X(double)
+#undef X

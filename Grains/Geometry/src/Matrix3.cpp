@@ -165,7 +165,7 @@ __HOSTDEVICE__ T& Matrix3<T>::operator()(uint i, uint j) noexcept
 template <typename T>
 __HOST__ std::ostream& operator<<(std::ostream& fileOut, const Matrix3<T>& m)
 {
-    fileOut << m[X] << std::endl << m[Y] << std::endl << m[Z];
+    fileOut << m[X] << "\n" << m[Y] << "\n" << m[Z];
     return (fileOut);
 }
 

@@ -123,6 +123,13 @@ void ComponentManagerCPU<T>::computeContactForces(
                                     m_relPosition.getData(),
                                     i);
     }
+
+    m_position.print("Position");
+    m_quaternion.print("Orientation");
+    m_relPosition.print("Relative Position");
+    m_relQuaternion.print("Relative Quaternion");
+    m_contactInfo.print("Contact Information");
+    m_torce.print("Torce");
 }
 
 // -----------------------------------------------------------------------------

@@ -236,7 +236,7 @@ void Grains<T>::Construction(DOMElement* rootElement)
     // Neighbor list
     DOMNode* nNeighborList
         = ReaderXML::getNode(collisionDetection, "NeighborList");
-    GAssert(nNeighborList, "NeighborList node not found");
+    GAssert(nNeighborList, "NeighborList node is mandatory!");
     std::string neighborListType
         = ReaderXML::getNodeAttr_String(nNeighborList, "Type");
     if(neighborListType == "BruteForce")
@@ -248,9 +248,8 @@ void Grains<T>::Construction(DOMElement* rootElement)
     GP::m_neighborListFrequency
         = ReaderXML::getNodeAttr_Int(nNeighborList, "UpdateFrequency");
     GoutWI(9,
-           "NeighborList generation with " + neighborListType
-               + " and frequency " + std::to_string(GP::m_neighborListFrequency)
-               + " ...");
+           "NeighborList: " + neighborListType + ", Frequency "
+               + std::to_string(GP::m_neighborListFrequency));
     // Linked cell
     if(GP::m_neighborListType == 1)
     {
@@ -270,9 +269,9 @@ void Grains<T>::Construction(DOMElement* rootElement)
         GP::m_sortingFrequency
             = ReaderXML::getNodeAttr_Int(nLinkedCell, "SortingFrequency");
         GoutWI(9,
-               linkedCellType + " LinkedCell" + " with cell size factor "
+               "LinkedCell:" + linkedCellType + ", cell size factor "
                    + std::to_string(GP::m_linkedCellSizeFactor)
-                   + " and sorting frequency "
+                   + ", sorting frequency "
                    + std::to_string(GP::m_sortingFrequency) + " ...");
     }
     // Bounding volume
@@ -290,7 +289,7 @@ void Grains<T>::Construction(DOMElement* rootElement)
             GP::m_boundingVolumeType = 2;
         else
             GAbort("Unknown bounding volume type! Aborting Grains!");
-        GoutWI(9, boundingVolumeType + " Bounding volume ...");
+        GoutWI(9, "BoundingVolume: " + boundingVolumeType);
     }
     // Narrow phase detection
     DOMNode* nNarrowPhase
@@ -303,7 +302,7 @@ void Grains<T>::Construction(DOMElement* rootElement)
             GP::m_narrowPhaseType = 0;
         else
             GAbort("Unknown narrow phase type! Aborting Grains!");
-        GoutWI(9, narrowPhaseType + " Narrow phase detection ...");
+        GoutWI(9, "NarrowPhase: " + narrowPhaseType);
     }
     GoutWI(6, "Reading collision detection completed!");
 

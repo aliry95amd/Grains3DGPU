@@ -582,9 +582,9 @@ public:
         if constexpr(M == MemType::HOST || M == MemType::PINNED)
         {
             if(!label.empty())
-                std::cout << label << ": ";
+                std::cout << label << ": " << "\n";
             for(size_t i = 0; i < m_size; ++i)
-                std::cout << m_ptr[i] << " ";
+                std::cout << "[" << i << "]. " << m_ptr[i] << "\n";
             std::cout << std::endl;
         }
         else if constexpr(M == MemType::DEVICE || M == MemType::MANAGED)
@@ -596,9 +596,9 @@ public:
                                     getBytes(),
                                     cudaMemcpyDeviceToHost));
             if(!label.empty())
-                std::cout << label << ": ";
+                std::cout << label << ": " << "\n";
             for(size_t i = 0; i < m_size; ++i)
-                std::cout << hostBuf[i] << " ";
+                std::cout << "[" << i << "]. " << hostBuf[i] << "\n";
             std::cout << std::endl;
         }
         else

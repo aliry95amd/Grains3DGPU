@@ -157,7 +157,8 @@ __HOSTDEVICE__ static INLINE void
     const Vector3<T> r
         = v_b2a[Z] > 0 ? Vector3<T>(0, 0, -1) : Vector3<T>(0, 0, 1);
     // Contact point on the particle
-    const Vector3<T> ptA = q_b2a >> convexB->support(q_b2a << r) + v_b2a;
+    Vector3<T> ptA = convexB->support(q_b2a << r);
+    transform(q_b2a, v_b2a, ptA);
     if(ptA[Z] < T(0))
     {
         // The projection point on the rectangle plane

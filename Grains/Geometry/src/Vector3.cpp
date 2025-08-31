@@ -175,7 +175,7 @@ __HOSTDEVICE__ Vector3<double>::operator Vector3<float>() const noexcept
 template <typename T>
 __HOST__ std::ostream& operator<<(std::ostream& fileOut, const Vector3<T>& v)
 {
-    fileOut << v[X] << " " << v[Y] << " " << v[Z];
+    fileOut << "[" << v[X] << ", " << v[Y] << ", " << v[Z] << "]";
     return (fileOut);
 }
 

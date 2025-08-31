@@ -142,7 +142,7 @@ public:
     //@{
     // -------------------------------------------------------------------------
     /** @brief Gets linked cell list */
-    const Cells<T>** getLinkedCell() const
+    Cells<T>* const* getLinkedCell() const
     {
         return m_cells.getData();
     }
@@ -163,7 +163,7 @@ public:
 
     // -------------------------------------------------------------------------
     /** @brief Gets neighbor cells */
-    uint* getCellNeighborsList()
+    const uint* getCellNeighborsList() const
     {
         return m_neighborCells.getData();
     }

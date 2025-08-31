@@ -174,6 +174,41 @@ public:
 
         return true;
     }
+
+    // -------------------------------------------------------------------------
+    /** @brief Collects particle IDs in the candidate's cell and its neighbors.
+        Appends IDs less than maxIndex into out.
+        @param candidate candidate world-space position
+        @param maxIndex only IDs < maxIndex are considered existing
+        @param out output buffer to append IDs */
+    void collectPotentialNeighbors(const Vector3<T>&  candidate,
+                                   uint               maxIndex,
+                                   std::vector<uint>& out) const
+    {
+        constexpr uint  NUM_NEIGHBOR_CELLS = 27; // Number of neighboring cells
+        const Cells<T>* cells              = this->getLinkedCell()[0];
+        const uint      cellID             = cells->computeCellHash(candidate);
+
+        // Same-cell particles
+        const auto& currentCellParticles = m_cellParticles[cellID];
+        for(const uint p : currentCellParticles)
+            if(p < maxIndex)
+                out.push_back(p);
+
+        // Neighbor cells
+        const uint* allNeighbors  = this->getCellNeighborsList();
+        const uint* neighborCells = &allNeighbors[NUM_NEIGHBOR_CELLS * cellID];
+        for(uint n = 0; n < NUM_NEIGHBOR_CELLS; ++n)
+        {
+            const uint c = neighborCells[n];
+            if(c == UINT_MAX || c == cellID)
+                continue;
+            const auto& neighborCellParticles = m_cellParticles[c];
+            for(const uint p : neighborCellParticles)
+                if(p < maxIndex)
+                    out.push_back(p);
+        }
+    }
     //@}
 };
 

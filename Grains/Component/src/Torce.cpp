@@ -98,7 +98,8 @@ __HOSTDEVICE__ void Torce<T>::addForce(const Vector3<T>& f, const Vector3<T>& p)
 template <typename T>
 __HOST__ std::ostream& operator<<(std::ostream& fileOut, const Torce<T>& t)
 {
-    fileOut << t.getTorque() << std::endl << t.getForce();
+    fileOut << "Torque: " << t.getTorque() << "\n"
+            << "Force: " << t.getForce();
     return (fileOut);
 }
 

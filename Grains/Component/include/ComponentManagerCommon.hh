@@ -43,12 +43,12 @@ __HOSTDEVICE__ static INLINE void
                                           Quaternion<T>* relativeQuaternion,
                                           const uint     pairID)
 {
-    const uint2 pair           = pairList[pairID];
-    const uint  idA            = pair.x;
-    const uint  idB            = pair.y;
-    relativePosition[pairID]   = position[idB] - position[idA];
+    const uint2 pair         = pairList[pairID];
+    const uint  idA          = pair.x;
+    const uint  idB          = pair.y;
+    relativePosition[pairID] = quaternion[idA]
+                               << (position[idB] - position[idA]);
     relativeQuaternion[pairID] = inverse(quaternion[idA]) * quaternion[idB];
-    // TODO: apply crust thickness
 }
 
 // -----------------------------------------------------------------------------

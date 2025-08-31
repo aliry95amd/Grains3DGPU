@@ -140,8 +140,7 @@ __HOST__ void Rectangle<T>::readConvex(std::istream& fileIn)
 template <typename T>
 __HOST__ void Rectangle<T>::writeConvex(std::ostream& fileOut) const
 {
-    fileOut << "Rectangle with dimensions " << T(2) * m_LX << ", and "
-            << T(2) * m_LY << ".\n";
+    fileOut << "Rectangle: " << T(2) * m_LX << ", " << T(2) * m_LY << ".\n";
 }
 
 // -----------------------------------------------------------------------------

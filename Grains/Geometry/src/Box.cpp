@@ -146,7 +146,7 @@ __HOST__ void Box<T>::readConvex(std::istream& fileIn)
 template <typename T>
 __HOST__ void Box<T>::writeConvex(std::ostream& fileOut) const
 {
-    fileOut << "Box with dimensions " << m_extent << ".\n";
+    fileOut << "Box: " << T(2) * m_extent << ".\n";
 }
 
 // -----------------------------------------------------------------------------

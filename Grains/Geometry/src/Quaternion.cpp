@@ -53,6 +53,14 @@ __HOSTDEVICE__ Quaternion<T>::Quaternion(const T* buffer) noexcept
 }
 
 // -----------------------------------------------------------------------------
+// Constructor from Euler angles (Z-Y-X intrinsic order)
+template <typename T>
+__HOSTDEVICE__ Quaternion<T>::Quaternion(T aX, T aY, T aZ) noexcept
+{
+    setQuaternion(aX, aY, aZ);
+}
+
+// -----------------------------------------------------------------------------
 // Constructor with a rotation matrix
 template <typename T>
 __HOSTDEVICE__ Quaternion<T>::Quaternion(const Matrix3<T>& rot) noexcept
@@ -121,23 +129,14 @@ __HOST__ Quaternion<T>::Quaternion(DOMNode* root) noexcept
         Matrix3<T> mat(root);
         setQuaternion(mat);
     }
-    else if(type == "Angles")
+    else if(type == "Angle")
     {
         // read in radiands
         T aX = RADS_PER_DEG<T> * T(ReaderXML::getNodeAttr_Double(root, "aX"));
         T aY = RADS_PER_DEG<T> * T(ReaderXML::getNodeAttr_Double(root, "aY"));
         T aZ = RADS_PER_DEG<T> * T(ReaderXML::getNodeAttr_Double(root, "aZ"));
 
-        Matrix3<T> mat(cos(aZ) * cos(aY),
-                       cos(aZ) * sin(aY) * sin(aX) - sin(aZ) * cos(aX),
-                       cos(aZ) * sin(aY) * cos(aX) + sin(aZ) * sin(aX),
-                       sin(aZ) * cos(aY),
-                       sin(aZ) * sin(aY) * sin(aX) + cos(aZ) * cos(aX),
-                       sin(aZ) * sin(aY) * cos(aX) - cos(aZ) * sin(aX),
-                       -sin(aY),
-                       cos(aY) * sin(aX),
-                       cos(aY) * cos(aX));
-        setQuaternion(mat);
+        setQuaternion(aX, aY, aZ);
     }
     else if(type == "Identity")
     {
@@ -145,7 +144,7 @@ __HOST__ Quaternion<T>::Quaternion(DOMNode* root) noexcept
     }
     else
         GAbort("A quaternion in one of the AngularPosition XML nodes is"
-               " not a rotation matrix or angles !!!");
+               " not a rotation matrix or angle !!!");
 }
 
 // -----------------------------------------------------------------------------
@@ -285,6 +284,24 @@ __HOSTDEVICE__ void Quaternion<T>::setQuaternion(const Matrix3<T>& rot) noexcept
     }
     else
         GAbort("Case not covered in Quaternion::setQuaternion!");
+}
+
+// -----------------------------------------------------------------------------
+// Sets the quaternion from Euler angles (Z-Y-X intrinsic order)
+template <typename T>
+__HOSTDEVICE__ void Quaternion<T>::setQuaternion(T aX, T aY, T aZ) noexcept
+{
+    // Build rotation matrix
+    Matrix3<T> mat(cos(aZ) * cos(aY),
+                   cos(aZ) * sin(aY) * sin(aX) - sin(aZ) * cos(aX),
+                   cos(aZ) * sin(aY) * cos(aX) + sin(aZ) * sin(aX),
+                   sin(aZ) * cos(aY),
+                   sin(aZ) * sin(aY) * sin(aX) + cos(aZ) * cos(aX),
+                   sin(aZ) * sin(aY) * cos(aX) - cos(aZ) * sin(aX),
+                   -sin(aY),
+                   cos(aY) * sin(aX),
+                   cos(aY) * cos(aX));
+    setQuaternion(mat);
 }
 
 // -----------------------------------------------------------------------------

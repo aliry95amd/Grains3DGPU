@@ -3,8 +3,8 @@
 
 #include "InsertionWindow.hh"
 #include "Kinematics.hh"
+#include "Quaternion.hh"
 #include "ReaderXML.hh"
-#include "Transform3.hh"
 #include <variant>
 
 /** @name Enumerations */
@@ -70,6 +70,8 @@ protected:
     InsertionInfo<T> m_translationalVelInsertionInfo;
     /** \brief info required for coming up with an insertion omega. */
     InsertionInfo<T> m_angularVelInsertionInfo;
+    /** \brief If insertion should be forced (true) or not (false) */
+    bool m_forceInsertion;
     //@}
 
 public:
@@ -112,7 +114,8 @@ public:
     /** @brief Returns all required data members to insert components as a 
         vector */
     __HOST__
-    std::pair<Transform3<T>, Kinematics<T>> fetchInsertionData();
+    std::tuple<Vector3<T>, Quaternion<T>, Kinematics<T>, bool>
+        fetchInsertionData();
     //@}
 };
 

@@ -220,8 +220,8 @@ __HOST__ void Superquadric<T>::readConvex(std::istream& fileIn)
 template <typename T>
 __HOST__ void Superquadric<T>::writeConvex(std::ostream& fileOut) const
 {
-    fileOut << "Superquadric with dimensions " << m_a << ", " << m_b << ", "
-            << m_c << ", and exponents " << m_n1 << ", " << m_n2 << ".\n";
+    fileOut << "Superquadric: " << m_a << ", " << m_b << ", " << m_c << ", "
+            << m_n1 << ", " << m_n2 << ".\n";
 }
 
 // -----------------------------------------------------------------------------

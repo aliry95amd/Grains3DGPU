@@ -60,6 +60,14 @@ public:
     __HOSTDEVICE__
     Quaternion(const T* buffer) noexcept;
 
+    /** @brief Constructor from Euler angles (radians)
+    Builds a quaternion from intrinsic Z-Y-X rotations: R = Rz(aZ) * Ry(aY) * Rx(aX).
+    @param aX rotation about X (roll)
+    @param aY rotation about Y (pitch)
+    @param aZ rotation about Z (yaw) */
+    __HOSTDEVICE__
+    Quaternion(T aX, T aY, T aZ) noexcept;
+
     /** @brief Constructor with a rotation matrix 		
 		@param rot rotation matrix */
     __HOSTDEVICE__
@@ -139,9 +147,17 @@ public:
     void setQuaternion(T x, T y, T z, T w) noexcept;
 
     /** @brief Sets the quaternion with a rotation matrix
-		@param rot rotation matrix */
+        @param rot rotation matrix */
     __HOSTDEVICE__
     void setQuaternion(const Matrix3<T>& rot) noexcept;
+
+    /** @brief Sets the quaternion from Euler angles (radians)
+    Intrinsic Z-Y-X order: R = Rz(aZ) * Ry(aY) * Rx(aX)
+        @param aX rotation about X (roll)
+        @param aY rotation about Y (pitch)
+        @param aZ rotation about Z (yaw) */
+    __HOSTDEVICE__
+    void setQuaternion(T aX, T aY, T aZ) noexcept;
 
     /** @brief Builds a unit quaternion representing the rotation, from
 		u to v. The input vectors need not to be normalised.

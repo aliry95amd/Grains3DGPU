@@ -84,20 +84,17 @@ public:
 /** @name External Methods - I/O methods */
 //@{
 /** @brief Input operator
-@param fileIn input stream
-@param k kinematics */
+    @param fileIn input stream
+    @param k kinematics */
 template <typename T>
 __HOST__ std::istream& operator>>(std::istream& fileIn, Kinematics<T>& k);
 
 /** @brief Output operator
-@param fileOut output stream
-@param k kinematics */
+    @param fileOut output stream
+    @param k kinematics */
 template <typename T>
 __HOST__ std::ostream& operator<<(std::ostream&        fileOut,
                                   const Kinematics<T>& k);
 //@}
-
-typedef Kinematics<float>  KinematicsF;
-typedef Kinematics<double> KinematicsD;
 
 #endif

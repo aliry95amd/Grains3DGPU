@@ -68,7 +68,7 @@ public:
     /** \brief Type of linked cell */
     static uint m_linkedCellType;
     /** \brief Linked cell size factor */
-    static uint m_linkedCellSizeFactor;
+    static T m_linkedCellSizeFactor;
     /** \brief Frequency of sorting particles */
     static uint m_sortingFrequency;
     /** @brief Number of cells in linked cell */

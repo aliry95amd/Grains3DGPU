@@ -157,8 +157,8 @@ __HOST__ void Cone<T>::readConvex(std::istream& fileIn)
 template <typename T>
 __HOST__ void Cone<T>::writeConvex(std::ostream& fileOut) const
 {
-    fileOut << "Cone with radius " << m_bottomRadius << ", and height "
-            << T(4) * m_quarterHeight << ".\n";
+    fileOut << "Cone: " << m_bottomRadius << ", " << T(4) * m_quarterHeight
+            << ".\n";
 }
 
 // -----------------------------------------------------------------------------

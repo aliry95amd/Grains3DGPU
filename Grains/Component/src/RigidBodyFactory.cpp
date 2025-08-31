@@ -97,12 +97,12 @@ __HOST__ void RigidBodyFactory<T>::create(
         Quaternion<T> rotation(T(0), T(0), T(0), T(1));
         if(nTransform)
         {
-            DOMNode* nCentre = ReaderXML::getNode(nObstacle, "Centre");
+            DOMNode* nCentre = ReaderXML::getNode(nTransform, "Centre");
             if(nCentre)
                 centre = Vector3<T>(nCentre);
 
             DOMNode* nRotation
-                = ReaderXML::getNode(nObstacle, "AngularPosition");
+                = ReaderXML::getNode(nTransform, "AngularPosition");
             if(nRotation)
                 rotation = Quaternion<T>(nRotation);
         }
@@ -131,12 +131,12 @@ __HOST__ void RigidBodyFactory<T>::create(
         Quaternion<T> rotation(T(0), T(0), T(0), T(1));
         if(nTransform)
         {
-            DOMNode* nCentre = ReaderXML::getNode(nParticle, "Centre");
+            DOMNode* nCentre = ReaderXML::getNode(nTransform, "Centre");
             if(nCentre)
                 centre = Vector3<T>(nCentre);
 
             DOMNode* nRotation
-                = ReaderXML::getNode(nParticle, "AngularPosition");
+                = ReaderXML::getNode(nTransform, "AngularPosition");
             if(nRotation)
                 rotation = Quaternion<T>(nRotation);
         }

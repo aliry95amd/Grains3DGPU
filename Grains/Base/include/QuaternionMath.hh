@@ -507,7 +507,7 @@ __HOSTDEVICE__ static INLINE void
 // -----------------------------------------------------------------------------
 /** @brief Transforms a point using a quaternion and a vector.
     @param q the quaternion representing the rotation
-    @param x the translation vector
+    @param v the translation vector
     @param w the vector to be transformed */
 template <typename T>
 __HOSTDEVICE__ static INLINE void transform(const Quaternion<T>& q,

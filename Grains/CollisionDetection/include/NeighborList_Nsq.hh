@@ -98,6 +98,34 @@ public:
 
         m_needsUpdate = false;
     }
+
+    // -------------------------------------------------------------------------
+    /** @brief Collect all IDs as everyone can be a neighbor;
+        nInserted particles have IDs [nObstacles, nObstacles+nInserted).
+        @param positions positions buffer
+        @param candidate candidate world-space position to insert
+        @param nObstacles number of obstacles
+        @param nInserted number of particles already inserted
+        @param out output buffer of indices (will be appended) */
+    void collectPotentialNeighbors(
+        const GrainsMemBuffer<Vector3<T>, M>& positions,
+        const Vector3<T>&                     candidate,
+        const uint                            nObstacles,
+        const uint                            nInserted,
+        std::vector<uint>&                    out) final
+    {
+        if constexpr(M == MemType::HOST)
+        {
+            out.reserve(out.size() + nObstacles + nInserted);
+            for(uint j = 0; j < nObstacles + nInserted; ++j)
+                out.push_back(j);
+        }
+        else if constexpr(M == MemType::DEVICE)
+        {
+            GAbort("NeighborList_Nsq::collectPotentialNeighbors is not "
+                   "implemented for DEVICE");
+        }
+    }
     //@}
 };
 

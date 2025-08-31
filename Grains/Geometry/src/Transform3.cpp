@@ -93,7 +93,7 @@ __HOST__ Transform3<T>::Transform3(DOMNode* root)
                 "Input matrix is not a valid rotation matrix in "
                 "Quaternion::setQuaternion!");
     }
-    else if(type == "Angles")
+    else if(type == "Angle")
     {
         // read in degree
         T aX = T(ReaderXML::getNodeAttr_Double(angPos, "aX"));
