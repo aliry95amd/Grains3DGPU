@@ -32,8 +32,6 @@ protected:
     T m_inertia_1[6];
     /** \brief Crust thickness */
     T m_crustThickness;
-    /** \brief Volume */
-    T m_volume;
     /** \brief Mass */
     T m_mass;
     /** \brief Material ID */

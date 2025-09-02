@@ -76,8 +76,8 @@ public:
         @param contactInfos geometric contact features
         @param relVelocityAtContact relative velocity at the contact point
         @param relAngVelocity relative angular velocity
-        @param m1 mass of the first component (Particle)
-        @param m2 mass of the second component (Particle ou Obstacle)
+        @param mA mass of the first component (Particle)
+        @param mB mass of the second component (Particle ou Obstacle)
         @param delFN normal force
         @param delFT tangential force
         @param delM torque */
@@ -85,8 +85,8 @@ public:
     void performForcesCalculus(const ContactInfo<T>& contactInfos,
                                const Vector3<T>&     relVelocityAtContact,
                                const Vector3<T>&     relAngVelocity,
-                               T                     m1,
-                               T                     m2,
+                               const T               mA,
+                               const T               mB,
                                Vector3<T>&           delFN,
                                Vector3<T>&           delFT,
                                Vector3<T>&           delM) const;

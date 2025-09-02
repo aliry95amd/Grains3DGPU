@@ -71,8 +71,7 @@ __HOSTDEVICE__ void Box<T>::setExtent(T x, T y, T z)
 template <typename T>
 __HOSTDEVICE__ Convex<T>* Box<T>::clone() const
 {
-    return (
-        new Box<T>(T(2) * m_extent[X], T(2) * m_extent[Y], T(2) * m_extent[Z]));
+    return (new Box<T>(m_extent));
 }
 
 // -----------------------------------------------------------------------------

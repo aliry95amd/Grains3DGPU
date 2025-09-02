@@ -23,9 +23,8 @@ __HOSTDEVICE__
     , m_crustThickness(ct)
     , m_material(material)
 {
-    // Volume and mass
-    m_volume = m_convex->computeVolume();
-    m_mass   = density * m_volume;
+    // mass
+    m_mass = density * m_convex->computeVolume();
     setInertia();
 }
 
@@ -35,7 +34,6 @@ template <typename T>
 __HOSTDEVICE__ RigidBody<T>::RigidBody(RigidBody<T> const& rb)
     : m_convex(NULL)
     , m_crustThickness(rb.m_crustThickness)
-    , m_volume(rb.m_volume)
     , m_mass(rb.m_mass)
     , m_material(rb.m_material)
 {
@@ -61,7 +59,6 @@ __HOSTDEVICE__ RigidBody<T>& RigidBody<T>::operator=(const RigidBody<T>& other)
         // copy
         m_convex         = other.m_convex ? other.m_convex->clone() : nullptr;
         m_crustThickness = other.m_crustThickness;
-        m_volume         = other.m_volume;
         m_mass           = other.m_mass;
         m_material       = other.m_material;
         for(int i = 0; i < 6; ++i)
@@ -79,7 +76,6 @@ template <typename T>
 __HOSTDEVICE__ RigidBody<T>::RigidBody(RigidBody<T>&& other)
     : m_convex(other.m_convex)
     , m_crustThickness(other.m_crustThickness)
-    , m_volume(other.m_volume)
     , m_mass(other.m_mass)
     , m_material(other.m_material)
 {
@@ -93,7 +89,6 @@ __HOSTDEVICE__ RigidBody<T>::RigidBody(RigidBody<T>&& other)
     // Reset moved-from
     other.m_convex         = nullptr;
     other.m_crustThickness = T(0);
-    other.m_volume         = T(0);
     other.m_mass           = T(0);
     other.m_material       = 0u;
     for(int i = 0; i < 6; ++i)
@@ -116,7 +111,6 @@ __HOSTDEVICE__ RigidBody<T>& RigidBody<T>::operator=(RigidBody<T>&& other)
         // Move ownership and copy POD fields
         m_convex         = other.m_convex;
         m_crustThickness = other.m_crustThickness;
-        m_volume         = other.m_volume;
         m_mass           = other.m_mass;
         m_material       = other.m_material;
         for(int i = 0; i < 6; ++i)
@@ -128,7 +122,6 @@ __HOSTDEVICE__ RigidBody<T>& RigidBody<T>::operator=(RigidBody<T>&& other)
         // Reset moved-from
         other.m_convex         = nullptr;
         other.m_crustThickness = T(0);
-        other.m_volume         = T(0);
         other.m_mass           = T(0);
         other.m_material       = 0u;
         for(int i = 0; i < 6; ++i)
@@ -152,15 +145,16 @@ __HOST__ RigidBody<T>::RigidBody(DOMNode* root)
     m_crustThickness
         = T(ReaderXML::getNodeAttr_Double(shape, "CrustThickness"));
     // Volume and mass
-    m_volume  = m_convex->computeVolume();
+    T volume  = m_convex->computeVolume();
     T density = T(0);
     if(ReaderXML::hasNodeAttr(root, "Density"))
     {
         density = T(ReaderXML::getNodeAttr_Double(root, "Density"));
-        m_mass  = density * m_volume;
+        m_mass  = density * volume;
     }
     else
-        m_mass = std::numeric_limits<T>::max();
+        m_mass = T(0);
+    setInertia();
     // Material
     std::string material = ReaderXML::getNodeAttr_String(root, "Material");
     // checking if the material name is already defined.
@@ -223,7 +217,7 @@ __HOSTDEVICE__ T RigidBody<T>::getCrustThickness() const
 template <typename T>
 __HOSTDEVICE__ T RigidBody<T>::getVolume() const
 {
-    return (m_volume);
+    return (m_convex->computeVolume());
 }
 
 // -----------------------------------------------------------------------------
@@ -267,7 +261,7 @@ __HOSTDEVICE__ void RigidBody<T>::setInertia()
     {
         // Storing inertia and inverse of it
         m_convex->computeInertia(m_inertia, m_inertia_1);
-        T density = m_mass / m_volume;
+        T density = m_mass / getVolume();
         for(int i = 0; i < 6; i++)
         {
             m_inertia[i] *= density;
@@ -311,12 +305,10 @@ __HOSTDEVICE__ Kinematics<T> RigidBody<T>::computeMomentum(
     const Vector3<T>& omega, const Torce<T>& t, const Quaternion<T>& q) const
 {
     // Angular momentum
-    // Quaternion and rotation quaternion conjugate
-    Quaternion<T> qCon(conjugate(q));
     // Write omega in the body-fixed coordinates system
-    Vector3<T> angVelocity(qCon.multToVector3(omega * q));
+    Vector3<T> angVelocity = q << omega;
     // Write torque in the body-fixed coordinates system
-    Vector3<T> angMomentum(qCon.multToVector3(t.getTorque() * q));
+    Vector3<T> angMomentum = q << t.getTorque();
 
     // Compute I.w in the body-fixed coordinates system
     Vector3<T> angMomentumTemp(
@@ -341,7 +333,7 @@ __HOSTDEVICE__ Kinematics<T> RigidBody<T>::computeMomentum(
                          + m_inertia_1[4] * angMomentum[1]
                          + m_inertia_1[5] * angMomentum[2];
     // Write I^-1.(T + I.w ^ w) in space-fixed coordinates system
-    angMomentum = q.multToVector3(angMomentumTemp * qCon);
+    angMomentum = q >> angMomentumTemp;
 
     // Translational momentum
     Vector3<T> transMomentum(t.getForce() / m_mass);

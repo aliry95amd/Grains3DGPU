@@ -18,6 +18,7 @@
 
 #include "GJK.hh"
 #include "LinkedCell_Host.hh"
+#include "OBB.hh"
 
 // =============================================================================
 /** @brief The class ComponentManager.
@@ -479,12 +480,21 @@ public:
             for(uint j = 0; j < m_nObstacles; ++j)
             {
                 const Convex<T>& convexJ = *(*m_rigidBody)[j]->getConvex();
-                if(intersectGJK<T>(convexNew,
-                                   convexJ,
-                                   m_position[j],
-                                   insertPosition,
-                                   m_quaternion[j],
-                                   insertQuaternion))
+                bool             BVintersect = intersectOrientedBoundingBox(
+                    convexJ.computeBoundingBox(),
+                    convexNew.computeBoundingBox(),
+                    m_position[j],
+                    insertPosition,
+                    m_quaternion[j],
+                    insertQuaternion);
+                // if(BVintersect
+                //    && intersectGJK<T>(convexJ,
+                //                       convexNew,
+                //                       m_position[j],
+                //                       insertPosition,
+                //                       m_quaternion[j],
+                //                       insertQuaternion))
+                if(BVintersect)
                     return false;
             }
 
@@ -496,12 +506,21 @@ public:
             for(uint j : neighborList)
             {
                 const Convex<T>& convexJ = *(*m_rigidBody)[j]->getConvex();
-                if(intersectGJK<T>(convexNew,
-                                   convexJ,
-                                   m_position[j],
-                                   insertPosition,
-                                   m_quaternion[j],
-                                   insertQuaternion))
+                bool             BVintersect = intersectOrientedBoundingBox(
+                    convexJ.computeBoundingBox(),
+                    convexNew.computeBoundingBox(),
+                    m_position[j],
+                    insertPosition,
+                    m_quaternion[j],
+                    insertQuaternion);
+                // if(BVintersect
+                //    && intersectGJK<T>(convexJ,
+                //                       convexNew,
+                //                       m_position[j],
+                //                       insertPosition,
+                //                       m_quaternion[j],
+                //                       insertQuaternion))
+                if(BVintersect)
                     return false;
             }
             return true;

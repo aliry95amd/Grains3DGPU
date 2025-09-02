@@ -87,8 +87,8 @@ __HOSTDEVICE__ void HookeContactForceModel<T>::performForcesCalculus(
     const ContactInfo<T>& contactInfos,
     const Vector3<T>&     relVelocityAtContact,
     const Vector3<T>&     relAngVelocity,
-    T                     m1,
-    T                     m2,
+    const T               mA,
+    const T               mB,
     Vector3<T>&           delFN,
     Vector3<T>&           delFT,
     Vector3<T>&           delM) const
@@ -114,11 +114,11 @@ __HOSTDEVICE__ void HookeContactForceModel<T>::performForcesCalculus(
         tangent = v_t / normv_t;
 
     // Normal dissipative force
-    T avmass = m1 * m2 / (m1 + m2);
+    T avmass = mA * mB / (mA + mB);
     T omega0 = sqrt(m_kn / avmass);
     if(avmass == T(0))
     {
-        avmass = m2 == T(0) ? T(0.5) * m1 : T(0.5) * m2;
+        avmass = mB == T(0) ? T(0.5) * mA : T(0.5) * mB;
         omega0 = T(2) * sqrt(m_kn / avmass);
     }
     T muen = -omega0 * m_muen;

@@ -144,7 +144,7 @@ __HOST__ Quaternion<T>::Quaternion(DOMNode* root) noexcept
     }
     else
         GAbort("A quaternion in one of the AngularPosition XML nodes is"
-               " not a rotation matrix or angle !!!");
+               " not a rotation matrix or angle.");
 }
 
 // -----------------------------------------------------------------------------

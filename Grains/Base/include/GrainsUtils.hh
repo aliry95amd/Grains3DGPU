@@ -123,7 +123,7 @@ __HOST__ static constexpr INLINE std::string
 {
     std::ostringstream oss;
     oss << vec;
-    return ("[" + oss.str() + "]");
+    return (oss.str());
 }
 
 // -----------------------------------------------------------------------------

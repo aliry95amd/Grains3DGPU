@@ -130,7 +130,7 @@ __HOSTDEVICE__ static INLINE void
                                 Torce<T>*                          torce,
                                 const uint                         pairID)
 {
-    const ContactInfo<T>& ci = contactInfo[pairID];
+    ContactInfo<T>& ci = const_cast<ContactInfo<T>&>(contactInfo[pairID]);
     // Compute the forces
     // On device path, this is redundant.
     if(ci.getOverlapDistance() < T(0))
@@ -169,6 +169,8 @@ __HOSTDEVICE__ static INLINE void
                                           torce[idA],
                                           torce[idB]);
     }
+    // reset the distance so we don't compute the torce twice
+    ci.setOverlapDistance(T(0));
 }
 
 // -----------------------------------------------------------------------------
@@ -225,6 +227,8 @@ __HOSTDEVICE__ static INLINE void
 
     position[cID] += transMotion;
     quaternion[cID] *= rotMotion;
+
+    const T* rotMotionBuffer = rotMotion.getBuffer();
 }
 
 #endif

@@ -78,9 +78,9 @@ __HOSTDEVICE__ void Cells<T>::resize(const T cellSize)
 
     m_cellSize     = cellSize;
     m_cellSize_inv = T(1) / cellSize;
-    m_numCells.x   = uint(DX * m_cellSize_inv);
-    m_numCells.y   = uint(DY * m_cellSize_inv);
-    m_numCells.z   = uint(DZ * m_cellSize_inv);
+    m_numCells.x   = max(1u, uint(DX * m_cellSize_inv));
+    m_numCells.y   = max(1u, uint(DY * m_cellSize_inv));
+    m_numCells.z   = max(1u, uint(DZ * m_cellSize_inv));
     m_numCells.w   = m_numCells.x * m_numCells.y * m_numCells.z;
 
     m_minCornerLinkedCell[X] = m_minCorner[X] - (m_numCells.x * cellSize - DX);
@@ -155,15 +155,19 @@ __HOSTDEVICE__ void Cells<T>::checkBound(const uint3& id) const
 template <typename T>
 __HOSTDEVICE__ uint3 Cells<T>::computeCellID(const Vector3<T>& p) const
 {
-    uint3 cellId;
+    const T* __RESTRICT__ pt    = p.getBuffer();
+    const T* __RESTRICT__ minPt = m_minCornerLinkedCell.getBuffer();
+    uint3                 cellId;
     // static_cast is faster than floor, though it comes with a cost ...
-    // if the operand is -0.7, it gives 0.
-    // cellId.x = static_cast<int>((p[X] - m_minCorner[X]) * m_cellSize_inv);
-    // cellId.y = static_cast<int>((p[Y] - m_minCorner[Y]) * m_cellSize_inv);
-    // cellId.z = static_cast<int>((p[Z] - m_minCorner[Z]) * m_cellSize_inv);
-    cellId.x = floor((p[X] - m_minCornerLinkedCell[X]) * m_cellSize_inv);
-    cellId.y = floor((p[Y] - m_minCornerLinkedCell[Y]) * m_cellSize_inv);
-    cellId.z = floor((p[Z] - m_minCornerLinkedCell[Z]) * m_cellSize_inv);
+    // if the operand is negative, cast truncates toward zero, while floor
+    // rounds down. However, the operand should be always non-negative in our
+    // case.
+    cellId.x = static_cast<int>((pt[X] - minPt[X]) * m_cellSize_inv);
+    cellId.y = static_cast<int>((pt[Y] - minPt[Y]) * m_cellSize_inv);
+    cellId.z = static_cast<int>((pt[Z] - minPt[Z]) * m_cellSize_inv);
+    // cellId.x = floor((p[X] - m_minCornerLinkedCell[X]) * m_cellSize_inv);
+    // cellId.y = floor((p[Y] - m_minCornerLinkedCell[Y]) * m_cellSize_inv);
+    // cellId.z = floor((p[Z] - m_minCornerLinkedCell[Z]) * m_cellSize_inv);
     checkBound(cellId);
     return (cellId);
 }
