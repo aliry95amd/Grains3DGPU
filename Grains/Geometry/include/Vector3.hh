@@ -117,10 +117,6 @@ public:
         @param i component index */
     __HOSTDEVICE__
     T& operator[](size_t i) noexcept;
-
-    /** @brief Conversion operator float */
-    __HOSTDEVICE__
-    operator Vector3<float>() const noexcept;
     //@}
 };
 

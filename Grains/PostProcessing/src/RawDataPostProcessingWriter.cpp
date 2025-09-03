@@ -90,10 +90,10 @@ void RawDataPostProcessingWriter<T>::PostProcessing(
     const GrainsMemBuffer<Kinematics<T>>& kin = cm->getVelocity();
 
     // Aux. variables
-    Vector3<T>  centre;
-    Vector3<T>  velT;
-    Vector3<T>  velR;
-    uint        type;
+    Vector3<T> centre;
+    Vector3<T> velT;
+    Vector3<T> velR;
+    // uint        type;  // Commented out as it's unused
     std::string fileName(m_directory + "/" + m_rootName);
     // This is broken
     // std::string particleTypeFile = fileName + "_particleType.dat";

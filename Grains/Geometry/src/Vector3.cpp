@@ -162,14 +162,6 @@ __HOSTDEVICE__ T& Vector3<T>::operator[](size_t i) noexcept
 }
 
 // -----------------------------------------------------------------------------
-// Conversion operator to float
-template <>
-__HOSTDEVICE__ Vector3<double>::operator Vector3<float>() const noexcept
-{
-    return (
-        Vector3<float>((float)m_comp[X], (float)m_comp[Y], (float)m_comp[Z]));
-}
-
 // -----------------------------------------------------------------------------
 // Output operator
 template <typename T>

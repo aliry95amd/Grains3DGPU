@@ -22,14 +22,10 @@
 #include <stdio.h>
 #include <string>
 
-#ifdef TEST_BUILD
-// Skip CUDA includes during testing to avoid GCC compatibility issues
-#else
 #include <cuda.h>
 #include <cuda_runtime.h>
 #include <curand.h>
 #include <curand_kernel.h>
-#endif
 
 #include <omp.h>
 
@@ -44,7 +40,7 @@
 /** @name Macros */
 //@{
 /** @brief Compiler macros */
-#if defined(__NVCC__) && !defined(TEST_BUILD)
+#if defined(__NVCC__)
 #define __HOST__ __host__
 #define __DEVICE__ __device__
 #define __HOSTDEVICE__ __host__ __device__

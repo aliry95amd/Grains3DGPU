@@ -3,7 +3,7 @@
 # ----------------
 
 # Declare phony targets
-.PHONY: install updatedev update clean cleanall cleandirs install-githook apply-clang-format githook xerces dtd build-tests run-tests clean-tests build-validation run-validation clean-validation cleanxerces cleandtd help
+.PHONY: install updatedev update clean cleanall cleandirs install-githook apply-clang-format githook xerces dtd build-tests run-tests clean-tests update-tests build-validation run-validation clean-validation cleanxerces cleandtd help
 
 install: xerces update dtd install-githook
 	@echo 'Grains platform installed!'
@@ -104,6 +104,17 @@ run-tests: build-tests
 	cd ../..;
 	@echo "Tests completed!"
 
+update-tests:
+	@echo "Updating tests (checking for Grains changes)..."
+	@if [ ! -d "Tests/build" ]; then \
+		echo "Tests not built yet, building from scratch..."; \
+		$(MAKE) build-tests; \
+	else \
+		echo "Rebuilding tests with dependency checking..."; \
+		cd Tests/build && $(MAKE) update-tests; \
+	fi
+	@echo "Tests updated!"
+
 clean-tests:
 	@echo "Cleaning test build directory..."
 	@rm -rf Tests/build
@@ -170,6 +181,7 @@ help:
 	@echo '      dtd              $(BANG) install the DTD files'
 	@echo '      build-tests      $(BANG) build the test suite using CMake'
 	@echo '      run-tests        $(BANG) build and run the test suite'
+	@echo '      update-tests     $(BANG) rebuild tests when Grains sources/headers change'
 	@echo '      clean-tests      $(BANG) clean the test build directory'
 	@echo '      build-validation $(BANG) build the validation tools'
 	@echo '      run-validation   $(BANG) build and run the validation tests'

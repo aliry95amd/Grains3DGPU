@@ -153,9 +153,25 @@ __HOSTDEVICE__ T& Matrix3<T>::operator()(uint i) noexcept
 }
 
 // -----------------------------------------------------------------------------
+// const element accessor
+template <typename T>
+__HOSTDEVICE__ const T& Matrix3<T>::operator()(uint i) const noexcept
+{
+    return (m_comp[i]);
+}
+
+// -----------------------------------------------------------------------------
 // element accessor
 template <typename T>
 __HOSTDEVICE__ T& Matrix3<T>::operator()(uint i, uint j) noexcept
+{
+    return (m_comp[i * 3 + j]);
+}
+
+// -----------------------------------------------------------------------------
+// const element accessor
+template <typename T>
+__HOSTDEVICE__ const T& Matrix3<T>::operator()(uint i, uint j) const noexcept
 {
     return (m_comp[i * 3 + j]);
 }

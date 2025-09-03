@@ -35,6 +35,15 @@ export GRAINS_XERCES_LIBDIR="${GRAINS_XERCES_ROOT}/lib64-${GRAINS_CPP_COMPILER_D
 # End Xerces
 
 
+# Grains Test
+export GTEST_ROOT=/usr
+export GTEST_INCLUDE_DIR=/usr/include
+export GTEST_LIBRARY_DIR=/usr/lib/x86_64-linux-gnu
+export GRAINS_TEST_TIMEOUT=300
+export GRAINS_TEST_PARALLEL_JOBS=8
+# End Testing
+
+
 # Display
 echo -e '\033[31mGRAINS_HOME\033[0m =' $GRAINS_HOME
 echo -e '\033[31mGRAINS_CPP_COMPILER\033[0m =' $GRAINS_CPP_COMPILER
@@ -66,8 +75,7 @@ export GRAINS_GPU_COMPILER_FLAGS="-t=8 -x cu -m64 \
     -use_fast_math -extra-device-vectorization -restrict \
     --extended-lambda --expt-relaxed-constexpr \
     -Xcompiler "-rdynamic,-fPIC,-fopenmp" \
-    -pg -g \
-    -diag-suppress 554 -diag-suppress 181"
+    -pg -g"
 export GRAINS_GPU_LINKER_FLAGS="-O3 -dlto \
     -arch=sm_75 -lineinfo -lcudart \
     -use_fast_math -extra-device-vectorization -restrict \
@@ -90,15 +98,6 @@ export CMAKE_CUDA_STANDARD=20
 export CMAKE_PREFIX_PATH="${GRAINS_XERCES_ROOT}:${GRAINS_GPU_COMPILER_ROOT}:${CMAKE_PREFIX_PATH}"
 export PKG_CONFIG_PATH="${GRAINS_XERCES_LIBDIR}/pkgconfig:${PKG_CONFIG_PATH}"
 # End CMake
-
-
-# Testing Configuration
-export GTEST_ROOT=/usr
-export GTEST_INCLUDE_DIR=/usr/include
-export GTEST_LIBRARY_DIR=/usr/lib/x86_64-linux-gnu
-export GRAINS_TEST_TIMEOUT=300
-export GRAINS_TEST_PARALLEL_JOBS=4
-# End Testing
 
 
 # LD_LIBRARY_PATH

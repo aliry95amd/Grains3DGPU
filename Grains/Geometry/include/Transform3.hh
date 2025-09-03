@@ -208,10 +208,6 @@ public:
         @param t the other Transform object */
     __HOSTDEVICE__
     Transform3<T>& operator=(const Transform3<T>& t);
-
-    /** @brief Conversion operator float */
-    __HOSTDEVICE__
-    operator Transform3<float>() const;
     //@}
 };
 

@@ -155,12 +155,46 @@ __HOST__ INLINE void GoutWI(const int numShift, const Args&... args)
 /** @brief Writes a message to stdout with Indent (WI)
     @param numShift the number of shift characters at the beginning
     @param args the output messages */
+// Helper functions for device printf with different types
+__DEVICE__ INLINE void print_device_arg(const char* arg)
+{
+    printf("%s ", arg);
+}
+__DEVICE__ INLINE void print_device_arg(char* arg)
+{
+    printf("%s ", arg);
+}
+__DEVICE__ INLINE void print_device_arg(size_t arg)
+{
+    printf("%zu ", arg);
+}
+__DEVICE__ INLINE void print_device_arg(int arg)
+{
+    printf("%d ", arg);
+}
+__DEVICE__ INLINE void print_device_arg(uint arg)
+{
+    printf("%u ", arg);
+}
+__DEVICE__ INLINE void print_device_arg(long arg)
+{
+    printf("%ld ", arg);
+}
+__DEVICE__ INLINE void print_device_arg(float arg)
+{
+    printf("%f ", arg);
+}
+__DEVICE__ INLINE void print_device_arg(double arg)
+{
+    printf("%f ", arg);
+}
+
 template <typename... Args>
 __HOSTDEVICE__ INLINE void GAbort(const Args&... args)
 {
 #ifdef __CUDA_ARCH__
     printf("[DEVICE] ");
-    (printf("%s ", args), ...);
+    (print_device_arg(args), ...);
     printf("\n");
     __trap(); // aborts the kernel
 #else
