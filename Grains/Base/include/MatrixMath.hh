@@ -417,6 +417,25 @@ __HOSTDEVICE__ static INLINE Matrix3<T> operator-(const Matrix3<T>& m) noexcept
 }
 
 // -----------------------------------------------------------------------------
+/** @brief Matrix comparison
+    @param m1 first matrix
+    @param m2 second matrix
+    @param tol tolerance for numerical checks */
+template <typename T>
+__HOSTDEVICE__ static INLINE bool operator==(const Matrix3<T>& m1,
+                                             const Matrix3<T>& m2) noexcept
+{
+    const T* __RESTRICT__ b1 = m1.getBuffer();
+    const T* __RESTRICT__ b2 = m2.getBuffer();
+    for(int i = 0; i < 9; ++i)
+    {
+        if(fabs(b1[i] - b2[i]) > HIGHEPS<T>)
+            return false;
+    }
+    return true;
+}
+
+// -----------------------------------------------------------------------------
 /** @brief Matrix check for rotation
     @param m the matrix
     @param tol tolerance for numerical checks */

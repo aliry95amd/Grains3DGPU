@@ -259,6 +259,7 @@ set(POTENTIAL_TEST_FILES
     geometry/test_matrix3.cpp
     geometry/test_quaternion.cpp
     geometry/test_transform3.cpp
+    geometry/test_transform.cpp
     collision/test_gjk.cpp
     collision/test_obb.cpp
     collision/test_collision_detection.cpp

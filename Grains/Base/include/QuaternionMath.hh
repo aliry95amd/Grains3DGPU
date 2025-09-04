@@ -393,13 +393,17 @@ __HOSTDEVICE__ static INLINE void operator*=(Quaternion<T>&       q1,
     @param q1 1st quaternion
     @param q2 2nd quaternion */
 template <typename T>
-__HOSTDEVICE__ bool operator==(const Quaternion<T>& q1,
-                               const Quaternion<T>& q2) noexcept
+__HOSTDEVICE__ static INLINE bool operator==(const Quaternion<T>& q1,
+                                             const Quaternion<T>& q2) noexcept
 {
     const T* __RESTRICT__ b1 = q1.getBuffer();
     const T* __RESTRICT__ b2 = q2.getBuffer();
-    return (b1[0] == b2[0] && b1[1] == b2[1] && b1[2] == b2[2]
-            && b1[3] == b2[3]);
+    for(int i = 0; i < 4; ++i)
+    {
+        if(fabs(b1[i] - b2[i]) > HIGHEPS<T>)
+            return false;
+    }
+    return true;
 }
 
 // -----------------------------------------------------------------------------
@@ -407,20 +411,25 @@ __HOSTDEVICE__ bool operator==(const Quaternion<T>& q1,
     @param q1 1st quaternion
     @param q2 2nd quaternion */
 template <typename T>
-__HOSTDEVICE__ bool operator!=(const Quaternion<T>& q1,
-                               const Quaternion<T>& q2) noexcept
+__HOSTDEVICE__ static INLINE bool operator!=(const Quaternion<T>& q1,
+                                             const Quaternion<T>& q2) noexcept
 {
     const T* __RESTRICT__ b1 = q1.getBuffer();
     const T* __RESTRICT__ b2 = q2.getBuffer();
-    return (b1[0] != b2[0] || b1[1] != b2[1] || b1[2] != b2[2]
-            || b1[3] != b2[3]);
+    for(int i = 0; i < 4; ++i)
+    {
+        if(fabs(b1[i] - b2[i]) > HIGHEPS<T>)
+            return true;
+    }
+    return false;
 }
 
 // -----------------------------------------------------------------------------
 /** @brief Quaternion sign flip
     @param q the quaternion */
 template <typename T>
-__HOSTDEVICE__ Quaternion<T> operator-(const Quaternion<T>& q) noexcept
+__HOSTDEVICE__ static INLINE Quaternion<T>
+                             operator-(const Quaternion<T>& q) noexcept
 {
     const T* __RESTRICT__ b = q.getBuffer();
     T __RESTRICT__        out[4];
