@@ -73,25 +73,17 @@ make -j
 
 ### Automatic Dependency Tracking
 
-The build system now includes automatic dependency tracking:
+The build system delegates to the Grains Makefile for dependency tracking and compilation:
 
-- **Source File Changes**: When Grains source files (`.cpp`) are modified, the system automatically detects this and rebuilds only the affected object files in the Grains library.
-- **Header File Changes**: When Grains header files (`.hh`) are modified, the system triggers appropriate rebuilds.
-- **Smart Rebuilding**: Only modified files are recompiled, not the entire library.
+- **Makefile Integration**: CMake calls `make` in the Grains directory to handle all source dependencies
+- **Automatic Rebuilds**: The Grains Makefile determines what needs recompilation based on file timestamps
+- **Minimal CMake**: CMake focuses only on test compilation and linking, leaving Grains compilation to its native Makefile
 
 ### Manual Control
 
-If you need manual control over the build process:
-
 ```bash
-# Manually rebuild just the Grains library
+# Manually rebuild Grains library
 make rebuild-grains
-
-# Force rebuild tests when Grains changes
-make update-tests
-
-# Check and rebuild Grains if sources changed
-make grains_dependency_check
 ```
 
 ### Specific Test Categories
