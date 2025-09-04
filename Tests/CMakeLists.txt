@@ -1,4 +1,7 @@
-# Testing CMakeLists.txt for GrainsGPU - Complete build from scratch with dependency tracking
+# Testing CMakeLists.txt for GrainsGPU - Optimized build using pre-compiled object files
+# This configuration uses existing object files from Grains/objGNU*** and include files 
+# from Grains/include to eliminate the need to recompile the entire Grains library.
+# Make sure to build the Grains library first using 'make' in the Grains directory.
 cmake_minimum_required(VERSION 3.18)
 
 # Set policies
@@ -8,7 +11,7 @@ cmake_policy(SET CMP0146 OLD)  # Suppress FindCUDA deprecation warning
 # Project declaration
 project(GrainsGPU_Tests 
     VERSION 1.0.0
-    DESCRIPTION "Test suite for GrainsGPU - builds everything from scratch"
+    DESCRIPTION "Test suite for GrainsGPU - optimized build using pre-compiled objects"
     LANGUAGES CXX CUDA)
 
 # Enable multithreaded compilation (like Makefile)
@@ -126,30 +129,17 @@ if(DEFINED ENV{GRAINS_GPU_LINKER_FLAGS})
     string(REPLACE ";" " " CUDA_LINKER_FLAGS_STRING "${SAFE_CUDA_LINKER_FLAGS}")
 endif()
 
-# Define all Grains source directories (following Makefile structure)
-set(GRAINS_SOURCE_DIRS
-    "${GRAINS_ROOT}/Base/src"
-    "${GRAINS_ROOT}/CollisionDetection/src"
-    "${GRAINS_ROOT}/Component/src"
-    "${GRAINS_ROOT}/Geometry/src"
-    "${GRAINS_ROOT}/PostProcessing/src"
-    "${GRAINS_ROOT}/TimeIntegration/src"
-    "${GRAINS_ROOT}/XML/src"
-)
+# Use consolidated include directory (following Makefile structure)
+set(GRAINS_INCLUDE_DIR "${GRAINS_ROOT}/include")
 
-# Define all Grains include directories (following Makefile structure)
-set(GRAINS_INCLUDE_DIRS
-    "${GRAINS_ROOT}/Base/include"
-    "${GRAINS_ROOT}/CollisionDetection/include"
-    "${GRAINS_ROOT}/Component/include"
-    "${GRAINS_ROOT}/Geometry/include"
-    "${GRAINS_ROOT}/PostProcessing/include"
-    "${GRAINS_ROOT}/TimeIntegration/include"
-    "${GRAINS_ROOT}/XML/include"
-)
+# Define object directory path from environment variables
+set(GRAINS_OBJ_DIR "${GRAINS_ROOT}/obj${GRAINS_FULL_EXT}")
+
+message(STATUS "Using Grains include directory: ${GRAINS_INCLUDE_DIR}")
+message(STATUS "Using Grains object directory: ${GRAINS_OBJ_DIR}")
 
 # Add include directories
-include_directories(${GRAINS_INCLUDE_DIRS})
+include_directories(${GRAINS_INCLUDE_DIR})
 
 # Add CUDA include directories from environment
 if(DEFINED ENV{GRAINS_GPU_COMPILER_INCDIR})
@@ -165,70 +155,84 @@ else()
     message(FATAL_ERROR "GRAINS_XERCES_INCDIR environment variable not set")
 endif()
 
-# Find all Grains source files (following Makefile pattern)
+# Check if object directory exists and contains object files
+if(NOT EXISTS "${GRAINS_OBJ_DIR}")
+    message(FATAL_ERROR "Grains object directory not found: ${GRAINS_OBJ_DIR}. Please build Grains first using 'make' in the Grains directory.")
+endif()
+
+# Find all existing object files
+file(GLOB GRAINS_OBJECT_FILES "${GRAINS_OBJ_DIR}/*.o")
+list(LENGTH GRAINS_OBJECT_FILES obj_count)
+
+if(obj_count EQUAL 0)
+    message(FATAL_ERROR "No object files found in ${GRAINS_OBJ_DIR}. Please build Grains first using 'make' in the Grains directory.")
+endif()
+
+message(STATUS "Found ${obj_count} existing Grains object files")
+
+# Find all Grains source files for dependency tracking (to detect when Grains needs rebuilding)
+set(GRAINS_SOURCE_DIRS
+    "${GRAINS_ROOT}/Base/src"
+    "${GRAINS_ROOT}/CollisionDetection/src"
+    "${GRAINS_ROOT}/Component/src"
+    "${GRAINS_ROOT}/Geometry/src"
+    "${GRAINS_ROOT}/PostProcessing/src"
+    "${GRAINS_ROOT}/TimeIntegration/src"
+    "${GRAINS_ROOT}/XML/src"
+)
+
 set(ALL_GRAINS_SOURCES)
 foreach(src_dir ${GRAINS_SOURCE_DIRS})
     file(GLOB sources "${src_dir}/*.cpp")
     if(sources)
         list(APPEND ALL_GRAINS_SOURCES ${sources})
-        list(LENGTH sources src_count)
-        get_filename_component(dir_name ${src_dir} NAME_WE)
-        message(STATUS "Found ${src_count} source files in ${dir_name}")
     endif()
 endforeach()
-
-list(LENGTH ALL_GRAINS_SOURCES total_sources)
-message(STATUS "Total Grains source files found: ${total_sources}")
-
-if(NOT ALL_GRAINS_SOURCES)
-    message(FATAL_ERROR "No Grains source files found! Please check that source files exist in: ${GRAINS_SOURCE_DIRS}")
-endif()
 
 # Find all Grains header files for dependency tracking
-set(ALL_GRAINS_HEADERS)
-foreach(inc_dir ${GRAINS_INCLUDE_DIRS})
-    file(GLOB headers "${inc_dir}/*.hh")
-    if(headers)
-        list(APPEND ALL_GRAINS_HEADERS ${headers})
-    endif()
-endforeach()
-
+file(GLOB ALL_GRAINS_HEADERS "${GRAINS_INCLUDE_DIR}/*.hh")
 list(LENGTH ALL_GRAINS_HEADERS total_headers)
 message(STATUS "Tracking ${total_headers} Grains header files for dependency changes")
 
-# Create Grains library from all sources
-add_library(grains_lib STATIC ${ALL_GRAINS_SOURCES})
+# Create Grains library from existing object files (OBJECT library for linking pre-compiled objects)
+add_library(grains_lib STATIC ${GRAINS_OBJECT_FILES})
 
-# Set properties for CUDA compilation
-set_target_properties(grains_lib PROPERTIES
-    CUDA_STANDARD ${CMAKE_CUDA_STANDARD}
-    CUDA_STANDARD_REQUIRED ON
-    POSITION_INDEPENDENT_CODE ON
-    CUDA_SEPARABLE_COMPILATION ON
-    CUDA_RESOLVE_DEVICE_SYMBOLS ON
+# Add dependency on source files to detect when Grains needs rebuilding
+add_custom_target(grains_sources_check
+    DEPENDS ${ALL_GRAINS_SOURCES}
+    COMMENT "Checking if Grains source files have changed"
 )
 
-# Apply CUDA compiler flags to Grains library using target_compile_options
-if(DEFINED CUDA_FLAGS_STRING)
-    # Convert string back to list for target_compile_options
-    string(REPLACE " " ";" CUDA_FLAGS_LIST "${CUDA_FLAGS_STRING}")
-    target_compile_options(grains_lib PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:${CUDA_FLAGS_LIST}>)
-    message(STATUS "Applied CUDA compiler flags to grains_lib: ${CUDA_FLAGS_LIST}")
-endif()
+# Custom command to check if Grains needs rebuilding and rebuild if necessary
+add_custom_command(
+    OUTPUT ${CMAKE_BINARY_DIR}/grains_build_check.stamp
+    DEPENDS ${ALL_GRAINS_SOURCES} ${ALL_GRAINS_HEADERS}
+    COMMAND ${CMAKE_COMMAND} -E echo "Checking if Grains library needs rebuilding..."
+    COMMAND ${CMAKE_COMMAND} -E chdir ${GRAINS_ROOT} make
+    COMMAND ${CMAKE_COMMAND} -E touch ${CMAKE_BINARY_DIR}/grains_build_check.stamp
+    COMMENT "Auto-rebuilding Grains library when source files change"
+    VERBATIM
+)
 
-# Add preprocessor definitions
+add_custom_target(grains_dependency_check
+    DEPENDS ${CMAKE_BINARY_DIR}/grains_build_check.stamp
+)
+
+# Set properties for the Grains library (object files are already compiled)
+set_target_properties(grains_lib PROPERTIES
+    POSITION_INDEPENDENT_CODE ON
+    LINKER_LANGUAGE CUDA
+)
+
+# Object files are already compiled with the correct flags, no need to reapply compile options
+# Just add preprocessor definitions if needed
 target_compile_definitions(grains_lib PRIVATE 
     CUDA_AVAILABLE=1 
     _XML
     __CUDACC__
 )
 
-# Set CUDA as the language for all source files with proper device code handling
-set_source_files_properties(${ALL_GRAINS_SOURCES} PROPERTIES 
-    LANGUAGE CUDA
-    CUDA_SEPARABLE_COMPILATION ON
-    CUDA_RESOLVE_DEVICE_SYMBOLS ON
-)
+# Object files are already compiled, no need to set source file properties
 
 # Create dependency tracking target for headers (like Makefile .d files)
 add_custom_target(grains_headers
@@ -236,8 +240,8 @@ add_custom_target(grains_headers
     COMMENT "Tracking Grains header dependencies"
 )
 
-# Make Grains library depend on headers
-add_dependencies(grains_lib grains_headers)
+# Make Grains library depend on dependency checks
+add_dependencies(grains_lib grains_headers grains_dependency_check)
 
 # Find GTest
 if(DEFINED ENV{GTEST_ROOT})
@@ -258,6 +262,7 @@ set(POTENTIAL_TEST_FILES
     geometry/test_vector3.cpp
     geometry/test_matrix3.cpp
     geometry/test_quaternion.cpp
+    geometry/RotationMathTest.cpp
     geometry/test_transform3.cpp
     geometry/test_transform.cpp
     collision/test_gjk.cpp
@@ -265,9 +270,6 @@ set(POTENTIAL_TEST_FILES
     collision/test_collision_detection.cpp
     component/test_rigid_body.cpp
     component/test_convex.cpp
-    integration/test_physics_integration.cpp
-    performance/test_benchmarks.cpp
-    cuda/test_cuda_kernels.cpp
 )
 
 foreach(test_file ${POTENTIAL_TEST_FILES})
@@ -384,8 +386,13 @@ set_tests_properties(grains_unit_tests PROPERTIES TIMEOUT ${TEST_TIMEOUT})
 # Custom targets for maintenance (like Makefile)
 add_custom_target(update-tests
     COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target grains_tests
-    DEPENDS grains_headers ${ALL_GRAINS_SOURCES} ${ALL_GRAINS_HEADERS}
-    COMMENT "Force rebuild tests when Grains sources or headers change"
+    DEPENDS grains_headers grains_dependency_check ${GRAINS_OBJECT_FILES} ${ALL_GRAINS_HEADERS}
+    COMMENT "Force rebuild tests when Grains objects or headers change"
+)
+
+add_custom_target(rebuild-grains
+    COMMAND ${CMAKE_COMMAND} -E chdir ${GRAINS_ROOT} make
+    COMMENT "Manually rebuild Grains library"
 )
 
 add_custom_target(clean-tests
@@ -395,8 +402,10 @@ add_custom_target(clean-tests
 
 # Custom targets information
 message(STATUS "Custom targets available:")
-message(STATUS "  - update-tests: Force rebuild tests when Grains sources change")
+message(STATUS "  - update-tests: Force rebuild tests when Grains objects change")
+message(STATUS "  - rebuild-grains: Manually rebuild Grains library")
 message(STATUS "  - clean-tests: Clean all test build artifacts") 
 message(STATUS "  - grains_headers: Dependency target for all Grains headers")
+message(STATUS "  - grains_dependency_check: Auto-rebuild Grains when sources change")
 
-message(STATUS "Test executable 'grains_tests' configured successfully with ${total_sources} Grains sources")
+message(STATUS "Test executable 'grains_tests' configured successfully using ${obj_count} pre-compiled Grains objects")

@@ -46,6 +46,13 @@ public:
     __HOSTDEVICE__
     Matrix3(T xx, T xy, T xz, T yx, T yy, T yz, T zx, T zy, T zz) noexcept;
 
+    /** @brief Constructor with 3 angles (in radians) as input parameters
+        @param roll rotation angle around the X axis
+        @param pitch rotation angle around the Y axis
+        @param yaw rotation angle around the Z axis */
+    __HOSTDEVICE__
+    Matrix3(T roll, T pitch, T yaw) noexcept;
+
     /** @brief Copy constructor
         @param mat the copied matrix */
     __HOSTDEVICE__

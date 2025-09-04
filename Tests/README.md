@@ -41,11 +41,57 @@ This document outlines the comprehensive testing strategy for GrainsGPU. Our tes
 
 ## Running Tests
 
-### Quick Start
+### Prerequisites
+**Important**: Before building tests, ensure the Grains library is compiled:
+```bash
+cd ../Grains
+make
+```
+
+This will generate the required object files in `Grains/objGNU-*/` that the test build system uses.
+
+### Quick Start (Optimized Build)
+The test system is optimized to use pre-compiled object files from the Grains library, eliminating the need to recompile everything:
+
 ```bash
 cd Tests
 chmod +x run_tests.sh
 ./run_tests.sh all
+```
+
+### Manual Build (Using CMake with Pre-compiled Objects)
+```bash
+cd Tests
+mkdir build && cd build
+source ../../Env/grainsGPU.env.sh
+cmake ..
+make -j
+./grains_tests
+```
+
+**Performance Note**: The optimized build system uses existing object files from `Grains/objGNU-*` and include files from `Grains/include`, which significantly reduces build time compared to compiling everything from scratch.
+
+### Automatic Dependency Tracking
+
+The build system now includes automatic dependency tracking:
+
+- **Source File Changes**: When Grains source files (`.cpp`) are modified, the system automatically detects this and rebuilds only the affected object files in the Grains library.
+- **Header File Changes**: When Grains header files (`.hh`) are modified, the system triggers appropriate rebuilds.
+- **Smart Rebuilding**: Only modified files are recompiled, not the entire library.
+
+### Manual Control
+
+If you need manual control over the build process:
+
+```bash
+# Manually rebuild just the Grains library
+make rebuild-grains
+
+# Force rebuild tests when Grains changes
+make update-tests
+
+# Check and rebuild Grains if sources changed
+make grains_dependency_check
 ```
 
 ### Specific Test Categories

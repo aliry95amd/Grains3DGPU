@@ -165,15 +165,7 @@ __HOSTDEVICE__ void Transform3<T>::setBasis(const Matrix3<T>& m)
 template <typename T>
 __HOSTDEVICE__ void Transform3<T>::setBasis(T aX, T aY, T aZ)
 {
-    m_basis = Matrix3<T>(cos(aZ) * cos(aY),
-                         cos(aZ) * sin(aY) * sin(aX) - sin(aZ) * cos(aX),
-                         cos(aZ) * sin(aY) * cos(aX) + sin(aZ) * sin(aX),
-                         sin(aZ) * cos(aY),
-                         sin(aZ) * sin(aY) * sin(aX) + cos(aZ) * cos(aX),
-                         sin(aZ) * sin(aY) * cos(aX) - cos(aZ) * sin(aX),
-                         -sin(aY),
-                         cos(aY) * sin(aX),
-                         cos(aY) * cos(aX));
+    m_basis = Matrix3<T>(aX, aY, aZ);
 }
 
 // -----------------------------------------------------------------------------

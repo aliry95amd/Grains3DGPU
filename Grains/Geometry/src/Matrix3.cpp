@@ -26,6 +26,33 @@ __HOSTDEVICE__ Matrix3<T>::Matrix3(
 }
 
 // -----------------------------------------------------------------------------
+// Constructor with 3 angles (in radians) as input parameters)
+template <typename T>
+__HOSTDEVICE__ Matrix3<T>::Matrix3(T roll, T pitch, T yaw) noexcept
+{
+    T cr = cos(roll);
+    T sr = sin(roll);
+    T cp = cos(pitch);
+    T sp = sin(pitch);
+    T cy = cos(yaw);
+    T sy = sin(yaw);
+
+    T xx = cy * cp;
+    T xy = cy * sp * sr - sy * cr;
+    T xz = cy * sp * cr + sy * sr;
+
+    T yx = sy * cp;
+    T yy = sy * sp * sr + cy * cr;
+    T yz = sy * sp * cr - cy * sr;
+
+    T zx = -sp;
+    T zy = cp * sr;
+    T zz = cp * cr;
+
+    setValue(xx, xy, xz, yx, yy, yz, zx, zy, zz);
+}
+
+// -----------------------------------------------------------------------------
 // Copy constructor
 template <typename T>
 __HOSTDEVICE__ Matrix3<T>::Matrix3(const Matrix3<T>& mat) noexcept
