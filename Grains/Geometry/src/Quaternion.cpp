@@ -238,7 +238,7 @@ __HOSTDEVICE__ void Quaternion<T>::setQuaternion(const Matrix3<T>& rot) noexcept
     if(b[YY] > -b[ZZ] && b[XX] > -b[YY] && b[XX] > -b[ZZ])
     {
         den = sqrt(T(1) + b[XX] + b[YY] + b[ZZ]);
-        GAssert(den > HIGHEPS<T>,
+        GAssert(den > EPS<T>,
                 "Numerical instability in Quaternion::setQuaternion - "
                 "denominator too small!");
         m_w      = T(0.5) * den;
@@ -250,7 +250,7 @@ __HOSTDEVICE__ void Quaternion<T>::setQuaternion(const Matrix3<T>& rot) noexcept
     else if(b[YY] < -b[ZZ] && b[XX] > b[YY] && b[XX] > b[ZZ])
     {
         den = sqrt(T(1) + b[XX] - b[YY] - b[ZZ]);
-        GAssert(den > HIGHEPS<T>,
+        GAssert(den > EPS<T>,
                 "Numerical instability in Quaternion::setQuaternion - "
                 "denominator too small!");
         m_w      = T(0.5) * (b[ZY] - b[YZ]) / den;
@@ -262,7 +262,7 @@ __HOSTDEVICE__ void Quaternion<T>::setQuaternion(const Matrix3<T>& rot) noexcept
     else if(b[YY] > b[ZZ] && b[XX] < b[YY] && b[XX] < -b[ZZ])
     {
         den = sqrt(T(1) - b[XX] + b[YY] - b[ZZ]);
-        GAssert(den > HIGHEPS<T>,
+        GAssert(den > EPS<T>,
                 "Numerical instability in Quaternion::setQuaternion - "
                 "denominator too small!");
         m_w      = T(0.5) * (b[XZ] - b[ZX]) / den;
@@ -274,7 +274,7 @@ __HOSTDEVICE__ void Quaternion<T>::setQuaternion(const Matrix3<T>& rot) noexcept
     else if(b[YY] < b[ZZ] && b[XX] < -b[YY] && b[XX] < b[ZZ])
     {
         den = sqrt(T(1) - b[XX] - b[YY] + b[ZZ]);
-        GAssert(den > HIGHEPS<T>,
+        GAssert(den > EPS<T>,
                 "Numerical instability in Quaternion::setQuaternion - "
                 "denominator too small!");
         m_w      = T(0.5) * (b[YX] - b[XY]) / den;
@@ -287,20 +287,12 @@ __HOSTDEVICE__ void Quaternion<T>::setQuaternion(const Matrix3<T>& rot) noexcept
 }
 
 // -----------------------------------------------------------------------------
-// Sets the quaternion from Euler angles (Z-Y-X intrinsic order)
+// Sets the quaternion from three angles in radians
 template <typename T>
 __HOSTDEVICE__ void Quaternion<T>::setQuaternion(T aX, T aY, T aZ) noexcept
 {
     // Build rotation matrix
-    Matrix3<T> mat(cos(aZ) * cos(aY),
-                   cos(aZ) * sin(aY) * sin(aX) - sin(aZ) * cos(aX),
-                   cos(aZ) * sin(aY) * cos(aX) + sin(aZ) * sin(aX),
-                   sin(aZ) * cos(aY),
-                   sin(aZ) * sin(aY) * sin(aX) + cos(aZ) * cos(aX),
-                   sin(aZ) * sin(aY) * cos(aX) - cos(aZ) * sin(aX),
-                   -sin(aY),
-                   cos(aY) * sin(aX),
-                   cos(aY) * cos(aX));
+    Matrix3<T> mat(aX, aY, aZ);
     setQuaternion(mat);
 }
 

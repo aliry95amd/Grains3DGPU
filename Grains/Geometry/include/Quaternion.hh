@@ -61,7 +61,8 @@ public:
     Quaternion(const T* buffer) noexcept;
 
     /** @brief Constructor from Euler angles (radians)
-    Builds a quaternion from intrinsic Z-Y-X rotations: R = Rz(aZ) * Ry(aY) * Rx(aX).
+    Builds a quaternion from intrinsic Z-Y-X rotations: 
+    R = Rz(aZ) * Ry(aY) * Rx(aX).
     @param aX rotation about X (roll)
     @param aY rotation about Y (pitch)
     @param aZ rotation about Z (yaw) */

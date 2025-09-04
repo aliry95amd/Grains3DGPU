@@ -40,7 +40,7 @@ __HOSTDEVICE__ static INLINE T norm2(const Vector3<T>& v) noexcept
     @param v the vector */
 template <typename T>
 __HOSTDEVICE__ static INLINE bool isApproxZero(const Vector3<T>& v,
-                                               T tol = HIGHEPS<T>) noexcept
+                                               T tol = EPS<T>) noexcept
 {
     const T* __RESTRICT__ buffer = v.getBuffer();
     return (fabs(buffer[0]) < tol && fabs(buffer[1]) < tol
@@ -244,7 +244,12 @@ __HOSTDEVICE__ static INLINE bool operator==(const Vector3<T>& v1,
 {
     const T* __RESTRICT__ b1 = v1.getBuffer();
     const T* __RESTRICT__ b2 = v2.getBuffer();
-    return (b1[0] == b2[0]) && (b1[1] == b2[1]) && (b1[2] == b2[2]);
+    for(int i = 0; i < 3; ++i)
+    {
+        if(fabs(b1[i] - b2[i]) > EPS<T>)
+            return false;
+    }
+    return true;
 }
 
 // -----------------------------------------------------------------------------
@@ -257,7 +262,12 @@ __HOSTDEVICE__ static INLINE bool operator!=(const Vector3<T>& v1,
 {
     const T* __RESTRICT__ b1 = v1.getBuffer();
     const T* __RESTRICT__ b2 = v2.getBuffer();
-    return (b1[0] != b2[0] || b1[1] != b2[1] || b1[2] != b2[2]);
+    for(int i = 0; i < 3; ++i)
+    {
+        if(fabs(b1[i] - b2[i]) > EPS<T>)
+            return true;
+    }
+    return false;
 }
 
 // -----------------------------------------------------------------------------

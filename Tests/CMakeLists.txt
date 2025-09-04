@@ -56,8 +56,8 @@ include_directories($ENV{GRAINS_XERCES_INCDIR})
 
 # Delegate to Grains Makefile for dependency tracking and compilation
 add_custom_target(grains_build
-    COMMAND ${CMAKE_COMMAND} -E chdir ${GRAINS_ROOT} make
-    COMMENT "Building Grains library using Makefile"
+    COMMAND ${CMAKE_COMMAND} -E chdir ${GRAINS_ROOT} make grains
+    COMMENT "Building Grains library using Makefile (target: grains)"
     VERBATIM
 )
 

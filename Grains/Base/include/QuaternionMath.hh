@@ -400,7 +400,7 @@ __HOSTDEVICE__ static INLINE bool operator==(const Quaternion<T>& q1,
     const T* __RESTRICT__ b2 = q2.getBuffer();
     for(int i = 0; i < 4; ++i)
     {
-        if(fabs(b1[i] - b2[i]) > HIGHEPS<T>)
+        if(fabs(b1[i] - b2[i]) > EPS<T>)
             return false;
     }
     return true;
@@ -418,7 +418,7 @@ __HOSTDEVICE__ static INLINE bool operator!=(const Quaternion<T>& q1,
     const T* __RESTRICT__ b2 = q2.getBuffer();
     for(int i = 0; i < 4; ++i)
     {
-        if(fabs(b1[i] - b2[i]) > HIGHEPS<T>)
+        if(fabs(b1[i] - b2[i]) > EPS<T>)
             return true;
     }
     return false;

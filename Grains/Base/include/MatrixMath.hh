@@ -116,7 +116,7 @@ __HOSTDEVICE__ static INLINE Matrix3<T> inverse(const Matrix3<T>& m) noexcept
 
     // Calculate determinant
     T det = b[XX] * out[XX] + b[XY] * out[YX] + b[XZ] * out[ZX];
-    if(fabs(det) < HIGHEPS<T>)
+    if(fabs(det) < EPS<T>)
         printf("Matrix is not inversible!\n");
 
     // Scale by inverse determinant
@@ -149,7 +149,7 @@ __HOSTDEVICE__ static INLINE void inverse(Matrix3<T>& m) noexcept
 
     // Calculate determinant
     T det = b[XX] * out[XX] + b[XY] * out[YX] + b[XZ] * out[ZX];
-    if(fabs(det) < HIGHEPS<T>)
+    if(fabs(det) < EPS<T>)
         printf("Matrix is not inversible!\n");
 
     // Scale by inverse determinant
@@ -417,10 +417,9 @@ __HOSTDEVICE__ static INLINE Matrix3<T> operator-(const Matrix3<T>& m) noexcept
 }
 
 // -----------------------------------------------------------------------------
-/** @brief Matrix comparison
+/** @brief Matrix equality comparison
     @param m1 first matrix
-    @param m2 second matrix
-    @param tol tolerance for numerical checks */
+    @param m2 second matrix */
 template <typename T>
 __HOSTDEVICE__ static INLINE bool operator==(const Matrix3<T>& m1,
                                              const Matrix3<T>& m2) noexcept
@@ -429,7 +428,25 @@ __HOSTDEVICE__ static INLINE bool operator==(const Matrix3<T>& m1,
     const T* __RESTRICT__ b2 = m2.getBuffer();
     for(int i = 0; i < 9; ++i)
     {
-        if(fabs(b1[i] - b2[i]) > HIGHEPS<T>)
+        if(fabs(b1[i] - b2[i]) > EPS<T>)
+            return false;
+    }
+    return true;
+}
+
+// -----------------------------------------------------------------------------
+/** @brief Matrix inequality operator
+    @param m1 first matrix
+    @param m2 second matrix */
+template <typename T>
+__HOSTDEVICE__ static INLINE bool operator!=(const Matrix3<T>& m1,
+                                             const Matrix3<T>& m2) noexcept
+{
+    const T* __RESTRICT__ b1 = m1.getBuffer();
+    const T* __RESTRICT__ b2 = m2.getBuffer();
+    for(int i = 0; i < 9; ++i)
+    {
+        if(fabs(b1[i] - b2[i]) > EPS<T>)
             return false;
     }
     return true;
