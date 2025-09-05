@@ -325,11 +325,11 @@ __HOSTDEVICE__ void closestPointsRigidBodies(const RigidBody<T>&  rbA,
                                                                nbIterGJK);
 
     // If bodies are too close
-    while(distance < EPS<T>)
+    while(fabs(distance) < HIGHEPS<T>)
     {
-        Gout("Warning: GJK too close bodies, increasing crust thicknesses.");
-        crustA *= 2;
-        crustB *= 2;
+        Gout("Warning: GJK too close bodies, increasing crust thicknesses ...");
+        crustA *= 10;
+        crustB *= 10;
         distance
             = computeClosestPoints_GJK<T, GJKType::JOHNSON, false>(convexA,
                                                                    convexB,
@@ -402,11 +402,11 @@ __HOSTDEVICE__ void closestPointsRigidBodies(const RigidBody<T>&  rbA,
                                                                nbIterGJK);
 
     // If bodies are too close
-    while(distance < EPS<T>)
+    while(fabs(distance) < HIGHEPS<T>)
     {
-        Gout("Warning: GJK too close bodies, increasing crust thicknesses.");
-        crustA *= 2;
-        crustB *= 2;
+        Gout("Warning: GJK too close bodies, increasing crust thicknesses ...");
+        crustA *= 10;
+        crustB *= 10;
         distance
             = computeClosestPoints_GJK<T, GJKType::JOHNSON, false>(convexA,
                                                                    convexB,
@@ -476,11 +476,11 @@ __HOSTDEVICE__ void closestPointsRigidBodies(const RigidBody<T>&  rbA,
                                                                nbIterGJK);
 
     // If bodies are too close
-    while(distance < EPS<T>)
+    while(fabs(distance) < HIGHEPS<T>)
     {
-        Gout("Warning: GJK too close bodies, increasing crust thicknesses.");
-        crustA *= 2;
-        crustB *= 2;
+        Gout("Warning: GJK too close bodies, increasing crust thicknesses ...");
+        crustA *= 10;
+        crustB *= 10;
         distance
             = computeClosestPoints_GJK<T, GJKType::JOHNSON, false>(convexA,
                                                                    convexB,
@@ -560,11 +560,11 @@ __HOSTDEVICE__ void closestPointsRigidBodies(const RigidBody<T>&  rbA,
                                                                nbIterGJK);
 
     // If bodies are too close
-    while(distance < EPS<T>)
+    while(fabs(distance) < HIGHEPS<T>)
     {
-        Gout("Warning: GJK too close bodies, increasing crust thicknesses.");
-        crustA *= 2;
-        crustB *= 2;
+        Gout("Warning: GJK too close bodies, increasing crust thicknesses ...");
+        crustA *= 10;
+        crustB *= 10;
         distance
             = computeClosestPoints_GJK<T, GJKType::JOHNSON, false>(convexA,
                                                                    convexB,

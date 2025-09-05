@@ -106,7 +106,7 @@ public:
     void setBasis(const Matrix3<T>& m);
 
     /** @brief Sets the matrix part of the transformation with specified
-        rotations around each principal axis
+        rotations around each principal axis (radians)
         @param aX rotation around the x-axis
         @param aY rotation around the y-axis
         @param aZ rotation around the z-axis */

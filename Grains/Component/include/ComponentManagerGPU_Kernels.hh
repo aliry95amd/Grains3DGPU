@@ -141,22 +141,23 @@ __GLOBAL__ void
 // -----------------------------------------------------------------------------
 /** @brief Transforms contact info to world and flags actives. */
 template <typename T>
-__GLOBAL__ void
-    transformContactInfo_Kernel(const uint2*          pairList,
-                                const ContactInfo<T>* contactInfoLocal,
-                                const Vector3<T>*     position,
-                                const Quaternion<T>*  quaternion,
-                                ContactInfo<T>*       contactInfoWorld,
-                                uint*                 activePairs,
-                                const uint            nPairs)
+__GLOBAL__ void transformContactInfo_Kernel(const uint2*         pairList,
+                                            const Vector3<T>*    position,
+                                            const Quaternion<T>* quaternion,
+                                            ContactInfo<T>* contactInfoLocal,
+                                            ContactInfo<T>* contactInfoWorld,
+                                            uint*           activePairs,
+                                            const uint      nPairs)
 {
     uint tID = blockIdx.x * blockDim.x + threadIdx.x;
+
     if(tID >= nPairs)
         return;
+
     transformContactInfo_common(pairList,
-                                contactInfoLocal,
                                 position,
                                 quaternion,
+                                contactInfoLocal,
                                 contactInfoWorld,
                                 activePairs,
                                 tID);

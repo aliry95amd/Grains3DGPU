@@ -99,9 +99,9 @@ void ComponentManagerCPU<T>::transformContactInfoToWorld()
     for(uint i = 0; i < nPairs; ++i)
     {
         transformContactInfo_common(m_neighborList->getData(),
-                                    m_contactInfo.getData(),
                                     m_position.getData(),
                                     m_quaternion.getData(),
+                                    m_contactInfo.getData(),
                                     m_contactInfoWorld.getData(),
                                     m_activePairs.getData(),
                                     i);

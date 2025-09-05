@@ -81,24 +81,24 @@ __HOSTDEVICE__ static INLINE void
 // -----------------------------------------------------------------------------
 /** @brief Flags active contacts and transforms CI from A-local to world.
     @param pairList list of contact pairs
-    @param contactInfoLocal CI computed in A-local frame (input)
     @param position world positions of components
     @param quaternion world orientations of components
+    @param contactInfoLocal CI computed in A-local frame (input)
     @param contactInfoWorld CI written in world frame (output, only for actives)
     @param active flag buffer (1 if active/contact, else 0)
     @param pairID ID of the pair */
 template <typename T>
 __HOSTDEVICE__ static INLINE void
-    transformContactInfo_common(const uint2*          pairList,
-                                const ContactInfo<T>* contactInfoLocal,
-                                const Vector3<T>*     position,
-                                const Quaternion<T>*  quaternion,
-                                ContactInfo<T>*       contactInfoWorld,
-                                uint*                 active,
-                                const uint            pairID)
+    transformContactInfo_common(const uint2*         pairList,
+                                const Vector3<T>*    position,
+                                const Quaternion<T>* quaternion,
+                                ContactInfo<T>*      contactInfoLocal,
+                                ContactInfo<T>*      contactInfoWorld,
+                                uint*                active,
+                                const uint           pairID)
 {
-    const ContactInfo<T>& ciL = contactInfoLocal[pairID];
-    active[pairID]            = (ciL.getOverlapDistance() < T(0)) ? 1 : 0;
+    ContactInfo<T>& ciL = contactInfoLocal[pairID];
+    active[pairID]      = (ciL.getOverlapDistance() < T(0)) ? 1 : 0;
 
     // Transform point and vector from A-local to world using A's pose
     const uint           idA = pairList[pairID].x;
@@ -107,6 +107,9 @@ __HOSTDEVICE__ static INLINE void
     ciW.setContactPoint((qA >> ciL.getContactPoint()) + position[idA]);
     ciW.setContactVector((qA >> ciL.getContactVector()));
     ciW.setOverlapDistance(ciL.getOverlapDistance());
+
+    // reset the distance so we don't compute the torce twice
+    ciL.setOverlapDistance(T(0));
 }
 
 // -----------------------------------------------------------------------------

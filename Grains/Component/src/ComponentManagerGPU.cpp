@@ -121,9 +121,9 @@ void ComponentManagerGPU<T>::transformContactInfoToWorld()
                                    numThreads);
     transformContactInfo_Kernel<<<numBlocks, numThreads>>>(
         m_neighborList->getData(),
-        m_contactInfo.getData(),
         m_position.getData(),
         m_quaternion.getData(),
+        m_contactInfo.getData(),
         m_contactInfoWorld.getData(),
         m_activePairs.getData(),
         nPairs);
