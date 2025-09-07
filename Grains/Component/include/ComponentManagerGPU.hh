@@ -66,12 +66,6 @@ public:
 
     /** @name Manager methods */
     //@{
-    /** @brief Allocates memory for the component manager */
-    void allocate();
-
-    /** @brief Initializes data members to default values */
-    void initialize();
-
     /** @brief Resizes pair-dependent buffers based on current neighbor list size */
     void resizePairBuffers();
     //@}

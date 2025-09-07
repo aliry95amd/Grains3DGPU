@@ -16,28 +16,18 @@ ComponentManagerGPU<T>::ComponentManagerGPU(
     uint                                             nParticles)
     : ComponentManager<T, MemType::DEVICE>(rigidBody, nObstacles, nParticles)
 {
-    allocate();
-    initialize();
+    uint maxPairs
+        = m_nObstacles * m_nParticles + m_nParticles * (m_nParticles - 1) / 2;
+    m_prefixScan.allocate(maxPairs);
+    m_prefixScan.fill();
+    m_activeIndex.allocate(maxPairs);
+    m_activeIndex.fill();
 }
 
 // -----------------------------------------------------------------------------
 // Destructor
 template <typename T>
 ComponentManagerGPU<T>::~ComponentManagerGPU() = default;
-
-// -----------------------------------------------------------------------------
-// Allocates memory for the component manager
-template <typename T>
-void ComponentManagerGPU<T>::allocate()
-{
-}
-
-// -------------------------------------------------------------------------
-// Initializes data members to default values
-template <typename T>
-void ComponentManagerGPU<T>::initialize()
-{
-}
 
 // -----------------------------------------------------------------------------
 // Resizes pair-dependent buffers based on current neighbor list size

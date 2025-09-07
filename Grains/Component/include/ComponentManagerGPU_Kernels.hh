@@ -33,14 +33,13 @@
 // =============================================================================
 /** @name ComponentManagerGPU_Kernels : External methods */
 //@{
-// -----------------------------------------------------------------------------
 /** @brief Build a compact list of active pair indices using exclusive scan + 
     scatter.
     @param flagsDev is a device array of uint flags (0/1) of length nPairs.
     @param prefixDev is a device array of length nPairs to store scan results.
     @param activeIdxDev is a device array with capacity >= nPairs to receive 
     indices. */
-inline uint buildCompactActiveIndex(const uint* flagsDev,
+INLINE uint buildCompactActiveIndex(const uint* flagsDev,
                                     const uint  nPairs,
                                     uint*       prefixDev,
                                     uint*       activeIdxDev)
