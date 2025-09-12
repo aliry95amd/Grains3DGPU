@@ -1,10 +1,12 @@
 #ifndef _LINKEDCELL_SORTBASED_HH_
 #define _LINKEDCELL_SORTBASED_HH_
 
+#include "thrust/device_ptr.h"
+#include "thrust/sort.h"
+
 #include "GrainsMemBuffer.hh"
 #include "LinkedCell.hh"
 #include "LinkedCell_Kernels.hh"
-#include "Misc_Kernels.hh"
 
 // =============================================================================
 /** @brief The class LinkedCell_SortBased.

@@ -5,7 +5,6 @@
 
 #include "GrainsParameters.hh"
 #include "GrainsUtils.hh"
-#include "Misc_Kernels.hh"
 
 enum class MemType
 {
@@ -24,6 +23,38 @@ enum class MemType
     and data transfer between these spaces.
 
     @author A.Yazdani - 2025 - Construction */
+// =============================================================================
+/** @name GrainsMemBuffer: External Methods */
+//@{
+/** @brief Fills a buffer to default 
+    @param buffer the buffer to be initialized
+    @param size size of the buffer
+    @param value the default value to be set (default is T()) */
+template <typename T>
+__GLOBAL__ void fill_Kernel(T* buffer, const size_t size, const T& value = T())
+{
+    size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if(idx >= size)
+        return;
+    buffer[idx] = value;
+}
+
+// -----------------------------------------------------------------------------
+/** @brief fills a buffer to incremental unsigned i
+    @param cells pointer to the Cells object
+    @param transforms buffer of transformations
+    @param size size of the buffer
+    @param particleHash output buffer for particle hashes */
+template <typename T>
+__GLOBAL__ void sequence_Kernel(T* buffer, const size_t size)
+{
+    size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if(idx >= size)
+        return;
+    buffer[idx] = static_cast<T>(idx);
+}
+//@}
+
 // =============================================================================
 template <typename T, MemType M = MemType::HOST>
 class GrainsMemBuffer
@@ -558,7 +589,7 @@ public:
 
     // -------------------------------------------------------------------------
     /** @brief Fills the buffer incrementally with values starting from 0 */
-    void fillIncremental()
+    void sequence()
     {
         if constexpr(M == MemType::HOST || M == MemType::PINNED)
         {
@@ -569,8 +600,7 @@ public:
         {
             static_assert(std::is_fundamental<T>::value,
                           "T must be a primitive type for device init");
-            fillIncremental_Kernel<<<(m_size + 255) / 256, 256>>>(m_ptr,
-                                                                  m_size);
+            sequence_Kernel<<<(m_size + 255) / 256, 256>>>(m_ptr, m_size);
             cudaDeviceSynchronize();
         }
     }

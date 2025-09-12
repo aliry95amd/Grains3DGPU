@@ -2,10 +2,6 @@
 #define _LINKEDCELL_HH_
 
 #include "thrust/device_ptr.h"
-#include "thrust/for_each.h"
-#include "thrust/sort.h"
-#include <thrust/device_vector.h>
-#include <thrust/functional.h>
 #include <thrust/iterator/zip_iterator.h>
 #include <thrust/transform_reduce.h>
 #include <thrust/tuple.h>
@@ -14,6 +10,7 @@
 #include "CellsFactory.hh"
 #include "GrainsMemBuffer.hh"
 #include "GrainsUtils.hh"
+#include "LinkedCell_Kernels.hh"
 #include "VectorMath.hh"
 
 // =============================================================================
@@ -114,7 +111,7 @@ public:
         }
         // m_particleID is initialized to 0, 1, 2, 3, ...
         m_particleID.reserve(nParticles);
-        m_particleID.fillIncremental();
+        m_particleID.sequence();
         // Neighbor cells are initialized to UINT_MAX
         m_neighborCells.reserve(m_numCells * 27); // 26 neighbors + self
         m_neighborCells.fill(UINT_MAX);
@@ -371,61 +368,5 @@ public:
         = 0;
     //@}
 };
-
-// =============================================================================
-/** @name LinkedCell: External kernels */
-//@{
-/** @brief Resizes the cells
-    @param cells pointer to the Cells object
-    @param cellSize new size of the cell
-    @param numCells number of cells */
-template <typename T>
-__GLOBAL__ void
-    resizeCells_Device(Cells<T>** cells, const T cellSize, uint* numCells)
-{
-    uint tID = blockIdx.x * blockDim.x + threadIdx.x;
-    if(tID > 0)
-        return;
-    cells[0]->resize(cellSize);
-    *numCells = cells[0]->getNumCells();
-}
-
-// -----------------------------------------------------------------------------
-/** @brief Gets the neighbor cells array
-    @param cells pointer to the Cells object
-    @param numCells number of cells
-    @param tr transformations */
-template <typename T>
-__GLOBAL__ void generateNeighborCells_Device(const Cells<T>* const* cells,
-                                             const uint             numCells,
-                                             uint* neighborCells)
-{
-    uint tID = blockIdx.x * blockDim.x + threadIdx.x;
-    if(tID >= numCells)
-        return;
-    // Generate neighbor cells for the cell with index tID
-    // Each thread is responsible for one cell
-    cells[0]->generateNeighborCells(neighborCells, tID, tID + 1);
-}
-
-// -----------------------------------------------------------------------------
-/** @brief Computes the cell hash for a given point
-    @param cells pointer to the Cells object
-    @param positions buffer of positions
-    @param numParticles number of particles
-    @param particleHash particle hash */
-template <typename T>
-__GLOBAL__ void computeHash_Device(const Cells<T>* const* cells,
-                                   const Vector3<T>*      positions,
-                                   uint                   numParticles,
-                                   uint*                  particleHash)
-{
-    // TODO: Load cells to shared memory if needed
-    uint tID = blockIdx.x * blockDim.x + threadIdx.x;
-    if(tID >= numParticles)
-        return;
-
-    particleHash[tID] = cells[0]->computeCellHash(positions[tID]);
-}
 
 #endif
