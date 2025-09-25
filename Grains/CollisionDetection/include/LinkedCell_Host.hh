@@ -27,22 +27,25 @@ template <typename T>
 class LinkedCell_Host : public LinkedCell<T, MemType::HOST>
 {
     using LC = LinkedCell<T, MemType::HOST>;
+    using LC::m_cellID;
     using LC::m_cells;
+    using LC::m_componentID;
     using LC::m_neighborCells;
     using LC::m_numCells;
-    using LC::m_particleHash;
-    using LC::m_particleID;
+    using LC::m_numObstacles;
+    using LC::m_numParticles;
+    using LC::m_obstaclesBufferSize;
 
 private:
     /** @name Host-specific storage */
     //@{
-    /** \brief Vector of lists, one list per cell containing particle IDs */
-    std::vector<std::list<uint>> m_cellParticles;
-    /** \brief Map to store iterators to particle positions in cell lists for
+    /** \brief Vector of lists, one list per cell containing component IDs */
+    std::vector<std::list<uint>> m_cellComponents;
+    /** \brief Map to store iterators to component positions in cell lists for
         O(1) removal */
-    std::unordered_map<uint, std::list<uint>::iterator> m_particleIteratorMap;
-    /** \brief Temporary buffer to store old particle hashes during updates */
-    GrainsMemBuffer<uint, MemType::HOST> m_oldParticleHashes;
+    std::unordered_map<uint, std::list<uint>::iterator> m_componentIteratorMap;
+    /** \brief Temporary buffer to store old component hashes during updates */
+    GrainsMemBuffer<uint, MemType::HOST> m_oldCellID;
     //@}
 
 public:
@@ -50,27 +53,40 @@ public:
     //@{
     // -------------------------------------------------------------------------
     /** @brief Constructor with parameters
+        @param rb Rigid body buffer
+        @param positions Positions buffer
+        @param quaternions Quaternions buffer
         @param minCorner minimum corner of the domain
         @param maxCorner maximum corner of the domain
-        @param cellSize size of the cell
-        @param nParticles number of particles */
-    LinkedCell_Host(const Vector3<T>& minCorner,
-                    const Vector3<T>& maxCorner,
-                    const T           cellSize,
-                    const uint        nParticles)
-        : LinkedCell<T, MemType::HOST>(
-              minCorner, maxCorner, cellSize, nParticles)
+        @param cellSizeFactor factor to multiply the minimum cell size
+        @param nObstacles number of obstacles
+        @param nParticles number of particles
+        @param nCellsForEachObstacle number of cells for each obstacle */
+    LinkedCell_Host(
+        const GrainsMemBuffer<RigidBody<T>*, MemType::HOST>* rb,
+        const GrainsMemBuffer<Vector3<T>, MemType::HOST>&    positions,
+        const GrainsMemBuffer<Quaternion<T>, MemType::HOST>& quaternions,
+        const Vector3<T>&                                    minCorner,
+        const Vector3<T>&                                    maxCorner,
+        const T                                              cellSizeFactor,
+        const uint                                           nObstacles,
+        const uint                                           nParticles)
+        : LinkedCell<T, MemType::HOST>(rb,
+                                       positions,
+                                       quaternions,
+                                       minCorner,
+                                       maxCorner,
+                                       cellSizeFactor,
+                                       nObstacles,
+                                       nParticles)
     {
         // Initialize vector of lists for each cell
-        m_cellParticles.resize(m_numCells);
+        m_cellComponents.resize(m_numCells);
         // Reserve space in iterator map for efficiency
-        m_particleIteratorMap.reserve(nParticles);
-        // Initialize old particle hashes buffer
-        m_oldParticleHashes.reserve(nParticles);
-        // Initialize old particle hashes to UINT_MAX, maybe faster than fill
-        std::fill(m_oldParticleHashes.getData(),
-                  m_oldParticleHashes.getData() + nParticles,
-                  UINT_MAX);
+        m_componentIteratorMap.reserve(nParticles);
+        // Initialize old cell IDs buffer
+        m_oldCellID.reserve(m_cellID.getSize());
+        m_oldCellID.fill(UINT_MAX);
     }
 
     // -------------------------------------------------------------------------
@@ -81,98 +97,100 @@ public:
     /** @name Get methods */
     //@{
     // -------------------------------------------------------------------------
-    /** @brief Gets all cell particle lists */
-    const std::vector<std::list<uint>>& getCellParticles() const
+    /** @brief Gets all cell component lists */
+    const std::vector<std::list<uint>>& getCellComponents() const
     {
-        return m_cellParticles;
+        return m_cellComponents;
     }
 
     // -------------------------------------------------------------------------
-    /** @brief Gets particles in a specific cell
-        @param cellID the cell ID */
-    const std::list<uint>& getParticlesInCell(uint cellID) const
+    /** @brief Gets all cell particle lists (for neighbor list computation) */
+    const std::vector<std::list<uint>>& getCellParticles() const
     {
-        return m_cellParticles[cellID];
+        return m_cellComponents;
+    }
+
+    // -------------------------------------------------------------------------
+    /** @brief Gets components in a specific cell
+        @param cellID the cell ID */
+    const std::list<uint>& getComponentsInCell(uint cellID) const
+    {
+        return m_cellComponents[cellID];
     }
 
     /** @name Methods */
     //@{
     // -------------------------------------------------------------------------
-    /** @brief Adds a particle to a specific cell
-        @param particleID the particle ID
+    /** @brief Adds a component to a specific cell
+        @param componentID the component ID
         @param cellID the cell ID */
-    void addParticleToCell(uint particleID, uint cellID)
+    void addComponentToCell(uint componentID, uint cellID)
     {
-        // Add particle to the cell's list
-        m_cellParticles[cellID].push_front(particleID);
+        if(cellID == UINT_MAX)
+            return;
+
+        // Add component to the cell's list
+        m_cellComponents[cellID].push_front(componentID);
 
         // Store the iterator for O(1) removal later
-        m_particleIteratorMap[particleID] = m_cellParticles[cellID].begin();
-
-        // Update particle hash in base class array directly
-        m_particleHash[particleID] = cellID;
+        m_componentIteratorMap[componentID] = m_cellComponents[cellID].begin();
     }
 
     // -------------------------------------------------------------------------
-    /** @brief Removes a particle from its current cell
-        @param particleID the particle ID */
-    void removeParticleFromCurrentCell(uint particleID)
+    /** @brief Removes a component from its current cell
+        @param componentID the component ID
+        @param cellID the cell ID */
+    void removeComponentFromCurrentCell(uint componentID, uint cellID)
     {
-        auto iterIt = m_particleIteratorMap.find(particleID);
+        if(cellID == UINT_MAX)
+            return;
 
-        if(iterIt != m_particleIteratorMap.end())
+        auto iterIt = m_componentIteratorMap.find(componentID);
+
+        if(iterIt != m_componentIteratorMap.end())
         {
-            // Get current cell from base class array directly
-            uint cellID = m_particleHash[particleID];
-
             // Remove from the cell's list using the stored iterator
-            m_cellParticles[cellID].erase(iterIt->second);
+            m_cellComponents[cellID].erase(iterIt->second);
 
             // Clean up iterator map
-            m_particleIteratorMap.erase(iterIt);
-
-            // Mark particle as not assigned to any cell
-            m_particleHash.getData()[particleID] = UINT_MAX;
+            m_componentIteratorMap.erase(iterIt);
         }
     }
 
     // -------------------------------------------------------------------------
-    /** @brief Moves a particle from one cell to another
-        @param particleID the particle ID
+    /** @brief Moves a component from one cell to another
+        @param componentID the component ID
+        @param oldCellID the old cell ID
         @param newCellID the new cell ID */
-    void moveParticleToCell(uint particleID, uint newCellID)
+    void moveComponentToCell(uint componentID, uint oldCellID, uint newCellID)
     {
-        removeParticleFromCurrentCell(particleID);
-        addParticleToCell(particleID, newCellID);
+        removeComponentFromCurrentCell(componentID, oldCellID);
+        addComponentToCell(componentID, newCellID);
     }
 
     // -------------------------------------------------------------------------
-    /** @brief Updates the linked cells based on particle transformations
-        @param positions buffer of positions */
-    bool updateLinkedCells(
-        GrainsMemBuffer<Vector3<T>, MemType::HOST>& positions) override
+    /** @brief Updates the linked cells based on component transformations */
+    bool updateLinkedCells() override
     {
-        uint numParticles = positions.getSize();
+        // Store old cell IDs before updating
+        std::memcpy(m_oldCellID.getData(),
+                    m_cellID.getData(),
+                    m_cellID.getBytes());
 
-        // Store old particle hashes before updating
-        std::memcpy(m_oldParticleHashes.getData(),
-                    m_particleHash.getData(),
-                    numParticles * sizeof(uint));
+        // Update component hashes with new positions
+        bool isUpdated = this->updateCellFixed();
 
-        // Update particle hashes with new positions
-        this->updateParticlesHash(positions);
-
-        // Process each particle
-        for(uint i = 0; i < numParticles; ++i)
+        // Process components
+        for(uint i = 0; i < m_obstaclesBufferSize + m_numParticles; ++i)
         {
-            uint newCellID = m_particleHash[i];
-            uint oldCellID = m_oldParticleHashes[i];
-            // Particle has moved to a different cell
+            uint comp      = m_componentID[i];
+            uint newCellID = m_cellID[comp];
+            uint oldCellID = m_oldCellID[comp];
             if(oldCellID != newCellID)
-                moveParticleToCell(i, newCellID);
+                moveComponentToCell(comp, oldCellID, newCellID);
         }
 
-        return true;
+        return isUpdated;
     }
 
     // -------------------------------------------------------------------------
@@ -190,7 +208,7 @@ public:
         const uint      cellID             = cells->computeCellHash(candidate);
 
         // Same-cell particles
-        const auto& currentCellParticles = m_cellParticles[cellID];
+        const auto& currentCellParticles = m_cellComponents[cellID];
         for(const uint p : currentCellParticles)
             if(p < maxIndex)
                 out.push_back(p);
@@ -203,7 +221,7 @@ public:
             const uint c = neighborCells[n];
             if(c == UINT_MAX || c == cellID)
                 continue;
-            const auto& neighborCellParticles = m_cellParticles[c];
+            const auto& neighborCellParticles = m_cellComponents[c];
             for(const uint p : neighborCellParticles)
                 if(p < maxIndex)
                     out.push_back(p);

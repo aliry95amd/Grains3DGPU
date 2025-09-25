@@ -136,7 +136,11 @@ public:
     GrainsMemBuffer& operator=(GrainsMemBuffer<T, M>&& other) noexcept
     {
         if(this != &other)
+        {
+            // Free existing storage before taking ownership to avoid leaks
+            free();
             moveFrom(other);
+        }
         return (*this);
     }
     //@}
@@ -294,17 +298,31 @@ public:
         if(new_capacity <= m_capacity)
             return;
 
-        m_capacity = new_capacity;
+        // Allocate a new buffer with the requested capacity
         GrainsMemBuffer<T, M> new_buf;
-        new_buf.allocate(new_capacity);
+        new_buf.allocate(new_capacity); // sets size = capacity = new_capacity
 
-        cudaMemcpyKind kind = getMemcpyKind<M, M>();
+        // Copy existing data (only logical size worth of bytes)
+        if(m_ptr && m_size)
+        {
+            if constexpr(M == MemType::HOST || M == MemType::PINNED)
+            {
+                std::memcpy(new_buf.getData(), m_ptr, m_size * sizeof(T));
+            }
+            else if constexpr(M == MemType::DEVICE || M == MemType::MANAGED)
+            {
+                // Device-to-device copy for device/managed memory
+                cudaErrCheck(cudaMemcpy(new_buf.getData(),
+                                        m_ptr,
+                                        m_size * sizeof(T),
+                                        cudaMemcpyDeviceToDevice));
+            }
+        }
 
-        cudaErrCheck(cudaMemcpy(new_buf.getDeviceData(),
-                                getDeviceData(),
-                                m_size * sizeof(T),
-                                kind));
+        // Preserve logical size; capacity is already new_capacity
+        new_buf.m_size = m_size;
 
+        // Replace current storage; move assignment frees old storage now
         *this = std::move(new_buf);
     }
 
@@ -513,6 +531,21 @@ public:
             T*             dst_ptr = m_ptr;
             cudaErrCheck(cudaMemcpy(dst_ptr, src_ptr, src.getBytes(), kind));
         }
+    }
+
+    // -------------------------------------------------------------------------
+    /** @brief at method to access elements with bounds checking
+        @param index index of the element to access */
+    const T& at(size_t index) const
+    {
+        static_assert(M == MemType::HOST || M == MemType::PINNED,
+                      "at() only available for HOST or PINNED memory");
+        GAssert(index < m_size,
+                "Index",
+                index,
+                "out of bounds for size",
+                m_size);
+        return m_ptr[index];
     }
 
     // -------------------------------------------------------------------------

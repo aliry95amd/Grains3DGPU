@@ -25,8 +25,6 @@ template <typename T>
 uint GrainsParameters<T>::m_numParticles = 0;
 template <typename T>
 uint GrainsParameters<T>::m_numObstacles = 0;
-template <typename T>
-T GrainsParameters<T>::m_maxRadius = T(0);
 
 /* Physical */
 template <typename T>

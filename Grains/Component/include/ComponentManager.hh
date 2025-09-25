@@ -99,7 +99,12 @@ public:
     {
         GAssert(m_rigidBody->getSize() == m_nParticles + m_nObstacles,
                 "Rigid body size mismatch");
-        NeighborListFactory<T, M>::create(m_neighborList);
+        NeighborListFactory<T, M>::create(m_rigidBody,
+                                          m_position,
+                                          m_quaternion,
+                                          nObstacles,
+                                          nParticles,
+                                          m_neighborList);
 
         // Initialize with maximum possible pairs for dynamic sizing
         // TODO: Make this dynamic
@@ -461,13 +466,15 @@ public:
             "host first, and copy to device. Aborting Grains!");
 
         // Build a temporary linked-cell structure for strict insertion checks
-        using GP         = GrainsParameters<T>;
-        const T cellSize = T(2) * GP::m_maxRadius * GP::m_linkedCellSizeFactor;
-        LinkedCell_Host<T> lc(GP::m_origin,
+        using GP = GrainsParameters<T>;
+        LinkedCell_Host<T> lc(m_rigidBody,
+                              m_position,
+                              m_quaternion,
+                              GP::m_origin,
                               GP::m_maxCoordinate,
-                              cellSize,
-                              m_nObstacles + m_nParticles);
-        lc.generateNeighborCells();
+                              GP::m_linkedCellSizeFactor,
+                              m_nObstacles,
+                              m_nParticles);
 
         // Exact overlap test using GJK; candidates restricted by LC neighborhood
         constexpr uint maxAttempts = 10000;
@@ -476,29 +483,7 @@ public:
                              const Quaternion<T>& insertQuaternion) {
             const Convex<T>& convexNew = *(*m_rigidBody)[insertID]->getConvex();
 
-            // 1) Check against all obstacles first
-            for(uint j = 0; j < m_nObstacles; ++j)
-            {
-                const Convex<T>& convexJ = *(*m_rigidBody)[j]->getConvex();
-                bool             BVintersect = intersectOrientedBoundingBox(
-                    convexJ.computeBoundingBox(),
-                    convexNew.computeBoundingBox(),
-                    m_position[j],
-                    insertPosition,
-                    m_quaternion[j],
-                    insertQuaternion);
-                // if(BVintersect
-                //    && intersectGJK<T>(convexJ,
-                //                       convexNew,
-                //                       m_position[j],
-                //                       insertPosition,
-                //                       m_quaternion[j],
-                //                       insertQuaternion))
-                if(BVintersect)
-                    return false;
-            }
-
-            // 2) Check against already-inserted particles via LC
+            // Check against already-inserted components via LC
             std::vector<uint> neighborList;
             lc.collectPotentialNeighbors(insertPosition,
                                          insertID,
@@ -545,10 +530,10 @@ public:
                     m_quaternion[insertID] = qCand;
                     m_velocity[insertID]   = std::get<2>(insData);
                     placed                 = true;
-                    // Add new particle to linked cells so the next insGGert sees it
+                    // Add new particle to linked cells so the next insert sees it
                     const Cells<T>* cells  = lc.getLinkedCell()[0];
                     const uint      cellID = cells->computeCellHash(pCand);
-                    lc.addParticleToCell(insertID, cellID);
+                    lc.addComponentToCell(insertID, cellID);
                 }
             }
 

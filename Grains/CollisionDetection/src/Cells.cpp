@@ -44,11 +44,27 @@ __HOSTDEVICE__ const Vector3<T>& Cells<T>::getMaxCorner() const
 }
 
 // -----------------------------------------------------------------------------
+// Gets the min corner point of the linked cell
+template <typename T>
+__HOSTDEVICE__ const Vector3<T>& Cells<T>::getMinCornerLinkedCell() const
+{
+    return (m_minCornerLinkedCell);
+}
+
+// -----------------------------------------------------------------------------
 // Gets the extent of each cell
 template <typename T>
 __HOSTDEVICE__ T Cells<T>::getCellSize() const
 {
     return (m_cellSize);
+}
+
+// -----------------------------------------------------------------------------
+// Gets the number of cells along each direction and total
+template <typename T>
+__HOSTDEVICE__ uint4 Cells<T>::getNumCellsPerDirection() const
+{
+    return (m_numCells);
 }
 
 // -----------------------------------------------------------------------------
@@ -173,6 +189,17 @@ __HOSTDEVICE__ uint3 Cells<T>::computeCellID(const Vector3<T>& p) const
 }
 
 // -----------------------------------------------------------------------------
+// Returns the 3d Id of the cell given its hash
+template <typename T>
+__HOSTDEVICE__ uint3 Cells<T>::computeCellID(const uint cellHash) const
+{
+    uint z = cellHash / (m_numCells.x * m_numCells.y);
+    uint y = (cellHash / m_numCells.x) % m_numCells.y;
+    uint x = cellHash % m_numCells.x;
+    return (uint3{x, y, z});
+}
+
+// -----------------------------------------------------------------------------
 // Returns the cell hash value of a given point
 template <typename T>
 __HOSTDEVICE__ uint Cells<T>::computeCellHash(const Vector3<T>& p) const
@@ -196,21 +223,6 @@ __HOSTDEVICE__ uint Cells<T>::computeCellHash(const uint i,
                                               const uint k) const
 {
     return ((k * m_numCells.y + j) * m_numCells.x + i);
-}
-
-// -----------------------------------------------------------------------------
-// Returns the cell hash value for a neighboring cell in the direction given by
-// (i, j, k)
-template <typename T>
-__HOSTDEVICE__ uint Cells<T>::computeNeighborCellHash(uint cellHash,
-                                                      uint i,
-                                                      uint j,
-                                                      uint k) const
-{
-    uint z = cellHash / (m_numCells.x * m_numCells.y);
-    uint y = (cellHash / m_numCells.x) % m_numCells.y;
-    uint x = cellHash % m_numCells.x;
-    return (computeCellHash(x + i, y + j, z + k));
 }
 
 // -----------------------------------------------------------------------------

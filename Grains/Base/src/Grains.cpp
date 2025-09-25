@@ -218,15 +218,6 @@ void Grains<T>::Construction(DOMElement* rootElement)
     GP::m_numObstacles = numObstacles;
     GP::m_numParticles = numParticles;
 
-    // Finding max circumscribed radius among all particles.
-    T maxRadius = T(0);
-    for(uint i = 0; i < m_refParticleRigidBodyList.getSize(); ++i)
-    {
-        if(m_refParticleRigidBodyList[i]->getCircumscribedRadius() > maxRadius)
-            maxRadius = m_refParticleRigidBodyList[i]->getCircumscribedRadius();
-    }
-    GP::m_maxRadius = maxRadius;
-
     // -------------------------------------------------------------------------
     // Setting up collision detection
     GoutWI(6, "Reading collision detection ...");

@@ -5,11 +5,10 @@
 #include "GrainsParameters.hh"
 #include "GrainsUtils.hh"
 #include "LinkedCell.hh"
+#include "LinkedCellFactory.hh"
 #include "LinkedCell_Host.hh"
-#include "LinkedCell_SortBased.hh"
 #include "NeighborList.hh"
 #include "NeighborList_Kernels.hh"
-#include "Transform3.hh"
 
 // =============================================================================
 /** @brief The class NeighborList_LinkedCell.
@@ -46,32 +45,34 @@ public:
 
     // -------------------------------------------------------------------------
     /** @brief Constructor with parameters
+        @param rb Rigid body buffer
+        @param positions Positions buffer
+        @param quaternions Quaternions buffer
         @param minCorner minimum corner of the domain
         @param maxCorner maximum corner of the domain
-        @param cellSize size of the cell
+        @param linkedCellFactor factor to multiply the minimum cell size
         @param nObstacles number of obstacles
         @param nParticles number of particles */
-    NeighborList_LinkedCell(const Vector3<T>& minCorner,
-                            const Vector3<T>& maxCorner,
-                            const T           cellSize,
-                            const uint        nObstacles,
-                            const uint        nParticles)
+    NeighborList_LinkedCell(
+        const GrainsMemBuffer<RigidBody<T>*, M>* rb,
+        const GrainsMemBuffer<Vector3<T>, M>&    positions,
+        const GrainsMemBuffer<Quaternion<T>, M>& quaternions,
+        const Vector3<T>&                        minCorner,
+        const Vector3<T>&                        maxCorner,
+        const T                                  linkedCellFactor,
+        const uint                               nObstacles,
+        const uint                               nParticles)
     {
-        // Initialize the LinkedCell buffer
-        if constexpr(M == MemType::HOST)
-        {
-            m_LinkedCell = new LinkedCell_Host<T>(minCorner,
-                                                  maxCorner,
-                                                  cellSize,
-                                                  nParticles);
-        }
-        else if constexpr(M == MemType::DEVICE)
-        {
-            m_LinkedCell = new LinkedCell_SortBased<T>(minCorner,
-                                                       maxCorner,
-                                                       cellSize,
-                                                       nParticles);
-        }
+        // Create the LinkedCell buffer
+        LinkedCellFactory<T, M>::create(rb,
+                                        positions,
+                                        quaternions,
+                                        minCorner,
+                                        maxCorner,
+                                        linkedCellFactor,
+                                        nObstacles,
+                                        nParticles,
+                                        m_LinkedCell);
 
         // TODO: Reduce init size
         m_pairList.allocate(nObstacles * nParticles
@@ -79,6 +80,7 @@ public:
         m_pairList.fill();
         m_pairCount.allocate(1);
         m_pairCount.fill(0);
+
         m_hPairCount.allocate(1);
         m_hPairCount.fill(0);
         m_needsUpdate = true; // Initially, we need to create the list
@@ -86,6 +88,7 @@ public:
 
     // -------------------------------------------------------------------------
     /** @brief Destructor */
+
     ~NeighborList_LinkedCell() override = default;
     //@}
 
@@ -106,12 +109,12 @@ public:
         if constexpr(M == MemType::HOST)
         {
             auto* LC_host    = static_cast<LinkedCell_Host<T>*>(m_LinkedCell);
-            bool  LC_updated = LC_host->updateLinkedCells(positions);
+            bool  LC_updated = LC_host->updateLinkedCells();
             // Check if the linked cell structure was updated.
             // If not, we bypass the neighbor list update.
             if(LC_updated)
             {
-                updateNeighborList_LC_Host(LC_host->getCellParticles(),
+                updateNeighborList_LC_Host(LC_host->getCellComponents(),
                                            LC_host->getCellNeighborsList(),
                                            m_pairList.getData(),
                                            m_pairCount.getData());
@@ -123,7 +126,7 @@ public:
         {
             auto* LC_device
                 = static_cast<LinkedCell_SortBased<T>*>(m_LinkedCell);
-            bool LC_updated = LC_device->updateLinkedCells(positions);
+            bool LC_updated = LC_device->updateLinkedCells();
             // Check if the linked cell structure was updated.
             // If not, we bypass the neighbor list update.
             if(LC_updated)
@@ -134,8 +137,8 @@ public:
                                                numBlocks,
                                                numThreads);
                 updateNeighborList_LC_Device<<<numBlocks, numThreads>>>(
-                    LC_device->getParticleIDs(),
-                    LC_device->getParticleHashes(),
+                    LC_device->getComponentIDs(),
+                    LC_device->getCellIDs(),
                     LC_device->getCellNeighborsList(),
                     LC_device->getCellStartIDs(),
                     positions.getSize(),

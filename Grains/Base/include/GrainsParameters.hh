@@ -37,8 +37,6 @@ public:
     static uint m_numParticles;
     /** @brief Number of obstacles in simulation */
     static uint m_numObstacles;
-    /** @brief Maximum radius among all particles */
-    static T m_maxRadius;
 
     /* Physical */
     /** \brief Gravity vector */

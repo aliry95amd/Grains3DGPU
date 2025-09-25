@@ -26,12 +26,13 @@ template <typename T>
 class LinkedCell_SortBased : public LinkedCell<T, MemType::DEVICE>
 {
     using LC = LinkedCell<T, MemType::DEVICE>;
+    using LC::m_cellID;
     using LC::m_cells;
-    using LC::m_needsUpdate;
+    using LC::m_componentID;
     using LC::m_neighborCells;
     using LC::m_numCells;
-    using LC::m_particleHash;
-    using LC::m_particleID;
+    using LC::m_numParticles;
+    using LC::m_obstaclesBufferSize;
 
 protected:
     /** @name Parameters */
@@ -49,16 +50,31 @@ public:
 
     // -------------------------------------------------------------------------
     /** @brief Constructor with parameters
+        @param rb Rigid body buffer
+        @param positions Positions buffer
+        @param quaternions Quaternions buffer
         @param minCorner minimum corner of the domain
         @param maxCorner maximum corner of the domain
-        @param cellSize size of the cell
+        @param cellSizeFactor size of the cell
+        @param nObstacles number of obstacles
         @param nParticles number of particles */
-    LinkedCell_SortBased(const Vector3<T>& minCorner,
-                         const Vector3<T>& maxCorner,
-                         const T           cellSize,
-                         const uint        nParticles)
-        : LinkedCell<T, MemType::DEVICE>(
-              minCorner, maxCorner, cellSize, nParticles)
+    LinkedCell_SortBased(
+        const GrainsMemBuffer<RigidBody<T>*, MemType::DEVICE>* rb,
+        const GrainsMemBuffer<Vector3<T>, MemType::DEVICE>&    positions,
+        const GrainsMemBuffer<Quaternion<T>, MemType::DEVICE>& quaternions,
+        const Vector3<T>&                                      minCorner,
+        const Vector3<T>&                                      maxCorner,
+        const T                                                cellSizeFactor,
+        const uint                                             nObstacles,
+        const uint                                             nParticles)
+        : LinkedCell<T, MemType::DEVICE>(rb,
+                                         positions,
+                                         quaternions,
+                                         minCorner,
+                                         maxCorner,
+                                         cellSizeFactor,
+                                         nObstacles,
+                                         nParticles)
         , m_cellStartID(m_numCells)
     {
     }
@@ -81,38 +97,32 @@ public:
     /** @name Methods */
     //@{
     // -------------------------------------------------------------------------
-    /** @brief Updates the linked cells based on the transformations
-    @param positions buffer of positions */
-    bool updateLinkedCells(
-        GrainsMemBuffer<Vector3<T>, MemType::DEVICE>& positions)
+    /** @brief Updates the linked cells based on the transformations */
+    bool updateLinkedCells()
     {
-        this->computeMaxDisplacement(positions);
-        if(m_needsUpdate)
-            this->updateCells();
-        else
+        // Update the cells only if needed
+        bool updated = this->updateCellAdaptive();
+        if(!updated)
             return false;
 
-        const uint numParticles = positions.getSize();
-        // Update the particle hashes
-        this->updateParticlesHash(positions);
-
+        const uint bufferSize = m_obstaclesBufferSize + m_numParticles;
         // Sorting the particle ids according to the cell hash
         thrust::sort_by_key(
-            thrust::device_ptr<uint>(m_particleHash.getData()),
-            thrust::device_ptr<uint>(m_particleHash.getData() + numParticles),
-            thrust::device_ptr<uint>(m_particleID.getData()));
+            thrust::device_ptr<uint>(m_cellID.getData()),
+            thrust::device_ptr<uint>(m_cellID.getData() + bufferSize),
+            thrust::device_ptr<uint>(m_componentID.getData()));
 
         // Finding the start of each cell
         m_cellStartID.fill(UINT_MAX);
         uint numBlocks, numThreads;
-        computeOptimalThreadsAndBlocks(numParticles,
+        computeOptimalThreadsAndBlocks(bufferSize,
                                        GrainsParameters<T>::m_GPU,
                                        numBlocks,
                                        numThreads);
         uint sMemSize = sizeof(uint) * (numThreads + 1);
         computeCellStart_Kernel<<<numBlocks, numThreads, sMemSize>>>(
-            m_particleHash.getData(),
-            numParticles,
+            m_cellID.getData(),
+            bufferSize,
             m_cellStartID.getData());
 
         return true;

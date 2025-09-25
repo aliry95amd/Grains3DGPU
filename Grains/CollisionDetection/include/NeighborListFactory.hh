@@ -7,6 +7,14 @@
 #include "NeighborList_LinkedCell.hh"
 #include "NeighborList_Nsq.hh"
 
+enum class NEIGHBORLISTTYPE
+{
+    /** @brief N-Squared neighbor list */
+    NSQ = 0,
+    /** @brief Linked cell neighbor list */
+    LINKEDCELL = 1
+};
+
 // =============================================================================
 /** @brief The class NeighborListFactory.
 
@@ -38,29 +46,51 @@ public:
     //@{
     // -------------------------------------------------------------------------
     /** @brief Creates and returns a buffer of NeighborList objects
+        @param rb Rigid body buffer
+        @param positions Positions buffer
+        @param quaternions Quaternions buffer
+        @param nObstacles number of obstacles
+        @param nParticles number of particles        
         @param NL Memory buffer for storing the neighbor list object */
-    static void create(NeighborList<T, M>*& NL)
+    static void create(const GrainsMemBuffer<RigidBody<T>*, M>* rb,
+                       const GrainsMemBuffer<Vector3<T>, M>&    positions,
+                       const GrainsMemBuffer<Quaternion<T>, M>& quaternions,
+                       const uint                               nObstacles,
+                       const uint                               nParticles,
+                       NeighborList<T, M>*&                     NL)
     {
         using GP = GrainsParameters<T>;
 
-        if(GP::m_neighborListType == 0)
+        // Assertions
+        GAssert(rb->getSize() == nObstacles + nParticles,
+                "Rigid body size mismatch");
+        GAssert(positions.getSize() == nObstacles + nParticles,
+                "Positions size mismatch");
+        GAssert(quaternions.getSize() == nObstacles + nParticles,
+                "Quaternions size mismatch");
+
+        // Global parameters
+        NEIGHBORLISTTYPE type
+            = static_cast<NEIGHBORLISTTYPE>(GP::m_neighborListType);
+        T          linkedCellFactor = GP::m_linkedCellSizeFactor;
+        Vector3<T> minCorner        = GP::m_origin;
+        Vector3<T> maxCorner        = GP::m_maxCoordinate;
+
+        if(type == NEIGHBORLISTTYPE::NSQ)
         {
-            // brute-force neighbor list
-            NL = new NeighborList_Nsq<T, M>(GP::m_numObstacles,
-                                            GP::m_numParticles);
+            NL = new NeighborList_Nsq<T, M>(nObstacles, nParticles);
         }
-        else if(GP::m_neighborListType == 1)
+        else if(type == NEIGHBORLISTTYPE::LINKEDCELL)
         {
-            T cellSize = T(2) * GP::m_maxRadius * GP::m_linkedCellSizeFactor;
-            // Linked cell neighbor list
-            NL = new NeighborList_LinkedCell<T, M>(GP::m_origin,
-                                                   GP::m_maxCoordinate,
-                                                   cellSize,
-                                                   GP::m_numObstacles,
-                                                   GP::m_numParticles);
+            NL = new NeighborList_LinkedCell<T, M>(rb,
+                                                   positions,
+                                                   quaternions,
+                                                   minCorner,
+                                                   maxCorner,
+                                                   linkedCellFactor,
+                                                   nObstacles,
+                                                   nParticles);
         }
-        else
-            GAbort("Unknown neighbor list type! Aborting Grains!");
     }
     //@}
 };
