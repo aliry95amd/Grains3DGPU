@@ -18,9 +18,9 @@ ComponentManagerGPU<T>::ComponentManagerGPU(
 {
     uint maxPairs
         = m_nObstacles * m_nParticles + m_nParticles * (m_nParticles - 1) / 2;
-    m_prefixScan.allocate(maxPairs);
+    m_prefixScan.initialize(maxPairs);
     m_prefixScan.fill();
-    m_activeIndex.allocate(maxPairs);
+    m_activeIndex.initialize(maxPairs);
     m_activeIndex.fill();
 }
 

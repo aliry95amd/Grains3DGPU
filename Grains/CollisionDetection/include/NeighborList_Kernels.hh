@@ -36,8 +36,13 @@ __GLOBAL__ void updateNeighborList_Nsq_Device(const uint nObstacles,
     @param pairList array of pairs
     @param pairCount number of pairs found */
 __HOST__ void updateNeighborList_LC_Host(
-    const std::vector<std::list<uint>>& cellParticles,
+    const uint*                         componentID,
+    const uint*                         cellID,
+    const std::vector<std::list<uint>>& cellComponents,
     const uint*                         cellNeighborsList,
+    const uint                          maxObstacleID,
+    const uint                          numObstacles,
+    const uint                          numParticles,
     uint2*                              pairList,
     uint*                               pairCount);
 

@@ -73,22 +73,23 @@ public:
                                         nObstacles,
                                         nParticles,
                                         m_LinkedCell);
+        // Sanity check to ensure LinkedCell was created
+        GAssert(m_LinkedCell != nullptr, "LinkedCell creation failed.");
 
         // TODO: Reduce init size
-        m_pairList.allocate(nObstacles * nParticles
-                            + nParticles * (nParticles - 1) / 2);
+        m_pairList.initialize(nObstacles * nParticles
+                              + nParticles * (nParticles - 1) / 2);
         m_pairList.fill();
-        m_pairCount.allocate(1);
+        m_pairCount.initialize(1);
         m_pairCount.fill(0);
 
-        m_hPairCount.allocate(1);
+        m_hPairCount.initialize(1);
         m_hPairCount.fill(0);
         m_needsUpdate = true; // Initially, we need to create the list
     }
 
     // -------------------------------------------------------------------------
     /** @brief Destructor */
-
     ~NeighborList_LinkedCell() override = default;
     //@}
 
@@ -114,8 +115,13 @@ public:
             // If not, we bypass the neighbor list update.
             if(LC_updated)
             {
-                updateNeighborList_LC_Host(LC_host->getCellComponents(),
+                updateNeighborList_LC_Host(LC_host->getComponentIDs(),
+                                           LC_host->getCellIDs(),
+                                           LC_host->getCellComponents(),
                                            LC_host->getCellNeighborsList(),
+                                           LC_host->getObstaclesBufferSize(),
+                                           nObstacles,
+                                           nParticles,
                                            m_pairList.getData(),
                                            m_pairCount.getData());
                 // Update the actual size of the pair list

@@ -110,15 +110,15 @@ public:
         // TODO: Make this dynamic
         uint maxPairs = m_nObstacles * m_nParticles
                         + m_nParticles * (m_nParticles - 1) / 2;
-        m_relPosition.allocate(maxPairs);
+        m_relPosition.initialize(maxPairs);
         m_relPosition.fill();
-        m_relQuaternion.allocate(maxPairs);
+        m_relQuaternion.initialize(maxPairs);
         m_relQuaternion.fill();
-        m_contactInfo.allocate(maxPairs);
+        m_contactInfo.initialize(maxPairs);
         m_contactInfo.fill();
-        m_contactInfoWorld.allocate(maxPairs);
+        m_contactInfoWorld.initialize(maxPairs);
         m_contactInfoWorld.fill();
-        m_activePairs.allocate(maxPairs);
+        m_activePairs.initialize(maxPairs);
         m_activePairs.fill();
     }
 

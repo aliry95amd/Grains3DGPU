@@ -42,7 +42,7 @@ __HOST__ void
                             GrainsMemBuffer<Cells<T>*, MemType::HOST>& cells,
                             uint*                                      numCells)
 {
-    cells.reserve(1);
+    cells.initialize(1);
     cells[0]  = new Cells<T>(minCorner, maxCorner, cellSize);
     *numCells = cells[0]->getNumCells();
     GoutWI(9, "LinkedCell with", *numCells, "cells is created on host.");
@@ -56,7 +56,7 @@ __HOST__ void CellsFactory<T>::copyHostToDevice(
     GrainsMemBuffer<Cells<T>*, MemType::DEVICE>& d_cells)
 {
     // Allocate the device memory for the linked cells
-    d_cells.allocate(h_cells.getSize());
+    d_cells.initialize(h_cells.getSize());
     uint  h_numCells = 0;
     uint* d_numCells;
     cudaMalloc(&d_numCells, sizeof(uint));

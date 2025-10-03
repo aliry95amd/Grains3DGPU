@@ -175,7 +175,7 @@ void Grains<T>::Construction(DOMElement* rootElement)
                                 numParticles);
     GoutWI(6, "Reading rigid bodies completed!");
 
-    m_rigidBodyList.reserve(numObstacles + numParticles);
+    m_rigidBodyList.initialize(numObstacles + numParticles);
     GrainsMemBuffer<Vector3<T>>    initialPosition(numObstacles + numParticles);
     GrainsMemBuffer<Quaternion<T>> initialOrientation(numObstacles
                                                       + numParticles);
@@ -251,7 +251,9 @@ void Grains<T>::Construction(DOMElement* rootElement)
                 "neighbor list!");
         std::string linkedCellType
             = ReaderXML::getNodeAttr_String(nLinkedCell, "Type");
-        if(linkedCellType == "MemoryEfficient")
+        if(linkedCellType == "HostEfficient")
+            GP::m_linkedCellType = 0;
+        else if(linkedCellType == "DeviceMemoryEfficient")
             GP::m_linkedCellType = 1;
         else
             GAbort("Unknown LinkedCell type! Aborting Grains!");
@@ -260,7 +262,7 @@ void Grains<T>::Construction(DOMElement* rootElement)
         GP::m_sortingFrequency
             = ReaderXML::getNodeAttr_Int(nLinkedCell, "SortingFrequency");
         GoutWI(9,
-               "LinkedCell:" + linkedCellType + ", cell size factor "
+               "LinkedCell: " + linkedCellType + ", cell size factor "
                    + std::to_string(GP::m_linkedCellSizeFactor)
                    + ", sorting frequency "
                    + std::to_string(GP::m_sortingFrequency) + " ...");

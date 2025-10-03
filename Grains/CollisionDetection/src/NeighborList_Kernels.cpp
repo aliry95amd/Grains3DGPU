@@ -1,3 +1,6 @@
+#include <algorithm>
+#include <set>
+
 #include "Transform3.hh"
 
 // -----------------------------------------------------------------------------
@@ -49,48 +52,104 @@ __GLOBAL__ void updateNeighborList_Nsq_Device(const uint nObstacles,
 // -----------------------------------------------------------------------------
 // Updates the neighbor list on host using a linked cell approach
 __HOST__ void updateNeighborList_LC_Host(
-    const std::vector<std::list<uint>>& cellParticles,
+    const uint*                         componentID,
+    const uint*                         cellID,
+    const std::vector<std::list<uint>>& cellComponents,
     const uint*                         cellNeighborsList,
+    const uint                          maxObstacleID,
+    const uint                          numObstacles,
+    const uint                          numParticles,
     uint2*                              pairList,
     uint*                               pairCount)
 {
     constexpr uint NUM_NEIGHBOR_CELLS = 27; // Number of neighboring cells
     uint           counter            = 0;
-    // Iterate through all cells
-    for(uint cellID = 0; cellID < cellParticles.size(); ++cellID)
+
+    // Use a set to track unique obstacle-particle pairs (to handle multi-cell obstacles)
+    std::set<std::pair<uint, uint>> uniqueObstacleParticlePairs;
+
+    // FIRST PASS: Loop over all obstacles
+    for(uint obstacleID = 0; obstacleID < maxObstacleID; ++obstacleID)
     {
-        const auto& currentCellParticles = cellParticles[cellID];
-        // Skip empty cells
-        if(currentCellParticles.empty())
-            continue;
-        // Check particles within the same cell
-        for(auto it1 = currentCellParticles.begin();
-            it1 != currentCellParticles.end();
-            ++it1)
-        {
-            for(auto it2 = std::next(it1); it2 != currentCellParticles.end();
-                ++it2)
-            {
-                uint particleID1    = *it1;
-                uint particleID2    = *it2;
-                pairList[counter++] = make_uint2(particleID1, particleID2);
-            }
-        }
-        // Loop over all neighboring cells
+        const uint obstacleIndex = componentID[obstacleID];
+        const uint obstacleCell  = cellID[obstacleID];
+        if(obstacleCell == UINT_MAX)
+            continue; // Obstacle not in any cell
+
+        // Get neighbor cells for this obstacle (includes own cell)
         const uint* neighborCells
-            = &cellNeighborsList[NUM_NEIGHBOR_CELLS * cellID];
+            = &cellNeighborsList[NUM_NEIGHBOR_CELLS * obstacleCell];
+
+        // Check all neighboring cells (including own cell)
         for(uint nCellID = 0; nCellID < NUM_NEIGHBOR_CELLS; ++nCellID)
         {
-            // Get the neighboring cell hash
-            uint c = neighborCells[nCellID];
-            // Check if the neighboring cell is valid
-            if(c == UINT_MAX || c == cellID || c < cellID)
+            uint targetCell = neighborCells[nCellID];
+            if(targetCell == UINT_MAX)
                 continue;
-            const auto& neighborCellParticles = cellParticles[c];
-            // Check all particle pairs between current cell and neighbor cell
-            for(uint particleID1 : currentCellParticles)
-                for(uint particleID2 : neighborCellParticles)
-                    pairList[counter++] = make_uint2(particleID1, particleID2);
+
+            const auto& targetCellComponents = cellComponents[targetCell];
+
+            // Check against all components in the target cell
+            for(uint otherComponentID : targetCellComponents)
+            {
+                // Only add obstacle-particle pairs (particles have ID >= numObstacles)
+                // Skip self-pairs for own cell
+                if(otherComponentID < numObstacles)
+                    continue;
+                uniqueObstacleParticlePairs.insert(
+                    std::make_pair(obstacleIndex, otherComponentID));
+            }
+        }
+    }
+
+    // Add unique obstacle-particle pairs to the output
+    for(const auto& pair : uniqueObstacleParticlePairs)
+    {
+        pairList[counter++] = make_uint2(pair.first, pair.second);
+    }
+
+    // SECOND PASS: Cell-centric approach for particle-particle pairs
+    for(uint cellID = 0; cellID < cellComponents.size(); ++cellID)
+    {
+        const auto& cellComps = cellComponents[cellID];
+        if(cellComps.empty())
+            continue; // Skip empty cells
+
+        // Get neighbor cells for this cell (includes own cell)
+        const uint* neighborCells
+            = &cellNeighborsList[NUM_NEIGHBOR_CELLS * cellID];
+
+        // Check interactions with neighboring cells
+        for(uint nCellID = 0; nCellID < NUM_NEIGHBOR_CELLS; ++nCellID)
+        {
+            uint targetCell = neighborCells[nCellID];
+            if(targetCell == UINT_MAX || targetCell < cellID)
+                continue; // Skip invalid cells and cells with lower indices
+
+            const auto& targetCellComps = cellComponents[targetCell];
+            if(targetCellComps.empty())
+                continue; // Skip empty target cells
+
+            // Process particle pairs between cells
+            for(uint comp1 : cellComps)
+            {
+                // Skip obstacles in second pass (already handled in first pass)
+                if(comp1 < numObstacles)
+                    continue;
+
+                for(uint comp2 : targetCellComps)
+                {
+                    // Skip obstacles and handle same-cell case with ordering
+                    if(comp2 < numObstacles)
+                        continue;
+
+                    // For same cell, use ordering to avoid duplicates
+                    if(targetCell == cellID && comp1 >= comp2)
+                        continue;
+
+                    pairList[counter++] = make_uint2(comp1, comp2);
+                }
+            }
         }
     }
 

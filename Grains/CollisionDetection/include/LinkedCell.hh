@@ -2,8 +2,10 @@
 #define _LINKEDCELL_HH_
 
 #include "thrust/device_ptr.h"
+#include <thrust/extrema.h>
 #include <thrust/find.h>
 #include <thrust/iterator/counting_iterator.h>
+#include <thrust/iterator/transform_iterator.h>
 #include <thrust/iterator/zip_iterator.h>
 #include <thrust/remove.h>
 #include <thrust/transform_reduce.h>
@@ -15,6 +17,17 @@
 #include "GrainsUtils.hh"
 #include "LinkedCell_Kernels.hh"
 #include "VectorMath.hh"
+
+// Thrust functors for global scope to avoid CUDA template issues
+template <typename T>
+struct obstacle_has_moved
+{
+    __device__ bool
+        operator()(const thrust::tuple<uint, Vector3<T>, Vector3<T>>& t) const
+    {
+        return thrust::get<1>(t) != thrust::get<2>(t);
+    }
+};
 
 // =============================================================================
 /** @brief The class LinkedCell.
@@ -104,7 +117,8 @@ public:
                const T                                  cellSizeFactor,
                const uint                               nObstacles,
                const uint                               nParticles)
-        : m_maxDisplacementSquared(0)
+        : m_oldPosition(nObstacles + nParticles)
+        , m_maxDisplacementSquared(0)
         , m_numIterationsSinceLastUpdate(0)
         , m_numObstacles(nObstacles)
         , m_numParticles(nParticles)
@@ -165,9 +179,15 @@ public:
                                 * maxCellsPerObstaclePerDim
                                 * maxCellsPerObstaclePerDim;
         m_maxCellsPerObstacle = std::max(m_maxCellsPerObstacle, m_numCells);
+        m_maxCellsPerObstacle = 170;
+
+        // Reserve space for component and cell IDs
+        T maxObstaclesBufferSize = m_maxCellsPerObstacle * nObstacles;
+        m_componentID.initialize(maxObstaclesBufferSize + m_numParticles);
+        m_cellID.initialize(maxObstaclesBufferSize + m_numParticles);
 
         // Force update at the first step
-        bool updated = updateCellFixed();
+        bool updated = updateCellFixed<true>();
     }
 
     // -------------------------------------------------------------------------
@@ -252,6 +272,13 @@ public:
     }
 
     // -------------------------------------------------------------------------
+    /** @brief Gets obstacles buffer size */
+    uint getObstaclesBufferSize() const
+    {
+        return m_obstaclesBufferSize;
+    }
+
+    // -------------------------------------------------------------------------
     /** @brief Gets number of cells */
     uint getNumCells() const
     {
@@ -268,7 +295,11 @@ public:
         // Component ID should be as the following:
         // First few elements are for obstacles. linkObstacles method should
         // set them.
-        // Elements after m_obstaclesBufferSize are for particles:
+        // Elements after m_obstaclesBufferSize are for particles.
+
+        // Note: resize should not have any overhead since capacity is enough
+        m_componentID.resize(m_obstaclesBufferSize + m_numParticles);
+
         if constexpr(M == MemType::HOST)
         {
             for(uint i = 0; i < m_numParticles; ++i)
@@ -297,7 +328,11 @@ public:
         // Cell ID should be as the following:
         // First few elements are for obstacles. linkObstacles method should
         // set them.
-        // Elements after m_obstaclesBufferSize are for particles:
+        // Elements after m_obstaclesBufferSize are for particles.
+
+        // Note: resize should not have any overhead since capacity is enough
+        m_cellID.resize(m_obstaclesBufferSize + m_numParticles);
+
         if constexpr(M == MemType::HOST)
         {
             for(uint i = 0; i < m_numParticles; ++i)
@@ -326,6 +361,9 @@ public:
         @param endID end ID of the interval */
     T computeMaxRadius(const uint startID, const uint endID) const
     {
+        GAssert(endID >= startID,
+                "LinkedCell::computeMaxRadius: endID must be >= startID");
+
         T maxRadius = T(0), radius = T(0);
         if constexpr(M == MemType::HOST)
         {
@@ -338,37 +376,22 @@ public:
         }
         if constexpr(M == MemType::DEVICE)
         {
-            using Tup = thrust::tuple<T, T>;
-
-            struct max_radius
-            {
-                __device__ Tup
-                    operator()(const RigidBody<T>* const& rb_ptr) const
-                {
-                    T radius = rb_ptr->getCircumscribedRadius();
-                    return thrust::make_tuple(radius, T(1));
-                }
-            };
-
-            struct tuple_max_reducer
-            {
-                __device__ Tup operator()(const Tup& a, const Tup& b) const
-                {
-                    return thrust::make_tuple(
-                        thrust::max(thrust::get<0>(a), thrust::get<0>(b)),
-                        thrust::get<1>(a) + thrust::get<1>(b));
-                }
-            };
-
+            // Use thrust to find the maximum radius
             auto begin = thrust::device_pointer_cast(m_rb->getData() + startID);
             auto end   = begin + (endID - startID);
-            auto result
-                = thrust::transform_reduce(begin,
-                                           end,
-                                           max_radius(),
-                                           thrust::make_tuple(T(0), T(0)),
-                                           tuple_max_reducer());
-            maxRadius = thrust::get<0>(result);
+
+            // Transform iterator to extract radius values
+            auto radius_begin = thrust::make_transform_iterator(
+                begin,
+                [] __device__(RigidBody<T>* const& rb) -> T {
+                    return rb->getCircumscribedRadius();
+                });
+            auto radius_end = radius_begin + (endID - startID);
+
+            // Find maximum radius
+            auto max_it = thrust::max_element(radius_begin, radius_end);
+            if(max_it != radius_end)
+                maxRadius = *max_it;
         }
 
         return (maxRadius);
@@ -416,24 +439,17 @@ public:
         }
         else if constexpr(M == MemType::DEVICE)
         {
-            using Tup = thrust::tuple<uint, Vector3<T>, Vector3<T>>;
-            struct has_moved
-            {
-                __device__ bool operator()(const Tup& t) const
-                {
-                    return thrust::get<1>(t) != thrust::get<2>(t);
-                }
-            } moved_pred;
-
-            auto ids_begin = thrust::make_counting_iterator<uint>(0);
             auto pos_begin
                 = thrust::device_pointer_cast(m_positions->getData());
             auto old_begin
                 = thrust::device_pointer_cast(m_oldPosition.getData());
+            auto ids_begin = thrust::make_counting_iterator<uint>(0);
+
             auto zip_begin = thrust::make_zip_iterator(
                 thrust::make_tuple(ids_begin, pos_begin, old_begin));
             auto zip_end = zip_begin + m_numObstacles;
 
+            obstacle_has_moved<T> moved_pred;
             auto it = thrust::find_if(zip_begin, zip_end, moved_pred);
             return it != zip_end;
         }
@@ -480,16 +496,16 @@ public:
                     // Check intersection
                     // Note that the relative position and quaternion of
                     // the obstacle is used here
-                    if(intersectOrientedBoundingBox(cellBBox,
-                                                    BBox,
-                                                    m_positions->at(r)
-                                                        - cellCenter,
-                                                    m_quaternions->at(r)))
-                    {
-                        componentID[index] = r;
-                        cellID[index]      = m_cells[0]->computeCellHash(hash);
-                        index++;
-                    }
+                    // if(intersectOrientedBoundingBox(cellBBox,
+                    //                                 BBox,
+                    //                                 m_positions->at(r)
+                    //                                     - cellCenter,
+                    //                                 m_quaternions->at(r)))
+                    // {
+                    componentID[index] = r;
+                    cellID[index]      = m_cells[0]->computeCellHash(hash);
+                    index++;
+                    // }
                 }
             }
 
@@ -516,27 +532,29 @@ public:
                                             cellID.getData());
             cudaDeviceSynchronize();
 
-            // Compact in-place: remove entries with ID == UINT_MAX
-            using Tup = thrust::tuple<uint, uint>;
-            struct is_invalid
-            {
-                __device__ bool operator()(const Tup& t) const
-                {
-                    return thrust::get<0>(t) == UINT_MAX;
-                }
-            } invalid_pred;
-
+            // Perform separate compactions for componentID and cellID
             const uint total = m_maxCellsPerObstacle * m_numObstacles;
-            auto ids_begin = thrust::device_pointer_cast(componentID.getData());
-            auto ids_end   = ids_begin + total;
-            auto hash_begin = thrust::device_pointer_cast(cellID.getData());
-            auto zip_begin  = thrust::make_zip_iterator(
-                thrust::make_tuple(ids_begin, hash_begin));
-            auto zip_end = zip_begin + total;
-            auto new_end = thrust::remove_if(zip_begin, zip_end, invalid_pred);
+
+            // First compaction: remove UINT_MAX entries from componentID
+            auto comp_begin
+                = thrust::device_pointer_cast(componentID.getData());
+            auto comp_end      = comp_begin + total;
+            auto comp_new_end  = thrust::remove(comp_begin, comp_end, UINT_MAX);
+            uint compactedSize = static_cast<uint>(comp_new_end - comp_begin);
+
+            // Second compaction: remove UINT_MAX entries from cellID
+            auto cell_begin   = thrust::device_pointer_cast(cellID.getData());
+            auto cell_end     = cell_begin + total;
+            auto cell_new_end = thrust::remove(cell_begin, cell_end, UINT_MAX);
+            uint cellCompactedSize
+                = static_cast<uint>(cell_new_end - cell_begin);
+
+            // Both should have the same size after compaction
+            GAssert(compactedSize == cellCompactedSize,
+                    "ComponentID and CellID compacted sizes don't match");
 
             // Set the size of the obstacles buffer
-            m_obstaclesBufferSize = static_cast<uint>(new_end - zip_begin);
+            m_obstaclesBufferSize = compactedSize;
         }
 
         // Copy the info to member buffers
@@ -707,8 +725,6 @@ public:
         setComponentID();
 
         // Set the cell IDs
-        // Note: reserve does not change the size if capacity is enough
-        m_cellID.reserve(m_obstaclesBufferSize + m_numParticles);
         setCellID();
 
         // Reset parameters
@@ -723,9 +739,10 @@ public:
 
     // -------------------------------------------------------------------------
     /** @brief Updates links on the current fixed grid (no resizing/skin) */
+    template <bool forceUpdate = false>
     bool updateCellFixed()
     {
-        if(haveObstaclesMoved() == true)
+        if(forceUpdate || haveObstaclesMoved() == true)
         {
             // Relink obstacles on the existing grid
             linkObstacles();

@@ -34,7 +34,7 @@ template <typename T>
 __HOST__ void TimeIntegratorFactory<T>::create(
     DOMNode* root, T dt, GrainsMemBuffer<TimeIntegrator<T>*, MemType::HOST>& TI)
 {
-    TI.allocate(1); // Allocate memory for one time integrator
+    TI.initialize(1); // Initialize memory for one time integrator
 
     std::string type = ReaderXML::getNodeAttr_String(root, "Type");
     if(type == "FirstOrderExplicit")
@@ -51,7 +51,7 @@ __HOST__ void TimeIntegratorFactory<T>::copyHostToDevice(
     GrainsMemBuffer<TimeIntegrator<T>*, MemType::DEVICE>& d_TI)
 {
     // Allocate the device memory for the time integrator
-    d_TI.allocate(h_TI.getSize());
+    d_TI.initialize(h_TI.getSize());
     for(uint i = 0; i < h_TI.getSize(); ++i)
     {
         if(h_TI[i] == nullptr)

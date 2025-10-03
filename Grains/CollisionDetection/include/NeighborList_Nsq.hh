@@ -43,9 +43,9 @@ public:
         m_pairList.reserve(nObstacles * nParticles
                            + nParticles * (nParticles - 1) / 2);
         m_pairList.fill();
-        m_pairCount.allocate(1);
+        m_pairCount.initialize(1);
         m_pairCount.fill(0);
-        m_hPairCount.allocate(1);
+        m_hPairCount.initialize(1);
         m_hPairCount.fill(0);
         m_needsUpdate = true; // Initially, we need to create the list
     }

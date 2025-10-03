@@ -83,10 +83,10 @@ __HOST__ void RigidBodyFactory<T>::create(
     DOMNodeList* allObstacles = ReaderXML::getNodes(obstacles);
     // Number of unique shapes (rigid bodies) in the simulation
     uint numRefObstacles = allObstacles->getLength();
-    refObstacleRB.allocate(numRefObstacles);
-    refObstacleInitialPosition.allocate(numRefObstacles);
-    refObstacleInitialOrientation.allocate(numRefObstacles);
-    numEachRefObstacle.allocate(numRefObstacles);
+    refObstacleRB.initialize(numRefObstacles);
+    refObstacleInitialPosition.initialize(numRefObstacles);
+    refObstacleInitialOrientation.initialize(numRefObstacles);
+    numEachRefObstacle.initialize(numRefObstacles);
     for(uint i = 0; i < numRefObstacles; ++i)
     {
         DOMNode* nObstacle    = allObstacles->item(i);
@@ -116,10 +116,10 @@ __HOST__ void RigidBodyFactory<T>::create(
     DOMNodeList* allParticles = ReaderXML::getNodes(particles);
     // Number of unique shapes (rigid bodies) in the simulation
     uint numRefParticles = allParticles->getLength();
-    refParticleRB.allocate(numRefParticles);
-    refParticleInitialPosition.allocate(numRefParticles);
-    refParticleInitialOrientation.allocate(numRefParticles);
-    numEachRefParticle.allocate(numRefParticles);
+    refParticleRB.initialize(numRefParticles);
+    refParticleInitialPosition.initialize(numRefParticles);
+    refParticleInitialOrientation.initialize(numRefParticles);
+    numEachRefParticle.initialize(numRefParticles);
     for(uint i = 0; i < numRefParticles; ++i)
     {
         DOMNode* nParticle    = allParticles->item(i);

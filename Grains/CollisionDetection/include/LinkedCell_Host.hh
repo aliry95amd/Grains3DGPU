@@ -85,8 +85,11 @@ public:
         // Reserve space in iterator map for efficiency
         m_componentIteratorMap.reserve(nParticles);
         // Initialize old cell IDs buffer
-        m_oldCellID.reserve(m_cellID.getSize());
+        m_oldCellID.initialize(m_cellID.getSize());
         m_oldCellID.fill(UINT_MAX);
+
+        // Populate initial cell assignments
+        populateInitialCells();
     }
 
     // -------------------------------------------------------------------------
@@ -104,13 +107,6 @@ public:
     }
 
     // -------------------------------------------------------------------------
-    /** @brief Gets all cell particle lists (for neighbor list computation) */
-    const std::vector<std::list<uint>>& getCellParticles() const
-    {
-        return m_cellComponents;
-    }
-
-    // -------------------------------------------------------------------------
     /** @brief Gets components in a specific cell
         @param cellID the cell ID */
     const std::list<uint>& getComponentsInCell(uint cellID) const
@@ -120,6 +116,18 @@ public:
 
     /** @name Methods */
     //@{
+    // -------------------------------------------------------------------------
+    /** @brief Populates initial cell assignments for all components */
+    void populateInitialCells()
+    {
+        for(uint i = 0; i < m_obstaclesBufferSize + m_numParticles; ++i)
+        {
+            uint componentID = m_componentID[i];
+            uint cellID      = m_cellID[i];
+            addComponentToCell(componentID, cellID);
+        }
+    }
+
     // -------------------------------------------------------------------------
     /** @brief Adds a component to a specific cell
         @param componentID the component ID
@@ -169,9 +177,30 @@ public:
     }
 
     // -------------------------------------------------------------------------
+    /** @brief Handles cell grid resize by updating component lists */
+    void handleCellResize()
+    {
+        if(m_cellComponents.size() != m_numCells)
+        {
+            // Clear all existing assignments
+            m_cellComponents.clear();
+            m_componentIteratorMap.clear();
+
+            // Resize to new cell count
+            m_cellComponents.resize(m_numCells);
+
+            // Repopulate all components
+            populateInitialCells();
+        }
+    }
+
+    // -------------------------------------------------------------------------
     /** @brief Updates the linked cells based on component transformations */
     bool updateLinkedCells() override
     {
+        // Ensure old buffer has correct size before copying
+        m_oldCellID.resize(m_cellID.getSize());
+
         // Store old cell IDs before updating
         std::memcpy(m_oldCellID.getData(),
                     m_cellID.getData(),
@@ -180,12 +209,15 @@ public:
         // Update component hashes with new positions
         bool isUpdated = this->updateCellFixed();
 
+        // Handle potential cell grid resize
+        handleCellResize();
+
         // Process components
         for(uint i = 0; i < m_obstaclesBufferSize + m_numParticles; ++i)
         {
             uint comp      = m_componentID[i];
-            uint newCellID = m_cellID[comp];
-            uint oldCellID = m_oldCellID[comp];
+            uint newCellID = m_cellID[i];
+            uint oldCellID = m_oldCellID[i];
             if(oldCellID != newCellID)
                 moveComponentToCell(comp, oldCellID, newCellID);
         }
