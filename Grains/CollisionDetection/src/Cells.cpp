@@ -94,14 +94,19 @@ __HOSTDEVICE__ void Cells<T>::resize(const T cellSize)
 
     m_cellSize     = cellSize;
     m_cellSize_inv = T(1) / cellSize;
-    m_numCells.x   = max(1u, uint(DX * m_cellSize_inv));
-    m_numCells.y   = max(1u, uint(DY * m_cellSize_inv));
-    m_numCells.z   = max(1u, uint(DZ * m_cellSize_inv));
-    m_numCells.w   = m_numCells.x * m_numCells.y * m_numCells.z;
+    // Use ceiling to ensure the grid is large enough to contain the entire domain
+    m_numCells.x = max(1u, uint(ceil(DX * m_cellSize_inv)));
+    m_numCells.y = max(1u, uint(ceil(DY * m_cellSize_inv)));
+    m_numCells.z = max(1u, uint(ceil(DZ * m_cellSize_inv)));
+    m_numCells.w = m_numCells.x * m_numCells.y * m_numCells.z;
 
-    m_minCornerLinkedCell[X] = m_minCorner[X] - (m_numCells.x * cellSize - DX);
-    m_minCornerLinkedCell[Y] = m_minCorner[Y] - (m_numCells.y * cellSize - DY);
-    m_minCornerLinkedCell[Z] = m_minCorner[Z] - (m_numCells.z * cellSize - DZ);
+    // Center the domain within the cell grid
+    m_minCornerLinkedCell[X]
+        = m_minCorner[X] - (m_numCells.x * cellSize - DX) * T(0.5);
+    m_minCornerLinkedCell[Y]
+        = m_minCorner[Y] - (m_numCells.y * cellSize - DY) * T(0.5);
+    m_minCornerLinkedCell[Z]
+        = m_minCorner[Z] - (m_numCells.z * cellSize - DZ) * T(0.5);
 }
 
 // -----------------------------------------------------------------------------

@@ -10,6 +10,7 @@
 #include "CellsFactory.hh"
 #include "GrainsMemBuffer.hh"
 #include "GrainsUtils.hh"
+#include "LinkedCell.hh"
 #include "Transform3.hh"
 
 // =============================================================================
@@ -30,6 +31,7 @@ class LinkedCell_Host : public LinkedCell<T, MemType::HOST>
     using LC::m_cellID;
     using LC::m_cells;
     using LC::m_componentID;
+    using LC::m_maxCellsPerObstacle;
     using LC::m_neighborCells;
     using LC::m_numCells;
     using LC::m_numObstacles;
@@ -84,8 +86,10 @@ public:
         m_cellComponents.resize(m_numCells);
         // Reserve space in iterator map for efficiency
         m_componentIteratorMap.reserve(nParticles);
-        // Initialize old cell IDs buffer
-        m_oldCellID.initialize(m_cellID.getSize());
+        // Initialize old cell IDs buffer with maximum size to accommodate all
+        // possible components
+        const uint maxObstaclesBufferSize = m_maxCellsPerObstacle * nObstacles;
+        m_oldCellID.initialize(maxObstaclesBufferSize + m_numParticles);
         m_oldCellID.fill(UINT_MAX);
 
         // Populate initial cell assignments
@@ -94,7 +98,7 @@ public:
 
     // -------------------------------------------------------------------------
     /** @brief Destructor */
-    virtual ~LinkedCell_Host() = default;
+    ~LinkedCell_Host() = default;
     //@}
 
     /** @name Get methods */
@@ -198,13 +202,12 @@ public:
     /** @brief Updates the linked cells based on component transformations */
     bool updateLinkedCells() override
     {
-        // Ensure old buffer has correct size before copying
-        m_oldCellID.resize(m_cellID.getSize());
-
         // Store old cell IDs before updating
+        // Manually copy to preserve m_oldCellID's maximum size (copyFrom would resize it)
+        const uint actualSize = m_obstaclesBufferSize + m_numParticles;
         std::memcpy(m_oldCellID.getData(),
                     m_cellID.getData(),
-                    m_cellID.getBytes());
+                    actualSize * sizeof(uint));
 
         // Update component hashes with new positions
         bool isUpdated = this->updateCellFixed();

@@ -1,7 +1,13 @@
-#include "Insertion.hh"
-#include "GrainsUtils.hh"
 #include <cstdlib>
 #include <ctime>
+
+#include "GJK.hh"
+#include "GrainsMemBuffer.hh"
+#include "GrainsUtils.hh"
+#include "Insertion.hh"
+#include "LinkedCell_Host.hh"
+#include "OBB.hh"
+#include "QuaternionMath.hh"
 
 /* ========================================================================== */
 /*                             Low-Level Methods                              */
@@ -225,9 +231,8 @@ __HOST__ Insertion<T>::~Insertion()
 // -----------------------------------------------------------------------------
 // Returns a vector of Vector3 accroding to type and data
 template <typename T>
-__HOST__ Vector3<T>
-         Insertion<T>::fetchInsertionDataForEach(InsertionType const type,
-                                            InsertionInfo<T>&   data)
+__HOST__ Vector3<T> Insertion<T>::fetchInsertionData(InsertionType const type,
+                                                     InsertionInfo<T>&   data)
 {
     // We only return a vector3. It is clear how it works for position, and
     // kinematics. However, for orientation, it returns the vector3 of rotation
@@ -257,29 +262,143 @@ __HOST__ Vector3<T>
 }
 
 // -----------------------------------------------------------------------------
-// Returns all required data members to insert components as a vector
+// Populates position, orientation, and kinematics according to the insertion
+// policy
 template <typename T>
-__HOST__ std::tuple<Vector3<T>, Quaternion<T>, Kinematics<T>, bool>
-         Insertion<T>::fetchInsertionData()
+__HOST__ void
+    Insertion<T>::insert(const GrainsMemBuffer<RigidBody<T>*>* rigidBody,
+                         GrainsMemBuffer<Vector3<T>>&          position,
+                         GrainsMemBuffer<Quaternion<T>>&       orientation,
+                         GrainsMemBuffer<Kinematics<T>>&       kinematics,
+                         const uint                            numObstacles,
+                         const uint                            numParticles)
 {
-    // Position
-    Vector3<T> pos
-        = fetchInsertionDataForEach(m_positionType, m_positionInsertionInfo);
+    using GP = GrainsParameters<T>;
+    GoutWI(3, "Inserting", std::to_string(numParticles), "particles ...");
 
-    // Orientation angles. These are not matrices, so we have to compute the
-    // rotation matrices.
-    Vector3<T>    ori = fetchInsertionDataForEach(m_orientationType,
-                                               m_orientationInsertionInfo);
-    Quaternion<T> quat(ori[X], ori[Y], ori[Z]);
+    if(m_forceInsertion)
+    {
+        for(uint i = 0; i < numParticles; ++i)
+        {
+            const uint insertID = i + numObstacles;
+            position[insertID]
+                = fetchInsertionData(m_positionType, m_positionInsertionInfo);
 
-    // Kinematics
-    Vector3<T>    vel = fetchInsertionDataForEach(m_translationalVelType,
-                                               m_translationalVelInsertionInfo);
-    Vector3<T>    ang = fetchInsertionDataForEach(m_angularVelType,
-                                               m_angularVelInsertionInfo);
-    Kinematics<T> k(vel, ang);
+            // Orientation angles. These are not matrices, so we have to
+            // compute the quaternions later.
+            Vector3<T> ori = fetchInsertionData(m_orientationType,
+                                                m_orientationInsertionInfo);
+            orientation[insertID]
+                = Quaternion<T>(ori[X], ori[Y], ori[Z]) * orientation[insertID];
 
-    return (std::make_tuple(pos, quat, k, m_forceInsertion));
+            Vector3<T> vel
+                = fetchInsertionData(m_translationalVelType,
+                                     m_translationalVelInsertionInfo);
+
+            Vector3<T> ang       = fetchInsertionData(m_angularVelType,
+                                                m_angularVelInsertionInfo);
+            kinematics[insertID] = Kinematics<T>(vel, ang);
+        }
+    }
+    else
+    {
+        // Max attempts to place a particle
+        const uint maxAttempts = 1000;
+
+        // Build a temporary linked-cell structure for strict insertion checks
+        LinkedCell_Host<T> LC(rigidBody,
+                              position,
+                              orientation,
+                              GP::m_origin,
+                              GP::m_maxCoordinate,
+                              GP::m_linkedCellSizeFactor,
+                              numObstacles,
+                              numParticles);
+
+        // Overlap test lambda function
+        auto canInsert = [&](const uint           insertID,
+                             const Vector3<T>&    insertPosition,
+                             const Quaternion<T>& insertQuaternion) {
+            const Convex<T>& convexNew = *(*rigidBody)[insertID]->getConvex();
+
+            // Check against already-inserted components via LC
+            std::vector<uint> neighborList;
+            LC.collectPotentialNeighbors(insertPosition,
+                                         insertID,
+                                         neighborList);
+            for(uint j : neighborList)
+            {
+                const Convex<T>& convexJ     = *(*rigidBody)[j]->getConvex();
+                bool             BVintersect = intersectOrientedBoundingBox(
+                    convexJ.computeBoundingBox(),
+                    convexNew.computeBoundingBox(),
+                    position[j],
+                    insertPosition,
+                    orientation[j],
+                    insertQuaternion);
+                // if(BVintersect
+                //    && intersectGJK<T>(convexJ,
+                //                       convexNew,
+                //                       position[j],
+                //                       insertPosition,
+                //                       orientation[j],
+                //                       insertQuaternion))
+                if(BVintersect)
+                    return false;
+            }
+            return true;
+        };
+
+        // Inserting particles
+        for(uint i = 0; i < numParticles; ++i)
+        {
+            const uint insertID = i + numObstacles;
+            bool       placed   = false;
+            for(uint attempt = 0; attempt < maxAttempts && !placed; ++attempt)
+            {
+                const Vector3<T>& pCand
+                    = fetchInsertionData(m_positionType,
+                                         m_positionInsertionInfo);
+                // Orientation angles. These are not matrices, so we have to
+                // compute the quaternions later.
+                Vector3<T>           ori = fetchInsertionData(m_orientationType,
+                                                    m_orientationInsertionInfo);
+                Quaternion<T>        quat(ori[X], ori[Y], ori[Z]);
+                const Quaternion<T>& qCand = quat * orientation[insertID];
+                // Check if candidate position is within domain bounds
+                // clang-format off
+                bool withinBounds = (pCand[0] >= GP::m_origin[0] && 
+                                     pCand[0] <= GP::m_maxCoordinate[0] && 
+                                     pCand[1] >= GP::m_origin[1] && 
+                                     pCand[1] <= GP::m_maxCoordinate[1] &&
+                                     pCand[2] >= GP::m_origin[2] &&
+                                     pCand[2] <= GP::m_maxCoordinate[2]);
+                // clang-format on
+                if(withinBounds && canInsert(insertID, pCand, qCand))
+                {
+                    position[insertID]    = pCand;
+                    orientation[insertID] = qCand;
+                    Vector3<T> vel
+                        = fetchInsertionData(m_translationalVelType,
+                                             m_translationalVelInsertionInfo);
+                    Vector3<T> ang
+                        = fetchInsertionData(m_angularVelType,
+                                             m_angularVelInsertionInfo);
+                    kinematics[insertID] = Kinematics<T>(vel, ang);
+                    placed               = true;
+                    // Add new particle to linked cells for the next insert
+                    const Cells<T>* cells  = LC.getLinkedCell()[0];
+                    const uint      cellID = cells->computeCellHash(pCand);
+                    LC.addComponentToCell(insertID, cellID);
+                }
+            }
+
+            GAssert(placed,
+                    "Failed to place a particle without overlap after too many "
+                    "attempts.");
+        }
+    }
+    GoutWI(3, "Inserted", std::to_string(numParticles), "particles.");
 }
 
 // -----------------------------------------------------------------------------

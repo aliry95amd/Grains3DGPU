@@ -16,10 +16,6 @@
 #include "NeighborList.hh"
 #include "NeighborListFactory.hh"
 
-#include "GJK.hh"
-#include "LinkedCell_Host.hh"
-#include "OBB.hh"
-
 // =============================================================================
 /** @brief The class ComponentManager.
 
@@ -457,7 +453,7 @@ public:
     // -------------------------------------------------------------------------
     /** @brief Inserts particles according to a given insertion policy
         @param ins insertion policy */
-    void insertParticles(const std::unique_ptr<Insertion<T>>& ins)
+    void insertParticles(const std::unique_ptr<Insertion<T>>& insertionPolicy)
     {
         // We can only insert on host
         static_assert(
@@ -465,82 +461,13 @@ public:
             "Cannot insert particles directly on the device. Try inserting on "
             "host first, and copy to device. Aborting Grains!");
 
-        // Build a temporary linked-cell structure for strict insertion checks
-        using GP = GrainsParameters<T>;
-        LinkedCell_Host<T> lc(m_rigidBody,
-                              m_position,
-                              m_quaternion,
-                              GP::m_origin,
-                              GP::m_maxCoordinate,
-                              GP::m_linkedCellSizeFactor,
-                              m_nObstacles,
-                              m_nParticles);
-
-        // Exact overlap test using GJK; candidates restricted by LC neighborhood
-        constexpr uint maxAttempts = 10000;
-        auto           canInsert   = [&](const uint           insertID,
-                             const Vector3<T>&    insertPosition,
-                             const Quaternion<T>& insertQuaternion) {
-            const Convex<T>& convexNew = *(*m_rigidBody)[insertID]->getConvex();
-
-            // Check against already-inserted components via LC
-            std::vector<uint> neighborList;
-            lc.collectPotentialNeighbors(insertPosition,
-                                         insertID,
-                                         neighborList);
-            for(uint j : neighborList)
-            {
-                const Convex<T>& convexJ = *(*m_rigidBody)[j]->getConvex();
-                bool             BVintersect = intersectOrientedBoundingBox(
-                    convexJ.computeBoundingBox(),
-                    convexNew.computeBoundingBox(),
-                    m_position[j],
-                    insertPosition,
-                    m_quaternion[j],
-                    insertQuaternion);
-                // if(BVintersect
-                //    && intersectGJK<T>(convexJ,
-                //                       convexNew,
-                //                       m_position[j],
-                //                       insertPosition,
-                //                       m_quaternion[j],
-                //                       insertQuaternion))
-                if(BVintersect)
-                    return false;
-            }
-            return true;
-        };
-
-        // Inserting particles
-        std::tuple<Vector3<T>, Quaternion<T>, Kinematics<T>, bool> insData;
-        for(uint i = 0; i < m_nParticles; ++i)
-        {
-            const uint insertID = i + m_nObstacles;
-            bool       placed   = false;
-            for(uint attempt = 0; attempt < maxAttempts && !placed; ++attempt)
-            {
-                insData                    = ins->fetchInsertionData();
-                const Vector3<T>&    pCand = std::get<0>(insData);
-                const Quaternion<T>& qCand
-                    = std::get<1>(insData) * m_quaternion[insertID];
-                bool forceInsertion = std::get<3>(insData);
-                if(forceInsertion || canInsert(insertID, pCand, qCand))
-                {
-                    m_position[insertID]   = pCand;
-                    m_quaternion[insertID] = qCand;
-                    m_velocity[insertID]   = std::get<2>(insData);
-                    placed                 = true;
-                    // Add new particle to linked cells so the next insert sees it
-                    const Cells<T>* cells  = lc.getLinkedCell()[0];
-                    const uint      cellID = cells->computeCellHash(pCand);
-                    lc.addComponentToCell(insertID, cellID);
-                }
-            }
-
-            GAssert(placed,
-                    "Failed to place a particle without overlap after too many "
-                    "attempts.");
-        }
+        // This adds all particles to the system all at once in the beginning
+        insertionPolicy->insert(m_rigidBody,
+                                m_position,
+                                m_quaternion,
+                                m_velocity,
+                                m_nObstacles,
+                                m_nParticles);
     }
 
     // -------------------------------------------------------------------------

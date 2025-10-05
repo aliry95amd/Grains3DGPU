@@ -45,7 +45,6 @@ __HOST__ void
     cells.initialize(1);
     cells[0]  = new Cells<T>(minCorner, maxCorner, cellSize);
     *numCells = cells[0]->getNumCells();
-    GoutWI(9, "LinkedCell with", *numCells, "cells is created on host.");
 }
 
 // -----------------------------------------------------------------------------

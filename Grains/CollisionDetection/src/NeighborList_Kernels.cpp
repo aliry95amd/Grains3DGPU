@@ -139,12 +139,12 @@ __HOST__ void updateNeighborList_LC_Host(
 
                 for(uint comp2 : targetCellComps)
                 {
-                    // Skip obstacles and handle same-cell case with ordering
+                    // Skip obstacles
                     if(comp2 < numObstacles)
                         continue;
 
-                    // For same cell, use ordering to avoid duplicates
-                    if(targetCell == cellID && comp1 >= comp2)
+                    // Always use ordering to avoid duplicates
+                    if(comp1 >= comp2)
                         continue;
 
                     pairList[counter++] = make_uint2(comp1, comp2);

@@ -1,11 +1,14 @@
 #ifndef _INSERTION_HH_
 #define _INSERTION_HH_
 
+#include <variant>
+
+#include "GrainsMemBuffer.hh"
 #include "InsertionWindow.hh"
 #include "Kinematics.hh"
 #include "Quaternion.hh"
 #include "ReaderXML.hh"
-#include <variant>
+#include "RigidBody.hh"
 
 /** @name Enumerations */
 //@{
@@ -108,14 +111,24 @@ public:
         @param type insertion type
         @param data insertion info */
     __HOST__
-    Vector3<T> fetchInsertionDataForEach(InsertionType const type,
-                                         InsertionInfo<T>&   data);
+    Vector3<T> fetchInsertionData(InsertionType const type,
+                                  InsertionInfo<T>&   data);
 
     /** @brief Returns all required data members to insert components as a 
-        vector */
+        vector
+        @param rigidBody rigid body buffer
+        @param position position buffer
+        @param quaternion quaternion buffer
+        @param velocity velocity buffer
+        @param numObstacles number of obstacles
+        @param numParticles number of particles */
     __HOST__
-    std::tuple<Vector3<T>, Quaternion<T>, Kinematics<T>, bool>
-        fetchInsertionData();
+    void insert(const GrainsMemBuffer<RigidBody<T>*>* rigidBody,
+                GrainsMemBuffer<Vector3<T>>&          position,
+                GrainsMemBuffer<Quaternion<T>>&       quaternion,
+                GrainsMemBuffer<Kinematics<T>>&       velocity,
+                const uint                            numObstacles,
+                const uint                            numParticles);
     //@}
 };
 

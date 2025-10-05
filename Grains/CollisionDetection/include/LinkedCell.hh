@@ -178,11 +178,10 @@ public:
         m_maxCellsPerObstacle = maxCellsPerObstaclePerDim
                                 * maxCellsPerObstaclePerDim
                                 * maxCellsPerObstaclePerDim;
-        m_maxCellsPerObstacle = std::max(m_maxCellsPerObstacle, m_numCells);
-        m_maxCellsPerObstacle = 170;
+        m_maxCellsPerObstacle = std::min(m_maxCellsPerObstacle, m_numCells);
 
         // Reserve space for component and cell IDs
-        T maxObstaclesBufferSize = m_maxCellsPerObstacle * nObstacles;
+        const uint maxObstaclesBufferSize = m_maxCellsPerObstacle * nObstacles;
         m_componentID.initialize(maxObstaclesBufferSize + m_numParticles);
         m_cellID.initialize(maxObstaclesBufferSize + m_numParticles);
 
@@ -482,30 +481,34 @@ public:
             const T          halfCellSize = T(0.5) * cellSize;
             const Vector3<T> cellBBox(halfCellSize, halfCellSize, halfCellSize);
             const Vector3<T>& minCorner = m_cells[0]->getMinCornerLinkedCell();
+
             for(uint r = 0; r < m_numObstacles; ++r)
             {
                 const Vector3<T> BBox
                     = (*m_rb)[r]->getConvex()->computeBoundingBox();
                 Vector3<T> cellCenter = minCorner;
+
                 for(int i = 0; i < m_numCells; ++i)
                 {
                     const uint3 hash = m_cells[0]->computeCellID(i);
                     cellCenter[0] = minCorner[0] + (hash.x + T(0.5)) * cellSize;
                     cellCenter[1] = minCorner[1] + (hash.y + T(0.5)) * cellSize;
                     cellCenter[2] = minCorner[2] + (hash.z + T(0.5)) * cellSize;
-                    // Check intersection
-                    // Note that the relative position and quaternion of
-                    // the obstacle is used here
-                    // if(intersectOrientedBoundingBox(cellBBox,
-                    //                                 BBox,
-                    //                                 m_positions->at(r)
-                    //                                     - cellCenter,
-                    //                                 m_quaternions->at(r)))
-                    // {
-                    componentID[index] = r;
-                    cellID[index]      = m_cells[0]->computeCellHash(hash);
-                    index++;
-                    // }
+
+                    // Since cell is axis-aligned, no need to do any rotation
+                    // transformation
+                    bool intersects = intersectOrientedBoundingBox(
+                        cellBBox,
+                        BBox,
+                        m_positions->at(r) - cellCenter,
+                        m_quaternions->at(r));
+
+                    if(intersects)
+                    {
+                        componentID[index] = r;
+                        cellID[index]      = m_cells[0]->computeCellHash(hash);
+                        index++;
+                    }
                 }
             }
 
