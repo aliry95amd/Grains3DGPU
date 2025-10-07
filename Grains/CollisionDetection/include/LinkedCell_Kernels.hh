@@ -19,6 +19,28 @@
 // =============================================================================
 /** @name LinkedCell_Kernels: External Kernels */
 //@{
+/** @brief Extracts radii from rigid bodies into an array
+    @param rb array of rigid body pointers
+    @param startID starting index in the rigid body array
+    @param endID ending index in the rigid body array  
+    @param radii output array for storing individual radii */
+template <typename T>
+__GLOBAL__ void computeMaxRadius_Device(const RigidBody<T>* const* rb,
+                                        const uint                 startID,
+                                        const uint                 endID,
+                                        T*                         radii)
+{
+    uint tID = blockIdx.x * blockDim.x + threadIdx.x;
+    uint idx = tID + startID;
+
+    if(idx >= endID)
+        return;
+
+    // Extract radius and store in output array
+    radii[tID] = rb[idx]->getCircumscribedRadius();
+}
+
+// -----------------------------------------------------------------------------
 /** @brief Resizes the cells
     @param cells pointer to the Cells object
     @param cellSize new size of the cell

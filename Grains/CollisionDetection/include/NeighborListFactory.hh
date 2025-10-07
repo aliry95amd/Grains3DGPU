@@ -47,17 +47,20 @@ public:
     // -------------------------------------------------------------------------
     /** @brief Creates and returns a buffer of NeighborList objects
         @param rb Rigid body buffer
+        @param referenceRigidBodies Reference rigid bodies buffer
         @param positions Positions buffer
         @param quaternions Quaternions buffer
         @param nObstacles number of obstacles
         @param nParticles number of particles        
         @param NL Memory buffer for storing the neighbor list object */
-    static void create(const GrainsMemBuffer<RigidBody<T>*, M>* rb,
-                       const GrainsMemBuffer<Vector3<T>, M>&    positions,
-                       const GrainsMemBuffer<Quaternion<T>, M>& quaternions,
-                       const uint                               nObstacles,
-                       const uint                               nParticles,
-                       NeighborList<T, M>*&                     NL)
+    static void
+        create(const GrainsMemBuffer<RigidBody<T>*, M>* rb,
+               const GrainsMemBuffer<RigidBody<T>*, M>* referenceRigidBodies,
+               const GrainsMemBuffer<Vector3<T>, M>&    positions,
+               const GrainsMemBuffer<Quaternion<T>, M>& quaternions,
+               const uint                               nObstacles,
+               const uint                               nParticles,
+               NeighborList<T, M>*&                     NL)
     {
         using GP = GrainsParameters<T>;
 
@@ -83,6 +86,7 @@ public:
         else if(type == NEIGHBORLISTTYPE::LINKEDCELL)
         {
             NL = new NeighborList_LinkedCell<T, M>(rb,
+                                                   referenceRigidBodies,
                                                    positions,
                                                    quaternions,
                                                    minCorner,

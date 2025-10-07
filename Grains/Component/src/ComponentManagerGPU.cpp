@@ -16,12 +16,10 @@ ComponentManagerGPU<T>::ComponentManagerGPU(
     uint                                             nParticles)
     : ComponentManager<T, MemType::DEVICE>(rigidBody, nObstacles, nParticles)
 {
+    this->initialize();
     uint maxPairs
         = m_nObstacles * m_nParticles + m_nParticles * (m_nParticles - 1) / 2;
-    m_prefixScan.initialize(maxPairs);
-    m_prefixScan.fill();
-    m_activeIndex.initialize(maxPairs);
-    m_activeIndex.fill();
+    resizePairBuffers(maxPairs);
 }
 
 // -----------------------------------------------------------------------------
@@ -32,11 +30,11 @@ ComponentManagerGPU<T>::~ComponentManagerGPU() = default;
 // -----------------------------------------------------------------------------
 // Resizes pair-dependent buffers based on current neighbor list size
 template <typename T>
-void ComponentManagerGPU<T>::resizePairBuffers()
+void ComponentManagerGPU<T>::resizePairBuffers(const uint size)
 {
-    uint nPairs = m_neighborList->getSize();
-    m_prefixScan.setSize(nPairs);
-    m_activeIndex.setSize(nPairs);
+    ComponentManager<T, MemType::DEVICE>::resizePairBuffers(size);
+    m_prefixScan.setSize(size);
+    m_activeIndex.setSize(size);
 }
 
 // -----------------------------------------------------------------------------
@@ -51,8 +49,8 @@ void ComponentManagerGPU<T>::updateNeighborList()
                                            m_nParticles);
 
         // Resize pair-dependent buffers in base, then GPU-specific buffers
-        ComponentManager<T, MemType::DEVICE>::resizePairBuffers();
-        this->resizePairBuffers();
+        const uint pairCount = m_neighborList->getSize();
+        this->resizePairBuffers(pairCount);
     }
 }
 

@@ -158,70 +158,146 @@ __HOST__ void updateNeighborList_LC_Host(
 
 // -----------------------------------------------------------------------------
 // Updates the neighbor list on device using a linked cell approach
-__GLOBAL__ void updateNeighborList_LC_Device(const uint* particleID,
-                                             const uint* particleHash,
+__GLOBAL__ void updateNeighborList_LC_Device(const uint* componentID,
+                                             const uint* cellID,
                                              const uint* cellNeighborsList,
                                              const uint* cellStartID,
+                                             const uint  maxObstacleID,
+                                             const uint  numObstacles,
                                              const uint  numParticles,
                                              const uint  numCells,
                                              uint2*      pairList,
                                              uint*       pairCount)
 {
-    // constexpr variables
-    // constexpr uint MAX_PAIRS_PER_PARTICLE = 64; // Maximum pairs per particle
     constexpr uint NUM_NEIGHBOR_CELLS = 27; // Number of neighboring cells
 
     uint tID = blockIdx.x * blockDim.x + threadIdx.x;
-    if(tID >= numParticles)
-        return;
 
-    // Initialize the pair count
+    // Initialize pair count
     if(tID == 0)
         pairCount[0] = 0;
 
-    const uint  i             = particleID[tID];
-    const uint  cell          = particleHash[i];
-    const uint* neighborCells = &cellNeighborsList[NUM_NEIGHBOR_CELLS * cell];
-    uint        c, cellStart, cellEnd, numParticlesInCell, j;
+    __syncthreads();
 
-    // Loop over all neighboring cells
-    for(uint cID = 0; cID < NUM_NEIGHBOR_CELLS; ++cID)
+    // FIRST PASS: Each thread handles one obstacle for obstacle-particle pairs
+    if(tID < maxObstacleID)
     {
-        // Get the neighboring cell hash
-        c = neighborCells[cID];
+        const uint obstacleIndex = componentID[tID];
+        const uint obstacleCell  = cellID[tID];
 
-        // Check if the neighboring cell is valid (not a boundary cell)
-        if(c == UINT_MAX || c < cell)
-            continue;
+        if(obstacleCell != UINT_MAX)
+        {
+            // Get neighbor cells for this obstacle
+            const uint* neighborCells
+                = &cellNeighborsList[NUM_NEIGHBOR_CELLS * obstacleCell];
 
-        // Get the particle IDs in the cell
-        cellStart = cellStartID[c];
+            // Check all neighboring cells
+            for(uint nCellID = 0; nCellID < NUM_NEIGHBOR_CELLS; ++nCellID)
+            {
+                uint targetCell = neighborCells[nCellID];
+                if(targetCell == UINT_MAX)
+                    continue;
 
-        // Skip empty cells
+                // Get the range of components in target cell
+                uint cellStart = cellStartID[targetCell];
+                if(cellStart == UINT_MAX)
+                    continue;
+
+                uint cellEnd;
+                uint k = targetCell;
+                do
+                {
+                    ++k;
+                    cellEnd = (k < numCells) ? cellStartID[k]
+                                             : (maxObstacleID + numParticles);
+                } while(cellEnd == UINT_MAX && k < numCells);
+
+                // Check all components in this cell
+                for(uint compIdx = cellStart; compIdx < cellEnd; ++compIdx)
+                {
+                    uint otherComponentID = componentID[compIdx];
+
+                    // Only add obstacle-particle pairs (avoid obstacle-obstacle pairs)
+                    if(otherComponentID >= numObstacles)
+                    {
+                        uint globalIndex = atomicAdd(pairCount, 1);
+                        pairList[globalIndex]
+                            = make_uint2(obstacleIndex, otherComponentID);
+                    }
+                }
+            }
+        }
+    }
+
+    __syncthreads();
+
+    // SECOND PASS: Each thread handles one cell for particle-particle pairs
+    if(tID < numCells)
+    {
+        uint cellID_current = tID;
+
+        // Get the range of components in current cell
+        uint cellStart = cellStartID[cellID_current];
         if(cellStart == UINT_MAX)
-            continue;
+            return;
 
-        // Get the end of the cell
-        uint k = c;
+        uint cellEnd;
+        uint k = cellID_current;
         do
         {
             ++k;
-            cellEnd = cellStartID[k];
+            cellEnd = (k < numCells) ? cellStartID[k]
+                                     : (maxObstacleID + numParticles);
         } while(cellEnd == UINT_MAX && k < numCells);
-        // Last cell case
-        if(k == numCells)
-            cellEnd = numParticles;
 
-        // Number of particles in the cell
-        numParticlesInCell = cellEnd - cellStart;
-        for(uint p = 0; p < numParticlesInCell; ++p)
+        // Get neighbor cells
+        const uint* neighborCells
+            = &cellNeighborsList[NUM_NEIGHBOR_CELLS * cellID_current];
+
+        // Check interactions with neighboring cells
+        for(uint nCellID = 0; nCellID < NUM_NEIGHBOR_CELLS; ++nCellID)
         {
-            j = particleID[cellStart + p];
-            if(i >= j)
-                continue; // Avoid duplicates and self-pairs
-            // Use atomic operation to get unique index
-            uint globalIndex      = atomicAdd(pairCount, 1);
-            pairList[globalIndex] = make_uint2(i, j);
+            uint targetCell = neighborCells[nCellID];
+            if(targetCell == UINT_MAX || targetCell < cellID_current)
+                continue;
+
+            // Get target cell range
+            uint targetCellStart = cellStartID[targetCell];
+            if(targetCellStart == UINT_MAX)
+                continue;
+
+            uint targetCellEnd;
+            uint kt = targetCell;
+            do
+            {
+                ++kt;
+                targetCellEnd = (kt < numCells)
+                                    ? cellStartID[kt]
+                                    : (maxObstacleID + numParticles);
+            } while(targetCellEnd == UINT_MAX && kt < numCells);
+
+            // Process particle pairs between cells
+            for(uint comp1Idx = cellStart; comp1Idx < cellEnd; ++comp1Idx)
+            {
+                uint comp1 = componentID[comp1Idx];
+
+                // Skip obstacles (already handled in first pass)
+                if(comp1 < numObstacles)
+                    continue;
+
+                for(uint comp2Idx = targetCellStart; comp2Idx < targetCellEnd;
+                    ++comp2Idx)
+                {
+                    uint comp2 = componentID[comp2Idx];
+
+                    // Skip obstacles and ensure ordering
+                    if(comp2 < numObstacles || comp1 >= comp2)
+                        continue;
+
+                    uint globalIndex      = atomicAdd(pairCount, 1);
+                    pairList[globalIndex] = make_uint2(comp1, comp2);
+                }
+            }
         }
     }
 }

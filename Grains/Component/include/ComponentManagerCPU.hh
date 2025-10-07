@@ -61,11 +61,6 @@ public:
 
     /** @name Manager methods */
     //@{
-    /** @brief Allocates memory for the component manager */
-    void allocate();
-
-    /** @brief Initializes data members to default values */
-    void initialize();
     //@}
 
     /** @name Methods */

@@ -154,6 +154,7 @@ __HOST__ void RigidBodyFactory<T>::copyHostToDevice(
     GrainsMemBuffer<RigidBody<T>*, MemType::DEVICE>& d_RB)
 {
     d_RB.reserve(h_RB.getSize());
+    d_RB.setSize(h_RB.getSize());
     for(uint i = 0; i < h_RB.getSize(); ++i)
     {
         // Extracting info from the host side object

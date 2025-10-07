@@ -26,6 +26,10 @@ protected:
     //@{
     /** \brief Parameters used in the simulation on the host memory. */
     GrainsParameters<T> m_parameters;
+    /** \brief Buffer of reference rigid bodies. We have all the obstacles in 
+        this buffer, while we only keep the unique particles (no duplicates) in 
+        this buffer. It is of size numObstacles + numUniqueParticles. */
+    GrainsMemBuffer<RigidBody<T>*, MemType::HOST> m_referenceRigidBodies;
     /** \brief Buffer of rigid bodies. It is of size numComponents where the
     first numObstacles are obstacles and the rest are particles. */
     GrainsMemBuffer<RigidBody<T>*, MemType::HOST> m_rigidBodyList;

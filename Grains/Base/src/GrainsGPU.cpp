@@ -134,13 +134,6 @@ void GrainsGPU<T>::Construction(DOMElement* rootElement)
     GoutWI(3, "Copying rigid bodies to device completed!");
 
     // -------------------------------------------------------------------------
-    // Setting up the component managers
-    m_d_components
-        = std::make_unique<ComponentManagerGPU<T>>(&m_d_rigidBodyList,
-                                                   GP::m_numObstacles,
-                                                   GP::m_numParticles);
-
-    // -------------------------------------------------------------------------
     // Contact force models
     // It is a GPU simulation, and we have already read contact force models
     // on the host. We allocate memory on device and copy the models over.
@@ -158,6 +151,13 @@ void GrainsGPU<T>::Construction(DOMElement* rootElement)
     TimeIntegratorFactory<T>::copyHostToDevice(Grains<T>::m_timeIntegrator,
                                                m_d_timeIntegrator);
     GoutWI(3, "Copying time integration scheme to device completed!");
+
+    // -------------------------------------------------------------------------
+    // Setting up the component managers
+    m_d_components
+        = std::make_unique<ComponentManagerGPU<T>>(&m_d_rigidBodyList,
+                                                   GP::m_numObstacles,
+                                                   GP::m_numParticles);
 }
 
 // -----------------------------------------------------------------------------

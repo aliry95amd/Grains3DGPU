@@ -47,18 +47,22 @@ __HOST__ void updateNeighborList_LC_Host(
     uint*                               pairCount);
 
 /** @brief Updates the neighbor list on device using a linked cell approach
-    @param particleID array of particle IDs
-    @param particleHash array of particle hashes (cells they belong to)
+    @param componentID array of component IDs
+    @param cellID array of cell IDs
     @param cellNeighborsList array of neighboring cells for each cell
     @param cellStartID array of start IDs for each cell
+    @param maxObstacleID maximum ID of obstacles
+    @param numObstacles number of obstacles
     @param numParticles number of particles
     @param numCells number of cells
     @param pairList array of pairs
     @param pairCount pointer to device memory for storing the total pair count */
-__GLOBAL__ void updateNeighborList_LC_Device(const uint* particleID,
-                                             const uint* particleHash,
+__GLOBAL__ void updateNeighborList_LC_Device(const uint* componentID,
+                                             const uint* cellID,
                                              const uint* cellNeighborsList,
                                              const uint* cellStartID,
+                                             const uint  maxObstacleID,
+                                             const uint  numObstacles,
                                              const uint  numParticles,
                                              const uint  numCells,
                                              uint2*      pairList,

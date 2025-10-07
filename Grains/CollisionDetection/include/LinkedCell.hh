@@ -1,7 +1,7 @@
 #ifndef _LINKEDCELL_HH_
 #define _LINKEDCELL_HH_
 
-#include "thrust/device_ptr.h"
+#include <thrust/device_ptr.h>
 #include <thrust/extrema.h>
 #include <thrust/find.h>
 #include <thrust/iterator/counting_iterator.h>
@@ -55,6 +55,8 @@ protected:
         We assume that this buffer remains valid during the lifetime of this 
         object. */
     const GrainsMemBuffer<RigidBody<T>*, M>* m_rb = nullptr;
+    /** \brief Non-owning pointer to the reference rigid bodies buffer (stable address) */
+    const GrainsMemBuffer<RigidBody<T>*, M>* m_referenceRigidBodies = nullptr;
     /** \brief Non-owning pointer to positions buffer (obstacles + particles) */
     const GrainsMemBuffer<Vector3<T>, M>* m_positions = nullptr;
     /** \brief Non-owning pointer to quaternions buffer (obstacles + particles) */
@@ -101,6 +103,7 @@ public:
     // -------------------------------------------------------------------------
     /** @brief Constructor with parameters
         @param rb Rigid body buffer
+        @param referenceRigidBodies Reference rigid bodies buffer
         @param positions Positions buffer
         @param quaternions Quaternions buffer
         @param minCorner minimum corner of the domain
@@ -110,6 +113,7 @@ public:
         @param nParticles number of particles
         @param nCellsForEachObstacle number of cells for each obstacle */
     LinkedCell(const GrainsMemBuffer<RigidBody<T>*, M>* rb,
+               const GrainsMemBuffer<RigidBody<T>*, M>* referenceRigidBodies,
                const GrainsMemBuffer<Vector3<T>, M>&    positions,
                const GrainsMemBuffer<Quaternion<T>, M>& quaternions,
                const Vector3<T>&                        minCorner,
@@ -124,9 +128,10 @@ public:
         , m_numParticles(nParticles)
     {
         // Store non-owning pointer to rigid body buffer (must remain valid)
-        m_rb          = rb;
-        m_positions   = &positions;
-        m_quaternions = &quaternions;
+        m_rb                   = rb;
+        m_referenceRigidBodies = referenceRigidBodies;
+        m_positions            = &positions;
+        m_quaternions          = &quaternions;
         GAssert(positions.getSize() == nObstacles + nParticles
                     && quaternions.getSize() == nObstacles + nParticles,
                 "LinkedCell: positions or quaternions size does not match "
@@ -375,22 +380,39 @@ public:
         }
         if constexpr(M == MemType::DEVICE)
         {
-            // Use thrust to find the maximum radius
-            auto begin = thrust::device_pointer_cast(m_rb->getData() + startID);
-            auto end   = begin + (endID - startID);
+            // Use Thrust approach with separate radii extraction
+            GrainsMemBuffer<T, MemType::DEVICE> radii(endID - startID, T(0));
 
-            // Transform iterator to extract radius values
-            auto radius_begin = thrust::make_transform_iterator(
-                begin,
-                [] __device__(RigidBody<T>* const& rb) -> T {
-                    return rb->getCircumscribedRadius();
-                });
-            auto radius_end = radius_begin + (endID - startID);
+            // Launch kernel to extract radii
+            uint numBlocks, numThreads;
+            computeOptimalThreadsAndBlocks(endID - startID,
+                                           GrainsParameters<T>::m_GPU,
+                                           numBlocks,
+                                           numThreads);
 
-            // Find maximum radius
-            auto max_it = thrust::max_element(radius_begin, radius_end);
-            if(max_it != radius_end)
-                maxRadius = *max_it;
+            computeMaxRadius_Device<<<numBlocks, numThreads>>>(m_rb->getData(),
+                                                               startID,
+                                                               endID,
+                                                               radii.getData());
+            cudaDeviceSynchronize();
+
+            // Use thrust to find maximum
+            auto max_it = thrust::max_element(
+                thrust::device,
+                thrust::device_pointer_cast(radii.getData()),
+                thrust::device_pointer_cast(radii.getData() + radii.getSize()));
+
+            if(max_it
+               != thrust::device_pointer_cast(radii.getData()
+                                              + radii.getSize()))
+            {
+                T temp_max;
+                cudaErrCheck(cudaMemcpy(&temp_max,
+                                        thrust::raw_pointer_cast(max_it),
+                                        sizeof(T),
+                                        cudaMemcpyDeviceToHost));
+                maxRadius = temp_max;
+            }
         }
 
         return (maxRadius);

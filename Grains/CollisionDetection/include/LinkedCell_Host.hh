@@ -56,6 +56,7 @@ public:
     // -------------------------------------------------------------------------
     /** @brief Constructor with parameters
         @param rb Rigid body buffer
+        @param referenceRigidBodies Reference rigid bodies buffer
         @param positions Positions buffer
         @param quaternions Quaternions buffer
         @param minCorner minimum corner of the domain
@@ -66,7 +67,9 @@ public:
         @param nCellsForEachObstacle number of cells for each obstacle */
     LinkedCell_Host(
         const GrainsMemBuffer<RigidBody<T>*, MemType::HOST>* rb,
-        const GrainsMemBuffer<Vector3<T>, MemType::HOST>&    positions,
+        const GrainsMemBuffer<RigidBody<T>*, MemType::HOST>*
+                                                          referenceRigidBodies,
+        const GrainsMemBuffer<Vector3<T>, MemType::HOST>& positions,
         const GrainsMemBuffer<Quaternion<T>, MemType::HOST>& quaternions,
         const Vector3<T>&                                    minCorner,
         const Vector3<T>&                                    maxCorner,
@@ -74,6 +77,7 @@ public:
         const uint                                           nObstacles,
         const uint                                           nParticles)
         : LinkedCell<T, MemType::HOST>(rb,
+                                       referenceRigidBodies,
                                        positions,
                                        quaternions,
                                        minCorner,

@@ -17,28 +17,13 @@ ComponentManagerCPU<T>::ComponentManagerCPU(
     uint                                           nParticles)
     : ComponentManager<T, MemType::HOST>(rigidBody, nObstacles, nParticles)
 {
-    allocate();
-    initialize();
+    this->initialize();
 }
 
 // -----------------------------------------------------------------------------
 // Destructor
 template <typename T>
 ComponentManagerCPU<T>::~ComponentManagerCPU() = default;
-
-// -----------------------------------------------------------------------------
-// Allocates memory for the component manager
-template <typename T>
-void ComponentManagerCPU<T>::allocate()
-{
-}
-
-// -------------------------------------------------------------------------
-// Initializes data members to default values
-template <typename T>
-void ComponentManagerCPU<T>::initialize()
-{
-}
 
 // -----------------------------------------------------------------------------
 // Updates neighbor list if needed
@@ -52,7 +37,7 @@ void ComponentManagerCPU<T>::updateNeighborList()
                                            m_nParticles);
 
         // Resize pair-dependent buffers to match actual number of pairs
-        this->resizePairBuffers();
+        this->resizePairBuffers(m_neighborList->getSize());
     }
 }
 

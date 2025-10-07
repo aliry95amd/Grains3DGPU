@@ -148,14 +148,14 @@ void Grains<T>::Construction(DOMElement* rootElement)
     // Components
     // Particle variables
     DOMNode* particles = ReaderXML::getNode(root, "Particles");
-    GrainsMemBuffer<RigidBody<T>*> m_refParticleRigidBodyList;
+    GrainsMemBuffer<RigidBody<T>*> refParticleRigidBodyList;
     GrainsMemBuffer<Vector3<T>>    refParticleInitialPosition;
     GrainsMemBuffer<Quaternion<T>> refParticleInitialOrientation;
     GrainsMemBuffer<uint>          numEachRefParticle;
     uint                           numParticles = 0;
     // Obstacle variables
     DOMNode* obstacles = ReaderXML::getNode(root, "Obstacles");
-    GrainsMemBuffer<RigidBody<T>*> m_refObstacleRigidBodyList;
+    GrainsMemBuffer<RigidBody<T>*> refObstacleRigidBodyList;
     GrainsMemBuffer<Vector3<T>>    refObstacleInitialPosition;
     GrainsMemBuffer<Quaternion<T>> refObstacleInitialOrientation;
     GrainsMemBuffer<uint>          numEachRefObstacle;
@@ -163,8 +163,8 @@ void Grains<T>::Construction(DOMElement* rootElement)
     GoutWI(6, "Reading rigid bodies ...");
     RigidBodyFactory<T>::create(obstacles,
                                 particles,
-                                m_refObstacleRigidBodyList,
-                                m_refParticleRigidBodyList,
+                                refObstacleRigidBodyList,
+                                refParticleRigidBodyList,
                                 refObstacleInitialPosition,
                                 refParticleInitialPosition,
                                 refObstacleInitialOrientation,
@@ -175,12 +175,33 @@ void Grains<T>::Construction(DOMElement* rootElement)
                                 numParticles);
     GoutWI(6, "Reading rigid bodies completed!");
 
-    m_rigidBodyList.initialize(numObstacles + numParticles);
-    GrainsMemBuffer<Vector3<T>>    initialPosition(numObstacles + numParticles);
-    GrainsMemBuffer<Quaternion<T>> initialOrientation(numObstacles
-                                                      + numParticles);
+    // Setting up reference rigid bodies buffer
+    m_referenceRigidBodies.initialize(numObstacles
+                                      + refParticleRigidBodyList.getSize());
+    {
+        uint offset = 0;
+        for(uint i = 0; i < refObstacleRigidBodyList.getSize(); ++i)
+        {
+            // Deep copy of the rigid body
+            m_referenceRigidBodies[offset++]
+                = new RigidBody<T>(*refObstacleRigidBodyList[i]);
+        }
 
-    if(numObstacles + numParticles > 0)
+        for(uint i = 0; i < refParticleRigidBodyList.getSize(); ++i)
+        {
+            // Deep copy of the rigid body
+            m_referenceRigidBodies[offset++]
+                = new RigidBody<T>(*refParticleRigidBodyList[i]);
+        }
+    }
+
+    // Setting up rigid bodies buffer
+    const uint totalNumComponents = numObstacles + numParticles;
+    GAssert(totalNumComponents > 0, "No components found in the simulation!");
+    m_rigidBodyList.initialize(totalNumComponents);
+    GrainsMemBuffer<Vector3<T>>    initialPosition(totalNumComponents);
+    GrainsMemBuffer<Quaternion<T>> initialOrientation(totalNumComponents);
+
     {
         uint offset = 0;
         for(uint i = 0; i < m_refObstacleRigidBodyList.getSize(); ++i)
@@ -337,8 +358,6 @@ void Grains<T>::Construction(DOMElement* rootElement)
 
     // -------------------------------------------------------------------------
     // Setting up the component managers
-    GP::m_numObstacles = numObstacles;
-    GP::m_numParticles = numParticles;
     m_components = std::make_unique<ComponentManagerCPU<T>>(&m_rigidBodyList,
                                                             GP::m_numObstacles,
                                                             GP::m_numParticles);
