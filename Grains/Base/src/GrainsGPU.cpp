@@ -26,6 +26,11 @@ void GrainsGPU<T>::setupGPUDevice()
 {
     using GP = GrainsParameters<T>;
 
+    // Check available devices first
+    int deviceCount = 0;
+    cudaErrCheck(cudaGetDeviceCount(&deviceCount));
+    GAssert(deviceCount > 0, "No CUDA devices found!");
+
     // Set the device to the first one
     uint device = 0;
     cudaErrCheck(cudaSetDevice(device));
@@ -60,7 +65,8 @@ void GrainsGPU<T>::setupGPUDevice()
 template <typename T>
 void GrainsGPU<T>::initialize(DOMElement* rootElement)
 {
-    // We first read using the base class Grains<T>
+
+    // Read using the base class Grains<T> with GPU context ready
     Grains<T>::initialize(rootElement);
 
     // Reading different blocks of the input XML

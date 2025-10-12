@@ -1,15 +1,16 @@
 #ifndef _LINKEDCELL_HH_
 #define _LINKEDCELL_HH_
 
-#include <thrust/device_ptr.h>
-#include <thrust/extrema.h>
-#include <thrust/find.h>
-#include <thrust/iterator/counting_iterator.h>
-#include <thrust/iterator/transform_iterator.h>
-#include <thrust/iterator/zip_iterator.h>
-#include <thrust/remove.h>
-#include <thrust/transform_reduce.h>
-#include <thrust/tuple.h>
+#include "thrust/device_ptr.h"
+#include "thrust/execution_policy.h"
+#include "thrust/extrema.h"
+#include "thrust/find.h"
+#include "thrust/iterator/counting_iterator.h"
+#include "thrust/iterator/transform_iterator.h"
+#include "thrust/iterator/zip_iterator.h"
+#include "thrust/remove.h"
+#include "thrust/transform_reduce.h"
+#include "thrust/tuple.h"
 
 #include "Cells.hh"
 #include "CellsFactory.hh"
@@ -55,8 +56,6 @@ protected:
         We assume that this buffer remains valid during the lifetime of this 
         object. */
     const GrainsMemBuffer<RigidBody<T>*, M>* m_rb = nullptr;
-    /** \brief Non-owning pointer to the reference rigid bodies buffer (stable address) */
-    const GrainsMemBuffer<RigidBody<T>*, M>* m_referenceRigidBodies = nullptr;
     /** \brief Non-owning pointer to positions buffer (obstacles + particles) */
     const GrainsMemBuffer<Vector3<T>, M>* m_positions = nullptr;
     /** \brief Non-owning pointer to quaternions buffer (obstacles + particles) */
@@ -103,7 +102,6 @@ public:
     // -------------------------------------------------------------------------
     /** @brief Constructor with parameters
         @param rb Rigid body buffer
-        @param referenceRigidBodies Reference rigid bodies buffer
         @param positions Positions buffer
         @param quaternions Quaternions buffer
         @param minCorner minimum corner of the domain
@@ -113,7 +111,6 @@ public:
         @param nParticles number of particles
         @param nCellsForEachObstacle number of cells for each obstacle */
     LinkedCell(const GrainsMemBuffer<RigidBody<T>*, M>* rb,
-               const GrainsMemBuffer<RigidBody<T>*, M>* referenceRigidBodies,
                const GrainsMemBuffer<Vector3<T>, M>&    positions,
                const GrainsMemBuffer<Quaternion<T>, M>& quaternions,
                const Vector3<T>&                        minCorner,
@@ -128,10 +125,9 @@ public:
         , m_numParticles(nParticles)
     {
         // Store non-owning pointer to rigid body buffer (must remain valid)
-        m_rb                   = rb;
-        m_referenceRigidBodies = referenceRigidBodies;
-        m_positions            = &positions;
-        m_quaternions          = &quaternions;
+        m_rb          = rb;
+        m_positions   = &positions;
+        m_quaternions = &quaternions;
         GAssert(positions.getSize() == nObstacles + nParticles
                     && quaternions.getSize() == nObstacles + nParticles,
                 "LinkedCell: positions or quaternions size does not match "
@@ -157,7 +153,7 @@ public:
         }
         else if constexpr(M == MemType::DEVICE)
         {
-            GrainsMemBuffer<Cells<T>*, MemType::HOST> h_cells;
+            GrainsMemBuffer<Cells<T>*, MemType::HOST> h_cells(1);
             CellsFactory<T>::create(minCorner,
                                     maxCorner,
                                     m_cellSizeWithoutSkin,
@@ -169,7 +165,7 @@ public:
         }
 
         // Initialize neighbor cells buffer
-        m_neighborCells.reserve(m_numCells * 27); // 26 neighbors + self
+        m_neighborCells.initialize(m_numCells * 27); // 26 neighbors + self
         m_neighborCells.fill(UINT_MAX);
         generateNeighborCells();
 
@@ -381,6 +377,7 @@ public:
         if constexpr(M == MemType::DEVICE)
         {
             // Use Thrust approach with separate radii extraction
+            // GrainsMemBuffer<T, MemType::HOST>   h_radii(endID - startID, T(0));
             GrainsMemBuffer<T, MemType::DEVICE> radii(endID - startID, T(0));
 
             // Launch kernel to extract radii
@@ -401,18 +398,7 @@ public:
                 thrust::device,
                 thrust::device_pointer_cast(radii.getData()),
                 thrust::device_pointer_cast(radii.getData() + radii.getSize()));
-
-            if(max_it
-               != thrust::device_pointer_cast(radii.getData()
-                                              + radii.getSize()))
-            {
-                T temp_max;
-                cudaErrCheck(cudaMemcpy(&temp_max,
-                                        thrust::raw_pointer_cast(max_it),
-                                        sizeof(T),
-                                        cudaMemcpyDeviceToHost));
-                maxRadius = temp_max;
-            }
+            maxRadius = *max_it;
         }
 
         return (maxRadius);
@@ -471,7 +457,10 @@ public:
             auto zip_end = zip_begin + m_numObstacles;
 
             obstacle_has_moved<T> moved_pred;
-            auto it = thrust::find_if(zip_begin, zip_end, moved_pred);
+            auto                  it = thrust::find_if(thrust::device,
+                                      zip_begin,
+                                      zip_end,
+                                      moved_pred);
             return it != zip_end;
         }
 
@@ -541,10 +530,10 @@ public:
         {
             // Launch one block per obstacle
             uint numBlocks = m_numObstacles;
-            // single thread in each block will work on multiple cells with
-            // 1024 strides
-            uint numThreads = 1024;
-
+            // Use minimal resources: 1 thread per obstacle to avoid all resource limit issues
+            // Single thread per block eliminates register pressure and shared memory conflicts
+            uint numThreads = 128;
+            cudaErrCheck(cudaGetLastError());
             linkObstacles_Device<T>
                 <<<numBlocks, numThreads>>>(m_rb->getData(),
                                             m_positions->getData(),
@@ -556,6 +545,7 @@ public:
                                             componentID.getData(),
                                             cellID.getData());
             cudaDeviceSynchronize();
+            cudaErrCheck(cudaGetLastError());
 
             // Perform separate compactions for componentID and cellID
             const uint total = m_maxCellsPerObstacle * m_numObstacles;
@@ -564,19 +554,33 @@ public:
             auto comp_begin
                 = thrust::device_pointer_cast(componentID.getData());
             auto comp_end      = comp_begin + total;
-            auto comp_new_end  = thrust::remove(comp_begin, comp_end, UINT_MAX);
+            auto comp_new_end  = thrust::remove(thrust::device,
+                                               comp_begin,
+                                               comp_end,
+                                               UINT_MAX);
             uint compactedSize = static_cast<uint>(comp_new_end - comp_begin);
 
             // Second compaction: remove UINT_MAX entries from cellID
             auto cell_begin   = thrust::device_pointer_cast(cellID.getData());
             auto cell_end     = cell_begin + total;
-            auto cell_new_end = thrust::remove(cell_begin, cell_end, UINT_MAX);
+            auto cell_new_end = thrust::remove(thrust::device,
+                                               cell_begin,
+                                               cell_end,
+                                               UINT_MAX);
             uint cellCompactedSize
                 = static_cast<uint>(cell_new_end - cell_begin);
 
             // Both should have the same size after compaction
             GAssert(compactedSize == cellCompactedSize,
                     "ComponentID and CellID compacted sizes don't match");
+
+            // For some reason the above does not work on some systems. Since
+            // this is not a performance-critical part, we use the following
+            // approach which works everywhere.
+            // GrainsMemBuffer<uint, MemType::HOST> h_componentID(maxBufferSize);
+            // GrainsMemBuffer<uint, MemType::HOST> h_cellID(maxBufferSize);
+            // h_componentID.copyFrom(componentID);
+            // h_cellID.copyFrom(cellID);
 
             // Set the size of the obstacles buffer
             m_obstaclesBufferSize = compactedSize;
@@ -619,6 +623,7 @@ public:
                 = pos_begin + m_positions->getSize();
 
             maxDisplacementSquared = thrust::transform_reduce(
+                thrust::device,
                 thrust::make_zip_iterator(
                     thrust::make_tuple(old_begin, pos_begin)),
                 thrust::make_zip_iterator(thrust::make_tuple(old_end, pos_end)),
@@ -767,7 +772,7 @@ public:
     template <bool forceUpdate = false>
     bool updateCellFixed()
     {
-        if(forceUpdate || haveObstaclesMoved() == true)
+        if constexpr(forceUpdate)
         {
             // Relink obstacles on the existing grid
             linkObstacles();
@@ -778,6 +783,21 @@ public:
 
             m_cellID.reserve(m_obstaclesBufferSize + m_numParticles);
             setCellID();
+        }
+        else
+        {
+            if(haveObstaclesMoved() == true)
+            {
+                // Relink obstacles on the existing grid
+                linkObstacles();
+
+                // Refresh component and cell IDs on current buffers
+                m_componentID.reserve(m_obstaclesBufferSize + m_numParticles);
+                setComponentID();
+
+                m_cellID.reserve(m_obstaclesBufferSize + m_numParticles);
+                setCellID();
+            }
         }
 
         // Update particle cell IDs

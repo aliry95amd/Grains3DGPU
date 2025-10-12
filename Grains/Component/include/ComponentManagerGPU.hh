@@ -66,7 +66,10 @@ public:
 
     /** @name Manager methods */
     //@{
-    /** @brief Resizes pair-dependent buffers based on current neighbor list 
+    /** @brief Initializes buffers for pair-dependent data */
+    void initialize();
+
+    /** @brief Resizes pair-dependent buffers based on current neighbor list
         size
         @param size New size for the pair-dependent buffers */
     void resizePairBuffers(const uint size);

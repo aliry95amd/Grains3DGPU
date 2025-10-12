@@ -42,6 +42,8 @@ __HOST__ void
                             GrainsMemBuffer<Cells<T>*, MemType::HOST>& cells,
                             uint*                                      numCells)
 {
+    // Safety check
+    GAssert(cellSize > 0, "Cell size must be positive! Aborting Grains!");
     cells.initialize(1);
     cells[0]  = new Cells<T>(minCorner, maxCorner, cellSize);
     *numCells = cells[0]->getNumCells();
@@ -68,6 +70,8 @@ __HOST__ void CellsFactory<T>::copyHostToDevice(
         Vector3<T> origin        = h_cells[i]->getMinCorner();
         Vector3<T> maxCoordinate = h_cells[i]->getMaxCorner();
         T          size          = h_cells[i]->getCellSize();
+        // Safety check
+        GAssert(size > 0, "Cell size must be positive! Aborting Grains!");
         createCellsKernel<<<1, 1>>>(d_cells.getData(),
                                     i,
                                     origin[X],
@@ -82,6 +86,7 @@ __HOST__ void CellsFactory<T>::copyHostToDevice(
                    d_numCells,
                    sizeof(uint),
                    cudaMemcpyDeviceToHost);
+        cudaDeviceSynchronize();
         GoutWI(9, "LinkedCell with", h_numCells, "cells is created on device.");
     }
     cudaDeviceSynchronize();

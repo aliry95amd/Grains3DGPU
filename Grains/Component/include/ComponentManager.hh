@@ -33,8 +33,6 @@ protected:
     // TODO: What to do with pointers? Better design? unique_ptr?
     /** \brief Pointer to buffer of components rigid bodies */
     const GrainsMemBuffer<RigidBody<T>*, M>* m_rigidBody;
-    /** \brief Pointer to buffer of reference rigid bodies for collision detection */
-    const GrainsMemBuffer<RigidBody<T>*, M>* m_referenceRigidBodies;
 
     /** \brief Components rigid body Id */
     GrainsMemBuffer<uint, M> m_rigidBodyId;
@@ -80,15 +78,12 @@ public:
     // -------------------------------------------------------------------------
     /** @brief Constructor with the number of particles, and obstacles
         @param rigidBody Pointer to the components rigid body buffer
-        @param referenceRigidBodies Pointer to the reference rigid bodies buffer
         @param nObstacles Number of obstacles
         @param nParticles Number of particles */
     ComponentManager(GrainsMemBuffer<RigidBody<T>*, M>* rigidBody,
-                     GrainsMemBuffer<RigidBody<T>*, M>* referenceRigidBodies,
                      uint                               nObstacles,
                      uint                               nParticles)
         : m_rigidBody(rigidBody)
-        , m_referenceRigidBodies(referenceRigidBodies)
         , m_rigidBodyId(nParticles + nObstacles)
         , m_position(nParticles + nObstacles)
         , m_quaternion(nParticles + nObstacles)
@@ -358,7 +353,6 @@ public:
     void initialize()
     {
         NeighborListFactory<T, M>::create(m_rigidBody,
-                                          m_referenceRigidBodies,
                                           m_position,
                                           m_quaternion,
                                           m_nObstacles,
@@ -369,7 +363,11 @@ public:
         // TODO: Make this dynamic
         uint maxPairs = m_nObstacles * m_nParticles
                         + m_nParticles * (m_nParticles - 1) / 2;
-        resizePairBuffers(maxPairs);
+        m_relPosition.initialize(maxPairs);
+        m_relQuaternion.initialize(maxPairs);
+        m_contactInfo.initialize(maxPairs);
+        m_contactInfoWorld.initialize(maxPairs);
+        m_activePairs.initialize(maxPairs);
     }
 
     // -------------------------------------------------------------------------
@@ -378,11 +376,11 @@ public:
         @param size new size for the pair buffers */
     virtual void resizePairBuffers(const uint size)
     {
-        m_relPosition.setSize(size);
-        m_relQuaternion.setSize(size);
-        m_contactInfo.setSize(size);
-        m_contactInfoWorld.setSize(size);
-        m_activePairs.setSize(size);
+        m_relPosition.resize(size);
+        m_relQuaternion.resize(size);
+        m_contactInfo.resize(size);
+        m_contactInfoWorld.resize(size);
+        m_activePairs.resize(size);
     }
 
     // -------------------------------------------------------------------------

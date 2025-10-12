@@ -175,42 +175,21 @@ void Grains<T>::Construction(DOMElement* rootElement)
                                 numParticles);
     GoutWI(6, "Reading rigid bodies completed!");
 
-    // Setting up reference rigid bodies buffer
-    m_referenceRigidBodies.initialize(numObstacles
-                                      + refParticleRigidBodyList.getSize());
-    {
-        uint offset = 0;
-        for(uint i = 0; i < refObstacleRigidBodyList.getSize(); ++i)
-        {
-            // Deep copy of the rigid body
-            m_referenceRigidBodies[offset++]
-                = new RigidBody<T>(*refObstacleRigidBodyList[i]);
-        }
-
-        for(uint i = 0; i < refParticleRigidBodyList.getSize(); ++i)
-        {
-            // Deep copy of the rigid body
-            m_referenceRigidBodies[offset++]
-                = new RigidBody<T>(*refParticleRigidBodyList[i]);
-        }
-    }
-
     // Setting up rigid bodies buffer
     const uint totalNumComponents = numObstacles + numParticles;
     GAssert(totalNumComponents > 0, "No components found in the simulation!");
     m_rigidBodyList.initialize(totalNumComponents);
     GrainsMemBuffer<Vector3<T>>    initialPosition(totalNumComponents);
     GrainsMemBuffer<Quaternion<T>> initialOrientation(totalNumComponents);
-
     {
         uint offset = 0;
-        for(uint i = 0; i < m_refObstacleRigidBodyList.getSize(); ++i)
+        for(uint i = 0; i < refObstacleRigidBodyList.getSize(); ++i)
         {
             for(uint j = 0; j < numEachRefObstacle[i]; j++)
             {
                 // Deep copy of the rigid body
                 m_rigidBodyList[offset + j]
-                    = new RigidBody<T>(*m_refObstacleRigidBodyList[i]);
+                    = new RigidBody<T>(*refObstacleRigidBodyList[i]);
                 // Initial transformation of the rigid body
                 initialPosition[offset + j] = refObstacleInitialPosition[i];
                 initialOrientation[offset + j]
@@ -220,13 +199,13 @@ void Grains<T>::Construction(DOMElement* rootElement)
             offset += numEachRefObstacle[i];
         }
 
-        for(uint i = 0; i < m_refParticleRigidBodyList.getSize(); ++i)
+        for(uint i = 0; i < refParticleRigidBodyList.getSize(); ++i)
         {
             for(uint j = 0; j < numEachRefParticle[i]; j++)
             {
                 // Deep copy of the rigid body
                 m_rigidBodyList[offset + j]
-                    = new RigidBody<T>(*m_refParticleRigidBodyList[i]);
+                    = new RigidBody<T>(*refParticleRigidBodyList[i]);
                 // Initial transformation of the rigid body
                 initialPosition[offset + j] = refParticleInitialPosition[i];
                 initialOrientation[offset + j]

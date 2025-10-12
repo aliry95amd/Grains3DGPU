@@ -46,7 +46,6 @@ public:
     // -------------------------------------------------------------------------
     /** @brief Constructor with parameters
         @param rb Rigid body buffer
-        @param referenceRigidBodies Reference rigid bodies buffer
         @param positions Positions buffer
         @param quaternions Quaternions buffer
         @param minCorner minimum corner of the domain
@@ -56,7 +55,6 @@ public:
         @param nParticles number of particles */
     NeighborList_LinkedCell(
         const GrainsMemBuffer<RigidBody<T>*, M>* rb,
-        const GrainsMemBuffer<RigidBody<T>*, M>* referenceRigidBodies,
         const GrainsMemBuffer<Vector3<T>, M>&    positions,
         const GrainsMemBuffer<Quaternion<T>, M>& quaternions,
         const Vector3<T>&                        minCorner,
@@ -67,7 +65,6 @@ public:
     {
         // Create the LinkedCell buffer
         LinkedCellFactory<T, M>::create(rb,
-                                        referenceRigidBodies,
                                         positions,
                                         quaternions,
                                         minCorner,
@@ -76,18 +73,18 @@ public:
                                         nObstacles,
                                         nParticles,
                                         m_LinkedCell);
-        // Sanity check to ensure LinkedCell was created
-        GAssert(m_LinkedCell != nullptr, "LinkedCell creation failed.");
 
         // TODO: Reduce init size
         m_pairList.initialize(nObstacles * nParticles
                               + nParticles * (nParticles - 1) / 2);
         m_pairList.fill();
+
         m_pairCount.initialize(1);
         m_pairCount.fill(0);
 
         m_hPairCount.initialize(1);
         m_hPairCount.fill(0);
+
         m_needsUpdate = true; // Initially, we need to create the list
     }
 

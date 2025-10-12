@@ -78,13 +78,11 @@ githook:
 	@echo '----------------------'
 
 xerces:
-	@cd $(XERCES_DIR); \
-	$(INSTALL_XERCES); \
+	$(INSTALL_XERCES);
 	@cd ..;
 
 dtd:
-	@cd Main/dtd; \
-	$(INSTALL_DTD); \
+	@cd Main/dtd && $(INSTALL_DTD);
 	@cd ../..;
 
 build-tests:
@@ -150,17 +148,17 @@ clean-validation:
 # Low level cleaning targets
 # --------------------------
 cleanxerces:
-	@cd $(XERCES_SOURCE); \
-	@make clean; \
+	@cd $(XERCES_SOURCE);
+	@make clean;
 	@cd ../../..;
-	@cd $(XERCES_DIR); \
-	$(RM) ${GRAINS_XERCES_LIBDIR}; \
+	@cd $(XERCES_DIR);
+	$(RM) ${GRAINS_XERCES_LIBDIR};
 	@cd ..;
 	@echo 'XERCES cleaned'
 
 cleandtd:
-	@cd Main/dtd; \
-	$(RM) Grains*.dtd; \
+	@cd Main/dtd;
+	$(RM) Grains*.dtd;
 	@cd ../..
 	@echo 'dtd cleaned!'
 
@@ -200,8 +198,8 @@ help:
 ##################################################################
 TOUCH := touch
 RM := rm -rf
-INSTALL_XERCES := ./install.sh
 XERCES_DIR := XERCES-2.8.0
 XERCES_SOURCE := XERCES-2.8.0/src/xercesc
+INSTALL_XERCES := cd $(XERCES_DIR) && ./install.sh
 INSTALL_DTD := ./installdtd.sh
 BANG := \#

@@ -193,15 +193,15 @@ static __GLOBAL__ void computeCellStart_Kernel(const uint* particleHash,
     @param obstacleIDs list of obstacle IDs
     @param obstacleCellHash list of cells obstacles belong to */
 template <typename T>
-__GLOBAL__ void linkObstacles_Device(const RigidBody<T>* const* rb,
-                                     const Vector3<T>*          positions,
-                                     const Quaternion<T>*       quaternions,
-                                     const Cells<T>* const*     cells,
-                                     const uint                 nObstacles,
-                                     const uint                 nCells,
-                                     const uint                 maxPerObstacle,
-                                     uint*                      obstacleIDs,
-                                     uint* obstacleCellHash)
+static __GLOBAL__ void linkObstacles_Device(const RigidBody<T>* const* rb,
+                                            const Vector3<T>*      positions,
+                                            const Quaternion<T>*   quaternions,
+                                            const Cells<T>* const* cells,
+                                            const uint             nObstacles,
+                                            const uint             nCells,
+                                            const uint maxPerObstacle,
+                                            uint*      obstacleIDs,
+                                            uint*      obstacleCellHash)
 {
     const uint r = blockIdx.x;
     if(r >= nObstacles)

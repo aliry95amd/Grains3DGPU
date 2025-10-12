@@ -17,9 +17,6 @@ ComponentManagerGPU<T>::ComponentManagerGPU(
     : ComponentManager<T, MemType::DEVICE>(rigidBody, nObstacles, nParticles)
 {
     this->initialize();
-    uint maxPairs
-        = m_nObstacles * m_nParticles + m_nParticles * (m_nParticles - 1) / 2;
-    resizePairBuffers(maxPairs);
 }
 
 // -----------------------------------------------------------------------------
@@ -28,13 +25,25 @@ template <typename T>
 ComponentManagerGPU<T>::~ComponentManagerGPU() = default;
 
 // -----------------------------------------------------------------------------
+// Initializes buffers for pair-dependent data
+template <typename T>
+void ComponentManagerGPU<T>::initialize()
+{
+    ComponentManager<T, MemType::DEVICE>::initialize();
+    uint maxPairs
+        = m_nObstacles * m_nParticles + m_nParticles * (m_nParticles - 1) / 2;
+    m_prefixScan.initialize(maxPairs);
+    m_activeIndex.initialize(maxPairs);
+}
+
+// -----------------------------------------------------------------------------
 // Resizes pair-dependent buffers based on current neighbor list size
 template <typename T>
 void ComponentManagerGPU<T>::resizePairBuffers(const uint size)
 {
     ComponentManager<T, MemType::DEVICE>::resizePairBuffers(size);
-    m_prefixScan.setSize(size);
-    m_activeIndex.setSize(size);
+    m_prefixScan.resize(size);
+    m_activeIndex.resize(size);
 }
 
 // -----------------------------------------------------------------------------

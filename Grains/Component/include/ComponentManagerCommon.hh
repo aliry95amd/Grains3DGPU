@@ -6,7 +6,6 @@
 #include "ContactForceModelFactory.hh"
 #include "GrainsParameters.hh"
 #include "Kinematics.hh"
-#include "LinkedCell.hh"
 #include "Quaternion.hh"
 #include "QuaternionMath.hh"
 #include "RigidBody.hh"

@@ -257,12 +257,9 @@ public:
     @param new_size new size of the buffer (must be <= capacity) */
     void setSize(size_t new_size)
     {
-        if(new_size > m_capacity)
-        {
-            std::cerr
-                << "GrainsMemBuffer::setSize() new size exceeds capacity\n";
-            return;
-        }
+        GAssert(new_size > 0, "Size must be positive in setSize()");
+        GAssert(new_size <= m_capacity,
+                "Size must be <= capacity in setSize()");
         m_size = new_size;
     }
     //@}
@@ -274,6 +271,8 @@ public:
     @param new_capacity new capacity of the buffer */
     void reserve(size_t new_capacity)
     {
+        GAssert(new_capacity > 0, "Capacity must be positive in reserve()");
+
         if(new_capacity <= m_capacity)
             return;
 
@@ -493,7 +492,7 @@ public:
         if(m_size == 0 || !m_ptr)
             return;
 
-        GAssert(dest.getSize() < m_size,
+        GAssert(dest.getSize() >= m_size,
                 "Destination buffer too small for copy");
 
         if constexpr(M == MemType::HOST && destM == MemType::HOST)
