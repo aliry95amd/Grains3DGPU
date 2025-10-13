@@ -135,10 +135,25 @@ public:
             auto* LC_device
                 = static_cast<LinkedCell_SortBased<T>*>(m_LinkedCell);
             bool LC_updated = LC_device->updateLinkedCells();
+            cudaErrCheck(cudaGetLastError());
             // Check if the linked cell structure was updated.
             // If not, we bypass the neighbor list update.
             if(LC_updated)
             {
+                if(nObstacles > 0)
+                {
+                    generateObstacleParticlePairs_Device<<<nObstacles, 64>>>(
+                        LC_device->getObstacleIDs(),
+                        LC_device->getObstacleCellIDs(),
+                        LC_device->getCellStartIDs(),
+                        LC_device->getParticleIDs(),
+                        LC_device->getMaxCellsPerObstacle(),
+                        nObstacles,
+                        nParticles,
+                        LC_device->getNumCells(),
+                        m_pairList.getData(),
+                        m_pairCount.getData());
+                }
                 uint numBlocks, numThreads;
                 computeOptimalThreadsAndBlocks(positions.getSize(),
                                                GrainsParameters<T>::m_GPU,

@@ -128,6 +128,61 @@ __HOST__ void updateNeighborList_LC_Host(
 }
 
 // -----------------------------------------------------------------------------
+// Generate obstacle-particle pairs on device
+__GLOBAL__ void
+    generateObstacleParticlePairs_Device(const uint2* obstacleIDs,
+                                         const uint*  obstacleCellIDs,
+                                         const uint*  cellStartIDs,
+                                         const uint*  particleIDs,
+                                         const uint   maxCellsPerObstacle,
+                                         const uint   numObstacles,
+                                         const uint   numParticles,
+                                         const uint   numCells,
+                                         uint2*       pairList,
+                                         uint*        pairCount)
+{
+    uint obstacleIdx = blockIdx.x;
+    if(obstacleIdx >= numObstacles)
+        return;
+
+    // Inintialize pair count to zero by the first thread
+    if(obstacleIdx == 0 && threadIdx.x == 0)
+        *pairCount = 0;
+    __syncthreads();
+
+    const uint offset             = obstacleIdx * maxCellsPerObstacle;
+    const uint obstacleIndex      = obstacleIDs[obstacleIdx].x;
+    const uint numCellsToTraverse = obstacleIDs[obstacleIdx].y;
+
+    // Each thread handles one cell for this obstacle
+    for(uint c = threadIdx.x; c < numCellsToTraverse; c += blockDim.x)
+    {
+        const uint cell      = obstacleCellIDs[offset + c];
+        const uint cellStart = cellStartIDs[cell];
+
+        if(cellStart == UINT_MAX)
+            continue; // Empty cell
+
+        // Find cell end
+        uint cellEnd;
+        uint k = cell;
+        do
+        {
+            ++k;
+            cellEnd = (k < numCells) ? cellStartIDs[k] : numParticles;
+        } while(cellEnd == UINT_MAX && k < numCells);
+
+        // Add pairs for all particles in this cell
+        for(uint p = cellStart; p < cellEnd; ++p)
+        {
+            uint particleID       = particleIDs[p];
+            uint globalIndex      = atomicAdd(pairCount, 1);
+            pairList[globalIndex] = make_uint2(obstacleIndex, particleID);
+        }
+    }
+}
+
+// -----------------------------------------------------------------------------
 // Updates the neighbor list on device using a linked cell approach
 __GLOBAL__ void updateNeighborList_LC_Device(const uint* cellNeighborsList,
                                              const uint* particleIDs,
@@ -147,9 +202,11 @@ __GLOBAL__ void updateNeighborList_LC_Device(const uint* cellNeighborsList,
     if(tID >= numParticles)
         return;
 
-    // Initialize the pair count
-    if(tID == 0)
-        pairCount[0] = 0;
+    // initialize pair count to zero by the first thread only if there is no
+    // obstacles
+    if(tID == 0 && numObstacles == 0)
+        *pairCount = 0;
+    __syncthreads();
 
     const uint  i             = particleIDs[tID];
     const uint  cell          = cellIDs[i];
