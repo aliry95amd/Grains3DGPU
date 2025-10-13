@@ -19,17 +19,6 @@
 #include "LinkedCell_Kernels.hh"
 #include "VectorMath.hh"
 
-// Thrust functors for global scope to avoid CUDA template issues
-template <typename T>
-struct obstacle_has_moved
-{
-    __device__ bool
-        operator()(const thrust::tuple<uint, Vector3<T>, Vector3<T>>& t) const
-    {
-        return thrust::get<1>(t) != thrust::get<2>(t);
-    }
-};
-
 // =============================================================================
 /** @brief The class LinkedCell.
 
@@ -56,9 +45,9 @@ protected:
         We assume that this buffer remains valid during the lifetime of this 
         object. */
     const GrainsMemBuffer<RigidBody<T>*, M>* m_rb = nullptr;
-    /** \brief Non-owning pointer to positions buffer (obstacles + particles) */
+    /** \brief Non-owning pointer to positions buffer */
     const GrainsMemBuffer<Vector3<T>, M>* m_positions = nullptr;
-    /** \brief Non-owning pointer to quaternions buffer (obstacles + particles) */
+    /** \brief Non-owning pointer to quaternions buffer */
     const GrainsMemBuffer<Quaternion<T>, M>* m_quaternions = nullptr;
     /** \brief Particles position in the last update */
     GrainsMemBuffer<Vector3<T>, M> m_oldPosition;
@@ -133,7 +122,7 @@ public:
                 "LinkedCell: positions or quaternions size does not match "
                 "nObstacles + nParticles");
 
-        // Find the maximum circumscribed radius of particles and obstacles
+        // Find the maximum circumscribed radius of particles
         T maxRadiusParticles = computeMaxRadius(nObstacles, m_rb->getSize());
 
         // Adjust the cell based on the obstacles and particles
@@ -446,6 +435,16 @@ public:
         }
         else if constexpr(M == MemType::DEVICE)
         {
+            // Define the functor
+            struct obstacle_has_moved
+            {
+                __device__ bool operator()(
+                    const thrust::tuple<uint, Vector3<T>, Vector3<T>>& t) const
+                {
+                    return thrust::get<1>(t) != thrust::get<2>(t);
+                }
+            };
+
             auto pos_begin
                 = thrust::device_pointer_cast(m_positions->getData());
             auto old_begin
@@ -456,8 +455,8 @@ public:
                 thrust::make_tuple(ids_begin, pos_begin, old_begin));
             auto zip_end = zip_begin + m_numObstacles;
 
-            obstacle_has_moved<T> moved_pred;
-            auto                  it = thrust::find_if(thrust::device,
+            obstacle_has_moved moved_pred;
+            auto               it = thrust::find_if(thrust::device,
                                       zip_begin,
                                       zip_end,
                                       moved_pred);
@@ -529,11 +528,8 @@ public:
         else if constexpr(M == MemType::DEVICE)
         {
             // Launch one block per obstacle
-            uint numBlocks = m_numObstacles;
-            // Use minimal resources: 1 thread per obstacle to avoid all resource limit issues
-            // Single thread per block eliminates register pressure and shared memory conflicts
-            uint numThreads = 128;
-            cudaErrCheck(cudaGetLastError());
+            const uint numBlocks  = m_numObstacles;
+            const uint numThreads = 1;
             linkObstacles_Device<T>
                 <<<numBlocks, numThreads>>>(m_rb->getData(),
                                             m_positions->getData(),
@@ -545,7 +541,6 @@ public:
                                             componentID.getData(),
                                             cellID.getData());
             cudaDeviceSynchronize();
-            cudaErrCheck(cudaGetLastError());
 
             // Perform separate compactions for componentID and cellID
             const uint total = m_maxCellsPerObstacle * m_numObstacles;
@@ -573,14 +568,6 @@ public:
             // Both should have the same size after compaction
             GAssert(compactedSize == cellCompactedSize,
                     "ComponentID and CellID compacted sizes don't match");
-
-            // For some reason the above does not work on some systems. Since
-            // this is not a performance-critical part, we use the following
-            // approach which works everywhere.
-            // GrainsMemBuffer<uint, MemType::HOST> h_componentID(maxBufferSize);
-            // GrainsMemBuffer<uint, MemType::HOST> h_cellID(maxBufferSize);
-            // h_componentID.copyFrom(componentID);
-            // h_cellID.copyFrom(cellID);
 
             // Set the size of the obstacles buffer
             m_obstaclesBufferSize = compactedSize;
