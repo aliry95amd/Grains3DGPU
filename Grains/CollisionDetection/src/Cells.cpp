@@ -165,16 +165,16 @@ __HOSTDEVICE__ void Cells<T>::generateNeighborCells(uint* neighborCells,
 // -----------------------------------------------------------------------------
 // Checks if a cell Id is in range
 template <typename T>
-__HOSTDEVICE__ void Cells<T>::checkBound(const uint3& id) const
+__HOSTDEVICE__ bool Cells<T>::isValid(const uint3& id) const
 {
-    GAssert(id.x < m_numCells.x || id.y < m_numCells.y || id.z < m_numCells.z,
-            "Linked cell range exceeded!");
+    return (id.x < m_numCells.x && id.y < m_numCells.y && id.z < m_numCells.z);
 }
 
 // -----------------------------------------------------------------------------
 // Returns the 3d Id of the cell which the point belongs to
 template <typename T>
-__HOSTDEVICE__ uint3 Cells<T>::computeCellID(const Vector3<T>& p) const
+__HOSTDEVICE__ uint3 Cells<T>::computeCellID(const Vector3<T>& p,
+                                             bool checkIfValid) const
 {
     const T* __RESTRICT__ pt    = p.getBuffer();
     const T* __RESTRICT__ minPt = m_minCornerLinkedCell.getBuffer();
@@ -189,7 +189,9 @@ __HOSTDEVICE__ uint3 Cells<T>::computeCellID(const Vector3<T>& p) const
     // cellId.x = floor((p[X] - m_minCornerLinkedCell[X]) * m_cellSize_inv);
     // cellId.y = floor((p[Y] - m_minCornerLinkedCell[Y]) * m_cellSize_inv);
     // cellId.z = floor((p[Z] - m_minCornerLinkedCell[Z]) * m_cellSize_inv);
-    checkBound(cellId);
+    if(checkIfValid)
+        GAssert(isValid(cellId), "Linked cell range exceeded!");
+
     return (cellId);
 }
 

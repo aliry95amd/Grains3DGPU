@@ -389,7 +389,7 @@ __HOST__ void
                     // Add new particle to linked cells for the next insert
                     const Cells<T>* cells  = LC.getLinkedCell()[0];
                     const uint      cellID = cells->computeCellHash(pCand);
-                    LC.addComponentToCell(insertID, cellID);
+                    LC.addParticleToCell(insertID, cellID);
                 }
             }
 

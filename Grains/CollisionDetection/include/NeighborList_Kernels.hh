@@ -31,37 +31,45 @@ __GLOBAL__ void updateNeighborList_Nsq_Device(const uint nObstacles,
                                               uint2*     pairList);
 
 /** @brief Updates the neighbor list on host using a linked cell approach
-    @param cellParticles vector of lists containing particle IDs for each cell
     @param cellNeighborsList array of neighboring cells for each cell
+    @param obstacleIDs array of obstacle IDs
+    @param obstacleCellIDs array of obstacle cell IDs
+    @param particleIDs array of particle IDs
+    @param cellIDs array of cell IDs
+    @param cellParticles vector of lists containing particle IDs for each cell
+    @param maxCellsPerObstacle maximum number of cells per obstacle
+    @param numObstacles number of obstacles
+    @param numParticles number of particles
     @param pairList array of pairs
-    @param pairCount number of pairs found */
+    @param pairCount pointer to host memory for storing the total pair count */
 __HOST__ void updateNeighborList_LC_Host(
-    const uint*                         componentID,
-    const uint*                         cellID,
-    const std::vector<std::list<uint>>& cellComponents,
     const uint*                         cellNeighborsList,
-    const uint                          maxObstacleID,
+    const uint2*                        obstacleIDs,
+    const uint*                         obstacleCellIDs,
+    const uint*                         particleIDs,
+    const uint*                         cellIDs,
+    const std::vector<std::list<uint>>& cellParticles,
+    const uint                          maxCellsPerObstacle,
     const uint                          numObstacles,
     const uint                          numParticles,
     uint2*                              pairList,
     uint*                               pairCount);
 
 /** @brief Updates the neighbor list on device using a linked cell approach
-    @param componentID array of component IDs
-    @param cellID array of cell IDs
     @param cellNeighborsList array of neighboring cells for each cell
-    @param cellStartID array of start IDs for each cell
+    @param particleIDs array of particle IDs
+    @param cellIDs array of cell IDs
+    @param cellStartIDs array of start IDs for each cell
     @param maxObstacleID maximum ID of obstacles
     @param numObstacles number of obstacles
     @param numParticles number of particles
     @param numCells number of cells
     @param pairList array of pairs
     @param pairCount pointer to device memory for storing the total pair count */
-__GLOBAL__ void updateNeighborList_LC_Device(const uint* componentID,
-                                             const uint* cellID,
-                                             const uint* cellNeighborsList,
-                                             const uint* cellStartID,
-                                             const uint  maxObstacleID,
+__GLOBAL__ void updateNeighborList_LC_Device(const uint* cellNeighborsList,
+                                             const uint* particleIDs,
+                                             const uint* cellIDs,
+                                             const uint* cellStartIDs,
                                              const uint  numObstacles,
                                              const uint  numParticles,
                                              const uint  numCells,

@@ -40,18 +40,19 @@ __GLOBAL__ void fill_Kernel(T* buffer, const size_t size, const T& value = T())
 }
 
 // -----------------------------------------------------------------------------
-/** @brief fills a buffer to incremental unsigned i
-    @param cells pointer to the Cells object
-    @param transforms buffer of transformations
+/** @brief fills a buffer with incremental values
+    @param buffer the buffer to be initialized
     @param size size of the buffer
-    @param particleHash output buffer for particle hashes */
+    @param start the starting value (default is 0) */
 template <typename T>
-__GLOBAL__ void sequence_Kernel(T* buffer, const size_t size)
+__GLOBAL__ void
+    sequence_Kernel(T* buffer, const size_t size, const T& start = T(0))
 {
     size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
     if(idx >= size)
         return;
-    buffer[idx] = static_cast<T>(idx);
+
+    buffer[idx] = static_cast<T>(start + idx);
 }
 //@}
 
@@ -624,19 +625,23 @@ public:
     }
 
     // -------------------------------------------------------------------------
-    /** @brief Fills the buffer incrementally with values starting from 0 */
-    void sequence()
+    /** @brief Fills the buffer incrementally with values starting from a given
+        value
+        @param start the starting value (default is 0) */
+    void sequence(const T& start = T(0))
     {
         if constexpr(M == MemType::HOST || M == MemType::PINNED)
         {
             for(size_t i = 0; i < m_size; ++i)
-                m_ptr[i] = static_cast<T>(i);
+                m_ptr[i] = static_cast<T>(start + i);
         }
         else if constexpr(M == MemType::DEVICE || M == MemType::MANAGED)
         {
             static_assert(std::is_fundamental<T>::value,
                           "T must be a primitive type for device init");
-            sequence_Kernel<<<(m_size + 255) / 256, 256>>>(m_ptr, m_size);
+            sequence_Kernel<<<(m_size + 255) / 256, 256>>>(m_ptr,
+                                                           m_size,
+                                                           start);
             cudaDeviceSynchronize();
         }
     }

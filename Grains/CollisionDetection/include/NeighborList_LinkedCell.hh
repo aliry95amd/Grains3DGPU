@@ -115,11 +115,13 @@ public:
             // If not, we bypass the neighbor list update.
             if(LC_updated)
             {
-                updateNeighborList_LC_Host(LC_host->getComponentIDs(),
+                updateNeighborList_LC_Host(LC_host->getCellNeighborsList(),
+                                           LC_host->getObstacleIDs(),
+                                           LC_host->getObstacleCellIDs(),
+                                           LC_host->getParticleIDs(),
                                            LC_host->getCellIDs(),
-                                           LC_host->getCellComponents(),
-                                           LC_host->getCellNeighborsList(),
-                                           LC_host->getObstaclesBufferSize(),
+                                           LC_host->getCellParticles(),
+                                           LC_host->getMaxCellsPerObstacle(),
                                            nObstacles,
                                            nParticles,
                                            m_pairList.getData(),
@@ -143,11 +145,10 @@ public:
                                                numBlocks,
                                                numThreads);
                 updateNeighborList_LC_Device<<<numBlocks, numThreads>>>(
-                    LC_device->getComponentIDs(),
-                    LC_device->getCellIDs(),
                     LC_device->getCellNeighborsList(),
+                    LC_device->getParticleIDs(),
+                    LC_device->getCellIDs(),
                     LC_device->getCellStartIDs(),
-                    LC_device->getObstaclesBufferSize(),
                     nObstacles,
                     nParticles,
                     LC_device->getNumCells(),

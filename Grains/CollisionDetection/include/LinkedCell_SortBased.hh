@@ -28,11 +28,10 @@ class LinkedCell_SortBased : public LinkedCell<T, MemType::DEVICE>
     using LC = LinkedCell<T, MemType::DEVICE>;
     using LC::m_cellID;
     using LC::m_cells;
-    using LC::m_componentID;
     using LC::m_neighborCells;
     using LC::m_numCells;
     using LC::m_numParticles;
-    using LC::m_obstaclesBufferSize;
+    using LC::m_particleID;
 
 protected:
     /** @name Parameters */
@@ -105,24 +104,23 @@ public:
         if(!updated)
             return false;
 
-        const uint bufferSize = m_obstaclesBufferSize + m_numParticles;
         // Sorting the particle ids according to the cell hash
         thrust::sort_by_key(
             thrust::device_ptr<uint>(m_cellID.getData()),
-            thrust::device_ptr<uint>(m_cellID.getData() + bufferSize),
-            thrust::device_ptr<uint>(m_componentID.getData()));
+            thrust::device_ptr<uint>(m_cellID.getData() + m_numParticles),
+            thrust::device_ptr<uint>(m_particleID.getData()));
 
         // Finding the start of each cell
         m_cellStartID.fill(UINT_MAX);
         uint numBlocks, numThreads;
-        computeOptimalThreadsAndBlocks(bufferSize,
+        computeOptimalThreadsAndBlocks(m_numParticles,
                                        GrainsParameters<T>::m_GPU,
                                        numBlocks,
                                        numThreads);
         uint sMemSize = sizeof(uint) * (numThreads + 1);
         computeCellStart_Kernel<<<numBlocks, numThreads, sMemSize>>>(
             m_cellID.getData(),
-            bufferSize,
+            m_numParticles,
             m_cellStartID.getData());
 
         return true;

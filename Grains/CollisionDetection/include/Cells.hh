@@ -108,12 +108,13 @@ public:
     /** @brief Checks if a cell Id is in range
         @param id 3D Id */
     __HOSTDEVICE__
-    void checkBound(const uint3& id) const;
+    bool isValid(const uint3& id) const;
 
     /** @brief Returns the 3d Id of the cell which the point belongs to
-        @param p point */
+        @param p point
+        @param checkIfValid flag to check if the cell ID is valid */
     __HOSTDEVICE__
-    uint3 computeCellID(const Vector3<T>& p) const;
+    uint3 computeCellID(const Vector3<T>& p, bool checkIfValid = true) const;
 
     /** @brief Returns the 3d Id of the cell given its hash
         @param cellHash cell hash */

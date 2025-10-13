@@ -17,6 +17,7 @@
 #include "GrainsMemBuffer.hh"
 #include "GrainsUtils.hh"
 #include "LinkedCell_Kernels.hh"
+#include "QuaternionMath.hh"
 #include "VectorMath.hh"
 
 // =============================================================================
@@ -56,24 +57,33 @@ protected:
     GrainsMemBuffer<Cells<T>*, M> m_cells;
     /** \brief Buffer to store neighbor cell IDs */
     GrainsMemBuffer<uint, M> m_neighborCells;
-    /** \brief Buffer of component IDs */
-    GrainsMemBuffer<uint, M> m_componentID;
-    /** \brief Buffer of cells that components belong to */
+    /** \brief Buffer of particle IDs */
+    GrainsMemBuffer<uint, M> m_particleID;
+    /** \brief Buffer of cells that particles belong to. This is a one-to-one 
+        mapping from particle IDs to cell IDs, i.e., for index i,
+        m_particleID[i] is the ID of particle i (p_i), and m_cellID[i] is the ID
+        of the cell that particle p_i belongs to. */
     GrainsMemBuffer<uint, M> m_cellID;
+    /** \brief Buffer of obstacle IDs and the number of cells that have to be 
+        checked for a possible contact with a particle. This is essentially the
+        number of cells each obstacle occupies + 1-ring.*/
+    GrainsMemBuffer<uint2, M> m_obstacleID;
+    /** \brief Buffer of the cell IDs that that have to be checked for a
+        possible contact with an obstacle. */
+    GrainsMemBuffer<uint, M> m_obstacleCellID;
     /** \brief Cell size. This is the minimum possible size for the cells. skin
         thickness will be added to this value. */
     T m_cellSizeWithoutSkin;
     /** \brief Skin thickness */
     T m_skinThickness;
-    /** \brief Maximum displacement of particles since the last update (squared) */
+    /** \brief Maximum displacement of particles since the last update. Note 
+        that we store the squared value */
     T m_maxDisplacementSquared;
     /** \brief Number of iterations since the last update */
     uint m_numIterationsSinceLastUpdate;
-    /** \brief Size of the obstacles buffer */
-    uint m_obstaclesBufferSize;
     /** \brief Number of obstacles */
     uint m_numObstacles;
-    /** \brief Maximum number of cells an obstacle can occupy */
+    /** \brief Maximum number of cells an obstacle can occupy + 1-ring */
     uint m_maxCellsPerObstacle;
     /** \brief Number of particles */
     uint m_numParticles;
@@ -108,6 +118,9 @@ public:
                const uint                               nObstacles,
                const uint                               nParticles)
         : m_oldPosition(nObstacles + nParticles)
+        , m_particleID(nParticles)
+        , m_cellID(nParticles)
+        , m_obstacleID(nObstacles)
         , m_maxDisplacementSquared(0)
         , m_numIterationsSinceLastUpdate(0)
         , m_numObstacles(nObstacles)
@@ -125,7 +138,9 @@ public:
         // Find the maximum circumscribed radius of particles
         T maxRadiusParticles = computeMaxRadius(nObstacles, m_rb->getSize());
 
-        // Adjust the cell based on the obstacles and particles
+        // The minimum cell size should be at least twice the maximum radius
+        // of particles. We multiply this value by a factor (>=1) to get the
+        // final cell size.
         m_cellSizeWithoutSkin = T(2) * maxRadiusParticles * cellSizeFactor;
 
         // Initialize the LinkedCell buffer
@@ -169,11 +184,7 @@ public:
                                 * maxCellsPerObstaclePerDim
                                 * maxCellsPerObstaclePerDim;
         m_maxCellsPerObstacle = std::min(m_maxCellsPerObstacle, m_numCells);
-
-        // Reserve space for component and cell IDs
-        const uint maxObstaclesBufferSize = m_maxCellsPerObstacle * nObstacles;
-        m_componentID.initialize(maxObstaclesBufferSize + m_numParticles);
-        m_cellID.initialize(maxObstaclesBufferSize + m_numParticles);
+        m_obstacleCellID.initialize(m_maxCellsPerObstacle * nObstacles);
 
         // Force update at the first step
         bool updated = updateCellFixed<true>();
@@ -212,10 +223,17 @@ public:
     }
 
     // -------------------------------------------------------------------------
-    /** @brief Gets component IDs */
-    const uint* getComponentIDs() const
+    /** @brief Gets neighbor cells */
+    const uint* getCellNeighborsList() const
     {
-        return m_componentID.getData();
+        return m_neighborCells.getData();
+    }
+
+    // -------------------------------------------------------------------------
+    /** @brief Gets particle IDs */
+    const uint* getParticleIDs() const
+    {
+        return m_particleID.getData();
     }
 
     // -------------------------------------------------------------------------
@@ -226,10 +244,17 @@ public:
     }
 
     // -------------------------------------------------------------------------
-    /** @brief Gets neighbor cells */
-    const uint* getCellNeighborsList() const
+    /** @brief Gets obstacle IDs */
+    const uint2* getObstacleIDs() const
     {
-        return m_neighborCells.getData();
+        return m_obstacleID.getData();
+    }
+
+    // -------------------------------------------------------------------------
+    /** @brief Gets obstacle cell IDs */
+    const uint* getObstacleCellIDs() const
+    {
+        return m_obstacleCellID.getData();
     }
 
     // -------------------------------------------------------------------------
@@ -261,10 +286,10 @@ public:
     }
 
     // -------------------------------------------------------------------------
-    /** @brief Gets obstacles buffer size */
-    uint getObstaclesBufferSize() const
+    /** @brief Gets maximum number of cells an obstacle can occupy */
+    uint getMaxCellsPerObstacle() const
     {
-        return m_obstaclesBufferSize;
+        return m_maxCellsPerObstacle;
     }
 
     // -------------------------------------------------------------------------
@@ -278,65 +303,41 @@ public:
     /** @name Set methods */
     //@{
     // -------------------------------------------------------------------------
-    /** @brief Sets the component ID */
-    void setComponentID()
+    /** @brief Sets the particle ID */
+    void setParticleID()
     {
-        // Component ID should be as the following:
-        // First few elements are for obstacles. linkObstacles method should
-        // set them.
-        // Elements after m_obstaclesBufferSize are for particles.
-
-        // Note: resize should not have any overhead since capacity is enough
-        m_componentID.resize(m_obstaclesBufferSize + m_numParticles);
-
-        if constexpr(M == MemType::HOST)
-        {
-            for(uint i = 0; i < m_numParticles; ++i)
-                m_componentID[m_obstaclesBufferSize + i] = m_numObstacles + i;
-        }
-        else if constexpr(M == MemType::DEVICE)
-        {
-            uint numThreads, numBlocks;
-            computeOptimalThreadsAndBlocks(m_numParticles,
-                                           GrainsParameters<T>::m_GPU,
-                                           numBlocks,
-                                           numThreads);
-            fillComponentID_Device<<<numBlocks, numThreads>>>(
-                m_componentID.getData(),
-                m_obstaclesBufferSize,
-                m_numObstacles,
-                m_numParticles);
-            cudaDeviceSynchronize();
-        }
+        // Initialize with sequence starting from m_numObstacles
+        m_particleID.sequence(m_numObstacles);
     }
 
     // -------------------------------------------------------------------------
     /** @brief Sets the cell ID */
     void setCellID()
     {
-        // Cell ID should be as the following:
-        // First few elements are for obstacles. linkObstacles method should
-        // set them.
-        // Elements after m_obstaclesBufferSize are for particles.
+        m_cellID.fill(UINT_MAX);
+    }
 
-        // Note: resize should not have any overhead since capacity is enough
-        m_cellID.resize(m_obstaclesBufferSize + m_numParticles);
-
+    // -------------------------------------------------------------------------
+    /** @brief Sets the obstacle ID */
+    void setObstacleID()
+    {
         if constexpr(M == MemType::HOST)
         {
-            for(uint i = 0; i < m_numParticles; ++i)
-                m_cellID[m_obstaclesBufferSize + i] = UINT_MAX;
+            for(uint i = 0; i < m_numObstacles; ++i)
+            {
+                m_obstacleID[i] = make_uint2(i, 0);
+            }
         }
         else if constexpr(M == MemType::DEVICE)
         {
-            uint numThreads, numBlocks;
-            computeOptimalThreadsAndBlocks(m_numParticles,
+            uint numBlocks, numThreads;
+            computeOptimalThreadsAndBlocks(m_numObstacles,
                                            GrainsParameters<T>::m_GPU,
                                            numBlocks,
                                            numThreads);
-            fillCellID_Device<<<numBlocks, numThreads>>>(m_cellID.getData(),
-                                                         m_obstaclesBufferSize,
-                                                         m_numParticles);
+            fillObstacleID_Device<<<numBlocks, numThreads>>>(
+                m_obstacleID.getData(),
+                m_numObstacles);
             cudaDeviceSynchronize();
         }
     }
@@ -365,8 +366,6 @@ public:
         }
         if constexpr(M == MemType::DEVICE)
         {
-            // Use Thrust approach with separate radii extraction
-            // GrainsMemBuffer<T, MemType::HOST>   h_radii(endID - startID, T(0));
             GrainsMemBuffer<T, MemType::DEVICE> radii(endID - startID, T(0));
 
             // Launch kernel to extract radii
@@ -384,7 +383,6 @@ public:
 
             // Use thrust to find maximum
             auto max_it = thrust::max_element(
-                thrust::device,
                 thrust::device_pointer_cast(radii.getData()),
                 thrust::device_pointer_cast(radii.getData() + radii.getSize()));
             maxRadius = *max_it;
@@ -418,8 +416,7 @@ public:
     }
 
     // -------------------------------------------------------------------------
-    /** @brief Determines if obstacles have moved
-        @param positions new positions of the obstacles */
+    /** @brief Determines if obstacles have moved */
     bool haveObstaclesMoved() const
     {
         if(m_numObstacles == 0)
@@ -456,10 +453,7 @@ public:
             auto zip_end = zip_begin + m_numObstacles;
 
             obstacle_has_moved moved_pred;
-            auto               it = thrust::find_if(thrust::device,
-                                      zip_begin,
-                                      zip_end,
-                                      moved_pred);
+            auto it = thrust::find_if(zip_begin, zip_end, moved_pred);
             return it != zip_end;
         }
 
@@ -467,67 +461,80 @@ public:
     }
 
     // -------------------------------------------------------------------------
-    /** @brief Links obstacles to cells and determines enough buffer size for 
-        obstacles */
+    /** @brief Links obstacles to cells */
     void linkObstacles()
     {
-        // If there is no obstacle, return 0
+        // If there is no obstacle
         if(m_numObstacles == 0)
-        {
-            m_obstaclesBufferSize = 0;
             return;
-        }
-
-        // Workspace to store the IDs of the obstacles and their cell hashes
-        // We allocate the maximum possible size
-        uint maxBufferSize = m_maxCellsPerObstacle * m_numObstacles;
-        GrainsMemBuffer<uint, M> componentID(maxBufferSize, UINT_MAX);
-        GrainsMemBuffer<uint, M> cellID(maxBufferSize, UINT_MAX);
 
         if constexpr(M == MemType::HOST)
         {
-            uint             index        = 0; // insertion index
-            const T          cellSize     = m_cells[0]->getCellSize();
-            const T          halfCellSize = T(0.5) * cellSize;
-            const Vector3<T> cellBBox(halfCellSize, halfCellSize, halfCellSize);
-            const Vector3<T>& minCorner = m_cells[0]->getMinCornerLinkedCell();
+            // Lambda to extract support point from rigid body in given world
+            // direction
+            auto support
+                = [this](uint              obstacleIndex,
+                         const Vector3<T>& worldDirection) -> Vector3<T> {
+                // Transform world direction to local coordinates using inverse
+                // rotation
+                const Quaternion<T>& q = m_quaternions->at(obstacleIndex);
+                const Vector3<T>     localDirection = q << worldDirection;
+                Vector3<T> supPt = (*m_rb)[obstacleIndex]->getConvex()->support(
+                    localDirection);
+                transform(q, m_positions->at(obstacleIndex), supPt);
+                return supPt;
+            };
 
-            for(uint r = 0; r < m_numObstacles; ++r)
+            // Cell info
+            const uint4 numCells = m_cells[0]->getNumCellsPerDirection();
+
+            for(uint i = 0; i < m_numObstacles; ++i)
             {
-                const Vector3<T> BBox
-                    = (*m_rb)[r]->getConvex()->computeBoundingBox();
-                Vector3<T> cellCenter = minCorner;
+                // offset in the obstacleCellID buffer
+                const uint offset = i * m_maxCellsPerObstacle;
 
-                for(int i = 0; i < m_numCells; ++i)
+                // AABB by querying support in all 6 axis directions
+                const Vector3<T> minExt(support(i, Vector3<T>(-1, 0, 0))[X],
+                                        support(i, Vector3<T>(0, -1, 0))[Y],
+                                        support(i, Vector3<T>(0, 0, -1))[Z]);
+                const Vector3<T> maxExt(support(i, Vector3<T>(1, 0, 0))[X],
+                                        support(i, Vector3<T>(0, 1, 0))[Y],
+                                        support(i, Vector3<T>(0, 0, 1))[Z]);
+
+                // Convert world coordinates to cell coordinates
+                const uint3 minCell = m_cells[0]->computeCellID(minExt, false);
+                const uint3 maxCell = m_cells[0]->computeCellID(maxExt, false);
+
+                uint cellCount = 0;
+                int  minX      = std::max((int)minCell.x - 1, 0);
+                int  maxX = std::min((int)maxCell.x + 1, (int)numCells.x - 1);
+                int  minY = std::max((int)minCell.y - 1, 0);
+                int  maxY = std::min((int)maxCell.y + 1, (int)numCells.y - 1);
+                int  minZ = std::max((int)minCell.z - 1, 0);
+                int  maxZ = std::min((int)maxCell.z + 1, (int)numCells.z - 1);
+
+                // Nested loops with 1-ring expansion
+                for(int x = minX; x <= maxX; ++x)
                 {
-                    const uint3 hash = m_cells[0]->computeCellID(i);
-                    cellCenter[0] = minCorner[0] + (hash.x + T(0.5)) * cellSize;
-                    cellCenter[1] = minCorner[1] + (hash.y + T(0.5)) * cellSize;
-                    cellCenter[2] = minCorner[2] + (hash.z + T(0.5)) * cellSize;
-
-                    // Since cell is axis-aligned, no need to do any rotation
-                    // transformation
-                    bool intersects = intersectOrientedBoundingBox(
-                        cellBBox,
-                        BBox,
-                        m_positions->at(r) - cellCenter,
-                        m_quaternions->at(r));
-
-                    if(intersects)
+                    for(int y = minY; y <= maxY; ++y)
                     {
-                        componentID[index] = r;
-                        cellID[index]      = m_cells[0]->computeCellHash(hash);
-                        index++;
+                        for(int z = minZ; z <= maxZ; ++z)
+                        {
+                            uint cellHash = m_cells[0]->computeCellHash(
+                                make_uint3((uint)x, (uint)y, (uint)z));
+                            m_obstacleCellID[offset + cellCount] = cellHash;
+                            ++cellCount;
+                        }
                     }
                 }
-            }
 
-            // Set the size of the obstacles buffer
-            m_obstaclesBufferSize = index;
+                // Update the count in obstacleID buffer
+                m_obstacleID[i].y = cellCount;
+            }
         }
         else if constexpr(M == MemType::DEVICE)
         {
-            // Launch one block per obstacle
+            // Launch one block per obstacle with one thread per block
             const uint numBlocks  = m_numObstacles;
             const uint numThreads = 1;
             linkObstacles_Device<T>
@@ -536,50 +543,11 @@ public:
                                             m_quaternions->getData(),
                                             m_cells.getData(),
                                             m_numObstacles,
-                                            m_numCells,
                                             m_maxCellsPerObstacle,
-                                            componentID.getData(),
-                                            cellID.getData());
+                                            m_obstacleID.getData(),
+                                            m_obstacleCellID.getData());
             cudaDeviceSynchronize();
-
-            // Perform separate compactions for componentID and cellID
-            const uint total = m_maxCellsPerObstacle * m_numObstacles;
-
-            // First compaction: remove UINT_MAX entries from componentID
-            auto comp_begin
-                = thrust::device_pointer_cast(componentID.getData());
-            auto comp_end      = comp_begin + total;
-            auto comp_new_end  = thrust::remove(thrust::device,
-                                               comp_begin,
-                                               comp_end,
-                                               UINT_MAX);
-            uint compactedSize = static_cast<uint>(comp_new_end - comp_begin);
-
-            // Second compaction: remove UINT_MAX entries from cellID
-            auto cell_begin   = thrust::device_pointer_cast(cellID.getData());
-            auto cell_end     = cell_begin + total;
-            auto cell_new_end = thrust::remove(thrust::device,
-                                               cell_begin,
-                                               cell_end,
-                                               UINT_MAX);
-            uint cellCompactedSize
-                = static_cast<uint>(cell_new_end - cell_begin);
-
-            // Both should have the same size after compaction
-            GAssert(compactedSize == cellCompactedSize,
-                    "ComponentID and CellID compacted sizes don't match");
-
-            // Set the size of the obstacles buffer
-            m_obstaclesBufferSize = compactedSize;
         }
-
-        // Copy the info to member buffers
-        // Resize the buffers (for copying)
-        componentID.resize(m_obstaclesBufferSize);
-        cellID.resize(m_obstaclesBufferSize);
-        // Copy the info to buffers
-        m_componentID.copyFrom(componentID);
-        m_cellID.copyFrom(cellID);
     }
 
     // -------------------------------------------------------------------------
@@ -654,11 +622,9 @@ public:
         if constexpr(M == MemType::HOST)
         {
             const Vector3<T>* p = m_positions->getData() + m_numObstacles;
-            // No need to update obstacles as they should be
-            // Particles
-            const uint offset = m_obstaclesBufferSize;
+
             for(uint i = 0; i < m_numParticles; ++i)
-                m_cellID[offset + i] = m_cells[0]->computeCellHash(p[i]);
+                m_cellID[i] = m_cells[0]->computeCellHash(p[i]);
         }
         else if constexpr(M == MemType::DEVICE)
         {
@@ -670,7 +636,6 @@ public:
             computeHash_Device<<<numBlocks, numThreads>>>(m_cells.getData(),
                                                           m_positions->getData()
                                                               + m_numObstacles,
-                                                          m_obstaclesBufferSize,
                                                           m_numParticles,
                                                           m_cellID.getData());
         }
@@ -736,10 +701,8 @@ public:
         // link obstacles
         linkObstacles();
 
-        // Set the component IDs
-        // Note: reserve does not change the size if capacity is enough
-        m_componentID.reserve(m_obstaclesBufferSize + m_numParticles);
-        setComponentID();
+        // Set the particle IDs
+        setParticleID();
 
         // Set the cell IDs
         setCellID();
@@ -763,12 +726,7 @@ public:
         {
             // Relink obstacles on the existing grid
             linkObstacles();
-
-            // Refresh component and cell IDs on current buffers
-            m_componentID.reserve(m_obstaclesBufferSize + m_numParticles);
-            setComponentID();
-
-            m_cellID.reserve(m_obstaclesBufferSize + m_numParticles);
+            setParticleID();
             setCellID();
         }
         else
@@ -777,12 +735,7 @@ public:
             {
                 // Relink obstacles on the existing grid
                 linkObstacles();
-
-                // Refresh component and cell IDs on current buffers
-                m_componentID.reserve(m_obstaclesBufferSize + m_numParticles);
-                setComponentID();
-
-                m_cellID.reserve(m_obstaclesBufferSize + m_numParticles);
+                setParticleID();
                 setCellID();
             }
         }
