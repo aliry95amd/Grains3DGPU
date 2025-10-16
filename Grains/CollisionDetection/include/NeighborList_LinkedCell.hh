@@ -14,9 +14,8 @@
 /** @brief The class NeighborList_LinkedCell.
 
     This is a derived class of NeighborList. It implements the neighbor list
-    creation using an O(n^2) algorithm. This is useful for systems with a small
-    number of components since we bypass LinkedCell and Bounding Volume and use
-    a brute force approach.
+    creation using an O(n) algorithm. This is useful for systems with large
+    number of components.
 
     @author A.Yazdani - 2025 - Construction */
 // =============================================================================
@@ -155,7 +154,7 @@ public:
                         m_pairCount.getData());
                 }
                 uint numBlocks, numThreads;
-                computeOptimalThreadsAndBlocks(positions.getSize(),
+                computeOptimalThreadsAndBlocks(nParticles,
                                                GrainsParameters<T>::m_GPU,
                                                numBlocks,
                                                numThreads);

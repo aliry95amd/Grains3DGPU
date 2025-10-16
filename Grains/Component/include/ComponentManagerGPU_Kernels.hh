@@ -44,14 +44,12 @@ INLINE uint buildCompactActiveIndex(const uint* flagsDev,
                                     uint*       prefixDev,
                                     uint*       activeIdxDev)
 {
+    cudaErrCheck(cudaGetLastError());
     auto flagsPtr  = thrust::device_pointer_cast(const_cast<uint*>(flagsDev));
     auto prefixPtr = thrust::device_pointer_cast(prefixDev);
 
     // Exclusive scan to compute output positions for active entries
-    thrust::exclusive_scan(thrust::device,
-                           flagsPtr,
-                           flagsPtr + nPairs,
-                           prefixPtr);
+    thrust::exclusive_scan(flagsPtr, flagsPtr + nPairs, prefixPtr);
 
     // Compute total active as last prefix + last flag
     uint lastPrefix = 0u, lastFlag = 0u;

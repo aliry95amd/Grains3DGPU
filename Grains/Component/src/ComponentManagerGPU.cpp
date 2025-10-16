@@ -82,6 +82,7 @@ void ComponentManagerGPU<T>::computeRelativeTransformations()
         m_relPosition.getData(),
         m_relQuaternion.getData(),
         nPairs);
+    cudaDeviceSynchronize();
 }
 
 // -----------------------------------------------------------------------------
@@ -103,6 +104,7 @@ void ComponentManagerGPU<T>::detectCollisionsComponents()
         m_relQuaternion.getData(),
         m_contactInfo.getData(),
         nPairs);
+    cudaDeviceSynchronize();
 }
 
 // -----------------------------------------------------------------------------
@@ -124,6 +126,7 @@ void ComponentManagerGPU<T>::transformContactInfoToWorld()
         m_contactInfoWorld.getData(),
         m_activePairs.getData(),
         nPairs);
+    cudaDeviceSynchronize();
 }
 
 // -----------------------------------------------------------------------------
@@ -151,28 +154,43 @@ void ComponentManagerGPU<T>::computeContactForces(
     const GrainsMemBuffer<ContactForceModel<T>*, MemType::DEVICE>& CF)
 {
     uint nPairs = m_neighborList->getSize();
-    // Build compact index of active pairs using the shared helper and persistent buffers
-    const uint nActive = buildCompactActiveIndex(m_activePairs.getData(),
-                                                 nPairs,
-                                                 m_prefixScan.getData(),
-                                                 m_activeIndex.getData());
+    // // Build compact index of active pairs using the shared helper and persistent buffers
+    // const uint nActive = buildCompactActiveIndex(m_activePairs.getData(),
+    //                                              nPairs,
+    //                                              m_prefixScan.getData(),
+    //                                              m_activeIndex.getData());
 
-    // Launch compact forces kernel
+    // // Launch compact forces kernel
+    // uint numThreads, numBlocks;
+    // computeOptimalThreadsAndBlocks(nActive,
+    //                                GrainsParameters<T>::m_GPU,
+    //                                numBlocks,
+    //                                numThreads);
+    // computeContactForcesCompact_Kernel<<<numBlocks, numThreads>>>(
+    //     CF.getData(),
+    //     m_neighborList->getData(),
+    //     m_contactInfoWorld.getData(),
+    //     m_activeIndex.getData(),
+    //     m_rigidBody->getData(),
+    //     m_position.getData(),
+    //     m_velocity.getData(),
+    //     m_torce.getData(),
+    //     nActive);
+
     uint numThreads, numBlocks;
-    computeOptimalThreadsAndBlocks(nActive,
+    computeOptimalThreadsAndBlocks(nPairs,
                                    GrainsParameters<T>::m_GPU,
                                    numBlocks,
                                    numThreads);
-    computeContactForcesCompact_Kernel<<<numBlocks, numThreads>>>(
+    computeContactForces_Kernel<<<numBlocks, numThreads>>>(
         CF.getData(),
         m_neighborList->getData(),
         m_contactInfoWorld.getData(),
-        m_activeIndex.getData(),
         m_rigidBody->getData(),
         m_position.getData(),
         m_velocity.getData(),
         m_torce.getData(),
-        nActive);
+        nPairs);
 }
 
 // -----------------------------------------------------------------------------

@@ -64,7 +64,7 @@ void Grains<T>::postProcess(
             pp->PostProcessing(m_rigidBodyList, cm, GP::m_time);
     }
     // In case we get past the saveTime, we need to remove it from the queue
-    if(GP::m_time > GP::m_tSave.front())
+    if(!GP::m_tSave.empty() && GP::m_time > GP::m_tSave.front())
         GP::m_tSave.pop();
 }
 
@@ -404,10 +404,17 @@ void Grains<T>::AdditionalFeatures(DOMElement* rootElement)
     {
         GoutWI(3, "Post-processing");
         // Post-processing save time
-        DOMNode* nTime  = ReaderXML::getNode(nPostProcessing, "TimeSave");
-        T        tStart = ReaderXML::getNodeAttr_Double(nTime, "Start");
-        T        tEnd   = ReaderXML::getNodeAttr_Double(nTime, "End");
-        T        tStep  = ReaderXML::getNodeAttr_Double(nTime, "dt");
+        DOMNode* nTime = ReaderXML::getNode(nPostProcessing, "TimeSave");
+        T        tStart, tEnd;
+        if(ReaderXML::hasNodeAttr(nTime, "Start"))
+            tStart = ReaderXML::getNodeAttr_Double(nTime, "Start");
+        else
+            tStart = GrainsParameters<T>::m_tStart;
+        if(ReaderXML::hasNodeAttr(nTime, "End"))
+            tEnd = ReaderXML::getNodeAttr_Double(nTime, "End");
+        else
+            tEnd = GrainsParameters<T>::m_tEnd;
+        T tStep = ReaderXML::getNodeAttr_Double(nTime, "dt");
         for(T t = tStart; t <= tEnd; t += tStep)
             GrainsParameters<T>::m_tSave.push(t);
         // Save for tEnd as well

@@ -164,12 +164,12 @@ __HOSTDEVICE__ static INLINE void
         // The projection point on the rectangle plane
         const Vector3<T> ptB(ptA[X], ptA[Y], T(0));
         // The projection point lies on the rectangle?
-        if(rect->isInside(ptB))
-        {
-            contactInfo.setContactPoint(T(0.5) * (ptA + ptB));
-            contactInfo.setContactVector(ptA - ptB);
-            contactInfo.setOverlapDistance(-norm(ptA - ptB));
-        }
+        // if(rect->isInside(ptB))
+        // {
+        contactInfo.setContactPoint(T(0.5) * (ptA + ptB));
+        contactInfo.setContactVector(ptA - ptB);
+        contactInfo.setOverlapDistance(-norm(ptA - ptB));
+        // }
     }
 }
 

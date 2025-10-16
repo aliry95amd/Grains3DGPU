@@ -233,21 +233,45 @@ public:
     {
         constexpr uint  NUM_NEIGHBOR_CELLS = 27; // Number of neighboring cells
         const Cells<T>* cells              = this->getLinkedCell()[0];
-        const uint      cellID             = cells->computeCellHash(candidate);
+        const uint      candidateCellID    = cells->computeCellHash(candidate);
+
+        // Collect obstacles that might interact with this candidate position
+        const uint2* obstacleIDs         = this->getObstacleIDs();
+        const uint*  obstacleCellIDs     = this->getObstacleCellIDs();
+        const uint   maxCellsPerObstacle = this->getMaxCellsPerObstacle();
+
+        for(uint i = 0; i < m_numObstacles; ++i)
+        {
+            const uint obstacleIndex      = obstacleIDs[i].x;
+            const uint numCellsToTraverse = obstacleIDs[i].y;
+            const uint offset             = i * maxCellsPerObstacle;
+
+            // Check if candidate cell intersects with any of obstacle's cells
+            for(uint c = 0; c < numCellsToTraverse; ++c)
+            {
+                const uint obstacleCell = obstacleCellIDs[offset + c];
+                if(obstacleCell == candidateCellID)
+                {
+                    out.push_back(obstacleIndex);
+                    break; // Found intersection, no need to check other cells for this obstacle
+                }
+            }
+        }
 
         // Same-cell particles
-        const auto& currentCellParticles = m_cellParticles[cellID];
+        const auto& currentCellParticles = m_cellParticles[candidateCellID];
         for(const uint p : currentCellParticles)
             if(p < maxIndex)
                 out.push_back(p);
 
-        // Neighbor cells
-        const uint* allNeighbors  = this->getCellNeighborsList();
-        const uint* neighborCells = &allNeighbors[NUM_NEIGHBOR_CELLS * cellID];
+        // Neighbor cells for particles
+        const uint* allNeighbors = this->getCellNeighborsList();
+        const uint* neighborCells
+            = &allNeighbors[NUM_NEIGHBOR_CELLS * candidateCellID];
         for(uint n = 0; n < NUM_NEIGHBOR_CELLS; ++n)
         {
             const uint c = neighborCells[n];
-            if(c == UINT_MAX || c == cellID)
+            if(c == UINT_MAX || c == candidateCellID)
                 continue;
             const auto& neighborCellParticles = m_cellParticles[c];
             for(const uint p : neighborCellParticles)

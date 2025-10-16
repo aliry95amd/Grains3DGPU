@@ -58,22 +58,6 @@ __GLOBAL__ void
 }
 
 // -----------------------------------------------------------------------------
-/** @brief Fills a buffer with obstacle IDs
-    @param nObstacles Number of obstacles
-    @param obstacleID Output buffer for obstacle IDs and counts (uint2) */
-static __GLOBAL__ void fillObstacleID_Device(const uint nObstacles,
-                                             uint2*     obstacleID)
-{
-    uint tID = blockIdx.x * blockDim.x + threadIdx.x;
-
-    if(tID >= nObstacles)
-        return;
-
-    obstacleID[tID].x = tID;
-    obstacleID[tID].y = 0; // will be updated later
-}
-
-// -----------------------------------------------------------------------------
 /** @brief Gets the neighbor cells array
     @param cells pointer to the Cells object
     @param numCells number of cells
@@ -233,6 +217,7 @@ static __GLOBAL__ void linkObstacles_Device(const RigidBody<T>* const* rb,
     }
 
     // Update the obstacle buffer
+    obstacleID[obstacleIdx].x = obstacleIdx;
     obstacleID[obstacleIdx].y = cellCount;
 }
 //@}

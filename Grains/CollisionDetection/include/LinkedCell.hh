@@ -316,31 +316,6 @@ public:
     {
         m_cellID.fill(UINT_MAX);
     }
-
-    // -------------------------------------------------------------------------
-    /** @brief Sets the obstacle ID */
-    void setObstacleID()
-    {
-        if constexpr(M == MemType::HOST)
-        {
-            for(uint i = 0; i < m_numObstacles; ++i)
-            {
-                m_obstacleID[i] = make_uint2(i, 0);
-            }
-        }
-        else if constexpr(M == MemType::DEVICE)
-        {
-            uint numBlocks, numThreads;
-            computeOptimalThreadsAndBlocks(m_numObstacles,
-                                           GrainsParameters<T>::m_GPU,
-                                           numBlocks,
-                                           numThreads);
-            fillObstacleID_Device<<<numBlocks, numThreads>>>(
-                m_obstacleID.getData(),
-                m_numObstacles);
-            cudaDeviceSynchronize();
-        }
-    }
     //@}
 
     /** @name Methods */
@@ -529,6 +504,7 @@ public:
                 }
 
                 // Update the count in obstacleID buffer
+                m_obstacleID[i].x = i;
                 m_obstacleID[i].y = cellCount;
             }
         }

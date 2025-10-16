@@ -40,8 +40,8 @@ public:
         @param nParticles number of particles */
     NeighborList_Nsq(const uint nObstacles, const uint nParticles)
     {
-        m_pairList.reserve(nObstacles * nParticles
-                           + nParticles * (nParticles - 1) / 2);
+        m_pairList.initialize(nObstacles * nParticles
+                              + nParticles * (nParticles - 1) / 2);
         m_pairList.fill();
 
         m_pairCount.initialize(1);
