@@ -64,6 +64,8 @@ protected:
         m_particleID[i] is the ID of particle i (p_i), and m_cellID[i] is the ID
         of the cell that particle p_i belongs to. */
     GrainsMemBuffer<uint, M> m_cellID;
+    /** \brief Buffer of number of particles per cell */
+    GrainsMemBuffer<uint, M> m_numParticlesPerCell;
     /** \brief Buffer of obstacle IDs and the number of cells that have to be 
         checked for a possible contact with a particle. This is essentially the
         number of cells each obstacle occupies + 1-ring.*/
@@ -168,6 +170,10 @@ public:
             delete h_cells[0];
         }
 
+        // Initialize number of particles per cell buffer
+        m_numParticlesPerCell.initialize(m_numCells);
+        m_numParticlesPerCell.fill(0);
+
         // Initialize neighbor cells buffer
         m_neighborCells.initialize(m_numCells * 27); // 26 neighbors + self
         m_neighborCells.fill(UINT_MAX);
@@ -241,6 +247,13 @@ public:
     const uint* getCellIDs() const
     {
         return m_cellID.getData();
+    }
+
+    // -------------------------------------------------------------------------
+    /** @brief Gets number of particles per cell */
+    const uint* getNumParticlesPerCell() const
+    {
+        return m_numParticlesPerCell.getData();
     }
 
     // -------------------------------------------------------------------------
@@ -592,7 +605,7 @@ public:
     }
 
     // -------------------------------------------------------------------------
-    /** @brief Updates the which cell particles belong to */
+    /** @brief Updates the cells particles belong to */
     void updateCellIDs()
     {
         if constexpr(M == MemType::HOST)
@@ -600,7 +613,11 @@ public:
             const Vector3<T>* p = m_positions->getData() + m_numObstacles;
 
             for(uint i = 0; i < m_numParticles; ++i)
-                m_cellID[i] = m_cells[0]->computeCellHash(p[i]);
+            {
+                uint cellHash = m_cells[0]->computeCellHash(p[i]);
+                m_cellID[i]   = cellHash;
+                m_numNeighborsPerCell[cellHash]++;
+            }
         }
         else if constexpr(M == MemType::DEVICE)
         {
@@ -609,11 +626,12 @@ public:
                                            GrainsParameters<T>::m_GPU,
                                            numBlocks,
                                            numThreads);
-            computeHash_Device<<<numBlocks, numThreads>>>(m_cells.getData(),
-                                                          m_positions->getData()
-                                                              + m_numObstacles,
-                                                          m_numParticles,
-                                                          m_cellID.getData());
+            computeHash_Device<<<numBlocks, numThreads>>>(
+                m_cells.getData(),
+                m_positions->getData() + m_numObstacles,
+                m_numParticles,
+                m_cellID.getData(),
+                m_numParticlesPerCell.getData());
         }
     }
 
@@ -673,6 +691,10 @@ public:
         m_neighborCells.reserve(m_numCells * 27); // 26 neighbors + self
         m_neighborCells.fill(UINT_MAX);
         generateNeighborCells();
+
+        // Reset number of particles per cell
+        m_numParticlesPerCell.reserve(m_numCells);
+        m_numParticlesPerCell.fill(0);
 
         // link obstacles
         linkObstacles();

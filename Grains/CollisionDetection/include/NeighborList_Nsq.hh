@@ -22,7 +22,6 @@ template <typename T, MemType M>
 class NeighborList_Nsq : public NeighborList<T, M>
 {
     using NL = NeighborList<T, M>;
-    using NL::m_hPairCount;
     using NL::m_needsUpdate;
     using NL::m_pairCount;
     using NL::m_pairList;
@@ -44,11 +43,7 @@ public:
                               + nParticles * (nParticles - 1) / 2);
         m_pairList.fill();
 
-        m_pairCount.initialize(1);
-        m_pairCount.fill(0);
-
-        m_hPairCount.initialize(1);
-        m_hPairCount.fill(0);
+        m_pairCount = 0;
 
         m_needsUpdate = true; // Initially, we need to create the list
     }
@@ -81,7 +76,7 @@ public:
             updateNeighborList_Nsq_Host(nObstacles,
                                         nParticles,
                                         m_pairList.getData());
-            m_pairCount[0]
+            m_pairCount
                 = nObstacles * nParticles + nParticles * (nParticles - 1) / 2;
         }
         else if constexpr(M == MemType::DEVICE || M == MemType::MANAGED)
@@ -95,39 +90,11 @@ public:
                 nObstacles,
                 nParticles,
                 m_pairList.getData());
-            m_hPairCount[0]
+            m_pairCount
                 = nObstacles * nParticles + nParticles * (nParticles - 1) / 2;
         }
 
         m_needsUpdate = false;
-    }
-
-    // -------------------------------------------------------------------------
-    /** @brief Collect all IDs as everyone can be a neighbor;
-        nInserted particles have IDs [nObstacles, nObstacles+nInserted).
-        @param positions positions buffer
-        @param candidate candidate world-space position to insert
-        @param nObstacles number of obstacles
-        @param nInserted number of particles already inserted
-        @param out output buffer of indices (will be appended) */
-    void collectPotentialNeighbors(
-        const GrainsMemBuffer<Vector3<T>, M>& positions,
-        const Vector3<T>&                     candidate,
-        const uint                            nObstacles,
-        const uint                            nInserted,
-        std::vector<uint>&                    out) final
-    {
-        if constexpr(M == MemType::HOST)
-        {
-            out.reserve(out.size() + nObstacles + nInserted);
-            for(uint j = 0; j < nObstacles + nInserted; ++j)
-                out.push_back(j);
-        }
-        else if constexpr(M == MemType::DEVICE)
-        {
-            GAbort("NeighborList_Nsq::collectPotentialNeighbors is not "
-                   "implemented for DEVICE");
-        }
     }
     //@}
 };

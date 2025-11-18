@@ -10,6 +10,11 @@
 #include "NeighborList.hh"
 #include "NeighborList_Kernels.hh"
 
+#if defined(__CUDACC__)
+#include <thrust/device_ptr.h>
+#include <thrust/scan.h>
+#endif
+
 // =============================================================================
 /** @brief The class NeighborList_LinkedCell.
 
@@ -23,7 +28,6 @@ template <typename T, MemType M>
 class NeighborList_LinkedCell : public NeighborList<T, M>
 {
     using NL = NeighborList<T, M>;
-    using NL::m_hPairCount;
     using NL::m_needsUpdate;
     using NL::m_pairCount;
     using NL::m_pairList;
@@ -33,6 +37,10 @@ protected:
     //@{
     /** \brief LinkedCell */
     LinkedCell<T, M>* m_LinkedCell;
+    /** \brief Buffer of number of neighbors for each particle */
+    GrainsMemBuffer<uint, M> m_numNeighbors;
+    /** \brief Buffer of prefix sums for neighbor counts */
+    GrainsMemBuffer<uint, M> m_m_numNeighborsPrefixSums;
     //@}
 
 public:
@@ -78,11 +86,17 @@ public:
                               + nParticles * (nParticles - 1) / 2);
         m_pairList.fill();
 
-        m_pairCount.initialize(1);
-        m_pairCount.fill(0);
+        m_pairCount = 0;
 
-        m_hPairCount.initialize(1);
-        m_hPairCount.fill(0);
+        if constexpr(M == MemType::DEVICE)
+        {
+            // Initialize neighbor counting buffers
+            m_numNeighbors.initialize(nParticles);
+            m_numNeighbors.fill(0);
+
+            m_numNeighborsPrefixSums.initialize(nParticles + 1); // +1 for total
+            m_numNeighborsPrefixSums.fill(0);
+        }
 
         m_needsUpdate = true; // Initially, we need to create the list
     }
@@ -114,6 +128,7 @@ public:
             // If not, we bypass the neighbor list update.
             if(LC_updated)
             {
+                m_pairList.clear();
                 updateNeighborList_LC_Host(LC_host->getCellNeighborsList(),
                                            LC_host->getObstacleIDs(),
                                            LC_host->getObstacleCellIDs(),
@@ -123,10 +138,9 @@ public:
                                            LC_host->getMaxCellsPerObstacle(),
                                            nObstacles,
                                            nParticles,
-                                           m_pairList.getData(),
-                                           m_pairCount.getData());
+                                           m_pairList.getData());
                 // Update the actual size of the pair list
-                m_pairList.setSize(m_pairCount[0]);
+                m_pairCount = m_pairList.getSize();
             }
         }
         else if constexpr(M == MemType::DEVICE)
@@ -134,11 +148,14 @@ public:
             auto* LC_device
                 = static_cast<LinkedCell_SortBased<T>*>(m_LinkedCell);
             bool LC_updated = LC_device->updateLinkedCells();
-            cudaErrCheck(cudaGetLastError());
+
             // Check if the linked cell structure was updated.
             // If not, we bypass the neighbor list update.
             if(LC_updated)
             {
+                // Reset pair count
+                m_pairCount = 0;
+
                 if(nObstacles > 0)
                 {
                     generateObstacleParticlePairs_Device<<<nObstacles, 64>>>(
@@ -151,58 +168,77 @@ public:
                         nParticles,
                         LC_device->getNumCells(),
                         m_pairList.getData(),
-                        m_pairCount.getData());
+                        &m_pairCount);
                 }
+
+                // Two-phase atomic-free particle-particle neighbor generation
                 uint numBlocks, numThreads;
                 computeOptimalThreadsAndBlocks(nParticles,
                                                GrainsParameters<T>::m_GPU,
                                                numBlocks,
                                                numThreads);
-                updateNeighborList_LC_Device<<<numBlocks, numThreads>>>(
+
+                // Phase 1: Count neighbors per particle
+                countNeighbors_Device<<<numBlocks, numThreads>>>(
+                    LC_device->getCellNeighborsList(),
+                    LC_device->getParticleIDs(),
+                    LC_device->getCellIDs(),
+                    LC_device->getNumParticlesPerCell(),
+                    nParticles,
+                    m_numNeighbors.getData());
+
+                // Phase 2: Compute prefix sum (using Thrust)
+                thrust::device_ptr<uint> numNeighbors_ptr(
+                    m_numNeighbors.getData());
+                thrust::device_ptr<uint> prefixSums_ptr(
+                    m_numNeighborsPrefixSums.getData());
+                thrust::exclusive_scan(numNeighbors_ptr,
+                                       numNeighbors_ptr + nParticles,
+                                       prefixSums_ptr);
+
+                // Get total pair count using async copy from exclusive scan result
+                // Async copy last elements (prefix_sum[n-1] + neighbor_count[n-1] = total)
+                uint lastPrefixSum, lastNeighborCount;
+                cudaMemcpyAsync(
+                    &lastPrefixSum,
+                    &m_numNeighborsPrefixSums.getData()[nParticles - 1],
+                    sizeof(uint),
+                    cudaMemcpyDeviceToHost);
+                cudaMemcpyAsync(&lastNeighborCount,
+                                &m_numNeighbors.getData()[nParticles - 1],
+                                sizeof(uint),
+                                cudaMemcpyDeviceToHost);
+                cudaDeviceSynchronize();
+
+                uint totalPairs = lastPrefixSum + lastNeighborCount;
+                // Add obstacle-particle pairs
+                if(nObstacles > 0)
+                    totalPairs += m_pairCount;
+
+                // Increase pair list size if needed
+                if(totalPairs > m_pairList.getSize())
+                {
+                    m_pairList.free();
+                    m_pairList.initialize(totalPairs);
+                }
+
+                // Phase 3: Write neighbor pairs using prefix sums
+                updateNeighborList_LC_SB_Device<<<numBlocks, numThreads>>>(
                     LC_device->getCellNeighborsList(),
                     LC_device->getParticleIDs(),
                     LC_device->getCellIDs(),
                     LC_device->getCellStartIDs(),
+                    m_numNeighborsPrefixSums.getData(),
                     nObstacles,
                     nParticles,
                     LC_device->getNumCells(),
                     m_pairList.getData(),
-                    m_pairCount.getData());
+                    &m_pairCount); // Offset for obstacle pairs
                 cudaDeviceSynchronize();
-                // Copy the actual pair count and update size
-                m_pairCount.copyTo(m_hPairCount);
-                m_pairList.setSize(m_hPairCount[0]);
             }
         }
 
         m_needsUpdate = true;
-    }
-
-    // -------------------------------------------------------------------------
-    /** @brief Collect IDs from the candidate's cell and neighbors. 
-        @param positions positions buffer
-        @param candidate candidate world-space position to insert
-        @param nObstacles number of obstacles
-        @param nInserted number of particles already inserted
-        @param out output buffer of indices (will be appended) */
-    void collectPotentialNeighbors(
-        const GrainsMemBuffer<Vector3<T>, M>& positions,
-        const Vector3<T>&                     candidate,
-        const uint                            nObstacles,
-        const uint                            nInserted,
-        std::vector<uint>&                    out) final
-    {
-        if constexpr(M == MemType::HOST)
-        {
-            auto*      LC_host = static_cast<LinkedCell_Host<T>*>(m_LinkedCell);
-            const uint maxIndex = nObstacles + nInserted;
-            LC_host->collectPotentialNeighbors(candidate, maxIndex, out);
-        }
-        else if constexpr(M == MemType::DEVICE)
-        {
-            GAbort("NeighborList_LinkedCell::collectPotentialNeighbors is not "
-                   "implemented for DEVICE");
-        }
     }
     //@}
 };

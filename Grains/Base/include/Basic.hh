@@ -44,6 +44,7 @@
 #define __HOST__ __host__
 #define __DEVICE__ __device__
 #define __HOSTDEVICE__ __host__ __device__
+#define __MANAGED__ __managed__
 #define __GLOBAL__ __global__
 #define INLINE __inline__
 #define __RESTRICT__ __restrict__

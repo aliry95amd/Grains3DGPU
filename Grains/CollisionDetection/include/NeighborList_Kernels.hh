@@ -78,24 +78,71 @@ __GLOBAL__ void
                                          uint2*       pairList,
                                          uint*        pairCount);
 
-/** @brief Updates the neighbor list on device using a linked cell approach
+/** @brief Count neighbors per particle using linked cells
+    @param cellNeighborsList array of neighboring cells for each cell
+    @param particleIDs array of particle IDs
+    @param cellIDs array of cell IDs
+    @param numParticlesPerCell array of number of particles per cell
+    @param numParticles number of particles
+    @param neighborCounts output array of neighbor counts per particle */
+__GLOBAL__ void countNeighbors_Device(const uint* cellNeighborsList,
+                                      const uint* particleIDs,
+                                      const uint* cellIDs,
+                                      const uint* numParticlesPerCell,
+                                      const uint  numParticles,
+                                      uint*       neighborCounts);
+
+/** @brief Updates the neighbor list on device using a sort-based linked cell 
+    approach
     @param cellNeighborsList array of neighboring cells for each cell
     @param particleIDs array of particle IDs
     @param cellIDs array of cell IDs
     @param cellStartIDs array of start IDs for each cell
+    @param numNeighborsPrefixSums array of prefix sums of neighbors
+    @param numObstacles number of obstacles
+    @param numParticles number of particles
+    @param numCells number of cells
+    @param pairCount pointer to device memory for storing the total pair count
+    @param pairList array of pairs */
+__GLOBAL__ void
+    updateNeighborList_LC_SB_Device(const uint* cellNeighborsList,
+                                    const uint* particleIDs,
+                                    const uint* cellIDs,
+                                    const uint* cellStartIDs,
+                                    const uint* numNeighborsPrefixSums,
+                                    const uint  numObstacles,
+                                    const uint  numParticles,
+                                    const uint  numCells,
+                                    uint2*      pairList,
+                                    uint*       pairCount);
+
+/** @brief Updates the neighbor list on device using an atomic-based linked cell 
+    approach
+    @param cellNeighborsList array of neighboring cells for each cell
+    @param particleIDs array of particle IDs
+    @param cellIDs array of cell IDs
+    @param particleInCells array of particle IDs organized by cell
+    @param numParticlesPerCell array of number of particles per cell
+    @param numParticlesPrefixSums array of prefix sums for particles per cell
+    @param numNeighborsPrefixSums array of prefix sums of neighbors
     @param numObstacles number of obstacles
     @param numParticles number of particles
     @param numCells number of cells
     @param pairList array of pairs
     @param pairCount pointer to device memory for storing the total pair count */
-__GLOBAL__ void updateNeighborList_LC_Device(const uint* cellNeighborsList,
-                                             const uint* particleIDs,
-                                             const uint* cellIDs,
-                                             const uint* cellStartIDs,
-                                             const uint  numObstacles,
-                                             const uint  numParticles,
-                                             const uint  numCells,
-                                             uint2*      pairList,
-                                             uint*       pairCount);
+__GLOBAL__ void
+    updateNeighborList_LC_AT_Device(const uint* cellNeighborsList,
+                                    const uint* particleIDs,
+                                    const uint* cellIDs,
+                                    const uint* particleInCells,
+                                    const uint* numParticlesPerCell,
+                                    const uint* numParticlesPrefixSums,
+                                    const uint* numNeighborsPrefixSums,
+                                    const uint  numObstacles,
+                                    const uint  numParticles,
+                                    const uint  numCells,
+                                    uint2*      pairList,
+                                    uint*       pairCount);
+//@}
 
 #endif

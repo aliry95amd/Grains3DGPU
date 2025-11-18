@@ -383,18 +383,20 @@ public:
     @param value value to push */
     void push_back(const T& value)
     {
-        if constexpr(M == MemType::HOST || M == MemType::PINNED)
+        if constexpr(M == MemType::HOST || M == MemType::PINNED
+                     || M == MemType::MANAGED)
         {
+            // Grow capacity if needed (like std::vector)
             if(m_size >= m_capacity)
             {
-                std::cerr << "GrainsMemBuffer::push_back overflow\n";
-                return;
+                size_t new_capacity = m_capacity == 0 ? 1 : m_capacity * 2;
+                reserve(new_capacity);
             }
             m_ptr[m_size++] = value;
         }
         else
-            std::cerr << "GrainsMemBuffer::push_back() only allowed on host or "
-                         "pinned memory\n";
+            std::cerr << "GrainsMemBuffer::push_back() only allowed on host, "
+                         "pinned, or managed memory\n";
     }
 
     // -------------------------------------------------------------------------
@@ -403,20 +405,24 @@ public:
     @param count number of elements to push */
     void push_bulk(const T* values, size_t count)
     {
-        if constexpr(M == MemType::HOST || M == MemType::PINNED)
+        if constexpr(M == MemType::HOST || M == MemType::PINNED
+                     || M == MemType::MANAGED)
         {
+            // Grow capacity if needed
             if(m_size + count > m_capacity)
             {
-                std::cerr << "GrainsMemBuffer::push_bulk overflow\n";
-                return;
+                size_t new_capacity
+                    = std::max(m_capacity == 0 ? 1 : m_capacity * 2,
+                               m_size + count);
+                reserve(new_capacity);
             }
             T* dst = m_ptr + m_size;
             std::memcpy(dst, values, count * sizeof(T));
             m_size += count;
         }
         else
-            std::cerr << "GrainsMemBuffer::push_bulk() only allowed on host or "
-                         "pinned memory\n";
+            std::cerr << "GrainsMemBuffer::push_bulk() only allowed on host, "
+                         "pinned, or managed memory\n";
     }
 
     // -------------------------------------------------------------------------

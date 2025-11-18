@@ -32,9 +32,7 @@ protected:
     /** \brief Pair list */
     GrainsMemBuffer<uint2, M> m_pairList;
     /** \brief Pair count */
-    GrainsMemBuffer<uint, M> m_pairCount;
-    /** \brief Pair count */
-    GrainsMemBuffer<uint, MemType::HOST> m_hPairCount;
+    __DEVICE__ __MANAGED__ uint m_pairCount;
     /** \brief If neighbor list needs update */
     bool m_needsUpdate;
     //@}
@@ -71,10 +69,7 @@ public:
     /** @brief Gets size of pair list */
     uint getSize() const
     {
-        if constexpr(M == MemType::HOST)
-            return m_pairCount[0];
-        else if constexpr(M == MemType::DEVICE)
-            return m_hPairCount[0];
+        return m_pairCount;
     }
     //@}
 
@@ -86,22 +81,6 @@ public:
     virtual void updateNeighborList(GrainsMemBuffer<Vector3<T>, M>& positions,
                                     const uint                      nObstacles,
                                     const uint                      nParticles)
-        = 0;
-
-    // -------------------------------------------------------------------------
-    /** @brief Collects potential neighbor IDs for a candidate insertion point.
-        Appends indices in [0, nObstacles + nInserted) that should be tested.
-        @param positions positions buffer
-        @param candidate candidate world-space position to insert
-        @param nObstacles number of obstacles (at start of arrays)
-        @param nInserted number of particles already inserted
-        @param out output buffer of indices (will be appended) */
-    virtual void collectPotentialNeighbors(
-        const GrainsMemBuffer<Vector3<T>, M>& positions,
-        const Vector3<T>&                     candidate,
-        const uint                            nObstacles,
-        const uint                            nInserted,
-        std::vector<uint>&                    out)
         = 0;
 
     // -------------------------------------------------------------------------

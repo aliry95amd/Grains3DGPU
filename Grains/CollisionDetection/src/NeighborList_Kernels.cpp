@@ -61,11 +61,9 @@ __HOST__ void updateNeighborList_LC_Host(
     const uint                          maxCellsPerObstacle,
     const uint                          numObstacles,
     const uint                          numParticles,
-    uint2*                              pairList,
-    uint*                               pairCount)
+    uint2*                              pairList)
 {
     constexpr uint NUM_NEIGHBOR_CELLS = 27; // Number of neighboring cells
-    uint           counter            = 0;
 
     // FIRST PASS: Loop over all obstacles
     for(uint i = 0; i < numObstacles; ++i)
@@ -83,7 +81,7 @@ __HOST__ void updateNeighborList_LC_Host(
             // Check against all particles in the target cell
             for(uint particleID : targetCellParticles)
             {
-                pairList[counter++] = make_uint2(obstacleIndex, particleID);
+                pairList.push_back(make_uint2(obstacleIndex, particleID));
             }
         }
     }
@@ -117,14 +115,12 @@ __HOST__ void updateNeighborList_LC_Host(
                     if(primaryParticle >= otherParticle)
                         continue;
 
-                    pairList[counter++]
-                        = make_uint2(primaryParticle, otherParticle);
+                    pairList.push_back(
+                        make_uint2(primaryParticle, otherParticle));
                 }
             }
         }
     }
-
-    *pairCount = counter;
 }
 
 // -----------------------------------------------------------------------------
@@ -183,19 +179,64 @@ __GLOBAL__ void
 }
 
 // -----------------------------------------------------------------------------
-// Updates the neighbor list on device using a linked cell approach
-__GLOBAL__ void updateNeighborList_LC_Device(const uint* cellNeighborsList,
-                                             const uint* particleIDs,
-                                             const uint* cellIDs,
-                                             const uint* cellStartIDs,
-                                             const uint  numObstacles,
-                                             const uint  numParticles,
-                                             const uint  numCells,
-                                             uint2*      pairList,
-                                             uint*       pairCount)
+// Counts neighbors per particle using linked cells
+__GLOBAL__ void countNeighbors_Device(const uint* cellNeighborsList,
+                                      const uint* particleIDs,
+                                      const uint* cellIDs,
+                                      const uint* numParticlesPerCell,
+                                      const uint  numParticles,
+                                      uint*       neighborCounts)
+{
+    constexpr uint NUM_NEIGHBOR_CELLS = 27; // Number of neighboring cells
+
+    uint tID = blockIdx.x * blockDim.x + threadIdx.x;
+    if(tID >= numParticles)
+        return;
+
+    const uint i    = particleIDs[tID];
+    const uint cell = cellIDs[i];
+
+    // Safety check: skip particles with invalid cell assignments
+    if(cell == UINT_MAX)
+    {
+        neighborCounts[i] = 0;
+        return;
+    }
+
+    const uint* neighborCells  = &cellNeighborsList[NUM_NEIGHBOR_CELLS * cell];
+    uint        totalNeighbors = 0;
+
+    // Loop over all neighboring cells
+    for(uint cID = 0; cID < NUM_NEIGHBOR_CELLS; ++cID)
+    {
+        uint c = neighborCells[cID];
+
+        // Check if the neighboring cell is valid (not a boundary cell)
+        if(c == UINT_MAX)
+            continue;
+
+        // Get the number of particles in the neighboring cell
+        totalNeighbors += numParticlesPerCell[c];
+    }
+
+    neighborCounts[i] = totalNeighbors;
+}
+
+// -----------------------------------------------------------------------------
+// Updates the neighbor list on device using a sort-based linked cell approach
+__GLOBAL__ void
+    updateNeighborList_LC_SB_Device(const uint* cellNeighborsList,
+                                    const uint* particleIDs,
+                                    const uint* cellIDs,
+                                    const uint* cellStartIDs,
+                                    const uint* numNeighborsPrefixSums,
+                                    const uint  numObstacles,
+                                    const uint  numParticles,
+                                    const uint  numCells,
+                                    uint2*      pairList,
+                                    uint*       pairCount)
 {
     // constexpr variables
-    // constexpr uint MAX_PAIRS_PER_PARTICLE = 64; // Maximum pairs per particle
     constexpr uint NUM_NEIGHBOR_CELLS = 27; // Number of neighboring cells
 
     uint tID = blockIdx.x * blockDim.x + threadIdx.x;
@@ -208,10 +249,16 @@ __GLOBAL__ void updateNeighborList_LC_Device(const uint* cellNeighborsList,
         *pairCount = 0;
     __syncthreads();
 
-    const uint  i             = particleIDs[tID];
-    const uint  cell          = cellIDs[i];
+    const uint i    = particleIDs[tID];
+    const uint cell = cellIDs[i];
+
+    // Safety check: skip particles with invalid cell assignments
+    if(cell == UINT_MAX || cell >= numCells)
+        return;
+
     const uint* neighborCells = &cellNeighborsList[NUM_NEIGHBOR_CELLS * cell];
     uint        c, cellStart, cellEnd, numParticlesInCell, j;
+    uint        insertIndex = numNeighborsPrefixSums[i];
 
     // Loop over all neighboring cells
     for(uint cID = 0; cID < NUM_NEIGHBOR_CELLS; ++cID)
@@ -246,11 +293,86 @@ __GLOBAL__ void updateNeighborList_LC_Device(const uint* cellNeighborsList,
         for(uint p = 0; p < numParticlesInCell; ++p)
         {
             j = particleIDs[cellStart + p];
+
+            // Avoid duplicates and self-pairs
             if(i >= j)
-                continue; // Avoid duplicates and self-pairs
-            // Use atomic operation to get unique index
-            uint globalIndex      = atomicAdd(pairCount, 1);
-            pairList[globalIndex] = make_uint2(i, j);
+                continue;
+
+            pairList[insertIndex++] = make_uint2(i, j);
+        }
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Updates the neighbor list on device using atomic-based linked cell approach
+__GLOBAL__ void
+    updateNeighborList_LC_AT_Device(const uint* cellNeighborsList,
+                                    const uint* particleIDs,
+                                    const uint* cellIDs,
+                                    const uint* particleInCells,
+                                    const uint* numParticlesPerCell,
+                                    const uint* numParticlesPrefixSums,
+                                    const uint* numNeighborsPrefixSums,
+                                    const uint  numObstacles,
+                                    const uint  numParticles,
+                                    const uint  numCells,
+                                    uint2*      pairList,
+                                    uint*       pairCount)
+{
+    // constexpr variables
+    constexpr uint NUM_NEIGHBOR_CELLS = 27; // Number of neighboring cells
+
+    uint tID = blockIdx.x * blockDim.x + threadIdx.x;
+    if(tID >= numParticles)
+        return;
+
+    // initialize pair count to zero by the first thread only if there is no
+    // obstacles
+    if(tID == 0 && numObstacles == 0)
+        *pairCount = 0;
+    __syncthreads();
+
+    const uint i    = particleIDs[tID];
+    const uint cell = cellIDs[i];
+
+    // Safety check: skip particles with invalid cell assignments
+    if(cell == UINT_MAX || cell >= numCells)
+        return;
+
+    const uint* neighborCells = &cellNeighborsList[NUM_NEIGHBOR_CELLS * cell];
+    uint        c, cellStart, numParticlesInCell, j;
+    uint        insertIndex = numNeighborsPrefixSums[i];
+
+    // Loop over all neighboring cells
+    for(uint cID = 0; cID < NUM_NEIGHBOR_CELLS; ++cID)
+    {
+        // Get the neighboring cell hash
+        c = neighborCells[cID];
+
+        // Check if the neighboring cell is valid (not a boundary cell)
+        if(c == UINT_MAX || c < cell)
+            continue;
+
+        // Get the number of particles in the cell
+        numParticlesInCell = numParticlesPerCell[c];
+
+        // Skip empty cells
+        if(numParticlesInCell == 0)
+            continue;
+
+        // Get the starting position of particles for this cell
+        cellStart = numParticlesPrefixSums[c];
+
+        // Loop through all particles in the neighbor cell
+        for(uint p = 0; p < numParticlesInCell; ++p)
+        {
+            j = particleInCells[cellStart + p];
+
+            // Avoid duplicates and self-pairs
+            if(i >= j)
+                continue;
+
+            pairList[insertIndex++] = make_uint2(i, j);
         }
     }
 }

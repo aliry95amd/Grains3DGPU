@@ -80,61 +80,23 @@ __GLOBAL__ void generateNeighborCells_Device(const Cells<T>* const* cells,
     @param cells pointer to the Cells object
     @param positions buffer of positions
     @param numParticles number of particles
-    @param cellIDs particle hash */
+    @param cellIDs particle hash
+    @param numParticlesPerCell number of particles per cell */
 template <typename T>
 __GLOBAL__ void computeHash_Device(const Cells<T>* const* cells,
                                    const Vector3<T>*      positions,
                                    uint                   numParticles,
-                                   uint*                  cellIDs)
+                                   uint*                  cellIDs,
+                                   uint*                  numParticlesPerCell)
 {
     // TODO: Load cells to shared memory if needed
     uint tID = blockIdx.x * blockDim.x + threadIdx.x;
     if(tID >= numParticles)
         return;
 
-    cellIDs[tID] = cells[0]->computeCellHash(positions[tID]);
-}
-
-// -----------------------------------------------------------------------------
-/** @brief Finds the start of each cell
-    The cellStart array will contain the start index for each cell hash,
-    @param particleHash Array of particle hashes
-    @param numParticles Number of particles
-    @param cellStart Output array to store start indices for each cell hash */
-static __GLOBAL__ void computeCellStart_Kernel(const uint* particleHash,
-                                               uint        numParticles,
-                                               uint*       cellStart)
-{
-    using namespace cooperative_groups;
-    // Handle to thread block group
-    thread_block           cta = this_thread_block();
-    extern __shared__ uint sharedHash[]; // blockSize + 1 elements
-    uint                   tid = blockIdx.x * blockDim.x + threadIdx.x;
-
-    uint hash;
-    if(tid < numParticles)
-    {
-        hash = particleHash[tid];
-        // Load hash data into shared memory so that we can look at neighboring
-        // particle's hash value without loading two hash values per thread
-        sharedHash[threadIdx.x + 1] = hash;
-        // first thread in block must load neighboring particle hash as well
-        if(tid > 0 && threadIdx.x == 0)
-            sharedHash[0] = particleHash[tid - 1];
-    }
-    sync(cta);
-
-    if(tid < numParticles)
-    {
-        // If this particle has a different cell hash value to the previous
-        // particle then it must be the first particle in the cell.
-        // As it isn't the first particle, it must also be the end of the
-        // previous particle's cell.
-        if(tid == 0 || hash != sharedHash[threadIdx.x])
-        {
-            cellStart[hash] = tid;
-        }
-    }
+    uint c       = cells[0]->computeCellHash(positions[tID]);
+    cellIDs[tID] = c;
+    atomicAdd(&numParticlesPerCell[c], 1);
 }
 
 // -----------------------------------------------------------------------------
@@ -219,6 +181,86 @@ static __GLOBAL__ void linkObstacles_Device(const RigidBody<T>* const* rb,
     // Update the obstacle buffer
     obstacleID[obstacleIdx].x = obstacleIdx;
     obstacleID[obstacleIdx].y = cellCount;
+}
+
+// -----------------------------------------------------------------------------
+/** @brief Finds the start of each cell
+    The cellStart array will contain the start index for each cell hash,
+    @param particleHash Array of particle hashes
+    @param numParticles Number of particles
+    @param cellStart Output array to store start indices for each cell hash */
+static __GLOBAL__ void computeCellStart_Kernel(const uint* particleHash,
+                                               uint        numParticles,
+                                               uint*       cellStart)
+{
+    using namespace cooperative_groups;
+    // Handle to thread block group
+    thread_block           cta = this_thread_block();
+    extern __shared__ uint sharedHash[]; // blockSize + 1 elements
+    uint                   tid = blockIdx.x * blockDim.x + threadIdx.x;
+
+    uint hash;
+    if(tid < numParticles)
+    {
+        hash = particleHash[tid];
+        // Load hash data into shared memory so that we can look at neighboring
+        // particle's hash value without loading two hash values per thread
+        sharedHash[threadIdx.x + 1] = hash;
+        // first thread in block must load neighboring particle hash as well
+        if(tid > 0 && threadIdx.x == 0)
+            sharedHash[0] = particleHash[tid - 1];
+    }
+    sync(cta);
+
+    if(tid < numParticles)
+    {
+        // If this particle has a different cell hash value to the previous
+        // particle then it must be the first particle in the cell.
+        // As it isn't the first particle, it must also be the end of the
+        // previous particle's cell.
+        if(tid == 0 || hash != sharedHash[threadIdx.x])
+        {
+            cellStart[hash] = tid;
+        }
+    }
+}
+
+// -----------------------------------------------------------------------------
+/** @brief Writes particle IDs into cell-based arrays using atomic operations
+    @param particleIDs array of particle IDs
+    @param cellIDs array of cell IDs for each particle
+    @param prefixSums prefix sums for each cell (starting positions)
+    @param numParticles total number of particles
+    @param particleInCells output array where particles are written by cell
+    @param cellCounters temporary counter array for atomic operations */
+__GLOBAL__ void writeParticleIDs_Kernel(const uint* particleIDs,
+                                        const uint* cellIDs,
+                                        const uint* prefixSums,
+                                        const uint  numParticles,
+                                        uint*       particleInCells,
+                                        uint*       cellCounters)
+{
+    uint tid = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if(tid >= numParticles)
+        return;
+
+    uint particleID = particleIDs[tid];
+    uint cellID     = cellIDs[particleID];
+
+    // Skip invalid cells
+    if(cellID == UINT_MAX)
+        return;
+
+    // Get the starting position for this cell from prefix sums
+    uint cellStart = prefixSums[cellID];
+
+    // Use atomic to get unique position within the cell
+    uint localOffset = atomicAdd(&cellCounters[cellID], 1);
+
+    // Write particle ID to the computed position
+    uint finalPosition             = cellStart + localOffset;
+    particleInCells[finalPosition] = particleID;
 }
 //@}
 
