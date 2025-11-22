@@ -7,14 +7,6 @@
 #include "NeighborList_LinkedCell.hh"
 #include "NeighborList_Nsq.hh"
 
-enum class NEIGHBORLISTTYPE
-{
-    /** @brief N-Squared neighbor list */
-    NSQ = 0,
-    /** @brief Linked cell neighbor list */
-    LINKEDCELL = 1
-};
-
 // =============================================================================
 /** @brief The class NeighborListFactory.
 
@@ -70,24 +62,19 @@ public:
                 "Quaternions size mismatch");
 
         // Global parameters
-        NEIGHBORLISTTYPE type
-            = static_cast<NEIGHBORLISTTYPE>(GP::m_neighborListType);
-        T          linkedCellFactor = GP::m_linkedCellSizeFactor;
-        Vector3<T> minCorner        = GP::m_origin;
-        Vector3<T> maxCorner        = GP::m_maxCoordinate;
+        const auto&      CD   = GP::m_collisionDetection;
+        NeighborListType type = CD.neighborListType;
 
-        if(type == NEIGHBORLISTTYPE::NSQ)
+        if(type == NeighborListType::NSQ)
         {
             NL = new NeighborList_Nsq<T, M>(nObstacles, nParticles);
         }
-        else if(type == NEIGHBORLISTTYPE::LINKEDCELL)
+        else if(type == NeighborListType::LINKEDCELL)
         {
             NL = new NeighborList_LinkedCell<T, M>(rb,
                                                    positions,
                                                    quaternions,
-                                                   minCorner,
-                                                   maxCorner,
-                                                   linkedCellFactor,
+                                                   CD.linkedCellParameters,
                                                    nObstacles,
                                                    nParticles);
         }

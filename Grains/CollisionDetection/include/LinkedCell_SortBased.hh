@@ -52,26 +52,20 @@ public:
         @param rb Rigid body buffer
         @param positions Positions buffer
         @param quaternions Quaternions buffer
-        @param minCorner minimum corner of the domain
-        @param maxCorner maximum corner of the domain
-        @param cellSizeFactor size of the cell
+        @param linkedCellParameters Linked cell parameters
         @param nObstacles number of obstacles
         @param nParticles number of particles */
     LinkedCell_SortBased(
         const GrainsMemBuffer<RigidBody<T>*, MemType::DEVICE>* rb,
         const GrainsMemBuffer<Vector3<T>, MemType::DEVICE>&    positions,
         const GrainsMemBuffer<Quaternion<T>, MemType::DEVICE>& quaternions,
-        const Vector3<T>&                                      minCorner,
-        const Vector3<T>&                                      maxCorner,
-        const T                                                cellSizeFactor,
-        const uint                                             nObstacles,
-        const uint                                             nParticles)
+        const LinkedCellParameters<T>& linkedCellParameters,
+        const uint                     nObstacles,
+        const uint                     nParticles)
         : LinkedCell<T, MemType::DEVICE>(rb,
                                          positions,
                                          quaternions,
-                                         minCorner,
-                                         maxCorner,
-                                         cellSizeFactor,
+                                         linkedCellParameters,
                                          nObstacles,
                                          nParticles)
         , m_cellStartID(m_numCells)

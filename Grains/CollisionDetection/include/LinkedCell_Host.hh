@@ -56,26 +56,20 @@ public:
         @param rb Rigid body buffer
         @param positions Positions buffer
         @param quaternions Quaternions buffer
-        @param minCorner minimum corner of the domain
-        @param maxCorner maximum corner of the domain
-        @param cellSizeFactor factor to multiply the minimum cell size
+        @param linkedCellParameters Linked cell parameters
         @param nObstacles number of obstacles
         @param nParticles number of particles */
     LinkedCell_Host(
         const GrainsMemBuffer<RigidBody<T>*, MemType::HOST>* rb,
         const GrainsMemBuffer<Vector3<T>, MemType::HOST>&    positions,
         const GrainsMemBuffer<Quaternion<T>, MemType::HOST>& quaternions,
-        const Vector3<T>&                                    minCorner,
-        const Vector3<T>&                                    maxCorner,
-        const T                                              cellSizeFactor,
-        const uint                                           nObstacles,
-        const uint                                           nParticles)
+        const LinkedCellParameters<T>& linkedCellParameters,
+        const uint                     nObstacles,
+        const uint                     nParticles)
         : LinkedCell<T, MemType::HOST>(rb,
                                        positions,
                                        quaternions,
-                                       minCorner,
-                                       maxCorner,
-                                       cellSizeFactor,
+                                       linkedCellParameters,
                                        nObstacles,
                                        nParticles)
     {

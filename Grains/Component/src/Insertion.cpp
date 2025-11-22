@@ -306,12 +306,12 @@ __HOST__ void
         const uint maxAttempts = 1000;
 
         // Build a temporary linked-cell structure for strict insertion checks
+        auto LCParameters = GP::m_collisionDetection.linkedCellParameters;
+        LCParameters.type = LinkedCellType::HOST; // Ensure HOST type
         LinkedCell_Host<T> LC(rigidBody,
                               position,
                               orientation,
-                              GP::m_origin,
-                              GP::m_maxCoordinate,
-                              GP::m_linkedCellSizeFactor,
+                              LCParameters,
                               numObstacles,
                               numParticles);
 

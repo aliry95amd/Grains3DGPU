@@ -81,6 +81,8 @@ protected:
     /** \brief Maximum displacement of particles since the last update. Note 
         that we store the squared value */
     T m_maxDisplacementSquared;
+    /** \brief Update frequency */
+    uint m_updateFrequency;
     /** \brief Number of iterations since the last update */
     uint m_numIterationsSinceLastUpdate;
     /** \brief Number of obstacles */
@@ -105,18 +107,14 @@ public:
         @param rb Rigid body buffer
         @param positions Positions buffer
         @param quaternions Quaternions buffer
-        @param minCorner minimum corner of the domain
-        @param maxCorner maximum corner of the domain
-        @param cellSizeFactor factor to multiply the minimum cell size
+        @param linkedCellParameters Linked cell parameters
         @param nObstacles number of obstacles
         @param nParticles number of particles
         @param nCellsForEachObstacle number of cells for each obstacle */
     LinkedCell(const GrainsMemBuffer<RigidBody<T>*, M>* rb,
                const GrainsMemBuffer<Vector3<T>, M>&    positions,
                const GrainsMemBuffer<Quaternion<T>, M>& quaternions,
-               const Vector3<T>&                        minCorner,
-               const Vector3<T>&                        maxCorner,
-               const T                                  cellSizeFactor,
+               const LinkedCellParameters<T>&           linkedCellParameters,
                const uint                               nObstacles,
                const uint                               nParticles)
         : m_oldPosition(nObstacles + nParticles)
@@ -136,6 +134,12 @@ public:
                     && quaternions.getSize() == nObstacles + nParticles,
                 "LinkedCell: positions or quaternions size does not match "
                 "nObstacles + nParticles");
+
+        // Extract parameters
+        const Vector3<T>& minCorner      = linkedCellParameters.minCorner;
+        const Vector3<T>& maxCorner      = linkedCellParameters.maxCorner;
+        const T           cellSizeFactor = linkedCellParameters.cellSizeFactor;
+        m_updateFrequency                = linkedCellParameters.updateFrequency;
 
         // Find the maximum circumscribed radius of particles
         T maxRadiusParticles = computeMaxRadius(nObstacles, m_rb->getSize());
@@ -587,15 +591,13 @@ public:
     /** @brief Computes the skin thickness based on the maximum displacement */
     T computeSkinThickness() const
     {
-        // Desired number of iterations before next update
-        constexpr T desiredNumIterationsToUpdate = 100;
         // Smoothing factor
         constexpr T mu = T(0.4);
         // Max Cap the skin thickness at 20% of the cell size
         constexpr T maxSkinThickness = T(0.2);
 
         const T newThickness = T(2) * sqrt(m_maxDisplacementSquared)
-                               * desiredNumIterationsToUpdate
+                               * m_updateFrequency
                                / m_numIterationsSinceLastUpdate;
         T skinThickness = mu * newThickness + (1 - mu) * m_skinThickness;
         if(skinThickness > maxSkinThickness * m_cellSizeWithoutSkin)
@@ -616,7 +618,7 @@ public:
             {
                 uint cellHash = m_cells[0]->computeCellHash(p[i]);
                 m_cellID[i]   = cellHash;
-                m_numNeighborsPerCell[cellHash]++;
+                m_numParticlesPerCell[cellHash]++;
             }
         }
         else if constexpr(M == MemType::DEVICE)

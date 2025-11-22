@@ -61,9 +61,11 @@ __HOST__ void updateNeighborList_LC_Host(
     const uint                          maxCellsPerObstacle,
     const uint                          numObstacles,
     const uint                          numParticles,
-    uint2*                              pairList)
+    uint2*                              pairList,
+    uint&                               pairCount)
 {
     constexpr uint NUM_NEIGHBOR_CELLS = 27; // Number of neighboring cells
+    uint           counter            = 0;
 
     // FIRST PASS: Loop over all obstacles
     for(uint i = 0; i < numObstacles; ++i)
@@ -81,7 +83,7 @@ __HOST__ void updateNeighborList_LC_Host(
             // Check against all particles in the target cell
             for(uint particleID : targetCellParticles)
             {
-                pairList.push_back(make_uint2(obstacleIndex, particleID));
+                pairList[counter++] = make_uint2(obstacleIndex, particleID);
             }
         }
     }
@@ -115,12 +117,14 @@ __HOST__ void updateNeighborList_LC_Host(
                     if(primaryParticle >= otherParticle)
                         continue;
 
-                    pairList.push_back(
-                        make_uint2(primaryParticle, otherParticle));
+                    pairList[counter++]
+                        = make_uint2(primaryParticle, otherParticle);
                 }
             }
         }
     }
+
+    pairCount = counter;
 }
 
 // -----------------------------------------------------------------------------

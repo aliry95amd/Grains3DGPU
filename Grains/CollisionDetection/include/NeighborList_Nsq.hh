@@ -43,7 +43,7 @@ public:
                               + nParticles * (nParticles - 1) / 2);
         m_pairList.fill();
 
-        m_pairCount = 0;
+        *m_pairCount = 0;
 
         m_needsUpdate = true; // Initially, we need to create the list
     }
@@ -76,7 +76,7 @@ public:
             updateNeighborList_Nsq_Host(nObstacles,
                                         nParticles,
                                         m_pairList.getData());
-            m_pairCount
+            *m_pairCount
                 = nObstacles * nParticles + nParticles * (nParticles - 1) / 2;
         }
         else if constexpr(M == MemType::DEVICE || M == MemType::MANAGED)
@@ -90,7 +90,7 @@ public:
                 nObstacles,
                 nParticles,
                 m_pairList.getData());
-            m_pairCount
+            *m_pairCount
                 = nObstacles * nParticles + nParticles * (nParticles - 1) / 2;
         }
 

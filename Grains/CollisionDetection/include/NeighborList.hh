@@ -32,7 +32,7 @@ protected:
     /** \brief Pair list */
     GrainsMemBuffer<uint2, M> m_pairList;
     /** \brief Pair count */
-    __DEVICE__ __MANAGED__ uint m_pairCount;
+    uint* m_pairCount;
     /** \brief If neighbor list needs update */
     bool m_needsUpdate;
     //@}
@@ -41,12 +41,33 @@ public:
     /** @name Constructors */
     //@{
     // -------------------------------------------------------------------------
-    /** @brief Default constructor (forbidden except in derived classes) */
-    NeighborList() = default;
+    /** @brief Default constructor */
+    NeighborList()
+    {
+        if constexpr(M == MemType::DEVICE)
+        {
+            cudaErrCheck(cudaMallocManaged(&m_pairCount, sizeof(uint)));
+        }
+        else
+        {
+            m_pairCount = new uint;
+        }
+        *m_pairCount = 0;
+    }
 
     // -------------------------------------------------------------------------
     /** @brief Destructor */
-    virtual ~NeighborList() = default;
+    virtual ~NeighborList()
+    {
+        if constexpr(M == MemType::DEVICE)
+        {
+            cudaErrCheck(cudaFree(m_pairCount));
+        }
+        else
+        {
+            delete m_pairCount;
+        }
+    }
     //@}
 
     /** @name Get methods */
@@ -69,7 +90,7 @@ public:
     /** @brief Gets size of pair list */
     uint getSize() const
     {
-        return m_pairCount;
+        return *m_pairCount;
     }
     //@}
 

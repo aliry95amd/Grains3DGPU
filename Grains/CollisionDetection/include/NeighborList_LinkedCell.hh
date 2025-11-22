@@ -40,7 +40,7 @@ protected:
     /** \brief Buffer of number of neighbors for each particle */
     GrainsMemBuffer<uint, M> m_numNeighbors;
     /** \brief Buffer of prefix sums for neighbor counts */
-    GrainsMemBuffer<uint, M> m_m_numNeighborsPrefixSums;
+    GrainsMemBuffer<uint, M> m_numNeighborsPrefixSums;
     //@}
 
 public:
@@ -55,18 +55,14 @@ public:
         @param rb Rigid body buffer
         @param positions Positions buffer
         @param quaternions Quaternions buffer
-        @param minCorner minimum corner of the domain
-        @param maxCorner maximum corner of the domain
-        @param linkedCellFactor factor to multiply the minimum cell size
+        @param linkedCellParameters Linked cell parameters
         @param nObstacles number of obstacles
         @param nParticles number of particles */
     NeighborList_LinkedCell(
         const GrainsMemBuffer<RigidBody<T>*, M>* rb,
         const GrainsMemBuffer<Vector3<T>, M>&    positions,
         const GrainsMemBuffer<Quaternion<T>, M>& quaternions,
-        const Vector3<T>&                        minCorner,
-        const Vector3<T>&                        maxCorner,
-        const T                                  linkedCellFactor,
+        const LinkedCellParameters<T>&           linkedCellParameters,
         const uint                               nObstacles,
         const uint                               nParticles)
     {
@@ -74,9 +70,7 @@ public:
         LinkedCellFactory<T, M>::create(rb,
                                         positions,
                                         quaternions,
-                                        minCorner,
-                                        maxCorner,
-                                        linkedCellFactor,
+                                        linkedCellParameters,
                                         nObstacles,
                                         nParticles,
                                         m_LinkedCell);
@@ -86,7 +80,7 @@ public:
                               + nParticles * (nParticles - 1) / 2);
         m_pairList.fill();
 
-        m_pairCount = 0;
+        *m_pairCount = 0;
 
         if constexpr(M == MemType::DEVICE)
         {
@@ -138,9 +132,8 @@ public:
                                            LC_host->getMaxCellsPerObstacle(),
                                            nObstacles,
                                            nParticles,
-                                           m_pairList.getData());
-                // Update the actual size of the pair list
-                m_pairCount = m_pairList.getSize();
+                                           m_pairList.getData(),
+                                           m_pairCount);
             }
         }
         else if constexpr(M == MemType::DEVICE)
@@ -154,7 +147,7 @@ public:
             if(LC_updated)
             {
                 // Reset pair count
-                m_pairCount = 0;
+                *m_pairCount = 0;
 
                 if(nObstacles > 0)
                 {
@@ -168,7 +161,7 @@ public:
                         nParticles,
                         LC_device->getNumCells(),
                         m_pairList.getData(),
-                        &m_pairCount);
+                        m_pairCount);
                 }
 
                 // Two-phase atomic-free particle-particle neighbor generation
@@ -213,7 +206,7 @@ public:
                 uint totalPairs = lastPrefixSum + lastNeighborCount;
                 // Add obstacle-particle pairs
                 if(nObstacles > 0)
-                    totalPairs += m_pairCount;
+                    totalPairs += *m_pairCount;
 
                 // Increase pair list size if needed
                 if(totalPairs > m_pairList.getSize())
@@ -233,7 +226,7 @@ public:
                     nParticles,
                     LC_device->getNumCells(),
                     m_pairList.getData(),
-                    &m_pairCount); // Offset for obstacle pairs
+                    m_pairCount); // Offset for obstacle pairs
                 cudaDeviceSynchronize();
             }
         }

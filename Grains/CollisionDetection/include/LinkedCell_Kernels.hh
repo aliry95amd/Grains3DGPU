@@ -233,12 +233,12 @@ static __GLOBAL__ void computeCellStart_Kernel(const uint* particleHash,
     @param numParticles total number of particles
     @param particleInCells output array where particles are written by cell
     @param cellCounters temporary counter array for atomic operations */
-__GLOBAL__ void writeParticleIDs_Kernel(const uint* particleIDs,
-                                        const uint* cellIDs,
-                                        const uint* prefixSums,
-                                        const uint  numParticles,
-                                        uint*       particleInCells,
-                                        uint*       cellCounters)
+static __GLOBAL__ void writeParticleIDs_Kernel(const uint* particleIDs,
+                                               const uint* cellIDs,
+                                               const uint* prefixSums,
+                                               const uint  numParticles,
+                                               uint*       particleInCells,
+                                               uint*       cellCounters)
 {
     uint tid = blockIdx.x * blockDim.x + threadIdx.x;
 

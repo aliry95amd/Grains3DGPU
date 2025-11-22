@@ -221,6 +221,8 @@ void Grains<T>::Construction(DOMElement* rootElement)
     // -------------------------------------------------------------------------
     // Setting up collision detection
     GoutWI(6, "Reading collision detection ...");
+    auto&    CD = GP::m_collisionDetection;
+    auto&    LC = CD.linkedCellParameters;
     DOMNode* collisionDetection
         = ReaderXML::getNode(root, "CollisionDetection");
     GAssert(collisionDetection, "CollisionDetection node is mandatory!");
@@ -231,18 +233,15 @@ void Grains<T>::Construction(DOMElement* rootElement)
     std::string neighborListType
         = ReaderXML::getNodeAttr_String(nNeighborList, "Type");
     if(neighborListType == "BruteForce")
-        GP::m_neighborListType = 0;
+        CD.neighborListType = NeighborListType::NSQ;
     else if(neighborListType == "LinkedCell")
-        GP::m_neighborListType = 1;
+        CD.neighborListType = NeighborListType::LINKEDCELL;
     else
         GAbort("Unknown NeighborList type! Aborting Grains!");
-    GP::m_neighborListFrequency
-        = ReaderXML::getNodeAttr_Int(nNeighborList, "UpdateFrequency");
-    GoutWI(9,
-           "NeighborList: " + neighborListType + ", Frequency "
-               + std::to_string(GP::m_neighborListFrequency));
+    GoutWI(9, "NeighborList: " + neighborListType);
+
     // Linked cell
-    if(GP::m_neighborListType == 1)
+    if(CD.neighborListType == NeighborListType::LINKEDCELL)
     {
         DOMNode* nLinkedCell
             = ReaderXML::getNode(collisionDetection, "LinkedCell");
@@ -251,22 +250,50 @@ void Grains<T>::Construction(DOMElement* rootElement)
                 "neighbor list!");
         std::string linkedCellType
             = ReaderXML::getNodeAttr_String(nLinkedCell, "Type");
-        if(linkedCellType == "HostEfficient")
-            GP::m_linkedCellType = 0;
-        else if(linkedCellType == "DeviceMemoryEfficient")
-            GP::m_linkedCellType = 1;
+        if(linkedCellType == "Host")
+            LC.type = LinkedCellType::HOST;
+        else if(linkedCellType == "Device_SortBased")
+            LC.type = LinkedCellType::SORTBASED;
+        else if(linkedCellType == "Device_Atomic")
+            LC.type = LinkedCellType::ATOMIC;
         else
             GAbort("Unknown LinkedCell type! Aborting Grains!");
-        GP::m_linkedCellSizeFactor
+
+        // Cell ordering
+        // Default is linear if not specified in the input file
+        std::string cellOrdering = "Linear";
+        if(ReaderXML::hasNodeAttr(nLinkedCell, "CellOrdering"))
+        {
+            cellOrdering
+                = ReaderXML::getNodeAttr_String(nLinkedCell, "CellOrdering");
+            if(cellOrdering == "Linear")
+                LC.cellOrdering = CellOrdering::LINEAR;
+            else if(cellOrdering == "Morton")
+                LC.cellOrdering = CellOrdering::MORTON;
+            else
+                GAbort("Unknown CellOrdering! Aborting Grains!");
+        }
+
+        // Cell size factor and sorting frequency
+        LC.cellSizeFactor
             = T(ReaderXML::getNodeAttr_Double(nLinkedCell, "CellSizeFactor"));
-        GP::m_sortingFrequency
+        LC.updateFrequency
+            = ReaderXML::getNodeAttr_Int(nLinkedCell, "UpdatingFrequency");
+        LC.sortFrequency
             = ReaderXML::getNodeAttr_Int(nLinkedCell, "SortingFrequency");
+
+        // TODO: Take from the input file
+        LC.minCorner = GP::m_origin;
+        LC.maxCorner = GP::m_maxCoordinate;
+
         GoutWI(9,
-               "LinkedCell: " + linkedCellType + ", cell size factor "
-                   + std::to_string(GP::m_linkedCellSizeFactor)
-                   + ", sorting frequency "
-                   + std::to_string(GP::m_sortingFrequency) + " ...");
+               "LinkedCell: " + linkedCellType + ", Ordering: " + cellOrdering
+                   + ", cell size factor " + std::to_string(LC.cellSizeFactor)
+                   + ", updating frequency "
+                   + std::to_string(LC.updateFrequency) + ", sorting frequency "
+                   + std::to_string(LC.sortFrequency) + " ...");
     }
+
     // Bounding volume
     DOMNode* nBoundingVolume
         = ReaderXML::getNode(collisionDetection, "BoundingVolume");
@@ -275,15 +302,16 @@ void Grains<T>::Construction(DOMElement* rootElement)
         std::string boundingVolumeType
             = ReaderXML::getNodeAttr_String(nBoundingVolume, "Type");
         if(boundingVolumeType == "OFF")
-            GP::m_boundingVolumeType = 0;
+            CD.boundingVolumeType = BoundingVolumeType::OFF;
         else if(boundingVolumeType == "OBB")
-            GP::m_boundingVolumeType = 1;
+            CD.boundingVolumeType = BoundingVolumeType::OBB;
         else if(boundingVolumeType == "OBC")
-            GP::m_boundingVolumeType = 2;
+            CD.boundingVolumeType = BoundingVolumeType::OBC;
         else
             GAbort("Unknown bounding volume type! Aborting Grains!");
         GoutWI(9, "BoundingVolume: " + boundingVolumeType);
     }
+
     // Narrow phase detection
     DOMNode* nNarrowPhase
         = ReaderXML::getNode(collisionDetection, "NarrowPhase");
@@ -292,7 +320,7 @@ void Grains<T>::Construction(DOMElement* rootElement)
         std::string narrowPhaseType
             = ReaderXML::getNodeAttr_String(nNarrowPhase, "Type");
         if(narrowPhaseType == "GJK")
-            GP::m_narrowPhaseType = 0;
+            CD.narrowPhaseType = NarrowPhaseType::GJK;
         else
             GAbort("Unknown narrow phase type! Aborting Grains!");
         GoutWI(9, "NarrowPhase: " + narrowPhaseType);

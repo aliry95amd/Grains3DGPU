@@ -4,16 +4,17 @@
 
 // -----------------------------------------------------------------------------
 // Default constructor
-template <typename T>
-__HOSTDEVICE__ Cells<T>::Cells()
+template <typename T, CellOrdering OrderingScheme>
+__HOSTDEVICE__ Cells<T, OrderingScheme>::Cells()
 {
 }
 
 // -----------------------------------------------------------------------------
 // Constructor with min and max points along with extent of each cell
-template <typename T>
-__HOSTDEVICE__
-    Cells<T>::Cells(const Vector3<T>& min, const Vector3<T>& max, T cellSize)
+template <typename T, CellOrdering OrderingScheme>
+__HOSTDEVICE__ Cells<T, OrderingScheme>::Cells(const Vector3<T>& min,
+                                               const Vector3<T>& max,
+                                               T                 cellSize)
     : m_minCorner(min)
     , m_maxCorner(max)
 {
@@ -22,71 +23,72 @@ __HOSTDEVICE__
 
 // -----------------------------------------------------------------------------
 // Destructor
-template <typename T>
-__HOSTDEVICE__ Cells<T>::~Cells()
+template <typename T, CellOrdering OrderingScheme>
+__HOSTDEVICE__ Cells<T, OrderingScheme>::~Cells()
 {
 }
 
 // -----------------------------------------------------------------------------
 // Gets the min corner point of the linked cell
-template <typename T>
-__HOSTDEVICE__ const Vector3<T>& Cells<T>::getMinCorner() const
+template <typename T, CellOrdering OrderingScheme>
+__HOSTDEVICE__ const Vector3<T>& Cells<T, OrderingScheme>::getMinCorner() const
 {
     return (m_minCorner);
 }
 
 // -----------------------------------------------------------------------------
 // Gets the max corner point of the linked cell
-template <typename T>
-__HOSTDEVICE__ const Vector3<T>& Cells<T>::getMaxCorner() const
+template <typename T, CellOrdering OrderingScheme>
+__HOSTDEVICE__ const Vector3<T>& Cells<T, OrderingScheme>::getMaxCorner() const
 {
     return (m_maxCorner);
 }
 
 // -----------------------------------------------------------------------------
 // Gets the min corner point of the linked cell
-template <typename T>
-__HOSTDEVICE__ const Vector3<T>& Cells<T>::getMinCornerLinkedCell() const
+template <typename T, CellOrdering OrderingScheme>
+__HOSTDEVICE__ const Vector3<T>&
+                     Cells<T, OrderingScheme>::getMinCornerLinkedCell() const
 {
     return (m_minCornerLinkedCell);
 }
 
 // -----------------------------------------------------------------------------
 // Gets the extent of each cell
-template <typename T>
-__HOSTDEVICE__ T Cells<T>::getCellSize() const
+template <typename T, CellOrdering OrderingScheme>
+__HOSTDEVICE__ T Cells<T, OrderingScheme>::getCellSize() const
 {
     return (m_cellSize);
 }
 
 // -----------------------------------------------------------------------------
 // Gets the number of cells along each direction and total
-template <typename T>
-__HOSTDEVICE__ uint4 Cells<T>::getNumCellsPerDirection() const
+template <typename T, CellOrdering OrderingScheme>
+__HOSTDEVICE__ uint4 Cells<T, OrderingScheme>::getNumCellsPerDirection() const
 {
     return (m_numCells);
 }
 
 // -----------------------------------------------------------------------------
 // Gets the number of cells
-template <typename T>
-__HOSTDEVICE__ uint Cells<T>::getNumCells() const
+template <typename T, CellOrdering OrderingScheme>
+__HOSTDEVICE__ uint Cells<T, OrderingScheme>::getNumCells() const
 {
     return (m_numCells.w);
 }
 
 // -----------------------------------------------------------------------------
 // Gets the required size for neighbor cells
-template <typename T>
-__HOSTDEVICE__ uint Cells<T>::getSizeOfNeighborCells() const
+template <typename T, CellOrdering OrderingScheme>
+__HOSTDEVICE__ uint Cells<T, OrderingScheme>::getSizeOfNeighborCells() const
 {
     return (27 * m_numCells.w);
 }
 
 // -----------------------------------------------------------------------------
 // Resizes the linked cells
-template <typename T>
-__HOSTDEVICE__ void Cells<T>::resize(const T cellSize)
+template <typename T, CellOrdering OrderingScheme>
+__HOSTDEVICE__ void Cells<T, OrderingScheme>::resize(const T cellSize)
 {
     T DX = m_maxCorner[X] - m_minCorner[X];
     T DY = m_maxCorner[Y] - m_minCorner[Y];
@@ -94,47 +96,75 @@ __HOSTDEVICE__ void Cells<T>::resize(const T cellSize)
 
     m_cellSize     = cellSize;
     m_cellSize_inv = T(1) / cellSize;
-    // Use ceiling to ensure the grid is large enough to contain the entire domain
+    // Use ceiling to ensure the grid is large enough to contain the entire
+    // domain
     m_numCells.x = max(1u, uint(ceil(DX * m_cellSize_inv)));
     m_numCells.y = max(1u, uint(ceil(DY * m_cellSize_inv)));
     m_numCells.z = max(1u, uint(ceil(DZ * m_cellSize_inv)));
+
+    // Apply Morton code constraints if using Morton ordering
+    if constexpr(OrderingScheme == CellOrdering::MORTON)
+    {
+        // Morton code limitation: each dimension must be <= 1024 (10 bits)
+        constexpr uint MAX_MORTON_DIM = 1024;
+        if(m_numCells.x > MAX_MORTON_DIM || m_numCells.y > MAX_MORTON_DIM
+           || m_numCells.z > MAX_MORTON_DIM)
+        {
+            // Scale down to fit Morton code constraints
+            T scale = max({T(m_numCells.x), T(m_numCells.y), T(m_numCells.z)})
+                      / T(MAX_MORTON_DIM);
+            m_cellSize *= scale;
+            m_cellSize_inv = T(1) / m_cellSize;
+            m_numCells.x   = max(1u, uint(ceil(DX * m_cellSize_inv)));
+            m_numCells.y   = max(1u, uint(ceil(DY * m_cellSize_inv)));
+            m_numCells.z   = max(1u, uint(ceil(DZ * m_cellSize_inv)));
+        }
+    }
+
     m_numCells.w = m_numCells.x * m_numCells.y * m_numCells.z;
 
     // Center the domain within the cell grid
     m_minCornerLinkedCell[X]
-        = m_minCorner[X] - (m_numCells.x * cellSize - DX) * T(0.5);
+        = m_minCorner[X] - (m_numCells.x * m_cellSize - DX) * T(0.5);
     m_minCornerLinkedCell[Y]
-        = m_minCorner[Y] - (m_numCells.y * cellSize - DY) * T(0.5);
+        = m_minCorner[Y] - (m_numCells.y * m_cellSize - DY) * T(0.5);
     m_minCornerLinkedCell[Z]
-        = m_minCorner[Z] - (m_numCells.z * cellSize - DZ) * T(0.5);
+        = m_minCorner[Z] - (m_numCells.z * m_cellSize - DZ) * T(0.5);
 }
 
 // -----------------------------------------------------------------------------
-// Generates neighbor list for cells
+// Generates neighbor list for cells with ordering-specific implementation
 // TODO: We can also improve this so each thread can take more than one cell,
 // but that would only be useful for cases where this is a bottleneck.
 // TODO: The length of the array is fixed as 27 * m_numCells.w. We can implement
 // a more dynamic approach where we first compute the maximum possible
 // number of neighbors for each cell, and then use that to allocate the neighbor
 // list. This would be more efficient in terms of memory usage.
-template <typename T>
-__HOSTDEVICE__ void Cells<T>::generateNeighborCells(uint* neighborCells,
-                                                    uint  start,
-                                                    uint  end) const
+template <typename T, CellOrdering OrderingScheme>
+__HOSTDEVICE__ void Cells<T, OrderingScheme>::generateNeighborCells(
+    uint* neighborCells, uint start, uint end) const
 {
     if(end == 0)
         end = m_numCells.w;
     constexpr uint numNeighbors = 27;
-    // Allocate memory for the flat array
-    uint offset;
+
     // Precompute neighbors for each cell
     // clang-format off
     for(uint cellHash = start; cellHash < end; ++cellHash)
     {
-        offset       = numNeighbors * cellHash;
-        uint3 cellId = { cellHash % m_numCells.x,
-                        (cellHash / m_numCells.x) % m_numCells.y,
-                         cellHash / (m_numCells.x * m_numCells.y)};
+        uint offset = numNeighbors * cellHash;
+        uint3 cellId;
+        
+        // Decode cell hash to 3D coordinates (ordering-specific)
+        if constexpr (OrderingScheme == CellOrdering::MORTON)
+        {
+            cellId = decodeMortonCode(cellHash);
+        }
+        else // LINEAR ordering
+        {
+            cellId = decodeLinearHash(cellHash);
+        }
+        
         for(int k = -1; k < 2; ++k) {
         for(int j = -1; j < 2; ++j) {
         for(int i = -1; i < 2; ++i) {
@@ -147,9 +177,11 @@ __HOSTDEVICE__ void Cells<T>::generateNeighborCells(uint* neighborCells,
                ny >= 0 && ny < m_numCells.y && 
                nz >= 0 && nz < m_numCells.z)
             {
-                uint neighborHash = nx + 
-                                    ny * m_numCells.x +
-                                    nz * m_numCells.x * m_numCells.y;
+                uint neighborHash;
+                
+                // Encode neighbor coordinates back to hash using public API
+                neighborHash = computeCellHash(nx, ny, nz);
+                
                 neighborCells[offset++] = neighborHash;
             }
             else
@@ -164,17 +196,17 @@ __HOSTDEVICE__ void Cells<T>::generateNeighborCells(uint* neighborCells,
 
 // -----------------------------------------------------------------------------
 // Checks if a cell Id is in range
-template <typename T>
-__HOSTDEVICE__ bool Cells<T>::isValid(const uint3& id) const
+template <typename T, CellOrdering OrderingScheme>
+__HOSTDEVICE__ bool Cells<T, OrderingScheme>::isValid(const uint3& id) const
 {
     return (id.x < m_numCells.x && id.y < m_numCells.y && id.z < m_numCells.z);
 }
 
 // -----------------------------------------------------------------------------
 // Returns the 3d Id of the cell which the point belongs to
-template <typename T>
-__HOSTDEVICE__ uint3 Cells<T>::computeCellID(const Vector3<T>& p,
-                                             bool checkIfValid) const
+template <typename T, CellOrdering OrderingScheme>
+__HOSTDEVICE__ uint3 Cells<T, OrderingScheme>::computeCellID(
+    const Vector3<T>& p, bool checkIfValid) const
 {
     const T* __RESTRICT__ pt    = p.getBuffer();
     const T* __RESTRICT__ minPt = m_minCornerLinkedCell.getBuffer();
@@ -196,43 +228,138 @@ __HOSTDEVICE__ uint3 Cells<T>::computeCellID(const Vector3<T>& p,
 }
 
 // -----------------------------------------------------------------------------
-// Returns the 3d Id of the cell given its hash
-template <typename T>
-__HOSTDEVICE__ uint3 Cells<T>::computeCellID(const uint cellHash) const
+// Returns the 3d Id of the cell given its hash (ordering-specific)
+template <typename T, CellOrdering OrderingScheme>
+__HOSTDEVICE__ uint3
+    Cells<T, OrderingScheme>::computeCellID(const uint cellHash) const
 {
-    uint z = cellHash / (m_numCells.x * m_numCells.y);
-    uint y = (cellHash / m_numCells.x) % m_numCells.y;
-    uint x = cellHash % m_numCells.x;
-    return (uint3{x, y, z});
+    if constexpr(OrderingScheme == CellOrdering::MORTON)
+    {
+        return decodeMortonCode(cellHash);
+    }
+    else // LINEAR ordering
+    {
+        return decodeLinearHash(cellHash);
+    }
 }
 
 // -----------------------------------------------------------------------------
 // Returns the cell hash value of a given point
-template <typename T>
-__HOSTDEVICE__ uint Cells<T>::computeCellHash(const Vector3<T>& p) const
+template <typename T, CellOrdering OrderingScheme>
+__HOSTDEVICE__ uint
+    Cells<T, OrderingScheme>::computeCellHash(const Vector3<T>& p) const
 {
     return (computeCellHash(computeCellID(p)));
 }
 
 // -----------------------------------------------------------------------------
-// Returns the cell hash value from the 3d Id of the cell
-template <typename T>
-__HOSTDEVICE__ uint Cells<T>::computeCellHash(const uint3& cellID) const
+// Returns the cell hash value from the 3d Id of the cell (ordering-specific)
+template <typename T, CellOrdering OrderingScheme>
+__HOSTDEVICE__ uint
+    Cells<T, OrderingScheme>::computeCellHash(const uint3& cellID) const
 {
-    return ((cellID.z * m_numCells.y + cellID.y) * m_numCells.x + cellID.x);
+    if constexpr(OrderingScheme == CellOrdering::MORTON)
+    {
+        return computeMortonCode(cellID.x, cellID.y, cellID.z);
+    }
+    else // LINEAR ordering
+    {
+        return computeLinearHash(cellID.x, cellID.y, cellID.z);
+    }
 }
 
 // -----------------------------------------------------------------------------
-// Returns the cell hash value from the Id along each axis
-template <typename T>
-__HOSTDEVICE__ uint Cells<T>::computeCellHash(const uint i,
-                                              const uint j,
-                                              const uint k) const
+// Returns the cell hash value from the Id along each axis (ordering-specific)
+template <typename T, CellOrdering OrderingScheme>
+__HOSTDEVICE__ uint Cells<T, OrderingScheme>::computeCellHash(
+    const uint i, const uint j, const uint k) const
 {
-    return ((k * m_numCells.y + j) * m_numCells.x + i);
+    if constexpr(OrderingScheme == CellOrdering::MORTON)
+    {
+        return computeMortonCode(i, j, k);
+    }
+    else // LINEAR ordering
+    {
+        return computeLinearHash(i, j, k);
+    }
 }
 
 // -----------------------------------------------------------------------------
-// Explicit instantiation
-template class Cells<float>;
-template class Cells<double>;
+// Computes linear hash for 3D coordinates
+template <typename T, CellOrdering OrderingScheme>
+__HOSTDEVICE__ uint Cells<T, OrderingScheme>::computeLinearHash(uint x,
+                                                                uint y,
+                                                                uint z) const
+{
+    return ((z * m_numCells.y + y) * m_numCells.x + x);
+}
+
+// -----------------------------------------------------------------------------
+// Decodes linear hash to 3D coordinates
+template <typename T, CellOrdering OrderingScheme>
+__HOSTDEVICE__ uint3 Cells<T, OrderingScheme>::decodeLinearHash(uint hash) const
+{
+    uint z = hash / (m_numCells.x * m_numCells.y);
+    uint y = (hash / m_numCells.x) % m_numCells.y;
+    uint x = hash % m_numCells.x;
+    return uint3{x, y, z};
+}
+
+// -----------------------------------------------------------------------------
+// Expands a 10-bit integer into 30 bits by inserting 2 zeros after each bit
+template <typename T, CellOrdering OrderingScheme>
+__HOSTDEVICE__ uint Cells<T, OrderingScheme>::expandBits(uint v) const
+{
+    v = (v * 0x00010001u) & 0xFF0000FFu;
+    v = (v * 0x00000101u) & 0x0F00F00Fu;
+    v = (v * 0x00000011u) & 0xC30C30C3u;
+    v = (v * 0x00000005u) & 0x49249249u;
+    return v;
+}
+
+// -----------------------------------------------------------------------------
+// Compresses a 30-bit Morton-encoded value back to 10 bits
+template <typename T, CellOrdering OrderingScheme>
+__HOSTDEVICE__ uint Cells<T, OrderingScheme>::compactBits(uint v) const
+{
+    v &= 0x49249249u;
+    v = (v | (v >> 2)) & 0xC30C30C3u;
+    v = (v | (v >> 4)) & 0x0F00F00Fu;
+    v = (v | (v >> 8)) & 0xFF0000FFu;
+    v = (v | (v >> 16)) & 0x000003FFu;
+    return v;
+}
+
+// -----------------------------------------------------------------------------
+// Computes Morton code for 3D coordinates
+template <typename T, CellOrdering OrderingScheme>
+__HOSTDEVICE__ uint Cells<T, OrderingScheme>::computeMortonCode(uint x,
+                                                                uint y,
+                                                                uint z) const
+{
+    // Ensure coordinates are within 10-bit range (0-1023)
+    x = min(x, 1023u);
+    y = min(y, 1023u);
+    z = min(z, 1023u);
+
+    return expandBits(x) | (expandBits(y) << 1) | (expandBits(z) << 2);
+}
+
+// -----------------------------------------------------------------------------
+// Decodes Morton code to 3D coordinates
+template <typename T, CellOrdering OrderingScheme>
+__HOSTDEVICE__ uint3 Cells<T, OrderingScheme>::decodeMortonCode(uint code) const
+{
+    uint3 result;
+    result.x = compactBits(code);
+    result.y = compactBits(code >> 1);
+    result.z = compactBits(code >> 2);
+    return result;
+}
+
+// -----------------------------------------------------------------------------
+// Explicit instantiation for both ordering schemes
+template class Cells<float, CellOrdering::LINEAR>;
+template class Cells<double, CellOrdering::LINEAR>;
+template class Cells<float, CellOrdering::MORTON>;
+template class Cells<double, CellOrdering::MORTON>;

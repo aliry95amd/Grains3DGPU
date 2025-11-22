@@ -2,6 +2,7 @@
 #define _CELLS_HH_
 
 #include "GrainsMemBuffer.hh"
+#include "GrainsParameters.hh"
 #include "Vector3.hh"
 
 // =============================================================================
@@ -11,11 +12,16 @@
     of potential collisions for collision to the neighboring components. 
     Neighboring components are those who belong to adjacent cells given a 
     uniform Cartesian grid for cells.
+    
+    The cell ID ordering can be specified via template parameter:
+    - LINEAR: Traditional linear indexing (z * ny + y) * nx + x
+    - MORTON: Z-order curve for better spatial locality and cache efficiency
 
     @author A.Yazdani - 2024 - Construction 
-    @author A.Yazdani - 2025 - Modification for NeighborList */
+    @author A.Yazdani - 2025 - Modification for NeighborList
+    @author A.Yazdani - 2025 - Morton code implementation */
 // =============================================================================
-template <typename T>
+template <typename T, CellOrdering OrderingScheme = CellOrdering::MORTON>
 class Cells
 {
 protected:
@@ -41,7 +47,7 @@ public:
     /** @name Constructors */
     //@{
     /** @brief Default constructor (forbidden except in derived classes) */
-    __HOSTDEVICE__ Cells<T>();
+    __HOSTDEVICE__ Cells();
 
     /** @brief Constructor with parameters
         @param minCorner minimum corner of the domain
@@ -51,7 +57,7 @@ public:
     Cells(const Vector3<T>& min, const Vector3<T>& max, T cellSize);
 
     /** @brief Destructor */
-    __HOSTDEVICE__ ~Cells<T>();
+    __HOSTDEVICE__ ~Cells();
     //@}
 
     /** @name Get methods */
@@ -126,18 +132,79 @@ public:
     __HOSTDEVICE__
     uint computeCellHash(const Vector3<T>& p) const;
 
-    /** @brief Returns the cell hash from the 3d Id of the cell
+    /** @brief Returns the cell hash from the 3d Id of the cell (using Morton code)
         @param cellId 3d cell Id */
     __HOSTDEVICE__
     uint computeCellHash(const uint3& cellId) const;
 
-    /** @brief Returns the cell hash from the 3d Id of the cell
+    /** @brief Returns the cell hash from the 3d Id of the cell (using Morton code)
         @param i position of the cell in the x-direction
         @param j position of the cell in the y-direction
         @param k position of the cell in the z-direction */
     __HOSTDEVICE__
     uint computeCellHash(uint i, uint j, uint k) const;
+
+private:
+    /** @name Linear Hash Helper Functions */
+    //@{
+    /** @brief Computes linear hash for 3D coordinates
+        @param x x-coordinate 
+        @param y y-coordinate 
+        @param z z-coordinate 
+        @return Linear hash code */
+    __HOSTDEVICE__
+    uint computeLinearHash(uint x, uint y, uint z) const;
+
+    /** @brief Decodes linear hash to 3D coordinates
+        @param hash Linear hash code
+        @return 3D coordinates as uint3 */
+    __HOSTDEVICE__
+    uint3 decodeLinearHash(uint hash) const;
+    //@}
+
+    /** @name Morton Code Helper Functions */
+    //@{
+    /** @brief Expands a 10-bit integer into 30 bits by inserting 2 zeros after each bit
+        @param v 10-bit integer value
+        @return 30-bit expanded value */
+    __HOSTDEVICE__
+    uint expandBits(uint v) const;
+
+    /** @brief Compresses a 30-bit Morton-encoded value back to 10 bits
+        @param v 30-bit Morton-encoded value
+        @return 10-bit compressed value */
+    __HOSTDEVICE__
+    uint compactBits(uint v) const;
+
+    /** @brief Computes Morton code for 3D coordinates
+        @param x x-coordinate (max 1024)
+        @param y y-coordinate (max 1024) 
+        @param z z-coordinate (max 1024)
+        @return Morton code */
+    __HOSTDEVICE__
+    uint computeMortonCode(uint x, uint y, uint z) const;
+
+    /** @brief Decodes Morton code to 3D coordinates
+        @param code Morton code
+        @return 3D coordinates as uint3 */
+    __HOSTDEVICE__
+    uint3 decodeMortonCode(uint code) const;
     //@}
 };
+
+// =============================================================================
+/** @brief Convenience type aliases for different cell ordering schemes */
+// =============================================================================
+template <typename T>
+using CellsLinear = Cells<T, CellOrdering::LINEAR>;
+
+template <typename T>
+using CellsMorton = Cells<T, CellOrdering::MORTON>;
+
+// Common instantiations
+using CellsLinear_f = CellsLinear<float>;
+using CellsLinear_d = CellsLinear<double>;
+using CellsMorton_f = CellsMorton<float>;
+using CellsMorton_d = CellsMorton<double>;
 
 #endif
