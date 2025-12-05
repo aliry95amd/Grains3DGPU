@@ -3,6 +3,7 @@
 
 #include "Basic.hh"
 #include "Vector3.hh"
+#include <unistd.h>
 
 // =============================================================================
 /** @brief Miscellaneous functionalities (mostly low-level) for Grains.
@@ -32,6 +33,25 @@ __HOST__ static INLINE void
         if(abort)
             exit(code);
     }
+}
+
+// -----------------------------------------------------------------------------
+/** @brief Returns the available memory on the host in bytes */
+__HOST__ static INLINE size_t getAvailableHostMemory()
+{
+    long pages     = sysconf(_SC_AVPHYS_PAGES);
+    long page_size = sysconf(_SC_PAGE_SIZE);
+    return pages * page_size;
+}
+
+// -----------------------------------------------------------------------------
+/** @brief Returns the available memory on the device in bytes */
+__HOST__ static INLINE size_t getAvailableDeviceMemory()
+{
+    size_t free_byte;
+    size_t total_byte;
+    cudaErrCheck(cudaMemGetInfo(&free_byte, &total_byte));
+    return free_byte;
 }
 
 // -----------------------------------------------------------------------------

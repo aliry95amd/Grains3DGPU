@@ -259,21 +259,6 @@ void Grains<T>::Construction(DOMElement* rootElement)
         else
             GAbort("Unknown LinkedCell type! Aborting Grains!");
 
-        // Cell ordering
-        // Default is linear if not specified in the input file
-        std::string cellOrdering = "Linear";
-        if(ReaderXML::hasNodeAttr(nLinkedCell, "CellOrdering"))
-        {
-            cellOrdering
-                = ReaderXML::getNodeAttr_String(nLinkedCell, "CellOrdering");
-            if(cellOrdering == "Linear")
-                LC.cellOrdering = CellOrdering::LINEAR;
-            else if(cellOrdering == "Morton")
-                LC.cellOrdering = CellOrdering::MORTON;
-            else
-                GAbort("Unknown CellOrdering! Aborting Grains!");
-        }
-
         // Cell size factor and sorting frequency
         LC.cellSizeFactor
             = T(ReaderXML::getNodeAttr_Double(nLinkedCell, "CellSizeFactor"));
@@ -287,9 +272,8 @@ void Grains<T>::Construction(DOMElement* rootElement)
         LC.maxCorner = GP::m_maxCoordinate;
 
         GoutWI(9,
-               "LinkedCell: " + linkedCellType + ", Ordering: " + cellOrdering
-                   + ", cell size factor " + std::to_string(LC.cellSizeFactor)
-                   + ", updating frequency "
+               "LinkedCell: " + linkedCellType + +", cell size factor "
+                   + std::to_string(LC.cellSizeFactor) + ", updating frequency "
                    + std::to_string(LC.updateFrequency) + ", sorting frequency "
                    + std::to_string(LC.sortFrequency) + " ...");
     }

@@ -62,7 +62,7 @@ __HOST__ void updateNeighborList_LC_Host(
     const uint                          numObstacles,
     const uint                          numParticles,
     uint2*                              pairList,
-    uint&                               pairCount)
+    uint*                               pairCount)
 {
     constexpr uint NUM_NEIGHBOR_CELLS = 27; // Number of neighboring cells
     uint           counter            = 0;
@@ -124,7 +124,7 @@ __HOST__ void updateNeighborList_LC_Host(
         }
     }
 
-    pairCount = counter;
+    *pairCount = counter;
 }
 
 // -----------------------------------------------------------------------------

@@ -150,20 +150,11 @@ __HOSTDEVICE__ void Cells<T, OrderingScheme>::generateNeighborCells(
 
     // Precompute neighbors for each cell
     // clang-format off
-    for(uint cellHash = start; cellHash < end; ++cellHash)
+    for(uint cellIndex = start; cellIndex < end; ++cellIndex)
     {
-        uint offset = numNeighbors * cellHash;
-        uint3 cellId;
-        
-        // Decode cell hash to 3D coordinates (ordering-specific)
-        if constexpr (OrderingScheme == CellOrdering::MORTON)
-        {
-            cellId = decodeMortonCode(cellHash);
-        }
-        else // LINEAR ordering
-        {
-            cellId = decodeLinearHash(cellHash);
-        }
+        uint offset = numNeighbors * cellIndex;
+        // Always use linear decode for row indexing to ensure dense [0..N)
+        uint3 cellId = decodeLinearHash(cellIndex);
         
         for(int k = -1; k < 2; ++k) {
         for(int j = -1; j < 2; ++j) {
@@ -177,12 +168,9 @@ __HOSTDEVICE__ void Cells<T, OrderingScheme>::generateNeighborCells(
                ny >= 0 && ny < m_numCells.y && 
                nz >= 0 && nz < m_numCells.z)
             {
-                uint neighborHash;
-                
-                // Encode neighbor coordinates back to hash using public API
-                neighborHash = computeCellHash(nx, ny, nz);
-                
-                neighborCells[offset++] = neighborHash;
+                // Store dense linear index for neighbor
+                uint neighborIdx = computeLinearHash((uint)nx, (uint)ny, (uint)nz);
+                neighborCells[offset++] = neighborIdx;
             }
             else
             {
@@ -282,6 +270,52 @@ __HOSTDEVICE__ uint Cells<T, OrderingScheme>::computeCellHash(
     {
         return computeLinearHash(i, j, k);
     }
+}
+
+// -----------------------------------------------------------------------------
+// Returns dense linear index from point
+template <typename T, CellOrdering OrderingScheme>
+__HOSTDEVICE__ uint Cells<T, OrderingScheme>::computeDenseIndex(
+    const Vector3<T>& p, bool checkIfValid) const
+{
+    const uint3 id = computeCellID(p, checkIfValid);
+    if(!isValid(id))
+        return UINT_MAX;
+    return computeLinearHash(id.x, id.y, id.z);
+}
+
+// -----------------------------------------------------------------------------
+// Returns dense linear index from 3D cell id
+template <typename T, CellOrdering OrderingScheme>
+__HOSTDEVICE__ uint
+    Cells<T, OrderingScheme>::computeDenseIndex(const uint3& cellId) const
+{
+    if(!isValid(cellId))
+        return UINT_MAX;
+    return computeLinearHash(cellId.x, cellId.y, cellId.z);
+}
+
+// -----------------------------------------------------------------------------
+// Returns dense linear index from i,j,k
+template <typename T, CellOrdering OrderingScheme>
+__HOSTDEVICE__ uint Cells<T, OrderingScheme>::computeDenseIndex(uint i,
+                                                                uint j,
+                                                                uint k) const
+{
+    if(!(i < m_numCells.x && j < m_numCells.y && k < m_numCells.z))
+        return UINT_MAX;
+    return computeLinearHash(i, j, k);
+}
+
+// -----------------------------------------------------------------------------
+// Returns Morton key from dense linear index
+template <typename T, CellOrdering OrderingScheme>
+__HOSTDEVICE__ uint
+    Cells<T, OrderingScheme>::mortonKeyFromLinearIndex(uint linearIndex) const
+{
+    // Decode linear to (x,y,z), then compute Morton code
+    const uint3 id = decodeLinearHash(linearIndex);
+    return computeMortonCode(id.x, id.y, id.z);
 }
 
 // -----------------------------------------------------------------------------

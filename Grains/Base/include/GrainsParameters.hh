@@ -41,23 +41,16 @@ enum class NarrowPhaseType
     GJK = 0
 };
 
-/** @brief Type of cell ordering */
-enum class CellOrdering
-{
-    /** @brief Linear ordering */
-    LINEAR = 0,
-    /** @brief Morton ordering (Z-curve) */
-    MORTON = 1
-};
-
 /** @brief Parameters for linked cell configuration */
 template <typename T>
 struct LinkedCellParameters
 {
+    /** \brief Minimum corner of the linked cell domain */
+    Vector3<T> minCorner = Vector3<T>(0, 0, 0);
+    /** \brief Maximum corner of the linked cell domain */
+    Vector3<T> maxCorner = Vector3<T>(0, 0, 0);
     /** \brief Type of linked cell */
     LinkedCellType type = LinkedCellType::HOST;
-    /** \brief Cell ordering */
-    CellOrdering cellOrdering = CellOrdering::LINEAR;
     /** \brief Linked cell size factor */
     T cellSizeFactor = 1;
     /** \brief If using adaptive skin, this is the desired number of 
@@ -67,10 +60,6 @@ struct LinkedCellParameters
     /** \brief If using Morton ordering, this is the number of iterations 
         between each sorting */
     uint sortFrequency = 0;
-    /** \brief Minimum corner of the linked cell domain */
-    Vector3<T> minCorner = Vector3<T>(0, 0, 0);
-    /** \brief Maximum corner of the linked cell domain */
-    Vector3<T> maxCorner = Vector3<T>(0, 0, 0);
 };
 
 // =============================================================================

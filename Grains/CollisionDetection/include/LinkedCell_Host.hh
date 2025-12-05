@@ -35,6 +35,7 @@ class LinkedCell_Host : public LinkedCell<T, MemType::HOST>
     using LC::m_numObstacles;
     using LC::m_numParticles;
     using LC::m_particleID;
+    using LC::m_useAdaptiveSkin;
 
 private:
     /** @name Host-specific storage */
@@ -107,6 +108,34 @@ public:
     {
         return m_cellParticles[cellID];
     }
+
+    // -------------------------------------------------------------------------
+    /** @brief Gets cell start IDs (unsupported on host variant) */
+    const uint* getCellStartIDs() const override
+    {
+        GAbort("LinkedCell_Host::getCellStartIDs is not supported in host "
+               "variant");
+        return nullptr;
+    }
+
+    // -------------------------------------------------------------------------
+    /** @brief Gets particle IDs array (unsupported on host variant) */
+    const uint* getParticleIDArray() const override
+    {
+        GAbort("LinkedCell_Host::getParticleIDArray is not supported in host "
+               "variant");
+        return nullptr;
+    }
+
+    // -------------------------------------------------------------------------
+    /** @brief Gets number of particles prefix sums (unsupported on host variant) */
+    const uint* getNumParticlesPrefixSums() const override
+    {
+        GAbort("LinkedCell_Host::getNumParticlesPrefixSums is not supported in "
+               "host variant");
+        return nullptr;
+    }
+    //@}
 
     /** @name Methods */
     //@{
@@ -193,11 +222,19 @@ public:
     bool updateLinkedCells() override
     {
         // Store old cell IDs before updating
-        // Manually copy to preserve m_oldCellID's maximum size (copyFrom would resize it)
+        // Manually copy to preserve m_oldCellID's maximum size.
+        // copyFrom resizes it
         m_oldCellID.copyFrom(m_cellID);
 
         // Update particle hashes with new positions
-        bool isUpdated = this->updateCellFixed();
+        bool updated;
+        if(m_useAdaptiveSkin)
+            updated = this->updateCellAdaptive();
+        else
+            updated = this->updateCellFixed();
+
+        if(!updated)
+            return false;
 
         // Handle potential cell grid resize
         handleCellResize();
@@ -212,7 +249,7 @@ public:
                 moveParticleToCell(particleID, oldCellID, newCellID);
         }
 
-        return isUpdated;
+        return true;
     }
 
     // -------------------------------------------------------------------------
@@ -254,9 +291,12 @@ public:
 
         // Same-cell particles
         const auto& currentCellParticles = m_cellParticles[candidateCellID];
-        for(const uint p : currentCellParticles)
-            if(p < maxIndex)
-                out.push_back(p);
+        if(!currentCellParticles.empty())
+        {
+            for(const uint p : currentCellParticles)
+                if(p < maxIndex)
+                    out.push_back(p);
+        }
 
         // Neighbor cells for particles
         const uint* allNeighbors = this->getCellNeighborsList();

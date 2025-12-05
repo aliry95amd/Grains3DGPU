@@ -138,28 +138,31 @@ public:
         }
         else if constexpr(M == MemType::DEVICE)
         {
-            auto* LC_device
-                = static_cast<LinkedCell_SortBased<T>*>(m_LinkedCell);
-            bool LC_updated = LC_device->updateLinkedCells();
+            bool LC_updated = m_LinkedCell->updateLinkedCells();
 
             // Check if the linked cell structure was updated.
             // If not, we bypass the neighbor list update.
             if(LC_updated)
             {
+                // Determine the type linked cell used
+                using GP = GrainsParameters<T>;
+                auto& CD = GP::m_collisionDetection;
+                auto& LC = CD.linkedCellParameters;
+
                 // Reset pair count
                 *m_pairCount = 0;
 
                 if(nObstacles > 0)
                 {
                     generateObstacleParticlePairs_Device<<<nObstacles, 64>>>(
-                        LC_device->getObstacleIDs(),
-                        LC_device->getObstacleCellIDs(),
-                        LC_device->getCellStartIDs(),
-                        LC_device->getParticleIDs(),
-                        LC_device->getMaxCellsPerObstacle(),
+                        m_LinkedCell->getObstacleIDs(),
+                        m_LinkedCell->getObstacleCellIDs(),
+                        m_LinkedCell->getCellStartIDs(),
+                        m_LinkedCell->getParticleIDs(),
+                        m_LinkedCell->getMaxCellsPerObstacle(),
                         nObstacles,
                         nParticles,
-                        LC_device->getNumCells(),
+                        m_LinkedCell->getNumCells(),
                         m_pairList.getData(),
                         m_pairCount);
                 }
@@ -173,10 +176,10 @@ public:
 
                 // Phase 1: Count neighbors per particle
                 countNeighbors_Device<<<numBlocks, numThreads>>>(
-                    LC_device->getCellNeighborsList(),
-                    LC_device->getParticleIDs(),
-                    LC_device->getCellIDs(),
-                    LC_device->getNumParticlesPerCell(),
+                    m_LinkedCell->getCellNeighborsList(),
+                    m_LinkedCell->getParticleIDs(),
+                    m_LinkedCell->getCellIDs(),
+                    m_LinkedCell->getNumParticlesPerCell(),
                     nParticles,
                     m_numNeighbors.getData());
 
@@ -189,8 +192,10 @@ public:
                                        numNeighbors_ptr + nParticles,
                                        prefixSums_ptr);
 
-                // Get total pair count using async copy from exclusive scan result
-                // Async copy last elements (prefix_sum[n-1] + neighbor_count[n-1] = total)
+                // Get total pair count using async copy from exclusive scan
+                // result
+                // Async copy last elements
+                // prefix_sum[n-1] + neighbor_count[n-1] = total
                 uint lastPrefixSum, lastNeighborCount;
                 cudaMemcpyAsync(
                     &lastPrefixSum,
@@ -216,17 +221,36 @@ public:
                 }
 
                 // Phase 3: Write neighbor pairs using prefix sums
-                updateNeighborList_LC_SB_Device<<<numBlocks, numThreads>>>(
-                    LC_device->getCellNeighborsList(),
-                    LC_device->getParticleIDs(),
-                    LC_device->getCellIDs(),
-                    LC_device->getCellStartIDs(),
-                    m_numNeighborsPrefixSums.getData(),
-                    nObstacles,
-                    nParticles,
-                    LC_device->getNumCells(),
-                    m_pairList.getData(),
-                    m_pairCount); // Offset for obstacle pairs
+                if(LC.type == LinkedCellType::ATOMIC)
+                {
+                    updateNeighborList_LC_AT_Device<<<numBlocks, numThreads>>>(
+                        m_LinkedCell->getCellNeighborsList(),
+                        m_LinkedCell->getParticleIDs(),
+                        m_LinkedCell->getCellIDs(),
+                        m_LinkedCell->getParticleIDArray(),
+                        m_LinkedCell->getNumParticlesPerCell(),
+                        m_LinkedCell->getNumParticlesPrefixSums(),
+                        m_numNeighborsPrefixSums.getData(),
+                        nObstacles,
+                        nParticles,
+                        m_LinkedCell->getNumCells(),
+                        m_pairList.getData(),
+                        m_pairCount); // Offset for obstacle pairs
+                }
+                else if(LC.type == LinkedCellType::SORTBASED)
+                {
+                    updateNeighborList_LC_SB_Device<<<numBlocks, numThreads>>>(
+                        m_LinkedCell->getCellNeighborsList(),
+                        m_LinkedCell->getParticleIDs(),
+                        m_LinkedCell->getCellIDs(),
+                        m_LinkedCell->getCellStartIDs(),
+                        m_numNeighborsPrefixSums.getData(),
+                        nObstacles,
+                        nParticles,
+                        m_LinkedCell->getNumCells(),
+                        m_pairList.getData(),
+                        m_pairCount); // Offset for obstacle pairs
+                }
                 cudaDeviceSynchronize();
             }
         }

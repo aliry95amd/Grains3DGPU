@@ -5,6 +5,7 @@
 #include "thrust/execution_policy.h"
 #include "thrust/extrema.h"
 #include "thrust/find.h"
+#include "thrust/functional.h"
 #include "thrust/iterator/counting_iterator.h"
 #include "thrust/iterator/transform_iterator.h"
 #include "thrust/iterator/zip_iterator.h"
@@ -68,7 +69,7 @@ protected:
     GrainsMemBuffer<uint, M> m_numParticlesPerCell;
     /** \brief Buffer of obstacle IDs and the number of cells that have to be 
         checked for a possible contact with a particle. This is essentially the
-        number of cells each obstacle occupies + 1-ring.*/
+        number of cells each obstacle occupies + one-ring.*/
     GrainsMemBuffer<uint2, M> m_obstacleID;
     /** \brief Buffer of the cell IDs that that have to be checked for a
         possible contact with an obstacle. */
@@ -93,6 +94,8 @@ protected:
     uint m_numParticles;
     /** \brief Number of cells in the grid */
     uint m_numCells;
+    /** \brief Flag to indicate if adaptive skin is used */
+    bool m_useAdaptiveSkin;
     //@}
 
 public:
@@ -140,6 +143,7 @@ public:
         const Vector3<T>& maxCorner      = linkedCellParameters.maxCorner;
         const T           cellSizeFactor = linkedCellParameters.cellSizeFactor;
         m_updateFrequency                = linkedCellParameters.updateFrequency;
+        m_useAdaptiveSkin                = (m_updateFrequency > 0);
 
         // Find the maximum circumscribed radius of particles
         T maxRadiusParticles = computeMaxRadius(nObstacles, m_rb->getSize());
@@ -275,6 +279,18 @@ public:
     }
 
     // -------------------------------------------------------------------------
+    /** @brief Gets cell start IDs (implementation-specific) */
+    virtual const uint* getCellStartIDs() const = 0;
+
+    // -------------------------------------------------------------------------
+    /** @brief Gets particle IDs array (implementation-specific) */
+    virtual const uint* getParticleIDArray() const = 0;
+
+    // -------------------------------------------------------------------------
+    /** @brief Gets number of particles prefix sums (implementation-specific) */
+    virtual const uint* getNumParticlesPrefixSums() const = 0;
+
+    // -------------------------------------------------------------------------
     /** @brief Gets cell size without skin thickness */
     T getCellSizeWithoutSkin() const
     {
@@ -374,10 +390,11 @@ public:
             cudaDeviceSynchronize();
 
             // Use thrust to find maximum
-            auto max_it = thrust::max_element(
+            maxRadius = thrust::reduce(
                 thrust::device_pointer_cast(radii.getData()),
-                thrust::device_pointer_cast(radii.getData() + radii.getSize()));
-            maxRadius = *max_it;
+                thrust::device_pointer_cast(radii.getData() + radii.getSize()),
+                T(0),
+                thrust::maximum<T>());
         }
 
         return (maxRadius);
@@ -424,16 +441,6 @@ public:
         }
         else if constexpr(M == MemType::DEVICE)
         {
-            // Define the functor
-            struct obstacle_has_moved
-            {
-                __device__ bool operator()(
-                    const thrust::tuple<uint, Vector3<T>, Vector3<T>>& t) const
-                {
-                    return thrust::get<1>(t) != thrust::get<2>(t);
-                }
-            };
-
             auto pos_begin
                 = thrust::device_pointer_cast(m_positions->getData());
             auto old_begin
@@ -655,9 +662,20 @@ public:
         bool needsUpdate = (T(4) * m_maxDisplacementSquared
                             > m_skinThickness * m_skinThickness);
 
-        // If no update is needed, return false
+        // If no update is needed, check if obstacles relinking is required
+        // Otherwise, we always relink obstacles during an update
         if(!needsUpdate)
+        {
+            // TODO: We should pass a flag from upstream to indicate if
+            // obstacles have moved. This would avoid checking again here.
+            // if(haveObstaclesMoved() == true)
+            // {
+            //     linkObstacles();
+            //     return true;
+            // }
+            // else
             return false;
+        }
 
         // If we reach here, an update is needed
         // Adjust skin thickness
@@ -751,6 +769,19 @@ public:
     /** @brief Updates the linked cells and returns if the LinkedCell has been
         updated */
     virtual bool updateLinkedCells() = 0;
+    //@}
+
+    // -------------------------------------------------------------------------
+    /** @name Functors */
+    //@{
+    struct obstacle_has_moved
+    {
+        __device__ bool operator()(
+            const thrust::tuple<uint, Vector3<T>, Vector3<T>>& t) const
+        {
+            return thrust::get<1>(t) != thrust::get<2>(t);
+        }
+    };
     //@}
 };
 

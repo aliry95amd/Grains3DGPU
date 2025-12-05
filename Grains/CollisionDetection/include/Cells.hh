@@ -5,6 +5,15 @@
 #include "GrainsParameters.hh"
 #include "Vector3.hh"
 
+/** @brief Type of cell ordering */
+enum class CellOrdering
+{
+    /** @brief Linear ordering */
+    LINEAR = 0,
+    /** @brief Morton ordering (Z-curve) */
+    MORTON = 1
+};
+
 // =============================================================================
 /** @brief The class Cells.
 
@@ -21,7 +30,7 @@
     @author A.Yazdani - 2025 - Modification for NeighborList
     @author A.Yazdani - 2025 - Morton code implementation */
 // =============================================================================
-template <typename T, CellOrdering OrderingScheme = CellOrdering::MORTON>
+template <typename T, CellOrdering OrderingScheme = CellOrdering::LINEAR>
 class Cells
 {
 protected:
@@ -143,6 +152,31 @@ public:
         @param k position of the cell in the z-direction */
     __HOSTDEVICE__
     uint computeCellHash(uint i, uint j, uint k) const;
+
+    /** @brief Returns dense linear index [0..numCells) from a point. Returns
+        UINT_MAX when out of bounds if checkIfValid=false.
+        @param p point
+        @param checkIfValid whether to assert on invalid cell */
+    __HOSTDEVICE__
+    uint computeDenseIndex(const Vector3<T>& p,
+                           bool              checkIfValid = false) const;
+
+    /** @brief Returns dense linear index [0..numCells) from a 3D cell id.
+        Returns UINT_MAX when out of bounds. */
+    __HOSTDEVICE__
+    uint computeDenseIndex(const uint3& cellId) const;
+
+    /** @brief Returns dense linear index [0..numCells) from i,j,k (no wrap).
+        Returns UINT_MAX when out of bounds. */
+    __HOSTDEVICE__
+    uint computeDenseIndex(uint i, uint j, uint k) const;
+
+    /** @brief Compute Morton key for a given dense linear cell index by
+        decoding to (i,j,k) then encoding with Morton. This is valid
+        regardless of current ordering scheme, but meaningful for Morton
+        ordering. */
+    __HOSTDEVICE__
+    uint mortonKeyFromLinearIndex(uint linearIndex) const;
 
 private:
     /** @name Linear Hash Helper Functions */
