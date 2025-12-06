@@ -55,7 +55,7 @@ __HOST__ void updateNeighborList_LC_Host(
     uint2*                              pairList,
     uint*                               pairCount);
 
-/** @brief Generate obstacle-particle pairs on device
+/** @brief Generate obstacle-particle pairs on device (sort-based)
     @param obstacleIDs array of obstacle IDs and cell counts
     @param obstacleCellIDs array of obstacle cell IDs
     @param cellStartIDs array of start IDs for each cell
@@ -67,16 +67,41 @@ __HOST__ void updateNeighborList_LC_Host(
     @param pairList array of pairs
     @param pairCount pointer to device memory for storing the total pair count */
 __GLOBAL__ void
-    generateObstacleParticlePairs_Device(const uint2* obstacleIDs,
-                                         const uint*  obstacleCellIDs,
-                                         const uint*  cellStartIDs,
-                                         const uint*  particleIDs,
-                                         const uint   maxCellsPerObstacle,
-                                         const uint   numObstacles,
-                                         const uint   numParticles,
-                                         const uint   numCells,
-                                         uint2*       pairList,
-                                         uint*        pairCount);
+    generateObstacleParticlePairs_SB_Device(const uint2* obstacleIDs,
+                                            const uint*  obstacleCellIDs,
+                                            const uint*  cellStartIDs,
+                                            const uint*  particleIDs,
+                                            const uint   maxCellsPerObstacle,
+                                            const uint   numObstacles,
+                                            const uint   numParticles,
+                                            const uint   numCells,
+                                            uint2*       pairList,
+                                            uint*        pairCount);
+
+/** @brief Generate obstacle-particle pairs on device (atomic-based)
+    @param obstacleIDs array of obstacle IDs and cell counts
+    @param obstacleCellIDs array of obstacle cell IDs
+    @param particleInCells array of particle IDs organized by cell
+    @param numParticlesPerCell array of number of particles per cell
+    @param numParticlesPrefixSums array of prefix sums for particles per cell
+    @param maxCellsPerObstacle maximum number of cells per obstacle
+    @param numObstacles number of obstacles
+    @param numParticles number of particles
+    @param numCells number of cells
+    @param pairList array of pairs
+    @param pairCount pointer to device memory for storing the total pair count */
+__GLOBAL__ void
+    generateObstacleParticlePairs_AT_Device(const uint2* obstacleIDs,
+                                            const uint*  obstacleCellIDs,
+                                            const uint*  particleInCells,
+                                            const uint*  numParticlesPerCell,
+                                            const uint*  numParticlesPrefixSums,
+                                            const uint   maxCellsPerObstacle,
+                                            const uint   numObstacles,
+                                            const uint   numParticles,
+                                            const uint   numCells,
+                                            uint2*       pairList,
+                                            uint*        pairCount);
 
 /** @brief Count neighbors per particle using linked cells
     @param cellNeighborsList array of neighboring cells for each cell

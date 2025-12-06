@@ -2,7 +2,6 @@
 #define _LINKEDCELL_ATOMIC_HH_
 
 #include "GrainsMemBuffer.hh"
-#include "GrainsUtils.hh"
 #include "LinkedCell.hh"
 #include "LinkedCell_Kernels.hh"
 

@@ -82,7 +82,7 @@ public:
     //@{
     // -------------------------------------------------------------------------
     /** @brief Gets cell IDs */
-    const uint* getCellStartIDs() const
+    const uint* getCellStartIDs() const override
     {
         return this->m_cellStartID.getData();
     }

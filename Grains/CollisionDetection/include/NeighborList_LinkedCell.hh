@@ -154,17 +154,37 @@ public:
 
                 if(nObstacles > 0)
                 {
-                    generateObstacleParticlePairs_Device<<<nObstacles, 64>>>(
-                        m_LinkedCell->getObstacleIDs(),
-                        m_LinkedCell->getObstacleCellIDs(),
-                        m_LinkedCell->getCellStartIDs(),
-                        m_LinkedCell->getParticleIDs(),
-                        m_LinkedCell->getMaxCellsPerObstacle(),
-                        nObstacles,
-                        nParticles,
-                        m_LinkedCell->getNumCells(),
-                        m_pairList.getData(),
-                        m_pairCount);
+                    if(LC.type == LinkedCellType::ATOMIC)
+                    {
+                        generateObstacleParticlePairs_AT_Device<<<nObstacles,
+                                                                  64>>>(
+                            m_LinkedCell->getObstacleIDs(),
+                            m_LinkedCell->getObstacleCellIDs(),
+                            m_LinkedCell->getParticleIDArray(),
+                            m_LinkedCell->getNumParticlesPerCell(),
+                            m_LinkedCell->getNumParticlesPrefixSums(),
+                            m_LinkedCell->getMaxCellsPerObstacle(),
+                            nObstacles,
+                            nParticles,
+                            m_LinkedCell->getNumCells(),
+                            m_pairList.getData(),
+                            m_pairCount);
+                    }
+                    else if(LC.type == LinkedCellType::SORTBASED)
+                    {
+                        generateObstacleParticlePairs_SB_Device<<<nObstacles,
+                                                                  64>>>(
+                            m_LinkedCell->getObstacleIDs(),
+                            m_LinkedCell->getObstacleCellIDs(),
+                            m_LinkedCell->getCellStartIDs(),
+                            m_LinkedCell->getParticleIDs(),
+                            m_LinkedCell->getMaxCellsPerObstacle(),
+                            nObstacles,
+                            nParticles,
+                            m_LinkedCell->getNumCells(),
+                            m_pairList.getData(),
+                            m_pairCount);
+                    }
                 }
 
                 // Two-phase atomic-free particle-particle neighbor generation
