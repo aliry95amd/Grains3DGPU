@@ -6,7 +6,7 @@
 #include "Quaternion.hh"
 #include "Transform3.hh"
 
-// =============================================================================
+// =================================================================================================
 /** @brief The header for the axis-aligned and oriented bounding boxes collision
     detection.
 
@@ -15,29 +15,24 @@
     AABB is deprecated, so try to use OBB.
 
     @author A.Yazdani - 2024 - Construction */
-// =============================================================================
+// =================================================================================================
 /** @name OBB : External methods */
 //@{
 // Low-level methods for OBB as macros in double precision
-#define TESTCASE1(i)                                                  \
-    (fabs(cen[i]) > (a[i] + b[0] * oriAbs[i][0] + b[1] * oriAbs[i][1] \
-                     + b[2] * oriAbs[i][2]))
+#define TESTCASE1(i) \
+    (fabs(cen[i]) > (a[i] + b[0] * oriAbs[i][0] + b[1] * oriAbs[i][1] + b[2] * oriAbs[i][2]))
 
 #define TESTCASE2(i)                                                    \
     (fabs(cen[0] * ori[0][i] + cen[1] * ori[1][i] + cen[2] * ori[2][i]) \
-     > (b[i] + a[0] * oriAbs[0][i] + a[1] * oriAbs[1][i]                \
-        + a[2] * oriAbs[2][i]))
+     > (b[i] + a[0] * oriAbs[0][i] + a[1] * oriAbs[1][i] + a[2] * oriAbs[2][i]))
 
-#define TESTCASE3(i, j)                             \
-    (fabs(cen[(i + 2) % 3] * ori[(i + 1) % 3][j]    \
-          - cen[(i + 1) % 3] * ori[(i + 2) % 3][j]) \
-     > (a[(i + 1) % 3] * oriAbs[(i + 2) % 3][j]     \
-        + a[(i + 2) % 3] * oriAbs[(i + 1) % 3][j]   \
-        + b[(j + 1) % 3] * oriAbs[i][(j + 2) % 3]   \
-        + b[(j + 2) % 3] * oriAbs[i][(j + 1) % 3]))
+#define TESTCASE3(i, j)                                                                    \
+    (fabs(cen[(i + 2) % 3] * ori[(i + 1) % 3][j] - cen[(i + 1) % 3] * ori[(i + 2) % 3][j]) \
+     > (a[(i + 1) % 3] * oriAbs[(i + 2) % 3][j] + a[(i + 2) % 3] * oriAbs[(i + 1) % 3][j]  \
+        + b[(j + 1) % 3] * oriAbs[i][(j + 2) % 3] + b[(j + 2) % 3] * oriAbs[i][(j + 1) % 3]))
 
-// -----------------------------------------------------------------------------
-/** @brief Returns whether the bounding boxes are in contact using OBB test - 
+// -------------------------------------------------------------------------------------------------
+/** @brief Returns whether the bounding boxes are in contact using OBB test -
     absolute transformation
     @param a The first bounding box
     @param b The second bounding box
@@ -106,8 +101,8 @@ __HOSTDEVICE__ bool intersectOrientedBoundingBox(const Vector3<T>&    a,
     return (true);
 }
 
-// -----------------------------------------------------------------------------
-/** @brief Returns whether the bounding boxes are in contact using OBB test - 
+// -------------------------------------------------------------------------------------------------
+/** @brief Returns whether the bounding boxes are in contact using OBB test -
     relative transformation
     @param a The first bounding box
     @param b The second bounding box
@@ -168,8 +163,8 @@ __HOSTDEVICE__ bool intersectOrientedBoundingBox(const Vector3<T>&    a,
     return (true);
 }
 
-// -----------------------------------------------------------------------------
-/** @brief Returns whether the bounding boxes are in contact using OBB test - 
+// -------------------------------------------------------------------------------------------------
+/** @brief Returns whether the bounding boxes are in contact using OBB test -
     quaternion version
     @param a The first bounding box
     @param b The second bounding box
@@ -240,8 +235,8 @@ __HOSTDEVICE__ bool intersectOrientedBoundingBox(const Vector3<T>&    a,
     return (true);
 }
 
-// -----------------------------------------------------------------------------
-/** @brief Returns whether the bounding boxes are in contact using OBB test - 
+// -------------------------------------------------------------------------------------------------
+/** @brief Returns whether the bounding boxes are in contact using OBB test -
     quaternion relative version
     @param a The first bounding box
     @param b The second bounding box
@@ -305,8 +300,8 @@ __HOSTDEVICE__ bool intersectOrientedBoundingBox(const Vector3<T>&    a,
     return (true);
 }
 
-// -----------------------------------------------------------------------------
-/** @brief Returns whether the bounding boxes are in contact using AABB test - 
+// -------------------------------------------------------------------------------------------------
+/** @brief Returns whether the bounding boxes are in contact using AABB test -
     absolute transformation
     @param a The first bounding box
     @param b The second bounding box
@@ -328,12 +323,12 @@ __HOSTDEVICE__ bool intersectAxisAlignedBoundingBox(const Vector3<T>&    a,
         return (false);
     else if(fabs(posA[Z] - posB[Z]) > (a[Z] + b[Z]))
         return (false);
-    else // overlap
+    else  // overlap
         return (true);
 }
 
-// -----------------------------------------------------------------------------
-/** @brief Returns whether the bounding boxes are in contact using AABB test - 
+// -------------------------------------------------------------------------------------------------
+/** @brief Returns whether the bounding boxes are in contact using AABB test -
     relative transformation
     @param a The first bounding box
     @param b The second bounding box
@@ -352,12 +347,12 @@ __HOSTDEVICE__ bool intersectAxisAlignedBoundingBox(const Vector3<T>&    a,
         return (false);
     else if(fabs(pos[Z]) > (a[Z] + b[Z]))
         return (false);
-    else // overlap
+    else  // overlap
         return (true);
 }
 
-// -----------------------------------------------------------------------------
-/** @brief Returns whether the bounding boxes are in contact using AABB test - 
+// -------------------------------------------------------------------------------------------------
+/** @brief Returns whether the bounding boxes are in contact using AABB test -
     quaternion version
     @param a The first bounding box
     @param b The second bounding box
@@ -380,12 +375,12 @@ __HOSTDEVICE__ bool intersectAxisAlignedBoundingBox(const Vector3<T>&    a,
         return (false);
     else if(fabs(v_a2w[Z] - v_b2w[Z]) > (a[Z] + b[Z]))
         return (false);
-    else // overlap
+    else  // overlap
         return (true);
 }
 
-// -----------------------------------------------------------------------------
-/** @brief Returns whether the bounding boxes are in contact using AABB test - 
+// -------------------------------------------------------------------------------------------------
+/** @brief Returns whether the bounding boxes are in contact using AABB test -
     quaternion relative version
     @param a The first bounding box
     @param b The second bounding box
@@ -404,7 +399,7 @@ __HOSTDEVICE__ bool intersectAxisAlignedBoundingBox(const Vector3<T>&    a,
         return (false);
     else if(fabs(v_b2a[Z]) > (a[Z] + b[Z]))
         return (false);
-    else // overlap
+    else  // overlap
         return (true);
 }
 

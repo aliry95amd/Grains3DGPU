@@ -9,9 +9,9 @@
 #include "OBB.hh"
 #include "QuaternionMath.hh"
 
-/* ========================================================================== */
-/*                             Low-Level Methods                              */
-/* ========================================================================== */
+/* ============================================================================================== */
+/* Low-Level Methods                                                                              */
+/* ============================================================================================== */
 // Reads if the root is of type Random
 template <typename T>
 __HOST__ static INLINE InsertionInfo<T> readDataRand(DOMNode* root)
@@ -20,17 +20,15 @@ __HOST__ static INLINE InsertionInfo<T> readDataRand(DOMNode* root)
     // We also set the seed with srand. We use it for to randomly pick an
     // insertion window
     RandomGeneratorSeed rgs;
-    unsigned            cSeed = 1; // default C RNG seed for window selection
-    std::string seedString    = ReaderXML::getNodeAttr_String(root, "Seed");
+    unsigned            cSeed      = 1;  // default C RNG seed for window selection
+    std::string         seedString = ReaderXML::getNodeAttr_String(root, "Seed");
     if(seedString == "UserDefined")
     {
         uint val = ReaderXML::getNodeAttr_Int(root, "Value");
         GAssert(val, "Seed value is not provided. Aborting Grains!");
         rgs   = RGS_UDEF;
         cSeed = static_cast<unsigned>(val);
-        GoutWI(12,
-               "Random initialization with seed",
-               std::to_string(val) + ".");
+        GoutWI(12, "Random initialization with seed", std::to_string(val) + ".");
     }
     else if(seedString == "Random")
     {
@@ -49,7 +47,7 @@ __HOST__ static INLINE InsertionInfo<T> readDataRand(DOMNode* root)
     srand(cSeed);
 
     // Insertion window
-    DOMNode* nWindows = ReaderXML::getNode(root, "Windows");
+    DOMNode*                        nWindows = ReaderXML::getNode(root, "Windows");
     std::vector<InsertionWindow<T>> insertionWindows;
     if(nWindows)
     {
@@ -65,7 +63,7 @@ __HOST__ static INLINE InsertionInfo<T> readDataRand(DOMNode* root)
     return (insertionWindows);
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Reads if the root is of type File
 template <typename T>
 __HOST__ static INLINE InsertionInfo<T> readDataFile(DOMNode* root)
@@ -78,7 +76,7 @@ __HOST__ static INLINE InsertionInfo<T> readDataFile(DOMNode* root)
     return (file);
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Reads if the root is of type Constant
 template <typename T>
 __HOST__ static INLINE InsertionInfo<T> readDataCons(DOMNode* root)
@@ -92,7 +90,7 @@ __HOST__ static INLINE InsertionInfo<T> readDataCons(DOMNode* root)
     return (vec);
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Reads if the root is of type Zero
 template <typename T>
 __HOST__ static INLINE InsertionInfo<T> readDataZero(DOMNode* root)
@@ -103,9 +101,9 @@ __HOST__ static INLINE InsertionInfo<T> readDataZero(DOMNode* root)
     return (vec);
 }
 
-/* ========================================================================== */
-/*                             High-Level Methods                             */
-/* ========================================================================== */
+/* ============================================================================================== */
+/* High-Level Methods                                                                             */
+/* ============================================================================================== */
 // Default constructor
 template <typename T>
 __HOST__ Insertion<T>::Insertion()
@@ -121,7 +119,7 @@ __HOST__ Insertion<T>::Insertion()
 {
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Constructor with XML node
 template <typename T>
 __HOST__ Insertion<T>::Insertion(DOMNode* dn)
@@ -207,13 +205,12 @@ __HOST__ Insertion<T>::Insertion(DOMNode* dn)
     }
 
     if(ReaderXML::hasNodeAttr(dn, "ForceInsertion"))
-        m_forceInsertion = static_cast<bool>(
-            ReaderXML::getNodeAttr_Int(dn, "ForceInsertion"));
+        m_forceInsertion = static_cast<bool>(ReaderXML::getNodeAttr_Int(dn, "ForceInsertion"));
     else
         m_forceInsertion = false;
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Destructor
 template <typename T>
 __HOST__ Insertion<T>::~Insertion()
@@ -228,7 +225,7 @@ __HOST__ Insertion<T>::~Insertion()
         (std::get<std::ifstream>(m_angularVelInsertionInfo)).close();
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Returns a vector of Vector3 accroding to type and data
 template <typename T>
 __HOST__ Vector3<T> Insertion<T>::fetchInsertionData(InsertionType const type,
@@ -240,8 +237,7 @@ __HOST__ Vector3<T> Insertion<T>::fetchInsertionData(InsertionType const type,
     if(type == RANDOMINSERTION)
     {
         auto& IWs = std::get<std::vector<InsertionWindow<T>>>(data);
-        GAssert(!IWs.empty(),
-                "Random insertion selected but no InsertionWindow defined!");
+        GAssert(!IWs.empty(), "Random insertion selected but no InsertionWindow defined!");
         if(IWs.size() == 1)
             return IWs[0].generateRandomPoint();
 
@@ -261,17 +257,16 @@ __HOST__ Vector3<T> Insertion<T>::fetchInsertionData(InsertionType const type,
         return (Vector3<T>());
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Populates position, orientation, and kinematics according to the insertion
 // policy
 template <typename T>
-__HOST__ void
-    Insertion<T>::insert(const GrainsMemBuffer<RigidBody<T>*>* rigidBody,
-                         GrainsMemBuffer<Vector3<T>>&          position,
-                         GrainsMemBuffer<Quaternion<T>>&       orientation,
-                         GrainsMemBuffer<Kinematics<T>>&       kinematics,
-                         const uint                            numObstacles,
-                         const uint                            numParticles)
+__HOST__ void Insertion<T>::insert(const GrainsMemBuffer<RigidBody<T>*>* rigidBody,
+                                   GrainsMemBuffer<Vector3<T>>&          position,
+                                   GrainsMemBuffer<Quaternion<T>>&       orientation,
+                                   GrainsMemBuffer<Kinematics<T>>&       kinematics,
+                                   const uint                            numObstacles,
+                                   const uint                            numParticles)
 {
     using GP = GrainsParameters<T>;
     GoutWI(3, "Inserting", std::to_string(numParticles), "particles ...");
@@ -281,22 +276,17 @@ __HOST__ void
         for(uint i = 0; i < numParticles; ++i)
         {
             const uint insertID = i + numObstacles;
-            position[insertID]
-                = fetchInsertionData(m_positionType, m_positionInsertionInfo);
+            position[insertID]  = fetchInsertionData(m_positionType, m_positionInsertionInfo);
 
             // Orientation angles. These are not matrices, so we have to
             // compute the quaternions later.
-            Vector3<T> ori = fetchInsertionData(m_orientationType,
-                                                m_orientationInsertionInfo);
-            orientation[insertID]
-                = Quaternion<T>(ori[X], ori[Y], ori[Z]) * orientation[insertID];
+            Vector3<T> ori = fetchInsertionData(m_orientationType, m_orientationInsertionInfo);
+            orientation[insertID] = Quaternion<T>(ori[X], ori[Y], ori[Z]) * orientation[insertID];
 
             Vector3<T> vel
-                = fetchInsertionData(m_translationalVelType,
-                                     m_translationalVelInsertionInfo);
+                = fetchInsertionData(m_translationalVelType, m_translationalVelInsertionInfo);
 
-            Vector3<T> ang       = fetchInsertionData(m_angularVelType,
-                                                m_angularVelInsertionInfo);
+            Vector3<T> ang       = fetchInsertionData(m_angularVelType, m_angularVelInsertionInfo);
             kinematics[insertID] = Kinematics<T>(vel, ang);
         }
     }
@@ -307,7 +297,7 @@ __HOST__ void
 
         // Build a temporary linked-cell structure for strict insertion checks
         auto LCParameters = GP::m_collisionDetection.linkedCellParameters;
-        LCParameters.type = LinkedCellType::HOST; // Ensure HOST type
+        LCParameters.type = LinkedCellType::HOST;  // Ensure HOST type
         LinkedCell_Host<T> LC(rigidBody,
                               position,
                               orientation,
@@ -323,19 +313,16 @@ __HOST__ void
 
             // Check against already-inserted components via LC
             std::vector<uint> neighborList;
-            LC.collectPotentialNeighbors(insertPosition,
-                                         insertID,
-                                         neighborList);
+            LC.collectPotentialNeighbors(insertPosition, insertID, neighborList);
             for(uint j : neighborList)
             {
-                const Convex<T>& convexJ     = *(*rigidBody)[j]->getConvex();
-                bool             BVintersect = intersectOrientedBoundingBox(
-                    convexJ.computeBoundingBox(),
-                    convexNew.computeBoundingBox(),
-                    position[j],
-                    insertPosition,
-                    orientation[j],
-                    insertQuaternion);
+                const Convex<T>& convexJ = *(*rigidBody)[j]->getConvex();
+                bool BVintersect = intersectOrientedBoundingBox(convexJ.computeBoundingBox(),
+                                                                convexNew.computeBoundingBox(),
+                                                                position[j],
+                                                                insertPosition,
+                                                                orientation[j],
+                                                                insertQuaternion);
                 // if(BVintersect
                 //    && intersectGJK<T>(convexJ,
                 //                       convexNew,
@@ -357,12 +344,10 @@ __HOST__ void
             for(uint attempt = 0; attempt < maxAttempts && !placed; ++attempt)
             {
                 const Vector3<T>& pCand
-                    = fetchInsertionData(m_positionType,
-                                         m_positionInsertionInfo);
+                    = fetchInsertionData(m_positionType, m_positionInsertionInfo);
                 // Orientation angles. These are not matrices, so we have to
                 // compute the quaternions later.
-                Vector3<T>           ori = fetchInsertionData(m_orientationType,
-                                                    m_orientationInsertionInfo);
+                Vector3<T> ori = fetchInsertionData(m_orientationType, m_orientationInsertionInfo);
                 Quaternion<T>        quat(ori[X], ori[Y], ori[Z]);
                 const Quaternion<T>& qCand = quat * orientation[insertID];
                 // Check if candidate position is within domain bounds
@@ -378,12 +363,10 @@ __HOST__ void
                 {
                     position[insertID]    = pCand;
                     orientation[insertID] = qCand;
-                    Vector3<T> vel
-                        = fetchInsertionData(m_translationalVelType,
-                                             m_translationalVelInsertionInfo);
+                    Vector3<T> vel        = fetchInsertionData(m_translationalVelType,
+                                                        m_translationalVelInsertionInfo);
                     Vector3<T> ang
-                        = fetchInsertionData(m_angularVelType,
-                                             m_angularVelInsertionInfo);
+                        = fetchInsertionData(m_angularVelType, m_angularVelInsertionInfo);
                     kinematics[insertID] = Kinematics<T>(vel, ang);
                     placed               = true;
                     // Add new particle to linked cells for the next insert
@@ -401,7 +384,7 @@ __HOST__ void
     GoutWI(3, "Inserted", std::to_string(numParticles), "particles.");
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Explicit instantiation
 template class Insertion<float>;
 template class Insertion<double>;

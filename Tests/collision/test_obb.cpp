@@ -20,9 +20,8 @@ protected:
         boundingBoxB = BoundingBox<double>(extentB);
 
         // Identity transform
-        identity_transform
-            = Transform3<double>(Quaternion<double>(0.0, 0.0, 0.0, 1.0),
-                                 Vector3<double>(0.0, 0.0, 0.0));
+        identity_transform = Transform3<double>(Quaternion<double>(0.0, 0.0, 0.0, 1.0),
+                                                Vector3<double>(0.0, 0.0, 0.0));
     }
 
     BoundingBox<double> boundingBoxA;

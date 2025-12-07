@@ -5,11 +5,11 @@
 #include "Vector3.hh"
 #include <unistd.h>
 
-// =============================================================================
+// =================================================================================================
 /** @brief Miscellaneous functionalities (mostly low-level) for Grains.
 
     @author A.Yazdani - 2025 - Construction */
-// =============================================================================
+// =================================================================================================
 /** @name Miscellaneous functions and utilities for Grains */
 //@{
 // Macro for outputting CUDA errors
@@ -25,17 +25,13 @@ __HOST__ static INLINE void
 {
     if(code != cudaSuccess)
     {
-        fprintf(stderr,
-                "GPUassert: %s %s %d\n",
-                cudaGetErrorString(code),
-                file,
-                line);
+        fprintf(stderr, "GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
         if(abort)
             exit(code);
     }
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 /** @brief Returns the available memory on the host in bytes */
 __HOST__ static INLINE size_t getAvailableHostMemory()
 {
@@ -44,7 +40,7 @@ __HOST__ static INLINE size_t getAvailableHostMemory()
     return pages * page_size;
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 /** @brief Returns the available memory on the device in bytes */
 __HOST__ static INLINE size_t getAvailableDeviceMemory()
 {
@@ -54,20 +50,19 @@ __HOST__ static INLINE size_t getAvailableDeviceMemory()
     return free_byte;
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 /** @brief computes the optimal number of threads and blocks for a given number
     of elements and an architecture
     @param numElements the number of elements
     @param numThreads the number of threads per block
     @param numBlocks the minimum number of blocks
     @param prop the device properties */
-__HOST__ static INLINE void
-    computeOptimalThreadsAndBlocks(const uint            numElements,
-                                   const cudaDeviceProp& prop,
-                                   uint&                 numThreads,
-                                   uint&                 numBlocks)
+__HOST__ static INLINE void computeOptimalThreadsAndBlocks(const uint            numElements,
+                                                           const cudaDeviceProp& prop,
+                                                           uint&                 numThreads,
+                                                           uint&                 numBlocks)
 {
-    constexpr uint maxThreads = 256; // Avoid 1024 unless necessary
+    constexpr uint maxThreads = 256;  // Avoid 1024 unless necessary
     constexpr uint minThreads = 32;
     const uint     minBlocks  = 2 * prop.multiProcessorCount;
 
@@ -89,24 +84,22 @@ __HOST__ static INLINE void
     }
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 /** @brief Writes a uint2 object in a string
     @param os the output stream
     @param v the uint2 object */
-__HOST__ static INLINE std::ostream& operator<<(std::ostream& os,
-                                                const uint2&  v)
+__HOST__ static INLINE std::ostream& operator<<(std::ostream& os, const uint2& v)
 {
     os << "(" << v.x << ", " << v.y << ")";
     return os;
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 /** @brief Writes a real number with a prescribed number of digits in a string
     @param figure the float number
     @param size number of digits */
 template <typename T>
-__HOST__ static constexpr INLINE std::string realToString(const T&  figure,
-                                                          const int size)
+__HOST__ static constexpr INLINE std::string realToString(const T& figure, const int size)
 {
     std::ostringstream oss;
     oss.width(size);
@@ -114,15 +107,15 @@ __HOST__ static constexpr INLINE std::string realToString(const T&  figure,
     return (oss.str());
 }
 
-// -----------------------------------------------------------------------------
-/** @brief Writes a float number with a prescribed format and a prescribed 
+// -------------------------------------------------------------------------------------------------
+/** @brief Writes a float number with a prescribed format and a prescribed
     number of digits after the decimal point in a string
     @param format the format
     @param digits number of digits after the decimal point
     @param number the float number */
 template <typename T>
-__HOST__ static constexpr INLINE std::string realToString(
-    std::ios_base::fmtflags format, const int digits, const T& number)
+__HOST__ static constexpr INLINE std::string
+    realToString(std::ios_base::fmtflags format, const int digits, const T& number)
 {
     std::ostringstream oss;
     if(number != T(0))
@@ -134,19 +127,18 @@ __HOST__ static constexpr INLINE std::string realToString(
     return (oss.str());
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 /** @brief Writes a vector3 object in a string
     @param vec the vector3 object */
 template <typename T>
-__HOST__ static constexpr INLINE std::string
-                                 Vector3ToString(const Vector3<T>& vec)
+__HOST__ static constexpr INLINE std::string Vector3ToString(const Vector3<T>& vec)
 {
     std::ostringstream oss;
     oss << vec;
     return (oss.str());
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 /** @brief Writes a message to stdout
     @param args the output messages */
 template <typename... Args>
@@ -156,7 +148,7 @@ __HOST__ static constexpr INLINE void Gout(const Args&... args)
     std::cout << std::endl;
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 /** @brief Writes a message to stdout with Indent (WI)
     @param numShift the number of shift characters at the beginning
     @param args the output messages */
@@ -171,7 +163,7 @@ __HOST__ INLINE void GoutWI(const int numShift, const Args&... args)
     std::cout << std::endl;
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 /** @brief Writes a message to stdout with Indent (WI)
     @param numShift the number of shift characters at the beginning
     @param args the output messages */
@@ -216,7 +208,7 @@ __HOSTDEVICE__ INLINE void GAbort(const Args&... args)
     printf("[DEVICE] ");
     (print_device_arg(args), ...);
     printf("\n");
-    __trap(); // aborts the kernel
+    __trap();  // aborts the kernel
 #else
     std::cerr << "[HOST] ";
     ((std::cerr << args << " "), ...);
@@ -225,7 +217,7 @@ __HOSTDEVICE__ INLINE void GAbort(const Args&... args)
 #endif
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 /** @brief Assert function that aborts the program if the condition is false
     @param condition the condition to check
     @param args the message(s) to display if the assertion fails */

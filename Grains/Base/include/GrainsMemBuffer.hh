@@ -15,18 +15,18 @@ enum class MemType
     UNKNOWN
 };
 
-// =============================================================================
+// =================================================================================================
 /** @brief The class GrainsMemBuffer.
 
-    This class provides a buffer that can be allocated in different memory spaces
-    (host, device, managed, pinned) and provides methods for memory management
-    and data transfer between these spaces.
+    This class provides a buffer that can be allocated in different memory spaces (host, device,
+    managed, pinned) and provides methods for memory management and data transfer between these
+    spaces.
 
     @author A.Yazdani - 2025 - Construction */
-// =============================================================================
+// =================================================================================================
 /** @name GrainsMemBuffer: External Methods */
 //@{
-/** @brief Fills a buffer to default 
+/** @brief Fills a buffer to default
     @param buffer the buffer to be initialized
     @param size size of the buffer
     @param value the default value to be set (default is T()) */
@@ -39,14 +39,13 @@ __GLOBAL__ void fill_Kernel(T* buffer, const size_t size, const T& value = T())
     buffer[idx] = value;
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 /** @brief fills a buffer with incremental values
     @param buffer the buffer to be initialized
     @param size size of the buffer
     @param start the starting value (default is 0) */
 template <typename T>
-__GLOBAL__ void
-    sequence_Kernel(T* buffer, const size_t size, const T& start = T(0))
+__GLOBAL__ void sequence_Kernel(T* buffer, const size_t size, const T& start = T(0))
 {
     size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
     if(idx >= size)
@@ -56,7 +55,7 @@ __GLOBAL__ void
 }
 //@}
 
-// =============================================================================
+// =================================================================================================
 template <typename T, MemType M = MemType::HOST>
 class GrainsMemBuffer
 {
@@ -76,11 +75,11 @@ protected:
 public:
     /** @name Constructors */
     //@{
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief Default constructor */
     GrainsMemBuffer() = default;
 
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief Constructor with the size */
     GrainsMemBuffer(size_t size)
     {
@@ -88,7 +87,7 @@ public:
         fill();
     }
 
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief Constructor with the size and default value
         @param size size of the buffer
         @param value default value to fill the buffer */
@@ -98,25 +97,25 @@ public:
         fill(value);
     }
 
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief Destructor */
     ~GrainsMemBuffer()
     {
         free();
     }
 
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief Copy constructor
-    @param other the other buffer to copy from */
+        @param other the other buffer to copy from */
     template <MemType srcM>
     GrainsMemBuffer(const GrainsMemBuffer<T, srcM>& other)
     {
         copyFrom(other);
     }
 
-    // -------------------------------------------------------------------------
-    /** @brief Copy assignment operator 
-    @param other the other buffer to copy from */
+    // ---------------------------------------------------------------------------------------------
+    /** @brief Copy assignment operator
+        @param other the other buffer to copy from */
     template <MemType srcM>
     GrainsMemBuffer<T, M>& operator=(const GrainsMemBuffer<T, srcM>& other)
     {
@@ -125,14 +124,14 @@ public:
         return *this;
     }
 
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief Move constructor */
     GrainsMemBuffer(GrainsMemBuffer<T, M>&& other) noexcept
     {
         moveFrom(other);
     }
 
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief Move assignment operator */
     GrainsMemBuffer& operator=(GrainsMemBuffer<T, M>&& other) noexcept
     {
@@ -148,21 +147,21 @@ public:
 
     /** @name Get methods */
     //@{
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief Returns the pointer to the data */
     T* getData()
     {
         return m_ptr;
     }
 
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief Returns the pointer to the data */
     const T* getData() const
     {
         return m_ptr;
     }
 
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief Returns the pointer to the data on device (for zero-copy) */
     /** @note This is only valid for pinned memory */
     T* getDeviceData()
@@ -173,28 +172,28 @@ public:
             return m_ptr;
     }
 
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief Returns the number of elements */
     size_t getSize() const
     {
         return m_size;
     }
 
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief Returns the size in bytes */
     size_t getBytes() const
     {
         return m_size * sizeof(T);
     }
 
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief Returns the capacity (maximum elements without reallocation) */
     size_t getCapacity() const
     {
         return m_capacity;
     }
 
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief Returns the type of memory */
     MemType getMemType() const
     {
@@ -210,66 +209,61 @@ public:
             return MemType::UNKNOWN;
     }
 
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief Returns iterator to the beginning of the buffer */
     T* begin()
     {
-        static_assert(
-            M == MemType::HOST || M == MemType::PINNED || M == MemType::MANAGED,
-            "begin() only available for HOST, PINNED, or MANAGED memory");
+        static_assert(M == MemType::HOST || M == MemType::PINNED || M == MemType::MANAGED,
+                      "begin() only available for HOST, PINNED, or MANAGED memory");
         return m_ptr;
     }
 
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief Returns const iterator to the beginning of the buffer */
     const T* begin() const
     {
-        static_assert(
-            M == MemType::HOST || M == MemType::PINNED || M == MemType::MANAGED,
-            "begin() only available for HOST, PINNED, or MANAGED memory");
+        static_assert(M == MemType::HOST || M == MemType::PINNED || M == MemType::MANAGED,
+                      "begin() only available for HOST, PINNED, or MANAGED memory");
         return m_ptr;
     }
 
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief Returns iterator to the end of the buffer */
     T* end()
     {
-        static_assert(
-            M == MemType::HOST || M == MemType::PINNED || M == MemType::MANAGED,
-            "end() only available for HOST, PINNED, or MANAGED memory");
+        static_assert(M == MemType::HOST || M == MemType::PINNED || M == MemType::MANAGED,
+                      "end() only available for HOST, PINNED, or MANAGED memory");
         return m_ptr + m_size;
     }
 
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief Returns const iterator to the end of the buffer */
     const T* end() const
     {
-        static_assert(
-            M == MemType::HOST || M == MemType::PINNED || M == MemType::MANAGED,
-            "end() only available for HOST, PINNED, or MANAGED memory");
+        static_assert(M == MemType::HOST || M == MemType::PINNED || M == MemType::MANAGED,
+                      "end() only available for HOST, PINNED, or MANAGED memory");
         return m_ptr + m_size;
     }
     //@}
 
     /** @name Set methods */
     //@{
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief Sets the size of the buffer without reallocation
-    @param new_size new size of the buffer (must be <= capacity) */
+        @param new_size new size of the buffer (must be <= capacity) */
     void setSize(size_t new_size)
     {
         GAssert(new_size > 0, "Size must be positive in setSize()");
-        GAssert(new_size <= m_capacity,
-                "Size must be <= capacity in setSize()");
+        GAssert(new_size <= m_capacity, "Size must be <= capacity in setSize()");
         m_size = new_size;
     }
     //@}
 
     /** @name Methods */
     //@{
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief Reserves memory for the buffer
-    @param new_capacity new capacity of the buffer */
+        @param new_capacity new capacity of the buffer */
     void reserve(size_t new_capacity)
     {
         GAssert(new_capacity > 0, "Capacity must be positive in reserve()");
@@ -305,18 +299,17 @@ public:
         *this = std::move(new_buf);
     }
 
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief Initialize/reinitialize buffer with specific size and capacity
-    @param new_size desired logical size
-    @param new_capacity desired capacity (if 0, uses new_size)
+        @param new_size desired logical size
+        @param new_capacity desired capacity (if 0, uses new_size)
     This is useful for buffer initialization or complete reallocation */
     void initialize(size_t new_size, size_t new_capacity = 0)
     {
         if(new_capacity == 0)
             new_capacity = new_size;
 
-        GAssert(new_capacity >= new_size,
-                "Capacity must be >= size in initialize()");
+        GAssert(new_capacity >= new_size, "Capacity must be >= size in initialize()");
 
         // Free existing memory
         free();
@@ -345,9 +338,9 @@ public:
         }
     }
 
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief Resizes the buffer (changes logical size, may grow capacity)
-    @param new_size new size of the buffer */
+        @param new_size new size of the buffer */
     void resize(size_t new_size)
     {
         // If new size fits within current capacity, just change size
@@ -362,29 +355,28 @@ public:
         m_size = new_size;
     }
 
-    // -------------------------------------------------------------------------
-    /** @brief Clears the buffer (sets size to 0, keeps capacity)
-    Useful when you want to "empty" the buffer but keep memory allocated */
+    // ---------------------------------------------------------------------------------------------
+    /** @brief Clears the buffer (sets size to 0, keeps capacity) Useful when you want to "empty"
+        the buffer but keep memory allocated */
     void clear()
     {
         m_size = 0;
     }
 
-    // -------------------------------------------------------------------------
-    /** @brief Resets the buffer completely (frees memory, size=0, capacity=0)
-    Useful when you want to completely reinitialize the buffer */
+    // ---------------------------------------------------------------------------------------------
+    /** @brief Resets the buffer completely (frees memory, size=0, capacity=0). Useful when you want
+        to completely reinitialize the buffer */
     void reset()
     {
         free();
     }
 
-    // -------------------------------------------------------------------------
-    /** @brief Pushes a new element to the back of the buffer 
-    @param value value to push */
+    // ---------------------------------------------------------------------------------------------
+    /** @brief Pushes a new element to the back of the buffer
+        @param value value to push */
     void push_back(const T& value)
     {
-        if constexpr(M == MemType::HOST || M == MemType::PINNED
-                     || M == MemType::MANAGED)
+        if constexpr(M == MemType::HOST || M == MemType::PINNED || M == MemType::MANAGED)
         {
             // Grow capacity if needed (like std::vector)
             if(m_size >= m_capacity)
@@ -399,21 +391,19 @@ public:
                          "pinned, or managed memory\n";
     }
 
-    // -------------------------------------------------------------------------
-    /** @brief Pushes a bulk of elements to the back of the buffer
-    @param values pointer to the array of values
-    @param count number of elements to push */
+    // ---------------------------------------------------------------------------------------------
+    /** @brief Pushes a bulk of elements to the back of the buffer.
+        @param values pointer to the array of values
+        @param count number of elements to push */
     void push_bulk(const T* values, size_t count)
     {
-        if constexpr(M == MemType::HOST || M == MemType::PINNED
-                     || M == MemType::MANAGED)
+        if constexpr(M == MemType::HOST || M == MemType::PINNED || M == MemType::MANAGED)
         {
             // Grow capacity if needed
             if(m_size + count > m_capacity)
             {
                 size_t new_capacity
-                    = std::max(m_capacity == 0 ? 1 : m_capacity * 2,
-                               m_size + count);
+                    = std::max(m_capacity == 0 ? 1 : m_capacity * 2, m_size + count);
                 reserve(new_capacity);
             }
             T* dst = m_ptr + m_size;
@@ -425,7 +415,7 @@ public:
                          "pinned, or managed memory\n";
     }
 
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief Shrinks the buffer to fit the current size */
     void shrink_to_fit()
     {
@@ -440,8 +430,7 @@ public:
         else if constexpr(M == MemType::DEVICE || M == MemType::MANAGED)
         {
             cudaMemcpyKind kind = cudaMemcpyDeviceToDevice;
-            cudaErrCheck(
-                cudaMemcpy(new_buf.getData(), m_ptr, m_size * sizeof(T), kind));
+            cudaErrCheck(cudaMemcpy(new_buf.getData(), m_ptr, m_size * sizeof(T), kind));
         }
         else
         {
@@ -452,9 +441,9 @@ public:
         *this = std::move(new_buf);
     }
 
-    // -------------------------------------------------------------------------
-    /** @brief Returns the kind of memory transfer for the given source and
-    destination memory types */
+    // ---------------------------------------------------------------------------------------------
+    /** @brief Returns the kind of memory transfer for the given source and destination memory
+        types. */
     template <MemType Src, MemType Dst>
     constexpr cudaMemcpyKind getMemcpyKind()
     {
@@ -490,17 +479,16 @@ public:
             return cudaMemcpyDefault;
     }
 
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief Copy to another buffer (host/device aware)
-    @param dest destination buffer */
+        @param dest destination buffer */
     template <MemType destM>
     void copyTo(GrainsMemBuffer<T, destM>& dest)
     {
         if(m_size == 0 || !m_ptr)
             return;
 
-        GAssert(dest.getSize() >= m_size,
-                "Destination buffer too small for copy");
+        GAssert(dest.getSize() >= m_size, "Destination buffer too small for copy");
 
         if constexpr(M == MemType::HOST && destM == MemType::HOST)
             std::memcpy(dest.getData(), m_ptr, getBytes());
@@ -513,9 +501,9 @@ public:
         }
     }
 
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief Copy from another buffer (host/device aware)
-    @param src source buffer */
+        @param src source buffer */
     template <MemType srcM>
     void copyFrom(const GrainsMemBuffer<T, srcM>& src)
     {
@@ -543,22 +531,18 @@ public:
         }
     }
 
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief at method to access elements with bounds checking
         @param index index of the element to access */
     const T& at(size_t index) const
     {
         static_assert(M == MemType::HOST || M == MemType::PINNED,
                       "at() only available for HOST or PINNED memory");
-        GAssert(index < m_size,
-                "Index",
-                index,
-                "out of bounds for size",
-                m_size);
+        GAssert(index < m_size, "Index", index, "out of bounds for size", m_size);
         return m_ptr[index];
     }
 
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief Frees the allocated memory */
     void free()
     {
@@ -592,7 +576,7 @@ public:
         m_capacity = 0;
     }
 
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief Fills the buffer with default values */
     void fill()
     {
@@ -610,7 +594,7 @@ public:
         }
     }
 
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief Fills the buffer with a user-provided value
         @param count number of elements
         @param value value to initialize with */
@@ -630,9 +614,8 @@ public:
         }
     }
 
-    // -------------------------------------------------------------------------
-    /** @brief Fills the buffer incrementally with values starting from a given
-        value
+    // ---------------------------------------------------------------------------------------------
+    /** @brief Fills the buffer incrementally with values starting from a given value
         @param start the starting value (default is 0) */
     void sequence(const T& start = T(0))
     {
@@ -645,14 +628,12 @@ public:
         {
             static_assert(std::is_fundamental<T>::value,
                           "T must be a primitive type for device init");
-            sequence_Kernel<<<(m_size + 255) / 256, 256>>>(m_ptr,
-                                                           m_size,
-                                                           start);
+            sequence_Kernel<<<(m_size + 255) / 256, 256>>>(m_ptr, m_size, start);
             cudaDeviceSynchronize();
         }
     }
 
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief Prints the buffer contents (host/pinned/device/managed) */
     void print(const std::string& label = "") const
     {
@@ -668,10 +649,7 @@ public:
         {
             // Copy to host and print
             std::vector<T> hostBuf(m_size);
-            cudaErrCheck(cudaMemcpy(hostBuf.data(),
-                                    m_ptr,
-                                    getBytes(),
-                                    cudaMemcpyDeviceToHost));
+            cudaErrCheck(cudaMemcpy(hostBuf.data(), m_ptr, getBytes(), cudaMemcpyDeviceToHost));
             if(!label.empty())
                 std::cout << label << ": " << "\n";
             for(size_t i = 0; i < m_size; ++i)
@@ -680,16 +658,15 @@ public:
         }
         else
         {
-            std::cerr << "print() unsupported for this memory type"
-                      << std::endl;
+            std::cerr << "print() unsupported for this memory type" << std::endl;
         }
     }
     //@}
 
     /** @name Operators */
     //@{
-    // -------------------------------------------------------------------------
-    /** @brief Index operator 
+    // ---------------------------------------------------------------------------------------------
+    /** @brief Index operator
     @param i index of the element */
     T& operator[](size_t i)
     {
@@ -699,9 +676,9 @@ public:
         return m_ptr[i];
     }
 
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief Index operator
-    @param i index of the element */
+        @param i index of the element */
     const T& operator[](size_t i) const
     {
         static_assert(M == MemType::HOST || M == MemType::PINNED,
@@ -711,9 +688,9 @@ public:
     }
 
 private:
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief Move from another buffer
-    @param other source buffer */
+        @param other source buffer */
     void moveFrom(GrainsMemBuffer<T, M>& other)
     {
         m_ptr      = other.m_ptr;

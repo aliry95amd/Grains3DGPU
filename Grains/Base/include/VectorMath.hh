@@ -3,15 +3,15 @@
 
 #include "Vector3.hh"
 
-// =============================================================================
+// =================================================================================================
 /** @brief Miscellaneous Vector3 functions and operators as header-only.
-   
+
     Defining important vector functions and operators here as static functions.
     It will increase the binary size, but the performance gain is much more
     appreciated.
 
     @author A.Yazdani - 2024 - Construction */
-// =============================================================================
+// =================================================================================================
 /** @name Vector3 math functions and operators */
 //@{
 /** @brief Returns the norm of the vector
@@ -20,34 +20,30 @@ template <typename T>
 __HOSTDEVICE__ static INLINE T norm(const Vector3<T>& v) noexcept
 {
     const T* __RESTRICT__ buffer = v.getBuffer();
-    return (sqrt(buffer[0] * buffer[0] + buffer[1] * buffer[1]
-                 + buffer[2] * buffer[2]));
+    return (sqrt(buffer[0] * buffer[0] + buffer[1] * buffer[1] + buffer[2] * buffer[2]));
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 /** @brief Returns the norm squared of the vector
     @param v the vector */
 template <typename T>
 __HOSTDEVICE__ static INLINE T norm2(const Vector3<T>& v) noexcept
 {
     const T* __RESTRICT__ buffer = v.getBuffer();
-    return (buffer[0] * buffer[0] + buffer[1] * buffer[1]
-            + buffer[2] * buffer[2]);
+    return (buffer[0] * buffer[0] + buffer[1] * buffer[1] + buffer[2] * buffer[2]);
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 /** @brief Determines if the vector is approximately zero or not
     @param v the vector */
 template <typename T>
-__HOSTDEVICE__ static INLINE bool isApproxZero(const Vector3<T>& v,
-                                               T tol = EPS<T>) noexcept
+__HOSTDEVICE__ static INLINE bool isApproxZero(const Vector3<T>& v, T tol = EPS<T>) noexcept
 {
     const T* __RESTRICT__ buffer = v.getBuffer();
-    return (fabs(buffer[0]) < tol && fabs(buffer[1]) < tol
-            && fabs(buffer[2]) < tol);
+    return (fabs(buffer[0]) < tol && fabs(buffer[1]) < tol && fabs(buffer[2]) < tol);
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 /** @brief Rounds the components of the vector to +-tol
     @param v the vector
     @param tol tolerance -- EPS defined in Basic.hh is the default */
@@ -62,7 +58,7 @@ __HOSTDEVICE__ static INLINE void round(Vector3<T>& v, T tol = EPS<T>) noexcept
     }
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 /** @brief Vectors addition
     @param v1 1st vector
     @param v2 2nd vector */
@@ -78,13 +74,12 @@ __HOSTDEVICE__ static INLINE Vector3<T> operator+(const Vector3<T>& v1,
     return (Vector3<T>(out));
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 /** @brief Vectors addition in-place
     @param v1 1st vector
     @param v2 2nd vector */
 template <typename T>
-__HOSTDEVICE__ static INLINE Vector3<T>&
-    operator+=(Vector3<T>& v1, const Vector3<T>& v2) noexcept
+__HOSTDEVICE__ static INLINE Vector3<T>& operator+=(Vector3<T>& v1, const Vector3<T>& v2) noexcept
 {
     T* __RESTRICT__       b1 = const_cast<T*>(v1.getBuffer());
     const T* __RESTRICT__ b2 = v2.getBuffer();
@@ -93,7 +88,7 @@ __HOSTDEVICE__ static INLINE Vector3<T>&
     return v1;
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 /** @brief Vectors subtraction
 @param v1 1st vector
 @param v2 2nd vector */
@@ -109,13 +104,12 @@ __HOSTDEVICE__ static INLINE Vector3<T> operator-(const Vector3<T>& v1,
     return (Vector3<T>(out));
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 /** @brief Vectors subtraction in-place
     @param v1 1st vector
     @param v2 2nd vector */
 template <typename T>
-__HOSTDEVICE__ static INLINE Vector3<T>&
-    operator-=(Vector3<T>& v1, const Vector3<T>& v2) noexcept
+__HOSTDEVICE__ static INLINE Vector3<T>& operator-=(Vector3<T>& v1, const Vector3<T>& v2) noexcept
 {
     T* __RESTRICT__       b1 = const_cast<T*>(v1.getBuffer());
     const T* __RESTRICT__ b2 = v2.getBuffer();
@@ -124,13 +118,12 @@ __HOSTDEVICE__ static INLINE Vector3<T>&
     return v1;
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 /** @brief Scalar-vector multiplication
     @param d the multiplication factor
     @param v the vector */
 template <typename T>
-__HOSTDEVICE__ static INLINE Vector3<T> operator*(const T           d,
-                                                  const Vector3<T>& v) noexcept
+__HOSTDEVICE__ static INLINE Vector3<T> operator*(const T d, const Vector3<T>& v) noexcept
 {
     const T* __RESTRICT__ buffer = v.getBuffer();
     T __RESTRICT__        out[3];
@@ -139,13 +132,12 @@ __HOSTDEVICE__ static INLINE Vector3<T> operator*(const T           d,
     return (Vector3<T>(out));
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 /** @brief Scalar-vector multiplication in-place
     @param v the vector
     @param d the multiplication factor */
 template <typename T>
-__HOSTDEVICE__ static INLINE Vector3<T>& operator*=(Vector3<T>& v,
-                                                    const T     d) noexcept
+__HOSTDEVICE__ static INLINE Vector3<T>& operator*=(Vector3<T>& v, const T d) noexcept
 {
     T* __RESTRICT__ buffer = const_cast<T*>(v.getBuffer());
     for(uint i = 0; i < 3; ++i)
@@ -153,13 +145,12 @@ __HOSTDEVICE__ static INLINE Vector3<T>& operator*=(Vector3<T>& v,
     return v;
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 /** @brief Scalar division
     @param d division factor
     @param v the vector */
 template <typename T>
-__HOSTDEVICE__ static INLINE Vector3<T> operator/(const Vector3<T>& v,
-                                                  const T           d) noexcept
+__HOSTDEVICE__ static INLINE Vector3<T> operator/(const Vector3<T>& v, const T d) noexcept
 {
     const T* __RESTRICT__ buffer = v.getBuffer();
     T __RESTRICT__        out[3];
@@ -168,13 +159,12 @@ __HOSTDEVICE__ static INLINE Vector3<T> operator/(const Vector3<T>& v,
     return (Vector3<T>(out));
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 /** @brief Scalar division in-place
     @param v the vector
     @param d division factor */
 template <typename T>
-__HOSTDEVICE__ static INLINE Vector3<T>& operator/=(Vector3<T>& v,
-                                                    const T     d) noexcept
+__HOSTDEVICE__ static INLINE Vector3<T>& operator/=(Vector3<T>& v, const T d) noexcept
 {
     T* __RESTRICT__ buffer = const_cast<T*>(v.getBuffer());
     for(uint i = 0; i < 3; ++i)
@@ -182,13 +172,12 @@ __HOSTDEVICE__ static INLINE Vector3<T>& operator/=(Vector3<T>& v,
     return v;
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 /** @brief Vector-vector dot product
     @param v1 1st vector
     @param v2 2nd vector */
 template <typename T>
-__HOSTDEVICE__ static INLINE T operator*(const Vector3<T>& v1,
-                                         const Vector3<T>& v2) noexcept
+__HOSTDEVICE__ static INLINE T operator*(const Vector3<T>& v1, const Vector3<T>& v2) noexcept
 {
     const T* __RESTRICT__ b1  = v1.getBuffer();
     const T* __RESTRICT__ b2  = v2.getBuffer();
@@ -198,7 +187,7 @@ __HOSTDEVICE__ static INLINE T operator*(const Vector3<T>& v1,
     return (out);
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 /** @brief Vector-vector cross product
     @param v1 1st vector
     @param v2 2nd vector */
@@ -215,13 +204,12 @@ __HOSTDEVICE__ static INLINE Vector3<T> operator^(const Vector3<T>& v1,
     return (Vector3<T>(out));
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 /** @brief Vector-vector cross product in-place
     @param v1 1st vector
     @param v2 2nd vector */
 template <typename T>
-__HOSTDEVICE__ static INLINE Vector3<T>&
-    operator^=(Vector3<T>& v1, const Vector3<T>& v2) noexcept
+__HOSTDEVICE__ static INLINE Vector3<T>& operator^=(Vector3<T>& v1, const Vector3<T>& v2) noexcept
 {
     T* __RESTRICT__       b1 = const_cast<T*>(v1.getBuffer());
     const T* __RESTRICT__ b2 = v2.getBuffer();
@@ -234,13 +222,12 @@ __HOSTDEVICE__ static INLINE Vector3<T>&
     return v1;
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 /** @brief Vector equality operator
     @param v1 1st vector
     @param v2 2nd vector */
 template <typename T>
-__HOSTDEVICE__ static INLINE bool operator==(const Vector3<T>& v1,
-                                             const Vector3<T>& v2) noexcept
+__HOSTDEVICE__ static INLINE bool operator==(const Vector3<T>& v1, const Vector3<T>& v2) noexcept
 {
     const T* __RESTRICT__ b1 = v1.getBuffer();
     const T* __RESTRICT__ b2 = v2.getBuffer();
@@ -252,13 +239,12 @@ __HOSTDEVICE__ static INLINE bool operator==(const Vector3<T>& v1,
     return true;
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 /** @brief Vector inequality operator
     @param v1 1st vector
     @param v2 2nd vector */
 template <typename T>
-__HOSTDEVICE__ static INLINE bool operator!=(const Vector3<T>& v1,
-                                             const Vector3<T>& v2) noexcept
+__HOSTDEVICE__ static INLINE bool operator!=(const Vector3<T>& v1, const Vector3<T>& v2) noexcept
 {
     const T* __RESTRICT__ b1 = v1.getBuffer();
     const T* __RESTRICT__ b2 = v2.getBuffer();
@@ -270,7 +256,7 @@ __HOSTDEVICE__ static INLINE bool operator!=(const Vector3<T>& v1,
     return false;
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 /** @brief Vector sign flip
     @param v the vector */
 template <typename T>

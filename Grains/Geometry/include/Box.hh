@@ -4,13 +4,13 @@
 #include "Convex.hh"
 #include "ReaderXML.hh"
 
-// =============================================================================
+// =================================================================================================
 /** @brief The class Box.
 
     Convex with the shape of a box.
 
     @author A.Yazdani - 2024 - Construction */
-// =============================================================================
+// =================================================================================================
 template <typename T>
 class Box : public Convex<T>
 {
@@ -95,7 +95,7 @@ public:
     __HOSTDEVICE__
     T computeCircumscribedRadius() const final;
 
-    /** @ Returns the half-length of the bounding box fitted to the box 
+    /** @ Returns the half-length of the bounding box fitted to the box
         without considering the transformation */
     __HOSTDEVICE__
     Vector3<T> computeBoundingBox() const final;
@@ -119,7 +119,7 @@ public:
     __HOST__
     void writeConvex(std::ostream& fileOut) const final;
 
-    /** @brief Returns the number of points to write the box in a Paraview 
+    /** @brief Returns the number of points to write the box in a Paraview
         format */
     __HOST__
     int numberOfPoints_PARAVIEW() const final;
@@ -134,9 +134,8 @@ public:
         @param transform geometric transformation
         @param translation additional center of mass translation */
     __HOST__
-    std::list<Vector3<T>>
-        writePoints_PARAVIEW(const Transform3<T>& transform,
-                             Vector3<T> const*    translation) const final;
+    std::list<Vector3<T>> writePoints_PARAVIEW(const Transform3<T>& transform,
+                                               Vector3<T> const*    translation) const final;
 
     /** @brief Writes the connectivity of the box in a Paraview format
         @param connectivity connectivity of Paraview polytopes

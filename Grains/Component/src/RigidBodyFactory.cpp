@@ -8,9 +8,9 @@
 #include "Sphere.hh"
 #include "Superquadric.hh"
 
-/* ========================================================================== */
-/*                             Low-Level Methods                              */
-/* ========================================================================== */
+/* ============================================================================================== */
+/* Low-Level Methods                                                                              */
+/* ============================================================================================== */
 // GPU kernel to construct the rigidbody on device.
 // This is mandatory as we cannot access device memory addresses on the host
 // So, we pass a device memory address to a kernel.
@@ -59,24 +59,24 @@ __GLOBAL__ void createRigidBodyKernel(RigidBody<T>** rb,
     rb[index] = new RigidBody<T>(convex, crustThickness, density, material);
 }
 
-/* ========================================================================== */
-/*                             High-Level Methods                             */
-/* ========================================================================== */
+/* ============================================================================================== */
+/* High-Level Methods                                                                             */
+/* ============================================================================================== */
 // Creates and stores a RigidBody object in the host memory.
 template <typename T>
-__HOST__ void RigidBodyFactory<T>::create(
-    DOMNode*                        obstacles,
-    DOMNode*                        particles,
-    GrainsMemBuffer<RigidBody<T>*>& refObstacleRB,
-    GrainsMemBuffer<RigidBody<T>*>& refParticleRB,
-    GrainsMemBuffer<Vector3<T>>&    refObstacleInitialPosition,
-    GrainsMemBuffer<Vector3<T>>&    refParticleInitialPosition,
-    GrainsMemBuffer<Quaternion<T>>& refObstacleInitialOrientation,
-    GrainsMemBuffer<Quaternion<T>>& refParticleInitialOrientation,
-    GrainsMemBuffer<uint>&          numEachRefObstacle,
-    GrainsMemBuffer<uint>&          numEachRefParticle,
-    uint&                           numObstacles,
-    uint&                           numParticles)
+__HOST__ void
+    RigidBodyFactory<T>::create(DOMNode*                        obstacles,
+                                DOMNode*                        particles,
+                                GrainsMemBuffer<RigidBody<T>*>& refObstacleRB,
+                                GrainsMemBuffer<RigidBody<T>*>& refParticleRB,
+                                GrainsMemBuffer<Vector3<T>>&    refObstacleInitialPosition,
+                                GrainsMemBuffer<Vector3<T>>&    refParticleInitialPosition,
+                                GrainsMemBuffer<Quaternion<T>>& refObstacleInitialOrientation,
+                                GrainsMemBuffer<Quaternion<T>>& refParticleInitialOrientation,
+                                GrainsMemBuffer<uint>&          numEachRefObstacle,
+                                GrainsMemBuffer<uint>&          numEachRefParticle,
+                                uint&                           numObstacles,
+                                uint&                           numParticles)
 {
     // Obstacles
     numObstacles              = 0;
@@ -89,11 +89,11 @@ __HOST__ void RigidBodyFactory<T>::create(
     numEachRefObstacle.initialize(numRefObstacles);
     for(uint i = 0; i < numRefObstacles; ++i)
     {
-        DOMNode* nObstacle    = allObstacles->item(i);
-        numEachRefObstacle[i] = 1;
-        refObstacleRB[i]      = new RigidBody<T>(nObstacle);
-        DOMNode*   nTransform = ReaderXML::getNode(nObstacle, "Transformation");
-        Vector3<T> centre(T(0), T(0), T(0));
+        DOMNode* nObstacle       = allObstacles->item(i);
+        numEachRefObstacle[i]    = 1;
+        refObstacleRB[i]         = new RigidBody<T>(nObstacle);
+        DOMNode*      nTransform = ReaderXML::getNode(nObstacle, "Transformation");
+        Vector3<T>    centre(T(0), T(0), T(0));
         Quaternion<T> rotation(T(0), T(0), T(0), T(1));
         if(nTransform)
         {
@@ -101,8 +101,7 @@ __HOST__ void RigidBodyFactory<T>::create(
             if(nCentre)
                 centre = Vector3<T>(nCentre);
 
-            DOMNode* nRotation
-                = ReaderXML::getNode(nTransform, "AngularPosition");
+            DOMNode* nRotation = ReaderXML::getNode(nTransform, "AngularPosition");
             if(nRotation)
                 rotation = Quaternion<T>(nRotation);
         }
@@ -123,11 +122,10 @@ __HOST__ void RigidBodyFactory<T>::create(
     for(uint i = 0; i < numRefParticles; ++i)
     {
         DOMNode* nParticle    = allParticles->item(i);
-        numEachRefParticle[i] = static_cast<uint>(
-            ReaderXML::getNodeAttr_Int(nParticle, "Number"));
+        numEachRefParticle[i] = static_cast<uint>(ReaderXML::getNodeAttr_Int(nParticle, "Number"));
         refParticleRB[i]      = new RigidBody<T>(nParticle);
-        DOMNode*   nTransform = ReaderXML::getNode(nParticle, "Transformation");
-        Vector3<T> centre(T(0), T(0), T(0));
+        DOMNode*      nTransform = ReaderXML::getNode(nParticle, "Transformation");
+        Vector3<T>    centre(T(0), T(0), T(0));
         Quaternion<T> rotation(T(0), T(0), T(0), T(1));
         if(nTransform)
         {
@@ -135,8 +133,7 @@ __HOST__ void RigidBodyFactory<T>::create(
             if(nCentre)
                 centre = Vector3<T>(nCentre);
 
-            DOMNode* nRotation
-                = ReaderXML::getNode(nTransform, "AngularPosition");
+            DOMNode* nRotation = ReaderXML::getNode(nTransform, "AngularPosition");
             if(nRotation)
                 rotation = Quaternion<T>(nRotation);
         }
@@ -146,12 +143,12 @@ __HOST__ void RigidBodyFactory<T>::create(
     }
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Constructs a ContactForceModel object on device.
 template <typename T>
-__HOST__ void RigidBodyFactory<T>::copyHostToDevice(
-    GrainsMemBuffer<RigidBody<T>*, MemType::HOST>&   h_RB,
-    GrainsMemBuffer<RigidBody<T>*, MemType::DEVICE>& d_RB)
+__HOST__ void
+    RigidBodyFactory<T>::copyHostToDevice(GrainsMemBuffer<RigidBody<T>*, MemType::HOST>&   h_RB,
+                                          GrainsMemBuffer<RigidBody<T>*, MemType::DEVICE>& d_RB)
 {
     d_RB.initialize(h_RB.getSize());
     for(uint i = 0; i < h_RB.getSize(); ++i)
@@ -169,13 +166,7 @@ __HOST__ void RigidBodyFactory<T>::copyHostToDevice(
         {
             Sphere<T>* c = dynamic_cast<Sphere<T>*>(convex);
             T          r = c->getRadius();
-            createRigidBodyKernel<<<1, 1>>>(d_RB.getData(),
-                                            i,
-                                            ct,
-                                            material,
-                                            density,
-                                            SPHERE,
-                                            r);
+            createRigidBodyKernel<<<1, 1>>>(d_RB.getData(), i, ct, material, density, SPHERE, r);
         }
         else if(cvxType == BOX)
         {
@@ -210,14 +201,7 @@ __HOST__ void RigidBodyFactory<T>::copyHostToDevice(
             Cone<T>* c = dynamic_cast<Cone<T>*>(convex);
             T        r = c->getRadius();
             T        h = c->getHeight();
-            createRigidBodyKernel<<<1, 1>>>(d_RB.getData(),
-                                            i,
-                                            ct,
-                                            material,
-                                            density,
-                                            CONE,
-                                            r,
-                                            h);
+            createRigidBodyKernel<<<1, 1>>>(d_RB.getData(), i, ct, material, density, CONE, r, h);
         }
         else if(cvxType == SUPERQUADRIC)
         {
@@ -255,7 +239,7 @@ __HOST__ void RigidBodyFactory<T>::copyHostToDevice(
     cudaDeviceSynchronize();
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Explicit instantiation
 template class RigidBodyFactory<float>;
 template class RigidBodyFactory<double>;

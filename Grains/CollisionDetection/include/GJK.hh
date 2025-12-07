@@ -7,11 +7,11 @@
 
 enum class GJKType
 {
-    JOHNSON, /**< Johnson's algorithm */
+    JOHNSON,     /**< Johnson's algorithm */
     SIGNEDVOLUME /**< Signed volume algorithm */
 };
 
-// =============================================================================
+// =================================================================================================
 /** @brief The header for the GJK distance query algorithm.
 
     The GJK distance query algorithm using the Johnson and signedVolume
@@ -20,7 +20,7 @@ enum class GJKType
     precision version as it is prone to numerical instabilities.
 
     @author A.Yazdani - 2024 - Construction */
-// =============================================================================
+// =================================================================================================
 /** @name GJK : External methods */
 //@{
 /** @brief Returns whether 2 convex shapes intersect - relative transformation
@@ -29,12 +29,10 @@ enum class GJKType
     @param b2a geometric transformation describing convex B in the A's reference
     frame */
 template <typename T>
-__HOSTDEVICE__ bool intersectGJK(const Convex<T>&     a,
-                                 const Convex<T>&     b,
-                                 const Transform3<T>& b2a);
+__HOSTDEVICE__ bool intersectGJK(const Convex<T>& a, const Convex<T>& b, const Transform3<T>& b2a);
 
-/** @brief Returns whether 2 convex shapes intersect   
-    @param a convex shape A 
+/** @brief Returns whether 2 convex shapes intersect
+    @param a convex shape A
     @param b convex shape B
     @param a2w geometric transformation describing convex A in the world
     reference frame
@@ -77,18 +75,15 @@ __HOSTDEVICE__ bool intersectGJK(const Convex<T>&     a,
     relative transformation
     @param a convex shape A
     @param b convex shape B
-    @param b2a geometric transformation describing convex B in the reference  
+    @param b2a geometric transformation describing convex B in the reference
     frame of A
     @param crustA crust/skin thickness on A (shrinks A along search dir)
     @param crustB crust/skin thickness on B (shrinks B along search dir)
     @param pa point representing one tip of the minimal distance segment on A
-    @param pb point representing the other tip of the minimal distance segment 
+    @param pb point representing the other tip of the minimal distance segment
     on B
     @param nbIter number of iterations of GJK for convergence */
-template <typename T,
-          GJKType GJKType,
-          bool    Acceleration = false,
-          T       Tolerance    = EPS<T>>
+template <typename T, GJKType GJKType, bool Acceleration = false, T Tolerance = EPS<T>>
 __HOSTDEVICE__ T computeClosestPoints_GJK(const Convex<T>&     a,
                                           const Convex<T>&     b,
                                           const Transform3<T>& b2a,
@@ -102,19 +97,16 @@ __HOSTDEVICE__ T computeClosestPoints_GJK(const Convex<T>&     a,
     convex shape that represents the tips of the minimal distance segment
     @param a convex shape A
     @param b convex shape B
-    @param a2w geometric transformation describing convex A in the world 
+    @param a2w geometric transformation describing convex A in the world
     reference frame
-    @param b2w geometric transformation describing convex B in the world 
+    @param b2w geometric transformation describing convex B in the world
     reference frame
     @param crustA crust/skin thickness on A (shrinks A along search dir)
     @param crustB crust/skin thickness on B (shrinks B along search dir)
     @param pa point representing one tip of the minimal distance segment on A
     @param pb point representing the tip of the minimal distance segment on B
     @param nbIter number of iterations of GJK for convergence */
-template <typename T,
-          GJKType GJKType,
-          bool    Acceleration = false,
-          T       Tolerance    = EPS<T>>
+template <typename T, GJKType GJKType, bool Acceleration = false, T Tolerance = EPS<T>>
 __HOSTDEVICE__ T computeClosestPoints_GJK(const Convex<T>&     a,
                                           const Convex<T>&     b,
                                           const Transform3<T>& a2w,
@@ -137,10 +129,7 @@ __HOSTDEVICE__ T computeClosestPoints_GJK(const Convex<T>&     a,
     @param pa point representing one tip of the minimal distance segment on A
     @param pb point representing the tip of the minimal distance segment on B
     @param nbIter number of iterations of GJK for convergence */
-template <typename T,
-          GJKType GJKType,
-          bool    Acceleration = false,
-          T       Tolerance    = EPS<T>>
+template <typename T, GJKType GJKType, bool Acceleration = false, T Tolerance = EPS<T>>
 __HOSTDEVICE__ T computeClosestPoints_GJK(const Convex<T>&     a,
                                           const Convex<T>&     b,
                                           const Vector3<T>&    v_b2a,
@@ -164,10 +153,7 @@ __HOSTDEVICE__ T computeClosestPoints_GJK(const Convex<T>&     a,
     @param pa point representing one tip of the minimal distance segment on A
     @param pb point representing the tip of the minimal distance segment on B
     @param nbIter number of iterations of GJK for convergence */
-template <typename T,
-          GJKType GJKType,
-          bool    Acceleration = false,
-          T       Tolerance    = EPS<T>>
+template <typename T, GJKType GJKType, bool Acceleration = false, T Tolerance = EPS<T>>
 __HOSTDEVICE__ T computeClosestPoints_GJK(const Convex<T>&     a,
                                           const Convex<T>&     b,
                                           const Vector3<T>&    v_a2w,

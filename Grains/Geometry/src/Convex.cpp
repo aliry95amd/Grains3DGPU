@@ -1,20 +1,20 @@
 #include "Convex.hh"
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Default constructor
 template <typename T>
 __HOSTDEVICE__ Convex<T>::Convex()
 {
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Destructor
 template <typename T>
 __HOSTDEVICE__ Convex<T>::~Convex()
 {
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Returns whether point p lies in the convex shape
 // @param p point
 template <typename T>
@@ -24,13 +24,12 @@ __HOSTDEVICE__ bool Convex<T>::isInside(const Vector3<T>& p) const
     return true;
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 //
 template <typename T>
-__HOST__ void
-    Convex<T>::writePoints_PARAVIEW(std::ostream&        f,
-                                    const Transform3<T>& transform,
-                                    const Vector3<T>*    translation) const
+__HOST__ void Convex<T>::writePoints_PARAVIEW(std::ostream&        f,
+                                              const Transform3<T>& transform,
+                                              const Vector3<T>*    translation) const
 {
     std::list<Vector3<T>> points = writePoints_PARAVIEW(transform, translation);
 
@@ -40,17 +39,16 @@ __HOST__ void
     }
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Output operator for Convex
 template <typename T>
-__HOST__ std::ostream& operator<<(std::ostream&    fileOut,
-                                  const Convex<T>& convex)
+__HOST__ std::ostream& operator<<(std::ostream& fileOut, const Convex<T>& convex)
 {
     convex.writeConvex(fileOut);
     return fileOut;
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Input operator for Convex
 template <typename T>
 __HOST__ std::istream& operator>>(std::istream& fileIn, Convex<T>& convex)
@@ -59,7 +57,7 @@ __HOST__ std::istream& operator>>(std::istream& fileIn, Convex<T>& convex)
     return fileIn;
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Explicit instantiation
 template class Convex<float>;
 template class Convex<double>;

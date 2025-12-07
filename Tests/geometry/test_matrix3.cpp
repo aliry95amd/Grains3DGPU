@@ -10,15 +10,12 @@ class Matrix3Test : public ::testing::Test
 protected:
     void SetUp() override
     {
-        testMatrix
-            = Matrix3<double>(1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0);
-        identity = Matrix3<double>();
-        invertible
-            = Matrix3<double>(2.0, 0.0, 0.0, 0.0, 3.0, 0.0, 0.0, 0.0, 4.0);
-        rotation_z
-            = Matrix3<double>(0.0, -1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0);
-        v1 = Vector3<double>(1.0, 2.0, 3.0);
-        v2 = Vector3<double>(4.0, 5.0, 6.0);
+        testMatrix = Matrix3<double>(1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0);
+        identity   = Matrix3<double>();
+        invertible = Matrix3<double>(2.0, 0.0, 0.0, 0.0, 3.0, 0.0, 0.0, 0.0, 4.0);
+        rotation_z = Matrix3<double>(0.0, -1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0);
+        v1         = Vector3<double>(1.0, 2.0, 3.0);
+        v2         = Vector3<double>(4.0, 5.0, 6.0);
     }
 
     Matrix3<double> identity, testMatrix, invertible, rotation_z;
@@ -133,8 +130,7 @@ TEST_F(Matrix3Test, ConstAccess)
 // Test matrix absolute value function
 TEST_F(Matrix3Test, FabsFunction)
 {
-    const Matrix3<double>
-        negative(-1.0, -2.0, 3.0, 4.0, -5.0, -6.0, -7.0, 8.0, -9.0);
+    const Matrix3<double> negative(-1.0, -2.0, 3.0, 4.0, -5.0, -6.0, -7.0, 8.0, -9.0);
 
     Matrix3<double> result = fabs<double>(negative);
 
@@ -220,9 +216,9 @@ TEST_F(Matrix3Test, Inverse)
     const Matrix3<double> invertible_const = invertible;
     Matrix3<double>       inv              = inverse<double>(invertible_const);
 
-    EXPECT_NEAR(inv(0, 0), 0.5, EPSILON); // 1/2
-    EXPECT_NEAR(inv(1, 1), 1.0 / 3.0, EPSILON); // 1/3
-    EXPECT_NEAR(inv(2, 2), 0.25, EPSILON); // 1/4
+    EXPECT_NEAR(inv(0, 0), 0.5, EPSILON);        // 1/2
+    EXPECT_NEAR(inv(1, 1), 1.0 / 3.0, EPSILON);  // 1/3
+    EXPECT_NEAR(inv(2, 2), 0.25, EPSILON);       // 1/4
 
     EXPECT_NEAR(inv(0, 1), 0.0, EPSILON);
     EXPECT_NEAR(inv(0, 2), 0.0, EPSILON);
@@ -252,9 +248,9 @@ TEST_F(Matrix3Test, InverseInPlace)
     Matrix3<double> matrix   = invertible;
     inverse<double>(matrix);
 
-    EXPECT_NEAR(matrix(0, 0), 0.5, EPSILON); // 1/2
-    EXPECT_NEAR(matrix(1, 1), 1.0 / 3.0, EPSILON); // 1/3
-    EXPECT_NEAR(matrix(2, 2), 0.25, EPSILON); // 1/4
+    EXPECT_NEAR(matrix(0, 0), 0.5, EPSILON);        // 1/2
+    EXPECT_NEAR(matrix(1, 1), 1.0 / 3.0, EPSILON);  // 1/3
+    EXPECT_NEAR(matrix(2, 2), 0.25, EPSILON);       // 1/4
 
     Matrix3<double> product = original * matrix;
 
@@ -275,7 +271,7 @@ TEST_F(Matrix3Test, Scale)
 {
     Vector3<double>       scale_factors(2.0, 3.0, 4.0);
     const Matrix3<double> identity_const = identity;
-    Matrix3<double>       result = scale<double>(identity_const, scale_factors);
+    Matrix3<double>       result         = scale<double>(identity_const, scale_factors);
 
     EXPECT_DOUBLE_EQ(result(0, 0), 2.0);
     EXPECT_DOUBLE_EQ(result(1, 1), 3.0);
@@ -306,14 +302,14 @@ TEST_F(Matrix3Test, ScaleInPlace)
 TEST_F(Matrix3Test, ArithmeticOperations)
 {
     Matrix3<double> sum = identity + testMatrix;
-    EXPECT_DOUBLE_EQ(sum(0, 0), 2.0); // 1 + 1
-    EXPECT_DOUBLE_EQ(sum(0, 1), 2.0); // 0 + 2
-    EXPECT_DOUBLE_EQ(sum(1, 1), 6.0); // 1 + 5
+    EXPECT_DOUBLE_EQ(sum(0, 0), 2.0);  // 1 + 1
+    EXPECT_DOUBLE_EQ(sum(0, 1), 2.0);  // 0 + 2
+    EXPECT_DOUBLE_EQ(sum(1, 1), 6.0);  // 1 + 5
 
     Matrix3<double> diff = testMatrix - identity;
-    EXPECT_DOUBLE_EQ(diff(0, 0), 0.0); // 1 - 1
-    EXPECT_DOUBLE_EQ(diff(0, 1), 2.0); // 2 - 0
-    EXPECT_DOUBLE_EQ(diff(1, 1), 4.0); // 5 - 1
+    EXPECT_DOUBLE_EQ(diff(0, 0), 0.0);  // 1 - 1
+    EXPECT_DOUBLE_EQ(diff(0, 1), 2.0);  // 2 - 0
+    EXPECT_DOUBLE_EQ(diff(1, 1), 4.0);  // 5 - 1
 
     Matrix3<double> neg = -testMatrix;
     EXPECT_DOUBLE_EQ(neg(0, 0), -1.0);

@@ -4,7 +4,7 @@
 #include "QuaternionMath.hh"
 #include "VectorMath.hh"
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Default constructor
 template <typename T>
 __HOSTDEVICE__ Quaternion<T>::Quaternion() noexcept
@@ -13,7 +13,7 @@ __HOSTDEVICE__ Quaternion<T>::Quaternion() noexcept
 {
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Constructor with 2 scalar as input parameters q and d. Quaternion is
 // initialized as [ d, (q,q,q) ]
 template <typename T>
@@ -23,7 +23,7 @@ __HOSTDEVICE__ Quaternion<T>::Quaternion(T q, T w) noexcept
 {
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Constructor with a Vector3 vector vec and a scalar d. Quaternion is
 // initialized as [ d, vec ]
 template <typename T>
@@ -33,7 +33,7 @@ __HOSTDEVICE__ Quaternion<T>::Quaternion(const Vector3<T>& vec, T w) noexcept
 {
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Constructor with a vector given by its 3 components (x,y,z) and a scalar d.
 // Quaternion is initialized as [ d, (x,y,z) ]
 template <typename T>
@@ -43,7 +43,7 @@ __HOSTDEVICE__ Quaternion<T>::Quaternion(T x, T y, T z, T w) noexcept
 {
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Constructor with a buffer
 template <typename T>
 __HOSTDEVICE__ Quaternion<T>::Quaternion(const T* buffer) noexcept
@@ -52,7 +52,7 @@ __HOSTDEVICE__ Quaternion<T>::Quaternion(const T* buffer) noexcept
 {
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Constructor from Euler angles (Z-Y-X intrinsic order)
 template <typename T>
 __HOSTDEVICE__ Quaternion<T>::Quaternion(T aX, T aY, T aZ) noexcept
@@ -60,7 +60,7 @@ __HOSTDEVICE__ Quaternion<T>::Quaternion(T aX, T aY, T aZ) noexcept
     setQuaternion(aX, aY, aZ);
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Constructor with a rotation matrix
 template <typename T>
 __HOSTDEVICE__ Quaternion<T>::Quaternion(const Matrix3<T>& rot) noexcept
@@ -68,7 +68,7 @@ __HOSTDEVICE__ Quaternion<T>::Quaternion(const Matrix3<T>& rot) noexcept
     this->setQuaternion(rot);
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Copy constructor
 template <typename T>
 __HOSTDEVICE__ Quaternion<T>::Quaternion(const Quaternion<T>& q) noexcept
@@ -77,13 +77,12 @@ __HOSTDEVICE__ Quaternion<T>::Quaternion(const Quaternion<T>& q) noexcept
 {
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Assign operator to another Quaternion object
 template <typename T>
-__HOSTDEVICE__ Quaternion<T>&
-               Quaternion<T>::operator=(const Quaternion<T>& q) noexcept
+__HOSTDEVICE__ Quaternion<T>& Quaternion<T>::operator=(const Quaternion<T>& q) noexcept
 {
-    if(this != &q) // self-assignment check
+    if(this != &q)  // self-assignment check
     {
         m_vqt = q.m_vqt;
         m_w   = q.m_w;
@@ -91,7 +90,7 @@ __HOSTDEVICE__ Quaternion<T>&
     return *this;
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Move constructor
 template <typename T>
 __HOSTDEVICE__ Quaternion<T>::Quaternion(Quaternion<T>&& q) noexcept
@@ -102,13 +101,12 @@ __HOSTDEVICE__ Quaternion<T>::Quaternion(Quaternion<T>&& q) noexcept
     q.m_vqt.reset();
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Move assignment operator
 template <typename T>
-__HOSTDEVICE__ Quaternion<T>&
-               Quaternion<T>::operator=(Quaternion<T>&& q) noexcept
+__HOSTDEVICE__ Quaternion<T>& Quaternion<T>::operator=(Quaternion<T>&& q) noexcept
 {
-    if(this != &q) // self-assignment check
+    if(this != &q)  // self-assignment check
     {
         m_vqt = std::move(q.m_vqt);
         m_w   = q.m_w;
@@ -118,7 +116,7 @@ __HOSTDEVICE__ Quaternion<T>&
     return *this;
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Constructor from an XML node
 template <typename T>
 __HOST__ Quaternion<T>::Quaternion(DOMNode* root) noexcept
@@ -147,14 +145,14 @@ __HOST__ Quaternion<T>::Quaternion(DOMNode* root) noexcept
                " not a rotation matrix or angle.");
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Destructor
 template <typename T>
 __HOSTDEVICE__ Quaternion<T>::~Quaternion() noexcept
 {
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Returns the pointer to the buffer
 // The buffer is an array of 4 elements: [x, y, z, w]
 template <typename T>
@@ -163,7 +161,7 @@ __HOSTDEVICE__ const T* Quaternion<T>::getBuffer() const noexcept
     return (reinterpret_cast<const T*>(&m_vqt));
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Returns the vectorial part of the quaternion
 template <typename T>
 __HOSTDEVICE__ const Vector3<T>& Quaternion<T>::getVector() const noexcept
@@ -171,7 +169,7 @@ __HOSTDEVICE__ const Vector3<T>& Quaternion<T>::getVector() const noexcept
     return (m_vqt);
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Returns the value of the scalar part of the quaternion
 template <typename T>
 __HOSTDEVICE__ const T& Quaternion<T>::getScalar() const noexcept
@@ -179,7 +177,7 @@ __HOSTDEVICE__ const T& Quaternion<T>::getScalar() const noexcept
     return (m_w);
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Sets the vectorial part of the quaternion
 template <typename T>
 __HOSTDEVICE__ void Quaternion<T>::setVector(const Vector3<T>& vec) noexcept
@@ -187,7 +185,7 @@ __HOSTDEVICE__ void Quaternion<T>::setVector(const Vector3<T>& vec) noexcept
     m_vqt = vec;
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Sets the scalar part of the quaternion
 template <typename T>
 __HOSTDEVICE__ void Quaternion<T>::setScalar(const T w) noexcept
@@ -195,25 +193,22 @@ __HOSTDEVICE__ void Quaternion<T>::setScalar(const T w) noexcept
     m_w = w;
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Sets the quaternion with a Vector3 vector vec and a scalar d.
 // Quaternion is set to [ d, vec ]
 template <typename T>
-__HOSTDEVICE__ void Quaternion<T>::setQuaternion(const Vector3<T>& vec,
-                                                 const T           w) noexcept
+__HOSTDEVICE__ void Quaternion<T>::setQuaternion(const Vector3<T>& vec, const T w) noexcept
 {
     m_vqt = vec;
     m_w   = w;
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Sets the quaternion with a vector given by its 3 components (x,y,z)
 // and a scalar d. Quaternion is set to [ d, (x,y,z) ]
 template <typename T>
-__HOSTDEVICE__ void Quaternion<T>::setQuaternion(const T x,
-                                                 const T y,
-                                                 const T z,
-                                                 const T w) noexcept
+__HOSTDEVICE__ void
+    Quaternion<T>::setQuaternion(const T x, const T y, const T z, const T w) noexcept
 {
     m_vqt[X] = x;
     m_vqt[Y] = y;
@@ -221,7 +216,7 @@ __HOSTDEVICE__ void Quaternion<T>::setQuaternion(const T x,
     m_w      = w;
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Sets the quaternion with a rotation matrix
 template <typename T>
 __HOSTDEVICE__ void Quaternion<T>::setQuaternion(const Matrix3<T>& rot) noexcept
@@ -231,7 +226,7 @@ __HOSTDEVICE__ void Quaternion<T>::setQuaternion(const Matrix3<T>& rot) noexcept
             "Input matrix is not a valid rotation matrix in "
             "Quaternion::setQuaternion!");
 
-    const T* b   = rot.getBuffer(); // rotation matrix buffer
+    const T* b   = rot.getBuffer();  // rotation matrix buffer
     T        den = T(0);
 
     // Case rotYY > - rotZZ, rotXX > - rotYY and rotXX > - rotZZ
@@ -286,7 +281,7 @@ __HOSTDEVICE__ void Quaternion<T>::setQuaternion(const Matrix3<T>& rot) noexcept
         GAbort("Case not covered in Quaternion::setQuaternion!");
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Sets the quaternion from three angles in radians
 template <typename T>
 __HOSTDEVICE__ void Quaternion<T>::setQuaternion(T aX, T aY, T aZ) noexcept
@@ -296,15 +291,14 @@ __HOSTDEVICE__ void Quaternion<T>::setQuaternion(T aX, T aY, T aZ) noexcept
     setQuaternion(mat);
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Build a unit quaternion representing the rotation from u to v.
 // The input vectors need not be normalised. */
 // TODO: if the input vectors aren't normalized, normalize them and warn the
 // user.
 template <typename T>
-__HOSTDEVICE__ void
-    Quaternion<T>::setRotFromTwoVectors(const Vector3<T>& u,
-                                        const Vector3<T>& v) noexcept
+__HOSTDEVICE__ void Quaternion<T>::setRotFromTwoVectors(const Vector3<T>& u,
+                                                        const Vector3<T>& v) noexcept
 {
     T          norm_u_norm_v = sqrt((u * u) * (v * v));
     T          real_part     = norm_u_norm_v + u * v;
@@ -313,8 +307,8 @@ __HOSTDEVICE__ void
     if(real_part < 1.e-6 * norm_u_norm_v)
     {
         /* If u and v are exactly opposite, rotate 180 degrees
-		around an arbitrary orthogonal axis. Axis normalisation
-		can happen later, when we normalise the quaternion. */
+        around an arbitrary orthogonal axis. Axis normalisation
+        can happen later, when we normalise the quaternion. */
         real_part = T(0);
         vect      = fabs(u[0]) > fabs(u[2]) ? Vector3<T>(-u[1], u[0], T(0))
                                             : Vector3<T>(T(0), -u[2], u[1]);
@@ -329,7 +323,7 @@ __HOSTDEVICE__ void
     *this = (T(1) / norm(qq)) * qq;
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Builds a matrix from the quaternion
 template <typename T>
 __HOSTDEVICE__ Matrix3<T> Quaternion<T>::toMatrix() const noexcept
@@ -357,18 +351,17 @@ __HOSTDEVICE__ Matrix3<T> Quaternion<T>::toMatrix() const noexcept
                        T(1) - (xx + yy)));
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Multiplies the quaternion on the right by another quaternion rhs,
 // i.e., perform this x rhs, and return the vectorial part of this x rhs
 template <typename T>
-__HOSTDEVICE__ Vector3<T>
-    Quaternion<T>::multToVector3(const Quaternion<T>& q) const noexcept
+__HOSTDEVICE__ Vector3<T> Quaternion<T>::multToVector3(const Quaternion<T>& q) const noexcept
 {
     Vector3<T> vtmp((m_vqt ^ q.m_vqt) + (m_w * q.m_vqt) + (q.m_w * m_vqt));
     return (vtmp);
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // ith-component accessor: (0,1,2) for the vector components and 3 forthe scalar
 template <typename T>
 __HOSTDEVICE__ T Quaternion<T>::operator[](size_t i) const noexcept
@@ -376,7 +369,7 @@ __HOSTDEVICE__ T Quaternion<T>::operator[](size_t i) const noexcept
     return (i == 3 ? m_w : m_vqt[i]);
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // ith-component accessor: (0,1,2) for the vector components and 3 for the
 // scalar - modifiable lvalue
 template <typename T>
@@ -385,7 +378,7 @@ __HOSTDEVICE__ T& Quaternion<T>::operator[](size_t i) noexcept
     return (i == 3 ? m_w : m_vqt[i]);
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Output operator
 template <typename T>
 std::ostream& operator<<(std::ostream& fileOut, const Quaternion<T>& q)
@@ -394,7 +387,7 @@ std::ostream& operator<<(std::ostream& fileOut, const Quaternion<T>& q)
     return (fileOut);
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Input operator
 template <typename T>
 std::istream& operator>>(std::istream& fileIn, Quaternion<T>& q)
@@ -407,17 +400,15 @@ std::istream& operator>>(std::istream& fileIn, Quaternion<T>& q)
     return (fileIn);
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Explicit instantiation
 template class Quaternion<float>;
 template class Quaternion<double>;
 
-#define X(T)                                                       \
-    template std::ostream& operator<< <T>(std::ostream & fileOut,  \
-                                          const Quaternion<T>& q); \
-                                                                   \
-    template std::istream& operator>> <T>(std::istream & fileIn,   \
-                                          Quaternion<T> & q);
+#define X(T)                                                                               \
+    template std::ostream& operator<< <T>(std::ostream & fileOut, const Quaternion<T>& q); \
+                                                                                           \
+    template std::istream& operator>> <T>(std::istream & fileIn, Quaternion<T> & q);
 X(float)
 X(double)
 #undef X

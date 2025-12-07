@@ -2,32 +2,30 @@
 #include "GrainsUtils.hh"
 #include "VectorMath.hh"
 
-/* ========================================================================== */
-/*                             Low-Level Methods                              */
-/* ========================================================================== */
+/* ============================================================================================== */
+/* Low-Level Methods                                                                              */
+/* ============================================================================================== */
 // Writes obstacles data
 template <typename T>
 void writeObstacles_Paraview(const GrainsMemBuffer<RigidBody<T>*>&       rb,
                              const std::unique_ptr<ComponentManager<T>>& cm,
-                             const std::string& obsFileName)
+                             const std::string&                          obsFileName)
 {
     std::ofstream f(obsFileName, std::ios::out);
     if(!f.is_open())
     {
         std::cerr << "Failed to open file: " << obsFileName << std::endl;
-        throw std::runtime_error("Cannot open file for writing: "
-                                 + obsFileName);
+        throw std::runtime_error("Cannot open file for writing: " + obsFileName);
     }
-    const uint numObstacles                        = cm->getNumberOfObstacles();
-    const GrainsMemBuffer<Vector3<T>>&    position = cm->getPosition();
-    const GrainsMemBuffer<Quaternion<T>>& quaternion = cm->getQuaternion();
-    const GrainsMemBuffer<Kinematics<T>>& kin        = cm->getVelocity();
+    const uint                            numObstacles = cm->getNumberOfObstacles();
+    const GrainsMemBuffer<Vector3<T>>&    position     = cm->getPosition();
+    const GrainsMemBuffer<Quaternion<T>>& quaternion   = cm->getQuaternion();
+    const GrainsMemBuffer<Kinematics<T>>& kin          = cm->getVelocity();
     GrainsMemBuffer<Transform3<T>>        tr(numObstacles);
     for(uint i = 0; i < numObstacles; ++i)
         tr[i] = Transform3<T>(quaternion[i], position[i]);
 
-    f << "<VTKFile type=\"UnstructuredGrid\" version=\"0.1\" "
-      << "byte_order=\"LittleEndian\" ";
+    f << "<VTKFile type=\"UnstructuredGrid\" version=\"0.1\" " << "byte_order=\"LittleEndian\" ";
     f << ">" << endl;
     f << "<UnstructuredGrid>" << endl;
     uint nbpts = 0, nbcells = 0;
@@ -36,8 +34,8 @@ void writeObstacles_Paraview(const GrainsMemBuffer<RigidBody<T>*>&       rb,
         nbpts += rb[i]->getConvex()->numberOfPoints_PARAVIEW();
         nbcells += rb[i]->getConvex()->numberOfCells_PARAVIEW();
     }
-    f << "<Piece NumberOfPoints=\"" << nbpts << "\"" << " NumberOfCells=\""
-      << nbcells << "\">" << endl;
+    f << "<Piece NumberOfPoints=\"" << nbpts << "\"" << " NumberOfCells=\"" << nbcells << "\">"
+      << endl;
     f << "<Points>" << endl;
     f << "<DataArray type=\"Float32\" NumberOfComponents=\"3\" ";
     f << "format=\"ascii\">";
@@ -102,32 +100,29 @@ void writeObstacles_Paraview(const GrainsMemBuffer<RigidBody<T>*>&       rb,
     f.close();
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Writes particles data
 template <typename T>
 void writeParticles_Paraview(const GrainsMemBuffer<RigidBody<T>*>&       rb,
                              const std::unique_ptr<ComponentManager<T>>& cm,
-                             const std::string& parFileName)
+                             const std::string&                          parFileName)
 {
     std::ofstream f(parFileName, std::ios::out);
     if(!f.is_open())
     {
         std::cerr << "Failed to open file: " << parFileName << std::endl;
-        throw std::runtime_error("Cannot open file for writing: "
-                                 + parFileName);
+        throw std::runtime_error("Cannot open file for writing: " + parFileName);
     }
-    const uint numObstacles                        = cm->getNumberOfObstacles();
-    const uint numParticles                        = cm->getNumberOfParticles();
-    const GrainsMemBuffer<Vector3<T>>&    position = cm->getPosition();
-    const GrainsMemBuffer<Quaternion<T>>& quaternion = cm->getQuaternion();
-    const GrainsMemBuffer<Kinematics<T>>& kin        = cm->getVelocity();
+    const uint                            numObstacles = cm->getNumberOfObstacles();
+    const uint                            numParticles = cm->getNumberOfParticles();
+    const GrainsMemBuffer<Vector3<T>>&    position     = cm->getPosition();
+    const GrainsMemBuffer<Quaternion<T>>& quaternion   = cm->getQuaternion();
+    const GrainsMemBuffer<Kinematics<T>>& kin          = cm->getVelocity();
     GrainsMemBuffer<Transform3<T>>        tr(numParticles);
     for(uint i = 0; i < numParticles; ++i)
-        tr[i] = Transform3<T>(quaternion[numObstacles + i],
-                              position[numObstacles + i]);
+        tr[i] = Transform3<T>(quaternion[numObstacles + i], position[numObstacles + i]);
 
-    f << "<VTKFile type=\"UnstructuredGrid\" version=\"0.1\" "
-      << "byte_order=\"LittleEndian\" ";
+    f << "<VTKFile type=\"UnstructuredGrid\" version=\"0.1\" " << "byte_order=\"LittleEndian\" ";
     f << ">" << endl;
     f << "<UnstructuredGrid>" << endl;
     uint nbpts = 0, nbcells = 0;
@@ -137,8 +132,8 @@ void writeParticles_Paraview(const GrainsMemBuffer<RigidBody<T>*>&       rb,
         nbcells += rb[i]->getConvex()->numberOfCells_PARAVIEW();
     }
 
-    f << "<Piece NumberOfPoints=\"" << nbpts << "\"" << " NumberOfCells=\""
-      << nbcells << "\">" << endl;
+    f << "<Piece NumberOfPoints=\"" << nbpts << "\"" << " NumberOfCells=\"" << nbcells << "\">"
+      << endl;
 
     f << "<Points>" << endl;
     f << "<DataArray type=\"Float32\" NumberOfComponents=\"3\" ";
@@ -155,12 +150,11 @@ void writeParticles_Paraview(const GrainsMemBuffer<RigidBody<T>*>&       rb,
     list<uint>::iterator ii;
     uint                 firstpoint_globalnumber = 0, last_offset = 0;
     for(uint i = 0; i < numParticles; ++i)
-        rb[numObstacles + i]->getConvex()->writeConnection_PARAVIEW(
-            connectivity,
-            offsets,
-            cellstype,
-            firstpoint_globalnumber,
-            last_offset);
+        rb[numObstacles + i]->getConvex()->writeConnection_PARAVIEW(connectivity,
+                                                                    offsets,
+                                                                    cellstype,
+                                                                    firstpoint_globalnumber,
+                                                                    last_offset);
     f << "<Cells>" << endl;
     f << "<DataArray type=\"Int32\" Name=\"connectivity\" ";
     f << "format=\"ascii\">" << endl;
@@ -234,16 +228,16 @@ void writeParticles_Paraview(const GrainsMemBuffer<RigidBody<T>*>&       rb,
     f.close();
 }
 
-/* ========================================================================== */
-/*                            High-Level Methods                              */
-/* ========================================================================== */
+/* ============================================================================================== */
+/* High-Level Methods                                                                             */
+/* ============================================================================================== */
 // Default constructor
 template <typename T>
 ParaviewPostProcessingWriter<T>::ParaviewPostProcessingWriter()
 {
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Constructor with XML node, rank and number of processes as input parameters
 template <typename T>
 
@@ -258,23 +252,22 @@ ParaviewPostProcessingWriter<T>::ParaviewPostProcessingWriter(DOMNode* dn)
     // GoutWI(12, "Writing mode =", (m_binary ? "Binary" : "Text"));
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Destructor
 template <typename T>
 ParaviewPostProcessingWriter<T>::~ParaviewPostProcessingWriter()
 {
 }
 
-// ----------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
 // Gets the post-processing writer type
 template <typename T>
-PostProcessingWriterType
-    ParaviewPostProcessingWriter<T>::getPostProcessingWriterType() const
+PostProcessingWriterType ParaviewPostProcessingWriter<T>::getPostProcessingWriterType() const
 {
     return (PARAVIEW);
 }
 
-// ----------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
 // Removes post-processing files already in the directory
 template <typename T>
 void ParaviewPostProcessingWriter<T>::clearPostProcessingFiles() const
@@ -292,16 +285,15 @@ void ParaviewPostProcessingWriter<T>::clearPostProcessingFiles() const
     PostProcessingWriter<T>::clearPostProcessingFiles(directory, patternsReg);
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 template <typename T>
 void ParaviewPostProcessingWriter<T>::PostProcessing_start()
 {
     clearPostProcessingFiles();
     // Obstacles
     m_Paraview_saveObstacles_pvd << "<?xml version=\"1.0\"?>" << endl;
-    m_Paraview_saveObstacles_pvd
-        << "<VTKFile type=\"Collection\" version=\"0.1\""
-        << " byte_order=\"LittleEndian\"";
+    m_Paraview_saveObstacles_pvd << "<VTKFile type=\"Collection\" version=\"0.1\""
+                                 << " byte_order=\"LittleEndian\"";
     m_Paraview_saveObstacles_pvd << ">" << endl;
     m_Paraview_saveObstacles_pvd << "<Collection>" << endl;
 
@@ -311,20 +303,18 @@ void ParaviewPostProcessingWriter<T>::PostProcessing_start()
     m_Paraview_saveParticles_pvd.push_back(ossNULL);
     m_Paraview_saveParticles_pvd[0] = new ostringstream;
     *m_Paraview_saveParticles_pvd[0] << "<?xml version=\"1.0\"?>" << endl;
-    *m_Paraview_saveParticles_pvd[0]
-        << "<VTKFile type=\"Collection\" version=\"0.1\""
-        << " byte_order=\"LittleEndian\"";
+    *m_Paraview_saveParticles_pvd[0] << "<VTKFile type=\"Collection\" version=\"0.1\""
+                                     << " byte_order=\"LittleEndian\"";
     *m_Paraview_saveParticles_pvd[0] << ">" << endl;
     *m_Paraview_saveParticles_pvd[0] << "<Collection>" << endl;
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Writes data
 template <typename T>
-void ParaviewPostProcessingWriter<T>::PostProcessing(
-    const GrainsMemBuffer<RigidBody<T>*>&       rb,
-    const std::unique_ptr<ComponentManager<T>>& cm,
-    const T                                     currentTime)
+void ParaviewPostProcessingWriter<T>::PostProcessing(const GrainsMemBuffer<RigidBody<T>*>&       rb,
+                                                     const std::unique_ptr<ComponentManager<T>>& cm,
+                                                     const T currentTime)
 {
     // list<string> Scalars;
     // Scalars.push_back("NormU");
@@ -334,21 +324,17 @@ void ParaviewPostProcessingWriter<T>::PostProcessing(
     ossCN << m_ParaviewCycleNumber;
 
     // Obstacles
-    std::string obsFileName
-        = m_rootName + "_Obstacles_T" + ossCN.str() + ".vtu";
+    std::string obsFileName     = m_rootName + "_Obstacles_T" + ossCN.str() + ".vtu";
     std::string obsFileNamePath = m_directory + "/" + obsFileName;
-    m_Paraview_saveObstacles_pvd << "<DataSet timestep=\"" << currentTime
-                                 << "\" " << "group=\"\" part=\"0\" file=\""
-                                 << obsFileName << "\"/>\n";
+    m_Paraview_saveObstacles_pvd << "<DataSet timestep=\"" << currentTime << "\" "
+                                 << "group=\"\" part=\"0\" file=\"" << obsFileName << "\"/>\n";
 
-    std::string obstacleFile
-        = m_directory + "/" + m_rootName + "_Obstacles.pvd";
+    std::string   obstacleFile = m_directory + "/" + m_rootName + "_Obstacles.pvd";
     std::ofstream f(obstacleFile, std::ios::out);
     if(!f.is_open())
     {
         std::cerr << "Failed to open file: " << obstacleFile << std::endl;
-        throw std::runtime_error("Cannot open file for writing: "
-                                 + obstacleFile);
+        throw std::runtime_error("Cannot open file for writing: " + obstacleFile);
     }
     f << m_Paraview_saveObstacles_pvd.str();
     f << "</Collection>" << endl;
@@ -357,21 +343,17 @@ void ParaviewPostProcessingWriter<T>::PostProcessing(
     writeObstacles_Paraview(rb, cm, obsFileNamePath);
 
     // Particles
-    std::string parFileName
-        = m_rootName + "_Particles_T" + ossCN.str() + ".vtu";
+    std::string parFileName     = m_rootName + "_Particles_T" + ossCN.str() + ".vtu";
     std::string parFileNamePath = m_directory + "/" + parFileName;
-    *m_Paraview_saveParticles_pvd[0] << "<DataSet timestep=\"" << currentTime
-                                     << "\" " << "group=\"\" part=\"0\" file=\""
-                                     << parFileName << "\"/>\n";
+    *m_Paraview_saveParticles_pvd[0] << "<DataSet timestep=\"" << currentTime << "\" "
+                                     << "group=\"\" part=\"0\" file=\"" << parFileName << "\"/>\n";
 
-    std::string particlesPvdFile
-        = m_directory + "/" + m_rootName + "_Particles.pvd";
+    std::string   particlesPvdFile = m_directory + "/" + m_rootName + "_Particles.pvd";
     std::ofstream g(particlesPvdFile, std::ios::out);
     if(!g.is_open())
     {
         std::cerr << "Failed to open file: " << particlesPvdFile << std::endl;
-        throw std::runtime_error("Cannot open file for writing: "
-                                 + particlesPvdFile);
+        throw std::runtime_error("Cannot open file for writing: " + particlesPvdFile);
     }
     g << m_Paraview_saveParticles_pvd[0]->str();
     g << "</Collection>" << endl;
@@ -382,14 +364,14 @@ void ParaviewPostProcessingWriter<T>::PostProcessing(
     m_ParaviewCycleNumber++;
 }
 
-// ----------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
 // Finalizes writing data
 template <typename T>
 void ParaviewPostProcessingWriter<T>::PostProcessing_end()
 {
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Explicit instantiation
 template class ParaviewPostProcessingWriter<float>;
 template class ParaviewPostProcessingWriter<double>;

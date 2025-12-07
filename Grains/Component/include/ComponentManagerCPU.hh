@@ -3,13 +3,13 @@
 
 #include "ComponentManager.hh"
 
-// =============================================================================
+// =================================================================================================
 /** @brief The class ComponentManagerCPU.
 
     Components in the simulation running on CPU.
 
     @author A.Yazdani - 2024 - Construction */
-// =============================================================================
+// =================================================================================================
 template <typename T>
 class ComponentManagerCPU : public ComponentManager<T, MemType::HOST>
 {
@@ -38,14 +38,13 @@ public:
     /** @brief Default constructor */
     ComponentManagerCPU();
 
-    /** @brief Constructor with the number of particles, and obstacles. 
+    /** @brief Constructor with the number of particles, and obstacles.
         @param rigidBody Pointer to the components rigid body buffer
         @param nObstacles Number of obstacles
         @param nParticles Number of particles */
-    ComponentManagerCPU(
-        GrainsMemBuffer<RigidBody<T>*, MemType::HOST>* rigidBody,
-        uint                                           nObstacles,
-        uint                                           nParticles);
+    ComponentManagerCPU(GrainsMemBuffer<RigidBody<T>*, MemType::HOST>* rigidBody,
+                        uint                                           nObstacles,
+                        uint                                           nParticles);
 
     /** @brief Destructor */
     ~ComponentManagerCPU();
@@ -82,16 +81,15 @@ public:
 
     /** @brief Computes contact forces between different components
         @param CF array of all contact force models */
-    void computeContactForces(
-        const GrainsMemBuffer<ContactForceModel<T>*, MemType::HOST>& CF) final;
+    void
+        computeContactForces(const GrainsMemBuffer<ContactForceModel<T>*, MemType::HOST>& CF) final;
 
     /** @brief Adds external forces such as gravity */
     void addExternalForces() final;
 
     /** @brief Updates the position and velocities of particles
         @param TI time integration scheme */
-    void moveParticles(
-        const GrainsMemBuffer<TimeIntegrator<T>*, MemType::HOST>& TI) final;
+    void moveParticles(const GrainsMemBuffer<TimeIntegrator<T>*, MemType::HOST>& TI) final;
     //@}
 };
 

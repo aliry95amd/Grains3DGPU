@@ -11,14 +11,14 @@ enum ContactForceModelType
     HOOKE
 };
 
-// =============================================================================
+// =================================================================================================
 /** @brief The class ContactForceModel.
 
     Defines the contact forces between two colliding components and computes
     these contact forces.
 
     @author A.YAZDANI - 2024 - Construction */
-// =============================================================================
+// =================================================================================================
 template <typename T>
 class ContactForceModel
 {

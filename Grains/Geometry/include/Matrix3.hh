@@ -3,13 +3,13 @@
 
 #include "Vector3.hh"
 
-// =============================================================================
+// =================================================================================================
 /** @brief The class Matrix3.
 
     3x3 real matrix.
 
     @author A.Yazdani - 2024 - Construction */
-// =============================================================================
+// =================================================================================================
 template <typename T>
 class Matrix3
 {
@@ -28,7 +28,7 @@ public:
     Matrix3() noexcept;
 
     /** @brief Constructor with a 1D array of values as input
-        @param buffer the 1D array of values containing the matrix components 
+        @param buffer the 1D array of values containing the matrix components
         ordered 0=Mxx, 1=Mxy, 2=Mxz, 3=Myx, 4=Myy, 5=Myz, 6=Mzx, 7=Mzy, 8=Mzz */
     __HOSTDEVICE__
     Matrix3(T const* buffer) noexcept;
@@ -93,7 +93,7 @@ public:
     /** @name Set methods */
     //@{
     /** @brief Sets the matrix to a 1D array of 9 values as input
-        @param buffer the 1D array of values ordered as: 
+        @param buffer the 1D array of values ordered as:
         0=Mxx, 1=Mxy, 2=Mxz, 3=Myx, 4=Myy, 5=Myz, 6=Mzx, 7=Mzy, 8=Mzz */
     __HOSTDEVICE__
     void setValue(T const* buffer) noexcept;
@@ -109,8 +109,7 @@ public:
         @param zy (3,2) coefficient
         @param zz (3,3) coefficient */
     __HOSTDEVICE__
-    void
-        setValue(T xx, T xy, T xz, T yx, T yy, T yz, T zx, T zy, T zz) noexcept;
+    void setValue(T xx, T xy, T xz, T yx, T yy, T yz, T zx, T zy, T zz) noexcept;
     //@}
 
     /** @name Operators */

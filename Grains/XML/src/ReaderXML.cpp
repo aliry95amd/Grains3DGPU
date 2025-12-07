@@ -14,7 +14,7 @@ using namespace std;
 
 DOMBuilder* ReaderXML::m_parser = NULL;
 
-// ----------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
 // Initializes the reader
 void ReaderXML::initialize()
 {
@@ -22,37 +22,34 @@ void ReaderXML::initialize()
     XMLPlatformUtils::Initialize();
 
     static const XMLCh gLS[] = {chLatin_L, chLatin_S, chNull};
-    DOMImplementation* impl
-        = DOMImplementationRegistry::getDOMImplementation(gLS);
-    m_parser = impl->createDOMBuilder(DOMImplementationLS::MODE_SYNCHRONOUS, 0);
+    DOMImplementation* impl  = DOMImplementationRegistry::getDOMImplementation(gLS);
+    m_parser                 = impl->createDOMBuilder(DOMImplementationLS::MODE_SYNCHRONOUS, 0);
 
     bool doNamespaces       = false;
     bool doSchema           = false;
     bool schemaFullChecking = false;
     m_parser->setFeature(XMLUni::fgDOMNamespaces, doNamespaces);
     m_parser->setFeature(XMLUni::fgXercesSchema, doSchema);
-    m_parser->setFeature(XMLUni::fgXercesSchemaFullChecking,
-                         schemaFullChecking);
+    m_parser->setFeature(XMLUni::fgXercesSchemaFullChecking, schemaFullChecking);
 
     m_parser->setFeature(XMLUni::fgDOMDatatypeNormalization, true);
 }
 
-// ----------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
 // Frees the reader
 void ReaderXML::terminate()
 {
     XMLPlatformUtils::Terminate();
 }
 
-// ----------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
 // Returns a node from its name and the root node
 DOMNode* ReaderXML::getNode(DOMElement* root, string const& name)
 {
-    return (root->getElementsByTagName(XMLString::transcode(name.c_str()))
-                ->item(0));
+    return (root->getElementsByTagName(XMLString::transcode(name.c_str()))->item(0));
 }
 
-// ----------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
 // Returns a node from its name and the root node
 DOMNode* ReaderXML::getNode(DOMNode* root, string const& name)
 {
@@ -66,17 +63,16 @@ DOMNode* ReaderXML::getNode(DOMNode* root, string const& name)
     return (node);
 }
 
-// ----------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
 // Returns the scalar value xxx of the attribute of a node "<root name="xxx">"
 double ReaderXML::getNodeAttr_Double(DOMNode* root, string const& name)
 {
     DOMNamedNodeMap* nodeValues = root->getAttributes();
-    DOMNode*         value
-        = nodeValues->getNamedItem(XMLString::transcode(name.c_str()));
+    DOMNode*         value      = nodeValues->getNamedItem(XMLString::transcode(name.c_str()));
     return (atof(XMLString::transcode(value->getNodeValue())));
 }
 
-// ----------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
 // Returns the integer value xxx of the attribute of a node "<root name="xxx">"
 int ReaderXML::getNodeAttr_Int(DOMNode* root, const string& name)
 {
@@ -86,7 +82,7 @@ int ReaderXML::getNodeAttr_Int(DOMNode* root, const string& name)
     return (atoi(XMLString::transcode(value->getNodeValue())));
 }
 
-// ----------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
 // Returns the string value xxx of the attribute of a node "<root name="xxx">"
 string ReaderXML::getNodeAttr_String(DOMNode* root, string const& name)
 {
@@ -97,7 +93,7 @@ string ReaderXML::getNodeAttr_String(DOMNode* root, string const& name)
     return (XMLString::transcode(value));
 }
 
-// ----------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
 // Returns whether the node root has an attribute named name "<node name="xxx">"
 bool ReaderXML::hasNodeAttr(DOMNode* root, string const& name)
 {
@@ -107,7 +103,7 @@ bool ReaderXML::hasNodeAttr(DOMNode* root, string const& name)
     return (node != NULL);
 }
 
-// ----------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
 // Returns the name of a node
 string ReaderXML::getNodeName(DOMNode const* root)
 {
@@ -116,7 +112,7 @@ string ReaderXML::getNodeName(DOMNode const* root)
     return (string(nodeName));
 }
 
-// ----------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
 // Returns the next node wrt to a node
 DOMNode* ReaderXML::getNodeNext(DOMNode* root)
 {
@@ -124,28 +120,28 @@ DOMNode* ReaderXML::getNodeNext(DOMNode* root)
     return (nodes->item(1));
 }
 
-// ----------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
 // Returns the scalar value xxx of the node "<root>xxx</root>"
 double ReaderXML::getNodeValue_Double(DOMNode* root)
 {
     return (atof(XMLString::transcode(root->getFirstChild()->getNodeValue())));
 }
 
-// ----------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
 // Returns the string value xxx of the node "<root>xxx</root>"
 string ReaderXML::getNodeValue_String(DOMNode* root)
 {
     return (XMLString::transcode(root->getFirstChild()->getNodeValue()));
 }
 
-// ----------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
 // Returns the list of nodes in a node
 DOMNodeList* ReaderXML::getNodes(DOMElement* root, string const& name)
 {
     return (root->getElementsByTagName(XMLString::transcode(name.c_str())));
 }
 
-// ----------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
 // Returns the list of nodes in a node
 DOMNodeList* ReaderXML::getNodes(DOMNode* root)
 {
@@ -160,7 +156,7 @@ DOMNodeList* ReaderXML::getNodes(DOMNode* root)
     return (allNodes->getChildNodes());
 }
 
-// ----------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
 // Noeud principal du document (root)
 DOMElement* ReaderXML::getRoot(string const& xmlFile)
 {
@@ -173,9 +169,8 @@ DOMElement* ReaderXML::getRoot(string const& xmlFile)
     }
     catch(const DOMException& e)
     {
-        XERCES_STD_QUALIFIER                                       cerr
-            << "XML exception " << e.code << XERCES_STD_QUALIFIER  endl
-            << XMLString::transcode(e.msg) << XERCES_STD_QUALIFIER endl;
+        XERCES_STD_QUALIFIER cerr << "XML exception " << e.code << XERCES_STD_QUALIFIER  endl
+                                  << XMLString::transcode(e.msg) << XERCES_STD_QUALIFIER endl;
     }
     return (root);
 }

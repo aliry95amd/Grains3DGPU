@@ -5,22 +5,22 @@
 #include "Quaternion.hh"
 #include "ReaderXML.hh"
 
-// =============================================================================
+// =================================================================================================
 /** @brief The class Transform3.
 
-    A position/origin described by a Vector3 and an orientation described by a 
+    A position/origin described by a Vector3 and an orientation described by a
     Matrix3. Note that the Matrix3 portion can also contain a scaling component
-    and is hence not necessarily unitary. 
+    and is hence not necessarily unitary.
 
     @author A.Yazdani - 2024 - Construction */
-// =============================================================================
+// =================================================================================================
 template <typename T>
 class Transform3
 {
 private:
     /**@name Parameters */
     //@{
-    Matrix3<T> m_basis; /**< Orientation of the transformation */
+    Matrix3<T> m_basis;  /**< Orientation of the transformation */
     Vector3<T> m_origin; /**< Center of the transformation */
     //@}
 
@@ -32,9 +32,9 @@ public:
     __HOSTDEVICE__
     Transform3(T def = T());
 
-    /** @brief Constructor with origin coordinates as inputs and matrix as 
+    /** @brief Constructor with origin coordinates as inputs and matrix as
         identity
-        @param x origin x-coordinate 
+        @param x origin x-coordinate
         @param y origin y-coordinate
         @param z origin z-coordinate */
     __HOSTDEVICE__
@@ -52,7 +52,7 @@ public:
     __HOSTDEVICE__
     Transform3(const Quaternion<T>& q, const Vector3<T>& p);
 
-    /** @brief Constructor with two tranformations. This constructs a 
+    /** @brief Constructor with two tranformations. This constructs a
         transformation which is equal to 't2 o inv( t1 )', representing t2 in
         local coordinate of t1.
         @param t1 primary transformation
@@ -92,9 +92,9 @@ public:
 
     /**@name Set methods */
     //@{
-    /** @brief Sets the transformation with an 1D array of 12 values as 
+    /** @brief Sets the transformation with an 1D array of 12 values as
         inputs. The 1D array must be organized as: 0=Mxx, 1=Mxy, 2=Mxz, 3=Myx,
-        4=Myy, 5=Myz, 6=Mzx, 7=Mzy, 8=Mzz, 9=Ox, 10=Oy, 11=Oz 
+        4=Myy, 5=Myz, 6=Mzx, 7=Mzy, 8=Mzz, 9=Ox, 10=Oy, 11=Oz
         @param buffer the 1D array of values containing the tranformation
         coefficients */
     __HOSTDEVICE__
@@ -122,7 +122,7 @@ public:
     __HOSTDEVICE__
     void setIDentity();
 
-    /** @brief Sets the transformation to the inverse of another 
+    /** @brief Sets the transformation to the inverse of another
         transformation
         @param t the other transformation
         @param isRotation if the other transformation is rotation. Default is
@@ -135,19 +135,18 @@ public:
         @param t1 1st affine transformation
         @param t2 2nd affine transformation */
     __HOSTDEVICE__
-    void setToTransformsComposition(const Transform3<T>& t1,
-                                    const Transform3<T>& t2);
+    void setToTransformsComposition(const Transform3<T>& t1, const Transform3<T>& t2);
     //@}
 
     /**@name Methods */
     //@{
-    /** @brief Composition with a scaling transformation: 
+    /** @brief Composition with a scaling transformation:
         this = this o scaling
         @param v diagonal entries of the scaling matrix */
     __HOSTDEVICE__
     void composeWithScaling(const Vector3<T>& v);
 
-    /** @brief Composition on the left by a rotation described by a 
+    /** @brief Composition on the left by a rotation described by a
         transform:
         this = rot o this (this first followed by rot).
         This composition leaves the origin unchanged but does not check that rot
@@ -156,8 +155,8 @@ public:
     __HOSTDEVICE__
     void composeLeftByRotation(const Transform3<T>& t);
 
-    /** @brief Composition on the left by a rotation described by a 
-        quaternion: this = rot( quaternion ) o this ( this first followed by 
+    /** @brief Composition on the left by a rotation described by a
+        quaternion: this = rot( quaternion ) o this ( this first followed by
         rot( quaternion ) )
         @param q quaternion describing the rotation */
     __HOSTDEVICE__
@@ -169,13 +168,13 @@ public:
     __HOSTDEVICE__
     void composeLeftByTranslation(const Vector3<T>& v);
 
-    /** @brief Composition on the left by another affine transformation: 
+    /** @brief Composition on the left by another affine transformation:
         this = t o this (this first followed by t)
         @param t the other affine transformation */
     __HOSTDEVICE__
     void composeLeftByTransform(const Transform3<T>& t);
 
-    /** @brief Composition on the right by another affine transformation: 
+    /** @brief Composition on the right by another affine transformation:
         this = this o t (t first followed by this)
         @param t the other affine transformation */
     __HOSTDEVICE__
@@ -192,13 +191,12 @@ public:
         @param transMotion displacement vector
         @param rotMotion rotation quaternion */
     __HOSTDEVICE__
-    void updateTransform(const Vector3<T>&    transMotion,
-                         const Quaternion<T>& rotMotion);
+    void updateTransform(const Vector3<T>& transMotion, const Quaternion<T>& rotMotion);
     //@}
 
     /**@name Operators */
     //@{
-    /** @brief Returns result of applying the transformation to the input 
+    /** @brief Returns result of applying the transformation to the input
         vector
         @param v input vector */
     __HOSTDEVICE__
@@ -217,8 +215,7 @@ public:
  @param fileOut output stream
  @param t transform object */
 template <typename T>
-__HOST__ std::ostream& operator<<(std::ostream&        fileOut,
-                                  const Transform3<T>& t);
+__HOST__ std::ostream& operator<<(std::ostream& fileOut, const Transform3<T>& t);
 
 /** @brief Input operator
         @param fileIn input stream

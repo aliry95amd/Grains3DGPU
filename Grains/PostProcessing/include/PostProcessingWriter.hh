@@ -17,13 +17,13 @@ enum PostProcessingWriterType
     RAW
 };
 
-// =============================================================================
+// =================================================================================================
 /** @brief The class PostProcessingWriter.
 
     Writes results in files for post-processing by an external software.
 
     @author A.Yazdani - 2024 - Construction */
-// =============================================================================
+// =================================================================================================
 template <typename T>
 class PostProcessingWriter
 {
@@ -55,9 +55,8 @@ public:
      @param directory directory of the files to be removed
      @param patterns Regex patterns of the files to be removed */
 
-    void
-        clearPostProcessingFiles(const std::filesystem::path&   directory,
-                                 const std::vector<std::regex>& patterns) const;
+    void clearPostProcessingFiles(const std::filesystem::path&   directory,
+                                  const std::vector<std::regex>& patterns) const;
 
     /** @brief Initializes the post-processing writer */
 
@@ -70,7 +69,7 @@ public:
 
     virtual void PostProcessing(const GrainsMemBuffer<RigidBody<T>*>&       rb,
                                 const std::unique_ptr<ComponentManager<T>>& cm,
-                                const T currentTime)
+                                const T                                     currentTime)
         = 0;
 
     /** @brief Finalizes writing data */

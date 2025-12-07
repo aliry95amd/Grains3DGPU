@@ -24,55 +24,50 @@
 #include "Vector3.hh"
 #include "VectorMath.hh"
 
-/* TODO: 
+/* TODO:
     Transform3 Generation random distribution
     Sort pairList and Compare
     Make sure GPU is working
 */
 
-// =============================================================================
+// =================================================================================================
 /** @brief Performance Comparison Tool for GJK Algorithms
-    
-    This class provides comprehensive performance analysis comparing various GJK
-    algorithms across different shape combinations, both on CPU and GPU 
-    platforms.
-    
-    @author A.Yazdani - 2025 - GJK Performance Validation */
-// =============================================================================
 
-// -----------------------------------------------------------------------------
+    This class provides comprehensive performance analysis comparing various GJK
+    algorithms across different shape combinations, both on CPU and GPU
+    platforms.
+
+    @author A.Yazdani - 2025 - GJK Performance Validation */
+// =================================================================================================
+
+// -------------------------------------------------------------------------------------------------
 // CPU Performance Functions
 namespace GJKPerformanceCPU
 {
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     // Run distance algorithm on Transform3 arrays
     template <typename T, GJKType type>
-    void collisionDetection(RigidBody<T>** rb,
-                            Transform3<T>* tr,
-                            uint2*         pairList,
-                            T*             dist,
-                            uint*          iter,
-                            int const      N)
+    void collisionDetection(
+        RigidBody<T>** rb, Transform3<T>* tr, uint2* pairList, T* dist, uint* iter, int const N)
     {
         for(int p = 0; p < N; p++)
         {
             uint       i = pairList[p].x;
             uint       j = pairList[p].y;
             Vector3<T> pa, pb;
-            dist[p] = computeClosestPoints_GJK<T, type, false, EPS<T>>(
-                *(rb[i]->getConvex()),
-                *(rb[j]->getConvex()),
-                tr[i],
-                tr[j],
-                rb[i]->getCrustThickness(),
-                rb[j]->getCrustThickness(),
-                pa,
-                pb,
-                iter[p]);
+            dist[p] = computeClosestPoints_GJK<T, type, false, EPS<T>>(*(rb[i]->getConvex()),
+                                                                       *(rb[j]->getConvex()),
+                                                                       tr[i],
+                                                                       tr[j],
+                                                                       rb[i]->getCrustThickness(),
+                                                                       rb[j]->getCrustThickness(),
+                                                                       pa,
+                                                                       pb,
+                                                                       iter[p]);
         }
     }
 
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     // Run distance algorithm on Quaternion+Position arrays
     template <typename T, GJKType type>
     void collisionDetection(RigidBody<T>** rb,
@@ -88,38 +83,32 @@ namespace GJKPerformanceCPU
             uint       i = pairList[p].x;
             uint       j = pairList[p].y;
             Vector3<T> pa, pb;
-            dist[p] = computeClosestPoints_GJK<T, type, false, EPS<T>>(
-                *(rb[i]->getConvex()),
-                *(rb[j]->getConvex()),
-                pos[i],
-                pos[j],
-                quat[i],
-                quat[j],
-                rb[i]->getCrustThickness(),
-                rb[j]->getCrustThickness(),
-                pa,
-                pb,
-                iter[p]);
+            dist[p] = computeClosestPoints_GJK<T, type, false, EPS<T>>(*(rb[i]->getConvex()),
+                                                                       *(rb[j]->getConvex()),
+                                                                       pos[i],
+                                                                       pos[j],
+                                                                       quat[i],
+                                                                       quat[j],
+                                                                       rb[i]->getCrustThickness(),
+                                                                       rb[j]->getCrustThickness(),
+                                                                       pa,
+                                                                       pb,
+                                                                       iter[p]);
         }
     }
-} // namespace GJKPerformanceCPU
+}  // namespace GJKPerformanceCPU
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // GPU Performance Functions
 namespace GJKPerformanceGPU
 {
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     // Johnson algorithm GPU kernel (Transform3)
     template <typename T, GJKType type>
-    __global__ void collisionDetection(RigidBody<T>** rb,
-                                       Transform3<T>* tr,
-                                       uint2*         pairList,
-                                       T*             dist,
-                                       uint*          iter,
-                                       int const      N)
+    __global__ void collisionDetection(
+        RigidBody<T>** rb, Transform3<T>* tr, uint2* pairList, T* dist, uint* iter, int const N)
     {
-        int bID = gridDim.x * gridDim.y * blockIdx.z + blockIdx.y * gridDim.x
-                  + blockIdx.x;
+        int bID = gridDim.x * gridDim.y * blockIdx.z + blockIdx.y * gridDim.x + blockIdx.x;
         int tID = bID * blockDim.x + threadIdx.x;
 
         if(tID < N)
@@ -127,20 +116,19 @@ namespace GJKPerformanceGPU
             uint       i = pairList[tID].x;
             uint       j = pairList[tID].y;
             Vector3<T> pa, pb;
-            dist[tID] = computeClosestPoints_GJK<T, type, false, EPS<T>>(
-                *(rb[i]->getConvex()),
-                *(rb[j]->getConvex()),
-                tr[i],
-                tr[j],
-                rb[i]->getCrustThickness(),
-                rb[j]->getCrustThickness(),
-                pa,
-                pb,
-                iter[tID]);
+            dist[tID] = computeClosestPoints_GJK<T, type, false, EPS<T>>(*(rb[i]->getConvex()),
+                                                                         *(rb[j]->getConvex()),
+                                                                         tr[i],
+                                                                         tr[j],
+                                                                         rb[i]->getCrustThickness(),
+                                                                         rb[j]->getCrustThickness(),
+                                                                         pa,
+                                                                         pb,
+                                                                         iter[tID]);
         }
     }
 
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     // Johnson algorithm GPU kernel (Quaternion)
     template <typename T, GJKType type>
     __global__ void collisionDetection(RigidBody<T>** rb,
@@ -151,8 +139,7 @@ namespace GJKPerformanceGPU
                                        uint*          iter,
                                        int const      N)
     {
-        int bID = gridDim.x * gridDim.y * blockIdx.z + blockIdx.y * gridDim.x
-                  + blockIdx.x;
+        int bID = gridDim.x * gridDim.y * blockIdx.z + blockIdx.y * gridDim.x + blockIdx.x;
         int tID = bID * blockDim.x + threadIdx.x;
 
         if(tID < N)
@@ -160,23 +147,22 @@ namespace GJKPerformanceGPU
             uint       i = pairList[tID].x;
             uint       j = pairList[tID].y;
             Vector3<T> pa, pb;
-            dist[tID] = computeClosestPoints_GJK<T, type, false, EPS<T>>(
-                *(rb[i]->getConvex()),
-                *(rb[j]->getConvex()),
-                pos[i],
-                pos[j],
-                quat[i],
-                quat[j],
-                rb[i]->getCrustThickness(),
-                rb[j]->getCrustThickness(),
-                pa,
-                pb,
-                iter[tID]);
+            dist[tID] = computeClosestPoints_GJK<T, type, false, EPS<T>>(*(rb[i]->getConvex()),
+                                                                         *(rb[j]->getConvex()),
+                                                                         pos[i],
+                                                                         pos[j],
+                                                                         quat[i],
+                                                                         quat[j],
+                                                                         rb[i]->getCrustThickness(),
+                                                                         rb[j]->getCrustThickness(),
+                                                                         pa,
+                                                                         pb,
+                                                                         iter[tID]);
         }
     }
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 /** @brief GJK Performance Comparison Class */
 template <typename T>
 class GJKPerformanceComparison
@@ -219,7 +205,7 @@ private:
     } m_results;
 
 public:
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief Default constructor */
     GJKPerformanceComparison()
         : m_numParticles(1)
@@ -258,11 +244,11 @@ public:
         m_results.iter_GSQ = 0.0;
     }
 
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief Destructor */
     ~GJKPerformanceComparison() {}
 
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief Runs the test */
     void run()
     {
@@ -285,9 +271,7 @@ public:
         // Randomize arrays on host
         for(uint i = 0; i < m_numParticles; ++i)
         {
-            h_tr[i].setBasis(rotation(generator),
-                             rotation(generator),
-                             rotation(generator));
+            h_tr[i].setBasis(rotation(generator), rotation(generator), rotation(generator));
             h_tr[i].setOrigin(Vector3<T>(distribution(generator),
                                          distribution(generator),
                                          distribution(generator)));
@@ -309,13 +293,13 @@ public:
 
         switch(m_shapeType)
         {
-        case 0: // Box
+        case 0:  // Box
             h_convex = new Box<T>(2 * r1, 2 * r2, 2 * r3);
             break;
-        case 1: // Sphere
+        case 1:  // Sphere
             h_convex = new Sphere<T>(r1);
             break;
-        case 2: // Superquadric
+        case 2:  // Superquadric
             h_convex = new Superquadric<T>(r1, r2, r3, T(3.0), T(3.0));
             break;
         default:
@@ -337,7 +321,7 @@ public:
 
         // ---------------------------------------------------------------------
         // Generate random collision pairs
-        std::uniform_int_distribution<int> particleDist(0, m_numParticles - 1);
+        std::uniform_int_distribution<int>    particleDist(0, m_numParticles - 1);
         GrainsMemBuffer<uint2, MemType::HOST> h_pairList(m_numPairs);
         for(uint p = 0; p < m_numPairs; ++p)
         {
@@ -353,9 +337,9 @@ public:
 
         // ---------------------------------------------------------------------
         // Host memory for results
-        auto start_timer = std::chrono::high_resolution_clock::now();
-        auto end_timer   = std::chrono::high_resolution_clock::now();
-        GrainsMemBuffer<T, MemType::HOST>      h_distance_base(m_numPairs, 0);
+        auto                              start_timer = std::chrono::high_resolution_clock::now();
+        auto                              end_timer   = std::chrono::high_resolution_clock::now();
+        GrainsMemBuffer<T, MemType::HOST> h_distance_base(m_numPairs, 0);
         GrainsMemBuffer<uint, MemType::HOST>   h_iterations_base(m_numPairs, 0);
         GrainsMemBuffer<T, MemType::HOST>      h_distance(m_numPairs, 0);
         GrainsMemBuffer<uint, MemType::HOST>   h_iterations(m_numPairs, 0);
@@ -366,8 +350,7 @@ public:
 
         // ---------------------------------------------------------------------
         // Helper functions for result comparison and iteration calculation
-        auto compareResultsCJT
-            = [&](const auto& data, const auto& base) -> double {
+        auto compareResultsCJT = [&](const auto& data, const auto& base) -> double {
             constexpr double tolerance     = EPS<T>;
             uint             numMismatches = 0;
 
@@ -375,16 +358,16 @@ public:
             const T* data_ptr;
             const T* base_ptr = base.getData();
 
-            // Handle different memory types - create temporary host copy for device data
+            // Handle different memory types - create temporary host copy for
+            // device data
             std::unique_ptr<GrainsMemBuffer<T, MemType::HOST>> h_data_copy;
             if constexpr(std::is_same_v<std::decay_t<decltype(data)>,
                                         GrainsMemBuffer<T, MemType::HOST>>)
                 data_ptr = data.getData();
             else
             {
-                h_data_copy
-                    = std::make_unique<GrainsMemBuffer<T, MemType::HOST>>(
-                        data); // Copy device to host
+                h_data_copy = std::make_unique<GrainsMemBuffer<T, MemType::HOST>>(
+                    data);  // Copy device to host
                 data_ptr = h_data_copy->getData();
             }
 
@@ -393,24 +376,23 @@ public:
                 if(fabs(data_ptr[p] - base_ptr[p]) > tolerance)
                     numMismatches++;
             }
-            return (1 - static_cast<double>(numMismatches) / m_numPairs)
-                   * 100.0;
+            return (1 - static_cast<double>(numMismatches) / m_numPairs) * 100.0;
         };
 
         // Helper function to compute average iterations
         auto computeAverageIterations = [&](const auto& iter) -> double {
             double      totalIterations = 0.0;
             const uint* iter_ptr;
-            // Handle different memory types - create temporary host copy for device data
+            // Handle different memory types - create temporary host copy for
+            // device data
             std::unique_ptr<GrainsMemBuffer<uint, MemType::HOST>> h_iter_copy;
             if constexpr(std::is_same_v<std::decay_t<decltype(iter)>,
                                         GrainsMemBuffer<uint, MemType::HOST>>)
                 iter_ptr = iter.getData();
             else
             {
-                h_iter_copy
-                    = std::make_unique<GrainsMemBuffer<uint, MemType::HOST>>(
-                        iter); // Copy device to host
+                h_iter_copy = std::make_unique<GrainsMemBuffer<uint, MemType::HOST>>(
+                    iter);  // Copy device to host
                 iter_ptr = h_iter_copy->getData();
             }
 
@@ -422,60 +404,52 @@ public:
         // ---------------------------------------------------------------------
         // CPU tests
         start_timer = std::chrono::high_resolution_clock::now();
-        GJKPerformanceCPU::collisionDetection<T, GJKType::JOHNSON>(
-            h_rb.getData(),
-            h_tr.getData(),
-            h_pairList.getData(),
-            h_distance_base.getData(),
-            h_iterations_base.getData(),
-            m_numPairs);
-        end_timer = std::chrono::high_resolution_clock::now();
-        m_results.time_CJT
-            = std::chrono::duration<double>(end_timer - start_timer).count();
-        m_results.acc_CJT = compareResultsCJT(h_distance_base, h_distance_base);
+        GJKPerformanceCPU::collisionDetection<T, GJKType::JOHNSON>(h_rb.getData(),
+                                                                   h_tr.getData(),
+                                                                   h_pairList.getData(),
+                                                                   h_distance_base.getData(),
+                                                                   h_iterations_base.getData(),
+                                                                   m_numPairs);
+        end_timer          = std::chrono::high_resolution_clock::now();
+        m_results.time_CJT = std::chrono::duration<double>(end_timer - start_timer).count();
+        m_results.acc_CJT  = compareResultsCJT(h_distance_base, h_distance_base);
         m_results.iter_CJT = computeAverageIterations(h_iterations_base);
 
         start_timer = std::chrono::high_resolution_clock::now();
-        GJKPerformanceCPU::collisionDetection<T, GJKType::SIGNEDVOLUME>(
-            h_rb.getData(),
-            h_tr.getData(),
-            h_pairList.getData(),
-            h_distance.getData(),
-            h_iterations.getData(),
-            m_numPairs);
-        end_timer = std::chrono::high_resolution_clock::now();
-        m_results.time_CST
-            = std::chrono::duration<double>(end_timer - start_timer).count();
+        GJKPerformanceCPU::collisionDetection<T, GJKType::SIGNEDVOLUME>(h_rb.getData(),
+                                                                        h_tr.getData(),
+                                                                        h_pairList.getData(),
+                                                                        h_distance.getData(),
+                                                                        h_iterations.getData(),
+                                                                        m_numPairs);
+        end_timer          = std::chrono::high_resolution_clock::now();
+        m_results.time_CST = std::chrono::duration<double>(end_timer - start_timer).count();
         m_results.acc_CST  = compareResultsCJT(h_distance, h_distance_base);
         m_results.iter_CST = computeAverageIterations(h_iterations);
 
         start_timer = std::chrono::high_resolution_clock::now();
-        GJKPerformanceCPU::collisionDetection<T, GJKType::JOHNSON>(
-            h_rb.getData(),
-            h_pos.getData(),
-            h_quat.getData(),
-            h_pairList.getData(),
-            h_distance.getData(),
-            h_iterations.getData(),
-            m_numPairs);
-        end_timer = std::chrono::high_resolution_clock::now();
-        m_results.time_CJQ
-            = std::chrono::duration<double>(end_timer - start_timer).count();
+        GJKPerformanceCPU::collisionDetection<T, GJKType::JOHNSON>(h_rb.getData(),
+                                                                   h_pos.getData(),
+                                                                   h_quat.getData(),
+                                                                   h_pairList.getData(),
+                                                                   h_distance.getData(),
+                                                                   h_iterations.getData(),
+                                                                   m_numPairs);
+        end_timer          = std::chrono::high_resolution_clock::now();
+        m_results.time_CJQ = std::chrono::duration<double>(end_timer - start_timer).count();
         m_results.acc_CJQ  = compareResultsCJT(h_distance, h_distance_base);
         m_results.iter_CJQ = computeAverageIterations(h_iterations);
 
         start_timer = std::chrono::high_resolution_clock::now();
-        GJKPerformanceCPU::collisionDetection<T, GJKType::SIGNEDVOLUME>(
-            h_rb.getData(),
-            h_pos.getData(),
-            h_quat.getData(),
-            h_pairList.getData(),
-            h_distance.getData(),
-            h_iterations.getData(),
-            m_numPairs);
-        end_timer = std::chrono::high_resolution_clock::now();
-        m_results.time_CSQ
-            = std::chrono::duration<double>(end_timer - start_timer).count();
+        GJKPerformanceCPU::collisionDetection<T, GJKType::SIGNEDVOLUME>(h_rb.getData(),
+                                                                        h_pos.getData(),
+                                                                        h_quat.getData(),
+                                                                        h_pairList.getData(),
+                                                                        h_distance.getData(),
+                                                                        h_iterations.getData(),
+                                                                        m_numPairs);
+        end_timer          = std::chrono::high_resolution_clock::now();
+        m_results.time_CSQ = std::chrono::duration<double>(end_timer - start_timer).count();
         m_results.acc_CSQ  = compareResultsCJT(h_distance, h_distance_base);
         m_results.iter_CSQ = computeAverageIterations(h_iterations);
 
@@ -493,10 +467,8 @@ public:
                                               d_iterations.getData(),
                                               m_numPairs);
             cudaDeviceSynchronize();
-            end_timer = std::chrono::high_resolution_clock::now();
-            m_results.time_GJT
-                = std::chrono::duration<double>(end_timer - start_timer)
-                      .count();
+            end_timer          = std::chrono::high_resolution_clock::now();
+            m_results.time_GJT = std::chrono::duration<double>(end_timer - start_timer).count();
             m_results.acc_GJT  = compareResultsCJT(d_distance, h_distance_base);
             m_results.iter_GJT = computeAverageIterations(d_iterations);
 
@@ -509,10 +481,8 @@ public:
                                               d_iterations.getData(),
                                               m_numPairs);
             cudaDeviceSynchronize();
-            end_timer = std::chrono::high_resolution_clock::now();
-            m_results.time_GST
-                = std::chrono::duration<double>(end_timer - start_timer)
-                      .count();
+            end_timer          = std::chrono::high_resolution_clock::now();
+            m_results.time_GST = std::chrono::duration<double>(end_timer - start_timer).count();
             m_results.acc_GST  = compareResultsCJT(d_distance, h_distance_base);
             m_results.iter_GST = computeAverageIterations(d_iterations);
 
@@ -526,10 +496,8 @@ public:
                                               d_iterations.getData(),
                                               m_numPairs);
             cudaDeviceSynchronize();
-            end_timer = std::chrono::high_resolution_clock::now();
-            m_results.time_GJQ
-                = std::chrono::duration<double>(end_timer - start_timer)
-                      .count();
+            end_timer          = std::chrono::high_resolution_clock::now();
+            m_results.time_GJQ = std::chrono::duration<double>(end_timer - start_timer).count();
             m_results.acc_GJQ  = compareResultsCJT(d_distance, h_distance_base);
             m_results.iter_GJQ = computeAverageIterations(d_iterations);
 
@@ -543,10 +511,8 @@ public:
                                               d_iterations.getData(),
                                               m_numPairs);
             cudaDeviceSynchronize();
-            end_timer = std::chrono::high_resolution_clock::now();
-            m_results.time_GSQ
-                = std::chrono::duration<double>(end_timer - start_timer)
-                      .count();
+            end_timer          = std::chrono::high_resolution_clock::now();
+            m_results.time_GSQ = std::chrono::duration<double>(end_timer - start_timer).count();
             m_results.acc_GSQ  = compareResultsCJT(d_distance, h_distance_base);
             m_results.iter_GSQ = computeAverageIterations(d_iterations);
         }
@@ -595,7 +561,7 @@ public:
         }
     }
 
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief Set test parameters */
     void setTestParameters(uint numParticles = 100000,
                            uint numPairs     = 100000,
@@ -610,7 +576,7 @@ public:
         m_runGPUTests  = runGPUTests;
     }
 
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief Set random seed for reproducible tests */
     void setRandomSeed(unsigned int seed)
     {

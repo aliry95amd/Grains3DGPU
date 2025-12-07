@@ -5,18 +5,18 @@
 #include "Vector3.hh"
 #include "VectorMath.hh"
 
-// =============================================================================
+// =================================================================================================
 /** @brief Miscellaneous Matrix3 functions and operators as header-only.
-   
+
     Defining important matrix functions and operators here as static functions.
     It will increase the binary size, but the performance gain is much more
     appreciated.
 
     @author A.Yazdani - 2024 - Construction */
-// =============================================================================
+// =================================================================================================
 /** @name Matrix3 math functions and operators */
 //@{
-/** @brief Matrix absolute 
+/** @brief Matrix absolute
     @param m the matrix */
 template <typename T>
 __HOSTDEVICE__ static INLINE Matrix3<T> fabs(const Matrix3<T>& m) noexcept
@@ -33,7 +33,7 @@ __HOSTDEVICE__ static INLINE Matrix3<T> fabs(const Matrix3<T>& m) noexcept
                        fabs(b[ZZ])));
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 /** @brief Matrix absolute in-place
     @param m the matrix */
 template <typename T>
@@ -51,7 +51,7 @@ __HOSTDEVICE__ static INLINE void fabs(Matrix3<T>& m) noexcept
     b[ZZ]             = fabs(b[ZZ]);
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 /** @brief Matrix determinant
     @param m the matrix */
 template <typename T>
@@ -64,18 +64,17 @@ __HOSTDEVICE__ static INLINE T determinant(const Matrix3<T>& m) noexcept
     return (out0 + out1 + out2);
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 /** @brief Matrix transposition
     @param m the matrix */
 template <typename T>
 __HOSTDEVICE__ static INLINE Matrix3<T> transpose(const Matrix3<T>& m) noexcept
 {
     const T* __RESTRICT__ b = m.getBuffer();
-    return (Matrix3<
-            T>(b[XX], b[YX], b[ZX], b[XY], b[YY], b[ZY], b[XZ], b[YZ], b[ZZ]));
+    return (Matrix3<T>(b[XX], b[YX], b[ZX], b[XY], b[YY], b[ZY], b[XZ], b[YZ], b[ZZ]));
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 /** @brief Matrix transposition in-place
     @param m the matrix */
 template <typename T>
@@ -94,7 +93,7 @@ __HOSTDEVICE__ static INLINE void transpose(Matrix3<T>& m) noexcept
     b[ZY]   = temp[2];
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 /** @brief Matrix inverse
     @param m the matrix */
 template <typename T>
@@ -127,7 +126,7 @@ __HOSTDEVICE__ static INLINE Matrix3<T> inverse(const Matrix3<T>& m) noexcept
     return (Matrix3<T>(out));
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 /** @brief Matrix inverse in-place
     @param m the matrix */
 template <typename T>
@@ -160,13 +159,12 @@ __HOSTDEVICE__ static INLINE void inverse(Matrix3<T>& m) noexcept
     m.setValue(out);
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 /** @brief Matrix scale
     @param m the matrix
     @param v the vector */
 template <typename T>
-__HOSTDEVICE__ static INLINE Matrix3<T> scale(const Matrix3<T>& m,
-                                              const Vector3<T>& v) noexcept
+__HOSTDEVICE__ static INLINE Matrix3<T> scale(const Matrix3<T>& m, const Vector3<T>& v) noexcept
 {
     const T* __RESTRICT__ b1 = m.getBuffer();
     const T* __RESTRICT__ b2 = v.getBuffer();
@@ -181,13 +179,12 @@ __HOSTDEVICE__ static INLINE Matrix3<T> scale(const Matrix3<T>& m,
                       b1[ZZ] * b2[2]);
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 /** @brief Matrix scale in-place
     @param m the matrix
     @param v the vector */
 template <typename T>
-__HOSTDEVICE__ static INLINE void scale(Matrix3<T>&       m,
-                                        const Vector3<T>& v) noexcept
+__HOSTDEVICE__ static INLINE void scale(Matrix3<T>& m, const Vector3<T>& v) noexcept
 {
     T* __RESTRICT__       b1 = const_cast<T*>(m.getBuffer());
     const T* __RESTRICT__ b2 = v.getBuffer();
@@ -202,7 +199,7 @@ __HOSTDEVICE__ static INLINE void scale(Matrix3<T>&       m,
     b1[ZZ] *= b2[2];
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 /** @brief Matrix addition
     @param m1 first matrix
     @param m2 second matrix */
@@ -218,13 +215,12 @@ __HOSTDEVICE__ static INLINE Matrix3<T> operator+(const Matrix3<T>& m1,
     return (Matrix3<T>(out));
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 /** @brief Matrix addition in-place
     @param m1 first matrix
     @param m2 second matrix */
 template <typename T>
-__HOSTDEVICE__ static INLINE void operator+=(Matrix3<T>&       m1,
-                                             const Matrix3<T>& m2) noexcept
+__HOSTDEVICE__ static INLINE void operator+=(Matrix3<T>& m1, const Matrix3<T>& m2) noexcept
 {
     T* __RESTRICT__       b1 = const_cast<T*>(m1.getBuffer());
     const T* __RESTRICT__ b2 = m2.getBuffer();
@@ -232,7 +228,7 @@ __HOSTDEVICE__ static INLINE void operator+=(Matrix3<T>&       m1,
         b1[i] += b2[i];
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 /** @brief Matrix subtraction
     @param m1 first matrix
     @param m2 second matrix */
@@ -248,13 +244,12 @@ __HOSTDEVICE__ static INLINE Matrix3<T> operator-(const Matrix3<T>& m1,
     return (Matrix3<T>(out));
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 /** @brief Matrix subtraction in-place
     @param m1 first matrix
     @param m2 second matrix */
 template <typename T>
-__HOSTDEVICE__ static INLINE void operator-=(Matrix3<T>&       m1,
-                                             const Matrix3<T>& m2) noexcept
+__HOSTDEVICE__ static INLINE void operator-=(Matrix3<T>& m1, const Matrix3<T>& m2) noexcept
 {
     T* __RESTRICT__       b1 = const_cast<T*>(m1.getBuffer());
     const T* __RESTRICT__ b2 = m2.getBuffer();
@@ -262,13 +257,12 @@ __HOSTDEVICE__ static INLINE void operator-=(Matrix3<T>&       m1,
         b1[i] -= b2[i];
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 /** @brief Scalar-matrix product
     @param c the scalar
     @param m the matrix */
 template <typename T>
-__HOSTDEVICE__ static INLINE Matrix3<T> operator*(T                 c,
-                                                  const Matrix3<T>& m) noexcept
+__HOSTDEVICE__ static INLINE Matrix3<T> operator*(T c, const Matrix3<T>& m) noexcept
 {
     const T* __RESTRICT__ b = m.getBuffer();
     T __RESTRICT__        out[9];
@@ -277,7 +271,7 @@ __HOSTDEVICE__ static INLINE Matrix3<T> operator*(T                 c,
     return (Matrix3<T>(out));
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 /** @brief Scalar-matrix product in-place
     @param c the scalar
     @param m the matrix */
@@ -289,47 +283,42 @@ __HOSTDEVICE__ static INLINE void operator*=(Matrix3<T>& m, T c) noexcept
         b[i] *= c;
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 /** @brief Matrix-vector product
     @param m the matrix
     @param v the vector */
 template <typename T>
-__HOSTDEVICE__ static INLINE Vector3<T> operator*(const Matrix3<T>& m,
-                                                  const Vector3<T>& v) noexcept
+__HOSTDEVICE__ static INLINE Vector3<T> operator*(const Matrix3<T>& m, const Vector3<T>& v) noexcept
 {
     const T* __RESTRICT__ b1 = m.getBuffer();
     const T* __RESTRICT__ b2 = v.getBuffer();
     T __RESTRICT__        out[3];
     for(uint i = 0; i < 3; ++i)
-        out[i]
-            = b1[3 * i] * b2[0] + b1[3 * i + 1] * b2[1] + b1[3 * i + 2] * b2[2];
+        out[i] = b1[3 * i] * b2[0] + b1[3 * i + 1] * b2[1] + b1[3 * i + 2] * b2[2];
     return (Vector3<T>(out));
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 /** @brief Matrix-vector product in-place. Note that this modifies the vector.
     @param m the matrix
     @param v the vector */
 template <typename T>
-__HOSTDEVICE__ static INLINE void operator*=(const Matrix3<T>& m,
-                                             Vector3<T>&       v) noexcept
+__HOSTDEVICE__ static INLINE void operator*=(const Matrix3<T>& m, Vector3<T>& v) noexcept
 {
     const T* __RESTRICT__ b1 = m.getBuffer();
     T* __RESTRICT__       b2 = const_cast<T*>(v.getBuffer());
     T __RESTRICT__        out[3];
     for(uint i = 0; i < 3; ++i)
-        out[i]
-            = b1[3 * i] * b2[0] + b1[3 * i + 1] * b2[1] + b1[3 * i + 2] * b2[2];
+        out[i] = b1[3 * i] * b2[0] + b1[3 * i + 1] * b2[1] + b1[3 * i + 2] * b2[2];
     v.setValue(out);
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 /** @brief Vector-matrix product
     @param v the vector
     @param m the matrix */
 template <typename T>
-__HOSTDEVICE__ static INLINE Vector3<T> operator*(const Vector3<T>& v,
-                                                  const Matrix3<T>& m) noexcept
+__HOSTDEVICE__ static INLINE Vector3<T> operator*(const Vector3<T>& v, const Matrix3<T>& m) noexcept
 {
     const T* __RESTRICT__ b1 = v.getBuffer();
     const T* __RESTRICT__ b2 = m.getBuffer();
@@ -339,13 +328,12 @@ __HOSTDEVICE__ static INLINE Vector3<T> operator*(const Vector3<T>& v,
     return (Vector3<T>(out));
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 /** @brief Vector-matrix product in-place. Note that this modifies the vector.
     @param v the vector
     @param m the matrix */
 template <typename T>
-__HOSTDEVICE__ static INLINE void operator*=(Vector3<T>&       v,
-                                             const Matrix3<T>& m) noexcept
+__HOSTDEVICE__ static INLINE void operator*=(Vector3<T>& v, const Matrix3<T>& m) noexcept
 {
     T* __RESTRICT__       b1 = const_cast<T*>(v.getBuffer());
     T const* __RESTRICT__ b2 = m.getBuffer();
@@ -355,7 +343,7 @@ __HOSTDEVICE__ static INLINE void operator*=(Vector3<T>&       v,
     v.setValue(out);
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 /** @brief Matrix-matrix product
 @param m right matrix */
 template <typename T>
@@ -375,13 +363,12 @@ __HOSTDEVICE__ static INLINE Matrix3<T> operator*(const Matrix3<T>& m1,
                        b1[ZX] * b2[XZ] + b1[ZY] * b2[YZ] + b1[ZZ] * b2[ZZ]));
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 /** @brief Matrix-matrix product in-place
     @param m1 left matrix
     @param m2 right matrix */
 template <typename T>
-__HOSTDEVICE__ static INLINE void operator*=(Matrix3<T>&       m1,
-                                             const Matrix3<T>& m2) noexcept
+__HOSTDEVICE__ static INLINE void operator*=(Matrix3<T>& m1, const Matrix3<T>& m2) noexcept
 {
     T* __RESTRICT__       b1 = const_cast<T*>(m1.getBuffer());
     const T* __RESTRICT__ b2 = m2.getBuffer();
@@ -398,31 +385,22 @@ __HOSTDEVICE__ static INLINE void operator*=(Matrix3<T>&       m1,
     m1.setValue(out);
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 /** @brief Matrix sign flip
     @param m the matrix */
 template <typename T>
 __HOSTDEVICE__ static INLINE Matrix3<T> operator-(const Matrix3<T>& m) noexcept
 {
     const T* __RESTRICT__ b = m.getBuffer();
-    return (Matrix3<T>(-b[XX],
-                       -b[XY],
-                       -b[XZ],
-                       -b[YX],
-                       -b[YY],
-                       -b[YZ],
-                       -b[ZX],
-                       -b[ZY],
-                       -b[ZZ]));
+    return (Matrix3<T>(-b[XX], -b[XY], -b[XZ], -b[YX], -b[YY], -b[YZ], -b[ZX], -b[ZY], -b[ZZ]));
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 /** @brief Matrix equality comparison
     @param m1 first matrix
     @param m2 second matrix */
 template <typename T>
-__HOSTDEVICE__ static INLINE bool operator==(const Matrix3<T>& m1,
-                                             const Matrix3<T>& m2) noexcept
+__HOSTDEVICE__ static INLINE bool operator==(const Matrix3<T>& m1, const Matrix3<T>& m2) noexcept
 {
     const T* __RESTRICT__ b1 = m1.getBuffer();
     const T* __RESTRICT__ b2 = m2.getBuffer();
@@ -434,13 +412,12 @@ __HOSTDEVICE__ static INLINE bool operator==(const Matrix3<T>& m1,
     return true;
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 /** @brief Matrix inequality operator
     @param m1 first matrix
     @param m2 second matrix */
 template <typename T>
-__HOSTDEVICE__ static INLINE bool operator!=(const Matrix3<T>& m1,
-                                             const Matrix3<T>& m2) noexcept
+__HOSTDEVICE__ static INLINE bool operator!=(const Matrix3<T>& m1, const Matrix3<T>& m2) noexcept
 {
     const T* __RESTRICT__ b1 = m1.getBuffer();
     const T* __RESTRICT__ b2 = m2.getBuffer();
@@ -452,13 +429,12 @@ __HOSTDEVICE__ static INLINE bool operator!=(const Matrix3<T>& m1,
     return true;
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 /** @brief Matrix check for rotation
     @param m the matrix
     @param tol tolerance for numerical checks */
 template <typename T>
-__HOSTDEVICE__ static INLINE bool isRotation(const Matrix3<T>& m,
-                                             const T tol = EPS<T>) noexcept
+__HOSTDEVICE__ static INLINE bool isRotation(const Matrix3<T>& m, const T tol = EPS<T>) noexcept
 {
     // Check if determinant is approximately 1
     T det = determinant(m);

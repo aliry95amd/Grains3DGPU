@@ -13,7 +13,7 @@
 #include "LinkedCell.hh"
 #include "Transform3.hh"
 
-// =============================================================================
+// =================================================================================================
 /** @brief The class LinkedCell_Host.
 
     This class provides functionalities to manage linked cells for
@@ -23,7 +23,7 @@
     particles between cells accordingly.
 
     @author A.Yazdani - 2025 - Construction */
-// =============================================================================
+// =================================================================================================
 template <typename T>
 class LinkedCell_Host : public LinkedCell<T, MemType::HOST>
 {
@@ -52,7 +52,7 @@ private:
 public:
     /** @name Constructors */
     //@{
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief Constructor with parameters
         @param rb Rigid body buffer
         @param positions Positions buffer
@@ -60,19 +60,14 @@ public:
         @param linkedCellParameters Linked cell parameters
         @param nObstacles number of obstacles
         @param nParticles number of particles */
-    LinkedCell_Host(
-        const GrainsMemBuffer<RigidBody<T>*, MemType::HOST>* rb,
-        const GrainsMemBuffer<Vector3<T>, MemType::HOST>&    positions,
-        const GrainsMemBuffer<Quaternion<T>, MemType::HOST>& quaternions,
-        const LinkedCellParameters<T>& linkedCellParameters,
-        const uint                     nObstacles,
-        const uint                     nParticles)
-        : LinkedCell<T, MemType::HOST>(rb,
-                                       positions,
-                                       quaternions,
-                                       linkedCellParameters,
-                                       nObstacles,
-                                       nParticles)
+    LinkedCell_Host(const GrainsMemBuffer<RigidBody<T>*, MemType::HOST>* rb,
+                    const GrainsMemBuffer<Vector3<T>, MemType::HOST>&    positions,
+                    const GrainsMemBuffer<Quaternion<T>, MemType::HOST>& quaternions,
+                    const LinkedCellParameters<T>&                       linkedCellParameters,
+                    const uint                                           nObstacles,
+                    const uint                                           nParticles)
+        : LinkedCell<T, MemType::HOST>(
+              rb, positions, quaternions, linkedCellParameters, nObstacles, nParticles)
     {
         // Initialize vector of lists for each cell
         m_cellParticles.resize(m_numCells);
@@ -87,21 +82,21 @@ public:
         populateInitialCells();
     }
 
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief Destructor */
     ~LinkedCell_Host() = default;
     //@}
 
     /** @name Get methods */
     //@{
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief Gets all cell particle lists */
     const std::vector<std::list<uint>>& getCellParticles() const
     {
         return m_cellParticles;
     }
 
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief Gets particles in a specific cell
         @param cellID the cell ID */
     const std::list<uint>& getParticlesInCell(uint cellID) const
@@ -109,7 +104,7 @@ public:
         return m_cellParticles[cellID];
     }
 
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief Gets cell start IDs (unsupported on host variant) */
     const uint* getCellStartIDs() const override
     {
@@ -118,7 +113,7 @@ public:
         return nullptr;
     }
 
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief Gets particle IDs array (unsupported on host variant) */
     const uint* getParticleIDArray() const override
     {
@@ -127,8 +122,9 @@ public:
         return nullptr;
     }
 
-    // -------------------------------------------------------------------------
-    /** @brief Gets number of particles prefix sums (unsupported on host variant) */
+    // ---------------------------------------------------------------------------------------------
+    /** @brief Gets number of particles prefix sums (unsupported on host
+     * variant) */
     const uint* getNumParticlesPrefixSums() const override
     {
         GAbort("LinkedCell_Host::getNumParticlesPrefixSums is not supported in "
@@ -139,7 +135,7 @@ public:
 
     /** @name Methods */
     //@{
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief Populates initial cell assignments for all components */
     void populateInitialCells()
     {
@@ -151,7 +147,7 @@ public:
         }
     }
 
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief Adds a particle to a specific cell
         @param particleID the particle ID
         @param cellID the cell ID */
@@ -167,7 +163,7 @@ public:
         m_particleIteratorMap[particleID] = m_cellParticles[cellID].begin();
     }
 
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief Removes a particle from its current cell
         @param particleID the particle ID
         @param cellID the cell ID */
@@ -188,7 +184,7 @@ public:
         }
     }
 
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief Moves a particle from one cell to another
         @param particleID the particle ID
         @param oldCellID the old cell ID
@@ -199,7 +195,7 @@ public:
         addParticleToCell(particleID, newCellID);
     }
 
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief Handles cell grid resize by updating particle lists */
     void handleCellResize()
     {
@@ -217,7 +213,7 @@ public:
         }
     }
 
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief Updates the linked cells based on particle transformations */
     bool updateLinkedCells() override
     {
@@ -252,7 +248,7 @@ public:
         return true;
     }
 
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief Collects particle IDs in the candidate's cell and its neighbors.
         Appends IDs less than maxIndex into out.
         @param candidate candidate world-space position
@@ -262,7 +258,7 @@ public:
                                    uint               maxIndex,
                                    std::vector<uint>& out) const
     {
-        constexpr uint  NUM_NEIGHBOR_CELLS = 27; // Number of neighboring cells
+        constexpr uint  NUM_NEIGHBOR_CELLS = 27;  // Number of neighboring cells
         const Cells<T>* cells              = this->getLinkedCell()[0];
         const uint      candidateCellID    = cells->computeCellHash(candidate);
 
@@ -284,7 +280,8 @@ public:
                 if(obstacleCell == candidateCellID)
                 {
                     out.push_back(obstacleIndex);
-                    break; // Found intersection, no need to check other cells for this obstacle
+                    break;  // Found intersection, no need to check other cells
+                            // for this obstacle
                 }
             }
         }
@@ -299,9 +296,8 @@ public:
         }
 
         // Neighbor cells for particles
-        const uint* allNeighbors = this->getCellNeighborsList();
-        const uint* neighborCells
-            = &allNeighbors[NUM_NEIGHBOR_CELLS * candidateCellID];
+        const uint* allNeighbors  = this->getCellNeighborsList();
+        const uint* neighborCells = &allNeighbors[NUM_NEIGHBOR_CELLS * candidateCellID];
         for(uint n = 0; n < NUM_NEIGHBOR_CELLS; ++n)
         {
             const uint c = neighborCells[n];

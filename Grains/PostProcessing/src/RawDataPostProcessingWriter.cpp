@@ -1,14 +1,14 @@
 #include "RawDataPostProcessingWriter.hh"
 #include "GrainsUtils.hh"
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Default constructor
 template <typename T>
 RawDataPostProcessingWriter<T>::RawDataPostProcessingWriter()
 {
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Constructor with XML node
 template <typename T>
 
@@ -22,23 +22,22 @@ RawDataPostProcessingWriter<T>::RawDataPostProcessingWriter(DOMNode* dn)
     GoutWI(12, "Output file root name =", m_rootName);
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Destructor
 template <typename T>
 RawDataPostProcessingWriter<T>::~RawDataPostProcessingWriter()
 {
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Gets the post-processing writer type
 template <typename T>
-PostProcessingWriterType
-    RawDataPostProcessingWriter<T>::getPostProcessingWriterType() const
+PostProcessingWriterType RawDataPostProcessingWriter<T>::getPostProcessingWriterType() const
 {
     return (RAW);
 }
 
-// ----------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
 // Removes post-processing files already in the directory
 template <typename T>
 void RawDataPostProcessingWriter<T>::clearPostProcessingFiles() const
@@ -57,7 +56,7 @@ void RawDataPostProcessingWriter<T>::clearPostProcessingFiles() const
     PostProcessingWriter<T>::clearPostProcessingFiles(directory, patternsReg);
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Initializes the post-processing writer
 template <typename T>
 void RawDataPostProcessingWriter<T>::PostProcessing_start()
@@ -69,20 +68,19 @@ void RawDataPostProcessingWriter<T>::PostProcessing_start()
     prepareResultFiles(mode);
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Writes data -- Particles come first, followed by obtacles
 template <typename T>
-void RawDataPostProcessingWriter<T>::PostProcessing(
-    const GrainsMemBuffer<RigidBody<T>*>&       rb,
-    const std::unique_ptr<ComponentManager<T>>& cm,
-    const T                                     currentTime)
+void RawDataPostProcessingWriter<T>::PostProcessing(const GrainsMemBuffer<RigidBody<T>*>&       rb,
+                                                    const std::unique_ptr<ComponentManager<T>>& cm,
+                                                    const T currentTime)
 {
     // Components
-    uint numObstacles                          = cm->getNumberOfObstacles();
-    uint numParticles                          = cm->getNumberOfParticles();
-    uint numComponents                         = numObstacles + numParticles;
-    const GrainsMemBuffer<Vector3<T>>&    pos  = cm->getPosition();
-    const GrainsMemBuffer<Quaternion<T>>& quat = cm->getQuaternion();
+    uint                                  numObstacles  = cm->getNumberOfObstacles();
+    uint                                  numParticles  = cm->getNumberOfParticles();
+    uint                                  numComponents = numObstacles + numParticles;
+    const GrainsMemBuffer<Vector3<T>>&    pos           = cm->getPosition();
+    const GrainsMemBuffer<Quaternion<T>>& quat          = cm->getQuaternion();
 
     GrainsMemBuffer<Transform3<T>> tr(numComponents);
     for(uint i = 0; i < numComponents; ++i)
@@ -115,36 +113,21 @@ void RawDataPostProcessingWriter<T>::PostProcessing(
     {
         // Center of mass position
         centre = tr[i].getOrigin();
-        m_gc_coordinates_x << " "
-                           << realToString(ios::scientific,
-                                           m_ndigits,
-                                           centre[X]);
-        m_gc_coordinates_y << " "
-                           << realToString(ios::scientific,
-                                           m_ndigits,
-                                           centre[Y]);
-        m_gc_coordinates_z << " "
-                           << realToString(ios::scientific,
-                                           m_ndigits,
-                                           centre[Z]);
+        m_gc_coordinates_x << " " << realToString(ios::scientific, m_ndigits, centre[X]);
+        m_gc_coordinates_y << " " << realToString(ios::scientific, m_ndigits, centre[Y]);
+        m_gc_coordinates_z << " " << realToString(ios::scientific, m_ndigits, centre[Z]);
 
         // Translational velocity
         velT = kin[i].getTranslationalComponent();
-        m_translational_velocity_x
-            << " " << realToString(ios::scientific, m_ndigits, velT[X]);
-        m_translational_velocity_y
-            << " " << realToString(ios::scientific, m_ndigits, velT[Y]);
-        m_translational_velocity_z
-            << " " << realToString(ios::scientific, m_ndigits, velT[Z]);
+        m_translational_velocity_x << " " << realToString(ios::scientific, m_ndigits, velT[X]);
+        m_translational_velocity_y << " " << realToString(ios::scientific, m_ndigits, velT[Y]);
+        m_translational_velocity_z << " " << realToString(ios::scientific, m_ndigits, velT[Z]);
 
         // Angular velocity
         velR = kin[i].getAngularComponent();
-        m_angular_velocity_x
-            << " " << realToString(ios::scientific, m_ndigits, velR[X]);
-        m_angular_velocity_y
-            << " " << realToString(ios::scientific, m_ndigits, velR[Y]);
-        m_angular_velocity_z
-            << " " << realToString(ios::scientific, m_ndigits, velR[Z]);
+        m_angular_velocity_x << " " << realToString(ios::scientific, m_ndigits, velR[X]);
+        m_angular_velocity_y << " " << realToString(ios::scientific, m_ndigits, velR[Y]);
+        m_angular_velocity_z << " " << realToString(ios::scientific, m_ndigits, velR[Z]);
 
         // // Number of contacts
         // m_coordination_number << " " << pp->getCoordinationNumber();
@@ -159,36 +142,21 @@ void RawDataPostProcessingWriter<T>::PostProcessing(
     {
         // Center of mass position
         centre = tr[i].getOrigin();
-        m_gc_coordinates_x << " "
-                           << realToString(ios::scientific,
-                                           m_ndigits,
-                                           centre[X]);
-        m_gc_coordinates_y << " "
-                           << realToString(ios::scientific,
-                                           m_ndigits,
-                                           centre[Y]);
-        m_gc_coordinates_z << " "
-                           << realToString(ios::scientific,
-                                           m_ndigits,
-                                           centre[Z]);
+        m_gc_coordinates_x << " " << realToString(ios::scientific, m_ndigits, centre[X]);
+        m_gc_coordinates_y << " " << realToString(ios::scientific, m_ndigits, centre[Y]);
+        m_gc_coordinates_z << " " << realToString(ios::scientific, m_ndigits, centre[Z]);
 
         // Translational velocity
         velT = kin[i].getTranslationalComponent();
-        m_translational_velocity_x
-            << " " << realToString(ios::scientific, m_ndigits, velT[X]);
-        m_translational_velocity_y
-            << " " << realToString(ios::scientific, m_ndigits, velT[Y]);
-        m_translational_velocity_z
-            << " " << realToString(ios::scientific, m_ndigits, velT[Z]);
+        m_translational_velocity_x << " " << realToString(ios::scientific, m_ndigits, velT[X]);
+        m_translational_velocity_y << " " << realToString(ios::scientific, m_ndigits, velT[Y]);
+        m_translational_velocity_z << " " << realToString(ios::scientific, m_ndigits, velT[Z]);
 
         // Angular velocity
         velR = kin[i].getAngularComponent();
-        m_angular_velocity_x
-            << " " << realToString(ios::scientific, m_ndigits, velR[X]);
-        m_angular_velocity_y
-            << " " << realToString(ios::scientific, m_ndigits, velR[Y]);
-        m_angular_velocity_z
-            << " " << realToString(ios::scientific, m_ndigits, velR[Z]);
+        m_angular_velocity_x << " " << realToString(ios::scientific, m_ndigits, velR[X]);
+        m_angular_velocity_y << " " << realToString(ios::scientific, m_ndigits, velR[Y]);
+        m_angular_velocity_z << " " << realToString(ios::scientific, m_ndigits, velR[Z]);
 
         // // Number of contacts
         // m_coordination_number << " " << pp->getCoordinationNumber();
@@ -213,7 +181,7 @@ void RawDataPostProcessingWriter<T>::PostProcessing(
     m_particle_class.close();
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Finalizes writing data
 template <typename T>
 void RawDataPostProcessingWriter<T>::PostProcessing_end()
@@ -231,7 +199,7 @@ void RawDataPostProcessingWriter<T>::PostProcessing_end()
     m_particle_class.close();
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Creates output files and open streams
 template <typename T>
 void RawDataPostProcessingWriter<T>::prepareResultFiles(ios_base::openmode mode)
@@ -263,7 +231,7 @@ void RawDataPostProcessingWriter<T>::prepareResultFiles(ios_base::openmode mode)
     m_coordination_number.open(file.c_str(), mode);
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Explicit instantiation
 template class RawDataPostProcessingWriter<float>;
 template class RawDataPostProcessingWriter<double>;

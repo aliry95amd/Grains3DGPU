@@ -8,7 +8,7 @@
 #include "Sphere.hh"
 #include "Superquadric.hh"
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Construct a convex with an XML node as an input parameter
 template <typename T>
 Convex<T>* ConvexFactory<T>::create(DOMNode* root)
@@ -32,10 +32,10 @@ Convex<T>* ConvexFactory<T>::create(DOMNode* root)
     else
         GAbort("Invalid convex type:", type.c_str(), "Aborting Grains!");
 
-    return (convex); // returns the host-side pointer to convex object
+    return (convex);  // returns the host-side pointer to convex object
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Construct a convex with a type and a input stream as input parameters
 template <typename T>
 Convex<T>* ConvexFactory<T>::create(string& type, istream& fileIn)
@@ -59,7 +59,7 @@ Convex<T>* ConvexFactory<T>::create(string& type, istream& fileIn)
     return (convex);
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Explicit instantiation
 template class ConvexFactory<float>;
 template class ConvexFactory<double>;

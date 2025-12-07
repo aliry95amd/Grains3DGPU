@@ -14,7 +14,7 @@
 #include "ParticleSorter_Kernels.hh"
 #include "Torce.hh"
 
-// =============================================================================
+// =================================================================================================
 /** @brief The class ParticleSorter.
 
     This class sorts particles based on their Morton codes (Z-order curve)
@@ -23,7 +23,7 @@
     provides methods to reorder particle data arrays accordingly.
 
     @author A.Yazdani - 2025 - Construction */
-// =============================================================================
+// =================================================================================================
 template <typename T, MemType M>
 class ParticleSorter
 {
@@ -50,11 +50,11 @@ protected:
 public:
     /** @name Constructors */
     //@{
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief Default constructor */
     ParticleSorter() = default;
 
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief Constructor with parameters
         @param numObstacles total number of obstacles
         @param numParticles total number of particles */
@@ -64,11 +64,10 @@ public:
         const auto& CD       = GP::m_collisionDetection;
         const auto& LCParams = CD.linkedCellParameters;
         // Create Cells object with Morton ordering
-        CellsFactory<T, CellOrdering::MORTON>::template create<M>(
-            LCParams.minCorner,
-            LCParams.maxCorner,
-            LCParams.cellSizeFactor,
-            m_cells);
+        CellsFactory<T, CellOrdering::MORTON>::template create<M>(LCParams.minCorner,
+                                                                  LCParams.maxCorner,
+                                                                  LCParams.cellSizeFactor,
+                                                                  m_cells);
 
         // Allocate buffers
         m_mortonCodes.reserve(numParticles);
@@ -88,7 +87,7 @@ public:
         }
     }
 
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief Destructor */
     ~ParticleSorter()
     {
@@ -125,7 +124,7 @@ public:
 
     /** @name Methods */
     //@{
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief Sorts particle data arrays based on Morton codes
         @param position particle positions (input/output)
         @param velocity particle velocities (input/output)
@@ -151,8 +150,7 @@ public:
             const Vector3<T>* pos         = position.getData();
 
             for(uint i = 0; i < numParticles; ++i)
-                mortonCodes[i]
-                    = m_cells[0]->computeCellHash(pos[numObstacles + i]);
+                mortonCodes[i] = m_cells[0]->computeCellHash(pos[numObstacles + i]);
 
             // Step 2: Initialize indices [0, 1, 2, ..., numParticles-1]
             uint* indices = m_sortedIndices.getData();
@@ -160,11 +158,9 @@ public:
                 indices[i] = i;
 
             // Step 3: Sort indices based on Morton codes
-            std::sort(indices,
-                      indices + numParticles,
-                      [mortonCodes](uint a, uint b) {
-                          return mortonCodes[a] < mortonCodes[b];
-                      });
+            std::sort(indices, indices + numParticles, [mortonCodes](uint a, uint b) {
+                return mortonCodes[a] < mortonCodes[b];
+            });
 
             // Step 4: Gather particle arrays according to sorted indices
             Vector3<T>*    tempPos    = m_tempPosition.getData();
@@ -174,12 +170,12 @@ public:
             uint*          tempRBID   = m_tempRigidBodyId.getData();
             uint*          tempCompID = m_tempComponentId.getData();
 
-            const Vector3<T>*    srcPos   = position.getData() + numObstacles;
-            const Kinematics<T>* srcVel   = velocity.getData() + numObstacles;
-            const Quaternion<T>* srcQuat  = quaternion.getData() + numObstacles;
-            const Torce<T>*      srcTorce = torce.getData() + numObstacles;
-            const uint*          srcRBID = rigidBodyId.getData() + numObstacles;
-            const uint* srcCompID        = componentId.getData() + numObstacles;
+            const Vector3<T>*    srcPos    = position.getData() + numObstacles;
+            const Kinematics<T>* srcVel    = velocity.getData() + numObstacles;
+            const Quaternion<T>* srcQuat   = quaternion.getData() + numObstacles;
+            const Torce<T>*      srcTorce  = torce.getData() + numObstacles;
+            const uint*          srcRBID   = rigidBodyId.getData() + numObstacles;
+            const uint*          srcCompID = componentId.getData() + numObstacles;
 
             for(uint i = 0; i < numParticles; ++i)
             {
@@ -215,17 +211,14 @@ public:
             using GP = GrainsParameters<T>;
             // Compute grid dimensions
             uint numBlocks, threadsPerBlock;
-            computeOptimalThreadsAndBlocks(numParticles,
-                                           GP::m_GPU,
-                                           threadsPerBlock,
-                                           numBlocks);
+            computeOptimalThreadsAndBlocks(numParticles, GP::m_GPU, threadsPerBlock, numBlocks);
 
             // Step 1: Compute Morton codes for particles only (skip obstacles)
-            computeMortonCodes_Kernel<<<numBlocks, threadsPerBlock>>>(
-                m_cells.getData(),
-                position.getData() + numObstacles,
-                m_mortonCodes.getData(),
-                numParticles);
+            computeMortonCodes_Kernel<<<numBlocks, threadsPerBlock>>>(m_cells.getData(),
+                                                                      position.getData()
+                                                                          + numObstacles,
+                                                                      m_mortonCodes.getData(),
+                                                                      numParticles);
             cudaDeviceSynchronize();
 
             // Step 2: Initialize indices [0, 1, 2, ..., numParticles-1]
@@ -234,9 +227,7 @@ public:
 
             // Step 3: Sort indices based on Morton codes using thrust
             thrust::device_ptr<uint64_t> mortonPtr(m_mortonCodes.getData());
-            thrust::sort_by_key(mortonPtr,
-                                mortonPtr + numParticles,
-                                indicesPtr);
+            thrust::sort_by_key(mortonPtr, mortonPtr + numParticles, indicesPtr);
 
             // Step 4: Gather particle arrays according to sorted indices using
             // multiple streams (skip obstacles)

@@ -4,20 +4,20 @@
 #include "Convex.hh"
 #include "ReaderXML.hh"
 
-// =============================================================================
+// =================================================================================================
 /** @brief The class Cylinder.
 
     Convex with the shape of a cylinder.
 
     @author A.Yazdani - 2024 - Construction */
-// =============================================================================
+// =================================================================================================
 template <typename T>
 class Cylinder : public Convex<T>
 {
 protected:
     /** @name Parameters */
     //@{
-    T m_radius; /**< cylinder radius */
+    T m_radius;     /**< cylinder radius */
     T m_halfHeight; /**< cylinder half height */
     //@}
 
@@ -70,14 +70,14 @@ public:
     __HOSTDEVICE__
     T computeVolume() const final;
 
-    /** @brief Computes the inertia tensor and the inverse of the inertia 
+    /** @brief Computes the inertia tensor and the inverse of the inertia
         tensor
         @param inertia inertia tensor
         @param inertia_1 inverse of the inertia tensor */
     __HOSTDEVICE__
     void computeInertia(T (&inertia)[6], T (&inertia_1)[6]) const final;
 
-    /** @brief Computes and returns the circumscribed radius of the 
+    /** @brief Computes and returns the circumscribed radius of the
         cylinder */
     __HOSTDEVICE__
     T computeCircumscribedRadius() const final;
@@ -106,26 +106,25 @@ public:
     __HOST__
     void writeConvex(std::ostream& fileOut) const final;
 
-    /** @brief Returns the number of points to write the cylinder in a 
+    /** @brief Returns the number of points to write the cylinder in a
         Paraview format */
     __HOST__
     int numberOfPoints_PARAVIEW() const final;
 
-    /** @brief Returns the number of elementary polytopes to write the 
+    /** @brief Returns the number of elementary polytopes to write the
         cylinder in a Paraview format */
     __HOST__
     int numberOfCells_PARAVIEW() const final;
 
-    /** @brief Returns a list of points describing the cylinder in a 
+    /** @brief Returns a list of points describing the cylinder in a
         Paraview format
         @param transform geometric transformation
         @param translation additional center of mass translation */
     __HOST__
-    std::list<Vector3<T>>
-        writePoints_PARAVIEW(const Transform3<T>& transform,
-                             Vector3<T> const*    translation) const final;
+    std::list<Vector3<T>> writePoints_PARAVIEW(const Transform3<T>& transform,
+                                               Vector3<T> const*    translation) const final;
 
-    /** @brief Writes the connectivity of the cylinder in a Paraview 
+    /** @brief Writes the connectivity of the cylinder in a Paraview
         format
         @param connectivity connectivity of Paraview polytopes
         @param offsets connectivity offsets

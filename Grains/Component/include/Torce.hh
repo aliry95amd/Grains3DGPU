@@ -3,14 +3,14 @@
 
 #include "Vector3.hh"
 
-// =============================================================================
+// =================================================================================================
 /** @brief The class Torce.
 
-    A torque and a force (Torque + Force = Torce) imposed on the center of mass 
+    A torque and a force (Torque + Force = Torce) imposed on the center of mass
     of a component.
 
     @author A.Yazdani - 2024 - Construction */
-// =============================================================================
+// =================================================================================================
 template <typename T>
 class Torce
 {
@@ -18,7 +18,7 @@ private:
     /**@name Parameter */
     //@{
     Vector3<T> m_torque; /**< torques exerted at the center of mass */
-    Vector3<T> m_force; /**< force exerted on the component */
+    Vector3<T> m_force;  /**< force exerted on the component */
     //@}
 
 public:
@@ -79,7 +79,7 @@ public:
     __HOSTDEVICE__
     void addForce(const Vector3<T>& f);
 
-    /** @brief Adds a force to the torce with accounting for the additional 
+    /** @brief Adds a force to the torce with accounting for the additional
         torque
         @param f added force
         @param p point of application */

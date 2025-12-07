@@ -3,45 +3,41 @@
 #include "Quaternion.hh"
 #include "VectorMath.hh"
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Default constructor
 template <typename T>
 ComponentManagerCPU<T>::ComponentManagerCPU() = default;
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Constructor with the number of particles, and obstacles
 template <typename T>
 ComponentManagerCPU<T>::ComponentManagerCPU(
-    GrainsMemBuffer<RigidBody<T>*, MemType::HOST>* rigidBody,
-    uint                                           nObstacles,
-    uint                                           nParticles)
+    GrainsMemBuffer<RigidBody<T>*, MemType::HOST>* rigidBody, uint nObstacles, uint nParticles)
     : ComponentManager<T, MemType::HOST>(rigidBody, nObstacles, nParticles)
 {
     this->initialize();
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Destructor
 template <typename T>
 ComponentManagerCPU<T>::~ComponentManagerCPU() = default;
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Updates neighbor list if needed
 template <typename T>
 void ComponentManagerCPU<T>::updateNeighborList()
 {
     if(m_neighborList->needsUpdate())
     {
-        m_neighborList->updateNeighborList(m_position,
-                                           m_nObstacles,
-                                           m_nParticles);
+        m_neighborList->updateNeighborList(m_position, m_nObstacles, m_nParticles);
 
         // Resize pair-dependent buffers to match actual number of pairs
         this->resizePairBuffers(m_neighborList->getSize());
     }
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Computes relative transformations
 template <typename T>
 void ComponentManagerCPU<T>::computeRelativeTransformations()
@@ -58,7 +54,7 @@ void ComponentManagerCPU<T>::computeRelativeTransformations()
     }
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Detects collisions
 template <typename T>
 void ComponentManagerCPU<T>::detectCollisionsComponents()
@@ -75,7 +71,7 @@ void ComponentManagerCPU<T>::detectCollisionsComponents()
     }
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Transforms contact information to world frame
 template <typename T>
 void ComponentManagerCPU<T>::transformContactInfoToWorld()
@@ -93,7 +89,7 @@ void ComponentManagerCPU<T>::transformContactInfoToWorld()
     }
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Detects collision between all components
 template <typename T>
 void ComponentManagerCPU<T>::detectCollisions()
@@ -111,7 +107,7 @@ void ComponentManagerCPU<T>::detectCollisions()
     transformContactInfoToWorld();
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Computes contact forces
 template <typename T>
 void ComponentManagerCPU<T>::computeContactForces(
@@ -131,7 +127,7 @@ void ComponentManagerCPU<T>::computeContactForces(
     }
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Adds external forces such as gravity
 template <typename T>
 void ComponentManagerCPU<T>::addExternalForces()
@@ -147,7 +143,7 @@ void ComponentManagerCPU<T>::addExternalForces()
     }
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Updates the position and velocities of particles
 template <typename T>
 void ComponentManagerCPU<T>::moveParticles(
@@ -166,7 +162,7 @@ void ComponentManagerCPU<T>::moveParticles(
     }
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Explicit instantiation
 template class ComponentManagerCPU<float>;
 template class ComponentManagerCPU<double>;

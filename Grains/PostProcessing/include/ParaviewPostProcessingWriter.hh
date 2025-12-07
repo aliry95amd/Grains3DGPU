@@ -5,13 +5,13 @@
 #include "PostProcessingWriter.hh"
 #include "Transform3.hh"
 
-// =============================================================================
+// =================================================================================================
 /** @brief The class ParaviewPostProcessingWriter.
 
     Writes data in files for post-processing with Paraview.
 
     @author A.Yazdani - 2024 - Construction */
-// =============================================================================
+// =================================================================================================
 template <typename T>
 class ParaviewPostProcessingWriter : public PostProcessingWriter<T>
 {
@@ -73,7 +73,7 @@ public:
 
     void PostProcessing(const GrainsMemBuffer<RigidBody<T>*>&       rb,
                         const std::unique_ptr<ComponentManager<T>>& cm,
-                        const T currentTime) final;
+                        const T                                     currentTime) final;
 
     /** @brief Finalizes writing data */
     void PostProcessing_end() final;

@@ -15,14 +15,14 @@ enum ConvexType
     RECTANGLE
 };
 
-// =============================================================================
+// =================================================================================================
 /** @brief The class Convex.
 
     Convex bodies - The base class for various particle shapes.
 
-    @author A.Yazdani - 2023 - Construction 
+    @author A.Yazdani - 2023 - Construction
     @author A.Yazdani - 2024 - Modificiation */
-// =============================================================================
+// =================================================================================================
 template <typename T>
 class Convex
 {
@@ -66,17 +66,17 @@ public:
     __HOSTDEVICE__
     virtual void computeInertia(T (&inertia)[6], T (&inertia_1)[6]) const = 0;
 
-    /** @brief Computes and returns the circumscribed radius of the 
+    /** @brief Computes and returns the circumscribed radius of the
         reference convex shape */
     __HOSTDEVICE__
     virtual T computeCircumscribedRadius() const = 0;
 
-    /** @brief Returns the half-length of the bounding box fitted to the 
+    /** @brief Returns the half-length of the bounding box fitted to the
         convex without considering the transformation */
     __HOSTDEVICE__
     virtual Vector3<T> computeBoundingBox() const = 0;
 
-    /** @brief Convex support function, returns the support point P, i.e. 
+    /** @brief Convex support function, returns the support point P, i.e.
         the point on the surface of the convex shape that satisfies max(P.v)
         @param v direction vector */
     __HOSTDEVICE__
@@ -100,12 +100,12 @@ public:
     __HOST__
     virtual void writeConvex(std::ostream& fileOut) const = 0;
 
-    /** @brief Returns the number of points to write the convex in a 
+    /** @brief Returns the number of points to write the convex in a
         Paraview format */
     __HOST__
     virtual int numberOfPoints_PARAVIEW() const = 0;
 
-    /** @brief Returns the number of elementary polytopes to write the 
+    /** @brief Returns the number of elementary polytopes to write the
         convex in a Paraview format */
     __HOST__
     virtual int numberOfCells_PARAVIEW() const = 0;
@@ -124,9 +124,8 @@ public:
         @param transform geometric transformation
         @param translation additional center of mass translation */
     __HOST__
-    virtual std::list<Vector3<T>>
-        writePoints_PARAVIEW(const Transform3<T>& transform,
-                             Vector3<T> const*    translation) const
+    virtual std::list<Vector3<T>> writePoints_PARAVIEW(const Transform3<T>& transform,
+                                                       Vector3<T> const*    translation) const
         = 0;
 
     /** @brief Writes the connectivity of the convex in a Paraview format
@@ -139,8 +138,8 @@ public:
     virtual void writeConnection_PARAVIEW(std::list<uint>& connectivity,
                                           std::list<uint>& offsets,
                                           std::list<uint>& cellstype,
-                                          uint& firstpoint_globalnumber,
-                                          uint& last_offset) const
+                                          uint&            firstpoint_globalnumber,
+                                          uint&            last_offset) const
         = 0;
     //@}
 };
@@ -151,8 +150,7 @@ public:
     @param fileOut output stream
     @param convex convex object */
 template <typename T>
-__HOST__ std::ostream& operator<<(std::ostream&    fileOut,
-                                  const Convex<T>& convex);
+__HOST__ std::ostream& operator<<(std::ostream& fileOut, const Convex<T>& convex);
 
 /** @brief Input operator for Convex: delegates to virtual readConvex
     @param fileIn input stream

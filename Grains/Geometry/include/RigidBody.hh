@@ -7,7 +7,7 @@
 #include "ReaderXML.hh"
 #include "Torce.hh"
 
-// =============================================================================
+// =================================================================================================
 /** @brief The class RigidBody.
 
     Rigid bodies comprising their shapes and physical attributes. The precision
@@ -17,7 +17,7 @@
     this template; (T, U) = (double, double), (double, float), (float, float).
 
     @author A.Yazdani - 2024 - Construction */
-// =============================================================================
+// =================================================================================================
 template <typename T>
 class RigidBody
 {
@@ -45,10 +45,10 @@ public:
     __HOSTDEVICE__
     RigidBody();
 
-    /** @brief Constructor with a convex, crust thickness, material, and 
+    /** @brief Constructor with a convex, crust thickness, material, and
         density
         @param convex convex
-        @param ct crust thickness of the rigid body 
+        @param ct crust thickness of the rigid body
         @param density density
         @param material material ID */
     __HOSTDEVICE__
@@ -136,8 +136,7 @@ public:
         @param omega angular velocity in the body-fixed coordinate system
         @param t imposed torce in the body-fixed coordinate system */
     __HOSTDEVICE__
-    Kinematics<T> computeMomentum(const Vector3<T>& omega,
-                                  const Torce<T>&   t) const;
+    Kinematics<T> computeMomentum(const Vector3<T>& omega, const Torce<T>& t) const;
 
     /** @brief Computes the acceleration of the rigid body as a kinematics
         object after imposing a torce (Torque + Force). The assumption is that
@@ -146,9 +145,8 @@ public:
         @param t imposed torce in the space-fixed coordinate system
         @param q quaternion of rotation from space to body coordinate systems */
     __HOSTDEVICE__
-    Kinematics<T> computeMomentum(const Vector3<T>&    omega,
-                                  const Torce<T>&      t,
-                                  const Quaternion<T>& q) const;
+    Kinematics<T>
+        computeMomentum(const Vector3<T>& omega, const Torce<T>& t, const Quaternion<T>& q) const;
     //@}
 };
 

@@ -9,20 +9,20 @@
 #include "QuaternionMath.hh"
 #include "RigidBody.hh"
 
-// =============================================================================
+// =================================================================================================
 /** @brief The class LinkedCell_Kernels.
 
     This header file contains the declarations of the various kernels used for
     updating the linked cells in the simulation.
 
     @author A.Yazdani - 2025 - Construction */
-// =============================================================================
+// =================================================================================================
 /** @name LinkedCell_Kernels: External Kernels */
 //@{
 /** @brief Extracts radii from rigid bodies into an array
     @param rb array of rigid body pointers
     @param startID starting index in the rigid body array
-    @param endID ending index in the rigid body array  
+    @param endID ending index in the rigid body array
     @param radii output array for storing individual radii */
 template <typename T>
 __GLOBAL__ void computeMaxRadius_Device(const RigidBody<T>* const* rb,
@@ -40,14 +40,13 @@ __GLOBAL__ void computeMaxRadius_Device(const RigidBody<T>* const* rb,
     radii[tID] = rb[idx]->getCircumscribedRadius();
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 /** @brief Resizes the cells
     @param cells pointer to the Cells object
     @param cellSize new size of the cell
     @param numCells number of cells */
 template <typename T>
-__GLOBAL__ void
-    resizeCells_Device(Cells<T>** cells, const T cellSize, uint* numCells)
+__GLOBAL__ void resizeCells_Device(Cells<T>** cells, const T cellSize, uint* numCells)
 {
     uint tID = blockIdx.x * blockDim.x + threadIdx.x;
     if(tID > 0)
@@ -57,7 +56,7 @@ __GLOBAL__ void
     *numCells = cells[0]->getNumCells();
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 /** @brief Gets the neighbor cells array
     @param cells pointer to the Cells object
     @param numCells number of cells
@@ -65,7 +64,7 @@ __GLOBAL__ void
 template <typename T>
 __GLOBAL__ void generateNeighborCells_Device(const Cells<T>* const* cells,
                                              const uint             numCells,
-                                             uint* neighborCells)
+                                             uint*                  neighborCells)
 {
     uint tID = blockIdx.x * blockDim.x + threadIdx.x;
     if(tID >= numCells)
@@ -75,7 +74,7 @@ __GLOBAL__ void generateNeighborCells_Device(const Cells<T>* const* cells,
     cells[0]->generateNeighborCells(neighborCells, tID, tID + 1);
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 /** @brief Computes the cell hash for a given point
     @param cells pointer to the Cells object
     @param positions buffer of positions
@@ -99,7 +98,7 @@ __GLOBAL__ void computeHash_Device(const Cells<T>* const* cells,
     atomicAdd(&numParticlesPerCell[c], 1);
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 /** @brief Links obstacles to cells using support function and 1-ring expansion
     @param rb pointer to the rigid bodies (obstacles)
     @param positions world-space centers of obstacles
@@ -111,13 +110,13 @@ __GLOBAL__ void computeHash_Device(const Cells<T>* const* cells,
     @param obstacleCellID buffer for cell IDs that obstacles occupy */
 template <typename T>
 static __GLOBAL__ void linkObstacles_Device(const RigidBody<T>* const* rb,
-                                            const Vector3<T>*      positions,
-                                            const Quaternion<T>*   quaternions,
-                                            const Cells<T>* const* cells,
-                                            const uint             nObstacles,
-                                            const uint maxPerObstacle,
-                                            uint2*     obstacleID,
-                                            uint*      obstacleCellID)
+                                            const Vector3<T>*          positions,
+                                            const Quaternion<T>*       quaternions,
+                                            const Cells<T>* const*     cells,
+                                            const uint                 nObstacles,
+                                            const uint                 maxPerObstacle,
+                                            uint2*                     obstacleID,
+                                            uint*                      obstacleCellID)
 {
     const uint obstacleIdx = blockIdx.x;
     if(obstacleIdx >= nObstacles)
@@ -132,8 +131,7 @@ static __GLOBAL__ void linkObstacles_Device(const RigidBody<T>* const* rb,
         // Transform world direction to local coordinates using inverse rotation
         const Quaternion<T>& q              = quaternions[obstacleIdx];
         const Vector3<T>     localDirection = q << worldDirection;
-        Vector3<T>           supPt
-            = rb[obstacleIdx]->getConvex()->support(localDirection);
+        Vector3<T>           supPt          = rb[obstacleIdx]->getConvex()->support(localDirection);
         transform(q, positions[obstacleIdx], supPt);
         return supPt;
     };
@@ -170,8 +168,7 @@ static __GLOBAL__ void linkObstacles_Device(const RigidBody<T>* const* rb,
         {
             for(int z = minZ; z <= maxZ; ++z)
             {
-                uint cellHash = cells[0]->computeCellHash(
-                    make_uint3((uint)x, (uint)y, (uint)z));
+                uint cellHash = cells[0]->computeCellHash(make_uint3((uint)x, (uint)y, (uint)z));
                 obstacleCellID[offset + cellCount] = cellHash;
                 ++cellCount;
             }
@@ -183,20 +180,19 @@ static __GLOBAL__ void linkObstacles_Device(const RigidBody<T>* const* rb,
     obstacleID[obstacleIdx].y = cellCount;
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 /** @brief Finds the start of each cell
     The cellStart array will contain the start index for each cell hash,
     @param particleHash Array of particle hashes
     @param numParticles Number of particles
     @param cellStart Output array to store start indices for each cell hash */
-static __GLOBAL__ void computeCellStart_Kernel(const uint* particleHash,
-                                               uint        numParticles,
-                                               uint*       cellStart)
+static __GLOBAL__ void
+    computeCellStart_Kernel(const uint* particleHash, uint numParticles, uint* cellStart)
 {
     using namespace cooperative_groups;
     // Handle to thread block group
     thread_block           cta = this_thread_block();
-    extern __shared__ uint sharedHash[]; // blockSize + 1 elements
+    extern __shared__ uint sharedHash[];  // blockSize + 1 elements
     uint                   tid = blockIdx.x * blockDim.x + threadIdx.x;
 
     uint hash;
@@ -225,7 +221,7 @@ static __GLOBAL__ void computeCellStart_Kernel(const uint* particleHash,
     }
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 /** @brief Writes particle IDs into cell-based arrays using atomic operations
     @param particleIDs array of particle IDs
     @param cellIDs array of cell IDs for each particle

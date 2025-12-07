@@ -3,18 +3,17 @@
 #include "VectorMath.hh"
 #include <ctime>
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Default constructor
 template <typename T>
 __HOST__ InsertionWindow<T>::InsertionWindow()
 {
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Constructor with XML node and the type of the seed
 template <typename T>
-__HOST__ InsertionWindow<T>::InsertionWindow(DOMNode*            dn,
-                                             RandomGeneratorSeed seed)
+__HOST__ InsertionWindow<T>::InsertionWindow(DOMNode* dn, RandomGeneratorSeed seed)
 {
     GoutWI(12, "Reading insertion window ...");
 
@@ -77,14 +76,14 @@ __HOST__ InsertionWindow<T>::InsertionWindow(DOMNode*            dn,
         GAbort("Insertion window type is not supported");
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Destructor
 template <typename T>
 __HOST__ InsertionWindow<T>::~InsertionWindow()
 {
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Generates a random number with uniform distribution in window
 template <typename T>
 __HOST__ Vector3<T> InsertionWindow<T>::generateRandomPoint()
@@ -92,10 +91,9 @@ __HOST__ Vector3<T> InsertionWindow<T>::generateRandomPoint()
     Vector3<T> out;
     if(m_type == BOXWINDOW)
     {
-        out = Vector3<T>(
-            m_v1[X] + m_dist(m_randGenerator) * (m_v2[X] - m_v1[X]),
-            m_v1[Y] + m_dist(m_randGenerator) * (m_v2[Y] - m_v1[Y]),
-            m_v1[Z] + m_dist(m_randGenerator) * (m_v2[Z] - m_v1[Z]));
+        out = Vector3<T>(m_v1[X] + m_dist(m_randGenerator) * (m_v2[X] - m_v1[X]),
+                         m_v1[Y] + m_dist(m_randGenerator) * (m_v2[Y] - m_v1[Y]),
+                         m_v1[Z] + m_dist(m_randGenerator) * (m_v2[Z] - m_v1[Z]));
     }
     else if(m_type == ANNULUSWINDOW)
     {
@@ -103,12 +101,12 @@ __HOST__ Vector3<T> InsertionWindow<T>::generateRandomPoint()
         Vector3<T> axis = m_v2 - m_v1;
         T          len  = sqrt(axis * axis);
         GAssert(len > HIGHEPS<T>, "Annulus insertion window has zero height!");
-        Vector3<T> k = (T(1) / len) * axis; // unit axis
+        Vector3<T> k = (T(1) / len) * axis;  // unit axis
 
         // Build an orthonormal basis (u, v) spanning the disk plane
-        Vector3<T> ref  = (fabs(k[Z]) < T(0.999)) ? Vector3<T>(T(0), T(0), T(1))
-                                                  : Vector3<T>(T(0), T(1), T(0));
-        Vector3<T> uvec = k ^ ref; // perpendicular to axis
+        Vector3<T> ref
+            = (fabs(k[Z]) < T(0.999)) ? Vector3<T>(T(0), T(0), T(1)) : Vector3<T>(T(0), T(1), T(0));
+        Vector3<T> uvec = k ^ ref;  // perpendicular to axis
         T          un   = sqrt(uvec * uvec);
         if(un < HIGHEPS<T>)
         {
@@ -116,9 +114,7 @@ __HOST__ Vector3<T> InsertionWindow<T>::generateRandomPoint()
             ref  = Vector3<T>(T(1), T(0), T(0));
             uvec = k ^ ref;
             un   = sqrt(uvec * uvec);
-            GAssert(
-                un > HIGHEPS<T>,
-                "Failed to construct orthonormal basis for annulus window!");
+            GAssert(un > HIGHEPS<T>, "Failed to construct orthonormal basis for annulus window!");
         }
         uvec            = (T(1) / un) * uvec;
         Vector3<T> vvec = k ^ uvec;
@@ -145,7 +141,7 @@ __HOST__ Vector3<T> InsertionWindow<T>::generateRandomPoint()
     return (out);
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Explicit instantiation
 template class InsertionWindow<float>;
 template class InsertionWindow<double>;

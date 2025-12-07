@@ -4,7 +4,7 @@
 #include "GrainsGPU.hh"
 #include "GrainsTestDev.hh"
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Adds the path to the dtd files using the GRAINS_HOME variable to
 // a copy of the input file. Returns the name of this copy.
 // TODO: CLEAN
@@ -16,9 +16,8 @@ string GrainsFactory<T>::init(string const& filename)
     string str_grainshome(grainshome);
 
     // Creates the copy file
-    string tline, buffer,
-        header1 = "<?xml version=\"1.0\" encoding=\"iso-8859-1\"?>",
-        header2 = "<!DOCTYPE Grains3D SYSTEM \"", option, dtd_file;
+    string tline, buffer, header1 = "<?xml version=\"1.0\" encoding=\"iso-8859-1\"?>",
+                          header2 = "<!DOCTYPE Grains3D SYSTEM \"", option, dtd_file;
     list<string> inputFile_linelist;
     int          dimension = 0;
 
@@ -80,8 +79,7 @@ string GrainsFactory<T>::init(string const& filename)
 
     fileOUT << header1 << endl;
     fileOUT << header2 << endl;
-    for(list<string>::iterator il = inputFile_linelist.begin();
-        il != inputFile_linelist.end();
+    for(list<string>::iterator il = inputFile_linelist.begin(); il != inputFile_linelist.end();
         il++)
         fileOUT << *il << endl;
 
@@ -91,7 +89,7 @@ string GrainsFactory<T>::init(string const& filename)
     return (filename + ".tmp");
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Creates and returns a standard Grains application
 template <typename T>
 Grains<T>* GrainsFactory<T>::create(DOMElement* root)
@@ -117,7 +115,7 @@ Grains<T>* GrainsFactory<T>::create(DOMElement* root)
     return (grains);
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Explicit instantiation
 template class GrainsFactory<float>;
 template class GrainsFactory<double>;

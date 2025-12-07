@@ -1,12 +1,12 @@
 #include "GrainsParameters.hh"
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Static variables
 /* Spatial */
 template <typename T>
-Vector3<T> GrainsParameters<T>::m_origin = zeroVector3T;
+Vector3<T> GrainsParameters<T>::m_origin = Vector3<T>(0, 0, 0);
 template <typename T>
-Vector3<T> GrainsParameters<T>::m_maxCoordinate = zeroVector3T;
+Vector3<T> GrainsParameters<T>::m_maxCoordinate = Vector3<T>(0, 0, 0);
 template <typename T>
 bool GrainsParameters<T>::m_isPeriodic = false;
 
@@ -28,7 +28,7 @@ uint GrainsParameters<T>::m_numObstacles = 0;
 
 /* Physical */
 template <typename T>
-Vector3<T> GrainsParameters<T>::m_gravity = zeroVector3T;
+Vector3<T> GrainsParameters<T>::m_gravity = Vector3<T>(0, 0, 0);
 
 /* Material */
 template <typename T>
@@ -51,7 +51,7 @@ template <typename T>
 typename GrainsParameters<T>::CollisionDetectionParameters
     GrainsParameters<T>::m_collisionDetection;
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Explicit instantiation
 template class GrainsParameters<float>;
 template class GrainsParameters<double>;

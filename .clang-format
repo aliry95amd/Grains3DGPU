@@ -3,7 +3,7 @@ BasedOnStyle: WebKit
 TabWidth:     4
 IndentWidth:  4
 UseTab:       Never
-ColumnLimit:  80
+ColumnLimit:  100
 
 Language: Cpp
 
@@ -16,7 +16,6 @@ AlignConsecutiveAssignments: true
 AlignConsecutiveDeclarations: true
 AlignEscapedNewlines: Left
 AlignOperands:   true
-AlignTrailingComments: false
 AllowAllArgumentsOnNextLine: false
 AllowAllConstructorInitializersOnNextLine: true
 AllowAllParametersOfDeclarationOnNextLine: true
@@ -57,8 +56,6 @@ BraceWrapping:
 #BreakBeforeTernaryOperators: true
 #BreakConstructorInitializersBeforeComma: true
 #BreakStringLiterals: true
-
-CommentPragmas:  '^ IWYU pragma:'
 #CompactNamespaces: false
 ConstructorInitializerAllOnOneLineOrOnePerLine: false
 ConstructorInitializerIndentWidth: 4
@@ -94,7 +91,6 @@ SpaceBeforeAssignmentOperators: true
 SpaceBeforeParens: Never
 SpaceInEmptyBlock: false
 SpaceInEmptyParentheses: false
-SpacesBeforeTrailingComments: 1
 SpacesInAngles:  false
 SpacesInContainerLiterals: true
 SpacesInCStyleCastParentheses: false
@@ -106,7 +102,10 @@ SpacesInSquareBrackets: false
 #SortUsingDeclarations: true
 SortIncludes: true
 
-# Comments are for developers, they should arrange them
-ReflowComments: false
+# Comments
+ReflowComments: true
+AlignTrailingComments: true
+SpacesBeforeTrailingComments: 2
+CommentPragmas:  '^ IWYU pragma:'
 
 #IncludeBlocks: Preserve

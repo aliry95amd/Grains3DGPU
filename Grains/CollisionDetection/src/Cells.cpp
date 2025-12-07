@@ -2,33 +2,32 @@
 #include "Transform3.hh"
 #include "VectorMath.hh"
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Default constructor
 template <typename T, CellOrdering OrderingScheme>
 __HOSTDEVICE__ Cells<T, OrderingScheme>::Cells()
 {
 }
 
-// -----------------------------------------------------------------------------
-// Constructor with min and max points along with extent of each cell
+// -------------------------------------------------------------------------------------------------
+// Constructor with min and max points along with the extent of each cell.
 template <typename T, CellOrdering OrderingScheme>
-__HOSTDEVICE__ Cells<T, OrderingScheme>::Cells(const Vector3<T>& min,
-                                               const Vector3<T>& max,
-                                               T                 cellSize)
+__HOSTDEVICE__
+    Cells<T, OrderingScheme>::Cells(const Vector3<T>& min, const Vector3<T>& max, T cellSize)
     : m_minCorner(min)
     , m_maxCorner(max)
 {
     resize(cellSize);
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Destructor
 template <typename T, CellOrdering OrderingScheme>
 __HOSTDEVICE__ Cells<T, OrderingScheme>::~Cells()
 {
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Gets the min corner point of the linked cell
 template <typename T, CellOrdering OrderingScheme>
 __HOSTDEVICE__ const Vector3<T>& Cells<T, OrderingScheme>::getMinCorner() const
@@ -36,7 +35,7 @@ __HOSTDEVICE__ const Vector3<T>& Cells<T, OrderingScheme>::getMinCorner() const
     return (m_minCorner);
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Gets the max corner point of the linked cell
 template <typename T, CellOrdering OrderingScheme>
 __HOSTDEVICE__ const Vector3<T>& Cells<T, OrderingScheme>::getMaxCorner() const
@@ -44,16 +43,15 @@ __HOSTDEVICE__ const Vector3<T>& Cells<T, OrderingScheme>::getMaxCorner() const
     return (m_maxCorner);
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Gets the min corner point of the linked cell
 template <typename T, CellOrdering OrderingScheme>
-__HOSTDEVICE__ const Vector3<T>&
-                     Cells<T, OrderingScheme>::getMinCornerLinkedCell() const
+__HOSTDEVICE__ const Vector3<T>& Cells<T, OrderingScheme>::getMinCornerLinkedCell() const
 {
     return (m_minCornerLinkedCell);
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Gets the extent of each cell
 template <typename T, CellOrdering OrderingScheme>
 __HOSTDEVICE__ T Cells<T, OrderingScheme>::getCellSize() const
@@ -61,7 +59,7 @@ __HOSTDEVICE__ T Cells<T, OrderingScheme>::getCellSize() const
     return (m_cellSize);
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Gets the number of cells along each direction and total
 template <typename T, CellOrdering OrderingScheme>
 __HOSTDEVICE__ uint4 Cells<T, OrderingScheme>::getNumCellsPerDirection() const
@@ -69,7 +67,7 @@ __HOSTDEVICE__ uint4 Cells<T, OrderingScheme>::getNumCellsPerDirection() const
     return (m_numCells);
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Gets the number of cells
 template <typename T, CellOrdering OrderingScheme>
 __HOSTDEVICE__ uint Cells<T, OrderingScheme>::getNumCells() const
@@ -77,7 +75,7 @@ __HOSTDEVICE__ uint Cells<T, OrderingScheme>::getNumCells() const
     return (m_numCells.w);
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Gets the required size for neighbor cells
 template <typename T, CellOrdering OrderingScheme>
 __HOSTDEVICE__ uint Cells<T, OrderingScheme>::getSizeOfNeighborCells() const
@@ -85,7 +83,7 @@ __HOSTDEVICE__ uint Cells<T, OrderingScheme>::getSizeOfNeighborCells() const
     return (27 * m_numCells.w);
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Resizes the linked cells
 template <typename T, CellOrdering OrderingScheme>
 __HOSTDEVICE__ void Cells<T, OrderingScheme>::resize(const T cellSize)
@@ -111,8 +109,7 @@ __HOSTDEVICE__ void Cells<T, OrderingScheme>::resize(const T cellSize)
            || m_numCells.z > MAX_MORTON_DIM)
         {
             // Scale down to fit Morton code constraints
-            T scale = max({T(m_numCells.x), T(m_numCells.y), T(m_numCells.z)})
-                      / T(MAX_MORTON_DIM);
+            T scale = max({T(m_numCells.x), T(m_numCells.y), T(m_numCells.z)}) / T(MAX_MORTON_DIM);
             m_cellSize *= scale;
             m_cellSize_inv = T(1) / m_cellSize;
             m_numCells.x   = max(1u, uint(ceil(DX * m_cellSize_inv)));
@@ -124,15 +121,12 @@ __HOSTDEVICE__ void Cells<T, OrderingScheme>::resize(const T cellSize)
     m_numCells.w = m_numCells.x * m_numCells.y * m_numCells.z;
 
     // Center the domain within the cell grid
-    m_minCornerLinkedCell[X]
-        = m_minCorner[X] - (m_numCells.x * m_cellSize - DX) * T(0.5);
-    m_minCornerLinkedCell[Y]
-        = m_minCorner[Y] - (m_numCells.y * m_cellSize - DY) * T(0.5);
-    m_minCornerLinkedCell[Z]
-        = m_minCorner[Z] - (m_numCells.z * m_cellSize - DZ) * T(0.5);
+    m_minCornerLinkedCell[X] = m_minCorner[X] - (m_numCells.x * m_cellSize - DX) * T(0.5);
+    m_minCornerLinkedCell[Y] = m_minCorner[Y] - (m_numCells.y * m_cellSize - DY) * T(0.5);
+    m_minCornerLinkedCell[Z] = m_minCorner[Z] - (m_numCells.z * m_cellSize - DZ) * T(0.5);
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Generates neighbor list for cells with ordering-specific implementation
 // TODO: We can also improve this so each thread can take more than one cell,
 // but that would only be useful for cases where this is a bottleneck.
@@ -141,8 +135,8 @@ __HOSTDEVICE__ void Cells<T, OrderingScheme>::resize(const T cellSize)
 // number of neighbors for each cell, and then use that to allocate the neighbor
 // list. This would be more efficient in terms of memory usage.
 template <typename T, CellOrdering OrderingScheme>
-__HOSTDEVICE__ void Cells<T, OrderingScheme>::generateNeighborCells(
-    uint* neighborCells, uint start, uint end) const
+__HOSTDEVICE__ void
+    Cells<T, OrderingScheme>::generateNeighborCells(uint* neighborCells, uint start, uint end) const
 {
     if(end == 0)
         end = m_numCells.w;
@@ -182,7 +176,7 @@ __HOSTDEVICE__ void Cells<T, OrderingScheme>::generateNeighborCells(
     // clang-format on
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Checks if a cell Id is in range
 template <typename T, CellOrdering OrderingScheme>
 __HOSTDEVICE__ bool Cells<T, OrderingScheme>::isValid(const uint3& id) const
@@ -190,11 +184,11 @@ __HOSTDEVICE__ bool Cells<T, OrderingScheme>::isValid(const uint3& id) const
     return (id.x < m_numCells.x && id.y < m_numCells.y && id.z < m_numCells.z);
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Returns the 3d Id of the cell which the point belongs to
 template <typename T, CellOrdering OrderingScheme>
-__HOSTDEVICE__ uint3 Cells<T, OrderingScheme>::computeCellID(
-    const Vector3<T>& p, bool checkIfValid) const
+__HOSTDEVICE__ uint3 Cells<T, OrderingScheme>::computeCellID(const Vector3<T>& p,
+                                                             bool              checkIfValid) const
 {
     const T* __RESTRICT__ pt    = p.getBuffer();
     const T* __RESTRICT__ minPt = m_minCornerLinkedCell.getBuffer();
@@ -215,68 +209,66 @@ __HOSTDEVICE__ uint3 Cells<T, OrderingScheme>::computeCellID(
     return (cellId);
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Returns the 3d Id of the cell given its hash (ordering-specific)
 template <typename T, CellOrdering OrderingScheme>
-__HOSTDEVICE__ uint3
-    Cells<T, OrderingScheme>::computeCellID(const uint cellHash) const
+__HOSTDEVICE__ uint3 Cells<T, OrderingScheme>::computeCellID(const uint cellHash) const
 {
     if constexpr(OrderingScheme == CellOrdering::MORTON)
     {
         return decodeMortonCode(cellHash);
     }
-    else // LINEAR ordering
+    else  // LINEAR ordering
     {
         return decodeLinearHash(cellHash);
     }
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Returns the cell hash value of a given point
 template <typename T, CellOrdering OrderingScheme>
-__HOSTDEVICE__ uint
-    Cells<T, OrderingScheme>::computeCellHash(const Vector3<T>& p) const
+__HOSTDEVICE__ uint Cells<T, OrderingScheme>::computeCellHash(const Vector3<T>& p) const
 {
     return (computeCellHash(computeCellID(p)));
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Returns the cell hash value from the 3d Id of the cell (ordering-specific)
 template <typename T, CellOrdering OrderingScheme>
-__HOSTDEVICE__ uint
-    Cells<T, OrderingScheme>::computeCellHash(const uint3& cellID) const
+__HOSTDEVICE__ uint Cells<T, OrderingScheme>::computeCellHash(const uint3& cellID) const
 {
     if constexpr(OrderingScheme == CellOrdering::MORTON)
     {
         return computeMortonCode(cellID.x, cellID.y, cellID.z);
     }
-    else // LINEAR ordering
+    else  // LINEAR ordering
     {
         return computeLinearHash(cellID.x, cellID.y, cellID.z);
     }
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Returns the cell hash value from the Id along each axis (ordering-specific)
 template <typename T, CellOrdering OrderingScheme>
-__HOSTDEVICE__ uint Cells<T, OrderingScheme>::computeCellHash(
-    const uint i, const uint j, const uint k) const
+__HOSTDEVICE__ uint Cells<T, OrderingScheme>::computeCellHash(const uint i,
+                                                              const uint j,
+                                                              const uint k) const
 {
     if constexpr(OrderingScheme == CellOrdering::MORTON)
     {
         return computeMortonCode(i, j, k);
     }
-    else // LINEAR ordering
+    else  // LINEAR ordering
     {
         return computeLinearHash(i, j, k);
     }
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Returns dense linear index from point
 template <typename T, CellOrdering OrderingScheme>
-__HOSTDEVICE__ uint Cells<T, OrderingScheme>::computeDenseIndex(
-    const Vector3<T>& p, bool checkIfValid) const
+__HOSTDEVICE__ uint Cells<T, OrderingScheme>::computeDenseIndex(const Vector3<T>& p,
+                                                                bool checkIfValid) const
 {
     const uint3 id = computeCellID(p, checkIfValid);
     if(!isValid(id))
@@ -284,51 +276,45 @@ __HOSTDEVICE__ uint Cells<T, OrderingScheme>::computeDenseIndex(
     return computeLinearHash(id.x, id.y, id.z);
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Returns dense linear index from 3D cell id
 template <typename T, CellOrdering OrderingScheme>
-__HOSTDEVICE__ uint
-    Cells<T, OrderingScheme>::computeDenseIndex(const uint3& cellId) const
+__HOSTDEVICE__ uint Cells<T, OrderingScheme>::computeDenseIndex(const uint3& cellId) const
 {
     if(!isValid(cellId))
         return UINT_MAX;
     return computeLinearHash(cellId.x, cellId.y, cellId.z);
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Returns dense linear index from i,j,k
 template <typename T, CellOrdering OrderingScheme>
-__HOSTDEVICE__ uint Cells<T, OrderingScheme>::computeDenseIndex(uint i,
-                                                                uint j,
-                                                                uint k) const
+__HOSTDEVICE__ uint Cells<T, OrderingScheme>::computeDenseIndex(uint i, uint j, uint k) const
 {
     if(!(i < m_numCells.x && j < m_numCells.y && k < m_numCells.z))
         return UINT_MAX;
     return computeLinearHash(i, j, k);
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Returns Morton key from dense linear index
 template <typename T, CellOrdering OrderingScheme>
-__HOSTDEVICE__ uint
-    Cells<T, OrderingScheme>::mortonKeyFromLinearIndex(uint linearIndex) const
+__HOSTDEVICE__ uint Cells<T, OrderingScheme>::mortonKeyFromLinearIndex(uint linearIndex) const
 {
     // Decode linear to (x,y,z), then compute Morton code
     const uint3 id = decodeLinearHash(linearIndex);
     return computeMortonCode(id.x, id.y, id.z);
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Computes linear hash for 3D coordinates
 template <typename T, CellOrdering OrderingScheme>
-__HOSTDEVICE__ uint Cells<T, OrderingScheme>::computeLinearHash(uint x,
-                                                                uint y,
-                                                                uint z) const
+__HOSTDEVICE__ uint Cells<T, OrderingScheme>::computeLinearHash(uint x, uint y, uint z) const
 {
     return ((z * m_numCells.y + y) * m_numCells.x + x);
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Decodes linear hash to 3D coordinates
 template <typename T, CellOrdering OrderingScheme>
 __HOSTDEVICE__ uint3 Cells<T, OrderingScheme>::decodeLinearHash(uint hash) const
@@ -339,7 +325,7 @@ __HOSTDEVICE__ uint3 Cells<T, OrderingScheme>::decodeLinearHash(uint hash) const
     return uint3{x, y, z};
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Expands a 10-bit integer into 30 bits by inserting 2 zeros after each bit
 template <typename T, CellOrdering OrderingScheme>
 __HOSTDEVICE__ uint Cells<T, OrderingScheme>::expandBits(uint v) const
@@ -351,7 +337,7 @@ __HOSTDEVICE__ uint Cells<T, OrderingScheme>::expandBits(uint v) const
     return v;
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Compresses a 30-bit Morton-encoded value back to 10 bits
 template <typename T, CellOrdering OrderingScheme>
 __HOSTDEVICE__ uint Cells<T, OrderingScheme>::compactBits(uint v) const
@@ -364,12 +350,10 @@ __HOSTDEVICE__ uint Cells<T, OrderingScheme>::compactBits(uint v) const
     return v;
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Computes Morton code for 3D coordinates
 template <typename T, CellOrdering OrderingScheme>
-__HOSTDEVICE__ uint Cells<T, OrderingScheme>::computeMortonCode(uint x,
-                                                                uint y,
-                                                                uint z) const
+__HOSTDEVICE__ uint Cells<T, OrderingScheme>::computeMortonCode(uint x, uint y, uint z) const
 {
     // Ensure coordinates are within 10-bit range (0-1023)
     x = min(x, 1023u);
@@ -379,7 +363,7 @@ __HOSTDEVICE__ uint Cells<T, OrderingScheme>::computeMortonCode(uint x,
     return expandBits(x) | (expandBits(y) << 1) | (expandBits(z) << 2);
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Decodes Morton code to 3D coordinates
 template <typename T, CellOrdering OrderingScheme>
 __HOSTDEVICE__ uint3 Cells<T, OrderingScheme>::decodeMortonCode(uint code) const
@@ -391,7 +375,7 @@ __HOSTDEVICE__ uint3 Cells<T, OrderingScheme>::decodeMortonCode(uint code) const
     return result;
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Explicit instantiation for both ordering schemes
 template class Cells<float, CellOrdering::LINEAR>;
 template class Cells<double, CellOrdering::LINEAR>;

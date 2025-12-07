@@ -22,12 +22,12 @@ int main()
         {
             Gout("\nTest Begins:");
             Gout(std::string(80, '='));
-            performanceTest.setTestParameters(numParticles, // numParticles
-                                              2 * numParticles, // numPairs
+            performanceTest.setTestParameters(numParticles,      // numParticles
+                                              2 * numParticles,  // numPairs
                                               shapeType.first,
                                               256,
                                               true);
-            performanceTest.setRandomSeed(42); // For reproducible results
+            performanceTest.setRandomSeed(42);  // For reproducible results
             performanceTest.run();
         }
     }

@@ -8,28 +8,27 @@
 #include "LinkedCell_Host.hh"
 #include "LinkedCell_SortBased.hh"
 
-// =============================================================================
+// =================================================================================================
 /** @brief The class LinkedCellFactory.
 
-	Creates the linked cell structure for the simulation.
+    Creates the linked cell structure for the simulation.
 
     @author A.YAZDANI - 2025 - Construction */
-// =============================================================================
+// =================================================================================================
 template <typename T, MemType M>
 class LinkedCellFactory
 {
-    static_assert(
-        M == MemType::HOST || M == MemType::DEVICE,
-        "LinkedCellFactory only supports MemType::HOST or MemType::DEVICE");
+    static_assert(M == MemType::HOST || M == MemType::DEVICE,
+                  "LinkedCellFactory only supports MemType::HOST or MemType::DEVICE");
 
 private:
     /** @name Constructors & Destructor */
     //@{
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief Default constructor (forbidden) */
     LinkedCellFactory() = default;
 
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief Destructor (forbidden) */
     ~LinkedCellFactory() = default;
     //@}
@@ -37,7 +36,7 @@ private:
 public:
     /**@name Methods */
     //@{
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief Creates and returns a buffer of LinkedCell objects
         @param rb Rigid body buffer
         @param positions Positions buffer
@@ -49,10 +48,10 @@ public:
     static void create(const GrainsMemBuffer<RigidBody<T>*, M>* rb,
                        const GrainsMemBuffer<Vector3<T>, M>&    positions,
                        const GrainsMemBuffer<Quaternion<T>, M>& quaternions,
-                       const LinkedCellParameters<T>& linkedCellParameters,
-                       const uint                     nObstacles,
-                       const uint                     nParticles,
-                       LinkedCell<T, M>*&             LC)
+                       const LinkedCellParameters<T>&           linkedCellParameters,
+                       const uint                               nObstacles,
+                       const uint                               nParticles,
+                       LinkedCell<T, M>*&                       LC)
     {
         auto type = linkedCellParameters.type;
         // Create the linked cell object

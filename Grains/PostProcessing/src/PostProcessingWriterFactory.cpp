@@ -3,7 +3,7 @@
 #include "ParaviewPostProcessingWriter.hh"
 #include "RawDataPostProcessingWriter.hh"
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Creates a post-processing writer from an XML node
 template <typename T>
 PostProcessingWriter<T>* PostProcessingWriterFactory<T>::create(DOMNode* nPPW)
@@ -21,7 +21,7 @@ PostProcessingWriter<T>* PostProcessingWriterFactory<T>::create(DOMNode* nPPW)
     return (ppw);
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Explicit instantiation
 template class PostProcessingWriterFactory<float>;
 template class PostProcessingWriterFactory<double>;

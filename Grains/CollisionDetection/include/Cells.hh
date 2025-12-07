@@ -14,22 +14,22 @@ enum class CellOrdering
     MORTON = 1
 };
 
-// =============================================================================
+// =================================================================================================
 /** @brief The class Cells.
 
-    The broad-phase detection is done through Cells class. It limits the number 
-    of potential collisions for collision to the neighboring components. 
-    Neighboring components are those who belong to adjacent cells given a 
+    The broad-phase detection is done through Cells class. It limits the number
+    of potential collisions for collision to the neighboring components.
+    Neighboring components are those who belong to adjacent cells given a
     uniform Cartesian grid for cells.
-    
+
     The cell ID ordering can be specified via template parameter:
     - LINEAR: Traditional linear indexing (z * ny + y) * nx + x
     - MORTON: Z-order curve for better spatial locality and cache efficiency
 
-    @author A.Yazdani - 2024 - Construction 
+    @author A.Yazdani - 2024 - Construction
     @author A.Yazdani - 2025 - Modification for NeighborList
     @author A.Yazdani - 2025 - Morton code implementation */
-// =============================================================================
+// =================================================================================================
 template <typename T, CellOrdering OrderingScheme = CellOrdering::LINEAR>
 class Cells
 {
@@ -116,9 +116,7 @@ public:
         @param start starting index for neighbor cells
         @param end ending index for neighbor cells */
     __HOSTDEVICE__
-    void generateNeighborCells(uint* neighborCells,
-                               uint  start = 0,
-                               uint  end   = 0) const;
+    void generateNeighborCells(uint* neighborCells, uint start = 0, uint end = 0) const;
 
     /** @brief Checks if a cell Id is in range
         @param id 3D Id */
@@ -141,12 +139,14 @@ public:
     __HOSTDEVICE__
     uint computeCellHash(const Vector3<T>& p) const;
 
-    /** @brief Returns the cell hash from the 3d Id of the cell (using Morton code)
+    /** @brief Returns the cell hash from the 3d Id of the cell (using Morton
+       code)
         @param cellId 3d cell Id */
     __HOSTDEVICE__
     uint computeCellHash(const uint3& cellId) const;
 
-    /** @brief Returns the cell hash from the 3d Id of the cell (using Morton code)
+    /** @brief Returns the cell hash from the 3d Id of the cell (using Morton
+       code)
         @param i position of the cell in the x-direction
         @param j position of the cell in the y-direction
         @param k position of the cell in the z-direction */
@@ -158,8 +158,7 @@ public:
         @param p point
         @param checkIfValid whether to assert on invalid cell */
     __HOSTDEVICE__
-    uint computeDenseIndex(const Vector3<T>& p,
-                           bool              checkIfValid = false) const;
+    uint computeDenseIndex(const Vector3<T>& p, bool checkIfValid = false) const;
 
     /** @brief Returns dense linear index [0..numCells) from a 3D cell id.
         Returns UINT_MAX when out of bounds. */
@@ -182,9 +181,9 @@ private:
     /** @name Linear Hash Helper Functions */
     //@{
     /** @brief Computes linear hash for 3D coordinates
-        @param x x-coordinate 
-        @param y y-coordinate 
-        @param z z-coordinate 
+        @param x x-coordinate
+        @param y y-coordinate
+        @param z z-coordinate
         @return Linear hash code */
     __HOSTDEVICE__
     uint computeLinearHash(uint x, uint y, uint z) const;
@@ -198,7 +197,8 @@ private:
 
     /** @name Morton Code Helper Functions */
     //@{
-    /** @brief Expands a 10-bit integer into 30 bits by inserting 2 zeros after each bit
+    /** @brief Expands a 10-bit integer into 30 bits by inserting 2 zeros after
+       each bit
         @param v 10-bit integer value
         @return 30-bit expanded value */
     __HOSTDEVICE__
@@ -212,7 +212,7 @@ private:
 
     /** @brief Computes Morton code for 3D coordinates
         @param x x-coordinate (max 1024)
-        @param y y-coordinate (max 1024) 
+        @param y y-coordinate (max 1024)
         @param z z-coordinate (max 1024)
         @return Morton code */
     __HOSTDEVICE__
@@ -226,9 +226,9 @@ private:
     //@}
 };
 
-// =============================================================================
+// =================================================================================================
 /** @brief Convenience type aliases for different cell ordering schemes */
-// =============================================================================
+// =================================================================================================
 template <typename T>
 using CellsLinear = Cells<T, CellOrdering::LINEAR>;
 

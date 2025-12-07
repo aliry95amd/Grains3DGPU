@@ -5,13 +5,13 @@
 #include <fstream>
 #include <iostream>
 
-// =============================================================================
+// =================================================================================================
 /** @brief The class RawPostProcessingWriter.
 
     Writes particle data in raw format for post-processing.
 
     @author A.Yazdani - 2024 - Construction */
-// =============================================================================
+// =================================================================================================
 template <typename T>
 class RawDataPostProcessingWriter : public PostProcessingWriter<T>
 {
@@ -56,7 +56,7 @@ public:
     RawDataPostProcessingWriter();
 
     /** @brief Constructor with XML node
-		@param dn XML node */
+        @param dn XML node */
 
     RawDataPostProcessingWriter(DOMNode* dn);
 
@@ -88,7 +88,7 @@ public:
 
     void PostProcessing(const GrainsMemBuffer<RigidBody<T>*>&       rb,
                         const std::unique_ptr<ComponentManager<T>>& cm,
-                        const T currentTime) final;
+                        const T                                     currentTime) final;
 
     /** @brief Finalizes writing data */
 

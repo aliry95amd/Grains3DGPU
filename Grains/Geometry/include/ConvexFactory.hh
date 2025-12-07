@@ -4,7 +4,7 @@
 #include "Convex.hh"
 #include "ReaderXML.hh"
 
-// =============================================================================
+// =================================================================================================
 /** @brief The class ConvexFactory.
 
     Static class that constructs a convex using input data from an XML node or a
@@ -12,10 +12,10 @@
     mother class Convex.
 
     @author G.FERRER - Institut Francais du Petrole - 2003 - Creation
-    @author D. RAKOTONIRINA - IFP Energies nouvelles - Oct. 2014 - Modification 
+    @author D. RAKOTONIRINA - IFP Energies nouvelles - Oct. 2014 - Modification
     @author A.WACHS - 2019 - Major cleaning & refactoring
     @author A.Yazdani - 2024 - Modification for GPUs */
-// =============================================================================
+// =================================================================================================
 template <typename T>
 class ConvexFactory
 {
@@ -44,7 +44,7 @@ public:
         @param root XML node */
     static Convex<T>* create(DOMNode* root);
 
-    /** @brief Construct a convex with a type and a input stream as input 
+    /** @brief Construct a convex with a type and a input stream as input
         parameters
         @param type convex type
         @param fileIn input stream */

@@ -16,14 +16,12 @@ protected:
         test_q1         = Quaternion<double>(1.0, 2.0, 3.0, 4.0);
         test_q2         = Quaternion<double>(2.0, 1.0, 0.5, 2.5);
         zero_q          = Quaternion<double>(0.0, 0.0, 0.0, 0.0);
-        double norm_val = std::sqrt(1.0 + 4.0 + 9.0 + 16.0); // norm of test_q1
-        normalized_q    = Quaternion<double>(1.0 / norm_val,
-                                          2.0 / norm_val,
-                                          3.0 / norm_val,
-                                          4.0 / norm_val);
-        test_vec1       = Vector3<double>(1.0, 0.0, 0.0);
-        test_vec2       = Vector3<double>(0.0, 1.0, 0.0);
-        test_vec3       = Vector3<double>(1.0, 2.0, 3.0);
+        double norm_val = std::sqrt(1.0 + 4.0 + 9.0 + 16.0);  // norm of test_q1
+        normalized_q
+            = Quaternion<double>(1.0 / norm_val, 2.0 / norm_val, 3.0 / norm_val, 4.0 / norm_val);
+        test_vec1 = Vector3<double>(1.0, 0.0, 0.0);
+        test_vec2 = Vector3<double>(0.0, 1.0, 0.0);
+        test_vec3 = Vector3<double>(1.0, 2.0, 3.0);
     }
 
     void TearDown() override {}
@@ -201,16 +199,16 @@ TEST_F(QuaternionTest, InverseFunction)
 TEST_F(QuaternionTest, AdditionOperators)
 {
     Quaternion<double> sum = test_q1 + test_q2;
-    EXPECT_NEAR(sum[0], 3.0, EPSILON); // 1+2
-    EXPECT_NEAR(sum[1], 3.0, EPSILON); // 2+1
-    EXPECT_NEAR(sum[2], 3.5, EPSILON); // 3+0.5
-    EXPECT_NEAR(sum[3], 6.5, EPSILON); // 4+2.5
+    EXPECT_NEAR(sum[0], 3.0, EPSILON);  // 1+2
+    EXPECT_NEAR(sum[1], 3.0, EPSILON);  // 2+1
+    EXPECT_NEAR(sum[2], 3.5, EPSILON);  // 3+0.5
+    EXPECT_NEAR(sum[3], 6.5, EPSILON);  // 4+2.5
 
     Quaternion<double> sum_identity = test_q1 + identity;
     EXPECT_NEAR(sum_identity[0], 1.0, EPSILON);
     EXPECT_NEAR(sum_identity[1], 2.0, EPSILON);
     EXPECT_NEAR(sum_identity[2], 3.0, EPSILON);
-    EXPECT_NEAR(sum_identity[3], 5.0, EPSILON); // 4+1
+    EXPECT_NEAR(sum_identity[3], 5.0, EPSILON);  // 4+1
 
     Quaternion<double> test_copy = test_q1;
     test_copy += test_q2;
@@ -224,16 +222,16 @@ TEST_F(QuaternionTest, AdditionOperators)
 TEST_F(QuaternionTest, SubtractionOperators)
 {
     Quaternion<double> diff = test_q1 - test_q2;
-    EXPECT_NEAR(diff[0], -1.0, EPSILON); // 1-2
-    EXPECT_NEAR(diff[1], 1.0, EPSILON); // 2-1
-    EXPECT_NEAR(diff[2], 2.5, EPSILON); // 3-0.5
-    EXPECT_NEAR(diff[3], 1.5, EPSILON); // 4-2.5
+    EXPECT_NEAR(diff[0], -1.0, EPSILON);  // 1-2
+    EXPECT_NEAR(diff[1], 1.0, EPSILON);   // 2-1
+    EXPECT_NEAR(diff[2], 2.5, EPSILON);   // 3-0.5
+    EXPECT_NEAR(diff[3], 1.5, EPSILON);   // 4-2.5
 
     Quaternion<double> diff_identity = test_q1 - identity;
     EXPECT_NEAR(diff_identity[0], 1.0, EPSILON);
     EXPECT_NEAR(diff_identity[1], 2.0, EPSILON);
     EXPECT_NEAR(diff_identity[2], 3.0, EPSILON);
-    EXPECT_NEAR(diff_identity[3], 3.0, EPSILON); // 4-1
+    EXPECT_NEAR(diff_identity[3], 3.0, EPSILON);  // 4-1
 
     Quaternion<double> test_copy = test_q1;
     test_copy -= test_q2;
@@ -286,18 +284,18 @@ TEST_F(QuaternionTest, QuaternionMultiplicationComprehensive)
     Quaternion<double> ij = unit_i * unit_j;
     EXPECT_NEAR(ij[0], 0.0, EPSILON);
     EXPECT_NEAR(ij[1], 0.0, EPSILON);
-    EXPECT_NEAR(ij[2], 1.0, EPSILON); // k
+    EXPECT_NEAR(ij[2], 1.0, EPSILON);  // k
     EXPECT_NEAR(ij[3], 0.0, EPSILON);
 
     Quaternion<double> jk = unit_j * unit_k;
-    EXPECT_NEAR(jk[0], 1.0, EPSILON); // i
+    EXPECT_NEAR(jk[0], 1.0, EPSILON);  // i
     EXPECT_NEAR(jk[1], 0.0, EPSILON);
     EXPECT_NEAR(jk[2], 0.0, EPSILON);
     EXPECT_NEAR(jk[3], 0.0, EPSILON);
 
     Quaternion<double> ki = unit_k * unit_i;
     EXPECT_NEAR(ki[0], 0.0, EPSILON);
-    EXPECT_NEAR(ki[1], 1.0, EPSILON); // j
+    EXPECT_NEAR(ki[1], 1.0, EPSILON);  // j
     EXPECT_NEAR(ki[2], 0.0, EPSILON);
     EXPECT_NEAR(ki[3], 0.0, EPSILON);
 

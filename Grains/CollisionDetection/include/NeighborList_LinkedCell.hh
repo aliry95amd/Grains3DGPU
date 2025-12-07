@@ -15,7 +15,7 @@
 #include <thrust/scan.h>
 #endif
 
-// =============================================================================
+// =================================================================================================
 /** @brief The class NeighborList_LinkedCell.
 
     This is a derived class of NeighborList. It implements the neighbor list
@@ -23,7 +23,7 @@
     number of components.
 
     @author A.Yazdani - 2025 - Construction */
-// =============================================================================
+// =================================================================================================
 template <typename T, MemType M>
 class NeighborList_LinkedCell : public NeighborList<T, M>
 {
@@ -46,11 +46,11 @@ protected:
 public:
     /** @name Constructors */
     //@{
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief Constructor */
     NeighborList_LinkedCell() = default;
 
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief Constructor with parameters
         @param rb Rigid body buffer
         @param positions Positions buffer
@@ -58,13 +58,12 @@ public:
         @param linkedCellParameters Linked cell parameters
         @param nObstacles number of obstacles
         @param nParticles number of particles */
-    NeighborList_LinkedCell(
-        const GrainsMemBuffer<RigidBody<T>*, M>* rb,
-        const GrainsMemBuffer<Vector3<T>, M>&    positions,
-        const GrainsMemBuffer<Quaternion<T>, M>& quaternions,
-        const LinkedCellParameters<T>&           linkedCellParameters,
-        const uint                               nObstacles,
-        const uint                               nParticles)
+    NeighborList_LinkedCell(const GrainsMemBuffer<RigidBody<T>*, M>* rb,
+                            const GrainsMemBuffer<Vector3<T>, M>&    positions,
+                            const GrainsMemBuffer<Quaternion<T>, M>& quaternions,
+                            const LinkedCellParameters<T>&           linkedCellParameters,
+                            const uint                               nObstacles,
+                            const uint                               nParticles)
     {
         // Create the LinkedCell buffer
         LinkedCellFactory<T, M>::create(rb,
@@ -76,8 +75,7 @@ public:
                                         m_LinkedCell);
 
         // TODO: Reduce init size
-        m_pairList.initialize(nObstacles * nParticles
-                              + nParticles * (nParticles - 1) / 2);
+        m_pairList.initialize(nObstacles * nParticles + nParticles * (nParticles - 1) / 2);
         m_pairList.fill();
 
         *m_pairCount = 0;
@@ -88,21 +86,21 @@ public:
             m_numNeighbors.initialize(nParticles);
             m_numNeighbors.fill(0);
 
-            m_numNeighborsPrefixSums.initialize(nParticles + 1); // +1 for total
+            m_numNeighborsPrefixSums.initialize(nParticles + 1);  // +1 for total
             m_numNeighborsPrefixSums.fill(0);
         }
 
-        m_needsUpdate = true; // Initially, we need to create the list
+        m_needsUpdate = true;  // Initially, we need to create the list
     }
 
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief Destructor */
     ~NeighborList_LinkedCell() override = default;
     //@}
 
     /** @name Methods */
     //@{
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief Updates the neighbor list
         @param positions array of positions
         @param nObstacles number of obstacles
@@ -156,8 +154,7 @@ public:
                 {
                     if(LC.type == LinkedCellType::ATOMIC)
                     {
-                        generateObstacleParticlePairs_AT_Device<<<nObstacles,
-                                                                  64>>>(
+                        generateObstacleParticlePairs_AT_Device<<<nObstacles, 64>>>(
                             m_LinkedCell->getObstacleIDs(),
                             m_LinkedCell->getObstacleCellIDs(),
                             m_LinkedCell->getParticleIDArray(),
@@ -172,8 +169,7 @@ public:
                     }
                     else if(LC.type == LinkedCellType::SORTBASED)
                     {
-                        generateObstacleParticlePairs_SB_Device<<<nObstacles,
-                                                                  64>>>(
+                        generateObstacleParticlePairs_SB_Device<<<nObstacles, 64>>>(
                             m_LinkedCell->getObstacleIDs(),
                             m_LinkedCell->getObstacleCellIDs(),
                             m_LinkedCell->getCellStartIDs(),
@@ -204,10 +200,8 @@ public:
                     m_numNeighbors.getData());
 
                 // Phase 2: Compute prefix sum (using Thrust)
-                thrust::device_ptr<uint> numNeighbors_ptr(
-                    m_numNeighbors.getData());
-                thrust::device_ptr<uint> prefixSums_ptr(
-                    m_numNeighborsPrefixSums.getData());
+                thrust::device_ptr<uint> numNeighbors_ptr(m_numNeighbors.getData());
+                thrust::device_ptr<uint> prefixSums_ptr(m_numNeighborsPrefixSums.getData());
                 thrust::exclusive_scan(numNeighbors_ptr,
                                        numNeighbors_ptr + nParticles,
                                        prefixSums_ptr);
@@ -217,11 +211,10 @@ public:
                 // Async copy last elements
                 // prefix_sum[n-1] + neighbor_count[n-1] = total
                 uint lastPrefixSum, lastNeighborCount;
-                cudaMemcpyAsync(
-                    &lastPrefixSum,
-                    &m_numNeighborsPrefixSums.getData()[nParticles - 1],
-                    sizeof(uint),
-                    cudaMemcpyDeviceToHost);
+                cudaMemcpyAsync(&lastPrefixSum,
+                                &m_numNeighborsPrefixSums.getData()[nParticles - 1],
+                                sizeof(uint),
+                                cudaMemcpyDeviceToHost);
                 cudaMemcpyAsync(&lastNeighborCount,
                                 &m_numNeighbors.getData()[nParticles - 1],
                                 sizeof(uint),
@@ -255,7 +248,7 @@ public:
                         nParticles,
                         m_LinkedCell->getNumCells(),
                         m_pairList.getData(),
-                        m_pairCount); // Offset for obstacle pairs
+                        m_pairCount);  // Offset for obstacle pairs
                 }
                 else if(LC.type == LinkedCellType::SORTBASED)
                 {
@@ -269,7 +262,7 @@ public:
                         nParticles,
                         m_LinkedCell->getNumCells(),
                         m_pairList.getData(),
-                        m_pairCount); // Offset for obstacle pairs
+                        m_pairCount);  // Offset for obstacle pairs
                 }
                 cudaDeviceSynchronize();
             }

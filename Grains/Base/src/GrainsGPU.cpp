@@ -5,21 +5,21 @@
 #include "RigidBodyFactory.hh"
 #include "TimeIntegratorFactory.hh"
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Default constructor
 template <typename T>
 GrainsGPU<T>::GrainsGPU()
 {
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Destructor
 template <typename T>
 GrainsGPU<T>::~GrainsGPU()
 {
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Setup the GPU and its parameters
 template <typename T>
 void GrainsGPU<T>::setupGPUDevice()
@@ -42,10 +42,7 @@ void GrainsGPU<T>::setupGPUDevice()
     GoutWI(6, "Device: ", prop.name);
     GoutWI(6, "Compute capability: ", prop.major, ".", prop.minor);
     GoutWI(6, "Number of SMs: ", prop.multiProcessorCount);
-    GoutWI(6,
-           "Total global memory: ",
-           prop.totalGlobalMem / (1024 * 1024),
-           " MB");
+    GoutWI(6, "Total global memory: ", prop.totalGlobalMem / (1024 * 1024), " MB");
     GoutWI(6, "Max threads per block: ", prop.maxThreadsPerBlock);
     GoutWI(6,
            "Max threads dimensions: ",
@@ -60,7 +57,7 @@ void GrainsGPU<T>::setupGPUDevice()
     GP::m_GPU   = prop;
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Initializes the simulation using the XML input
 template <typename T>
 void GrainsGPU<T>::initialize(DOMElement* rootElement)
@@ -83,7 +80,7 @@ void GrainsGPU<T>::initialize(DOMElement* rootElement)
     Gout(std::string(80, '='));
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Runs the simulation over the prescribed time interval
 template <typename T>
 void GrainsGPU<T>::simulate()
@@ -101,8 +98,7 @@ void GrainsGPU<T>::simulate()
     Grains<T>::m_components->copyTo(m_d_components);
     cout << "Copying completed!" << endl;
     cout << "\nTime \t TO \tend \tParticles \tIn \tOut" << endl;
-    for(GP::m_time = GP::m_tStart; GP::m_time <= GP::m_tEnd;
-        GP::m_time += GP::m_dt)
+    for(GP::m_time = GP::m_tStart; GP::m_time <= GP::m_tEnd; GP::m_time += GP::m_dt)
     {
         // Output time
         ostringstream oss;
@@ -121,9 +117,9 @@ void GrainsGPU<T>::simulate()
     cudaDeviceSynchronize();
 }
 
-/* ========================================================================== */
-/*                            Low-Level Methods                               */
-/* ========================================================================== */
+/* ============================================================================================== */
+/* Low-Level Methods                                                                              */
+/* ============================================================================================== */
 // Constructs the simulation -- Reads the Construction part of the XML input to
 // set the parameters
 template <typename T>
@@ -131,55 +127,51 @@ void GrainsGPU<T>::Construction(DOMElement* rootElement)
 {
     using GP = GrainsParameters<T>;
 
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     // Particles
     GoutWI(3, "Copying rigid bodies to device ...");
-    RigidBodyFactory<T>::copyHostToDevice(Grains<T>::m_rigidBodyList,
-                                          m_d_rigidBodyList);
+    RigidBodyFactory<T>::copyHostToDevice(Grains<T>::m_rigidBodyList, m_d_rigidBodyList);
     GoutWI(3, "Copying rigid bodies to device completed!");
 
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     // Contact force models
     // It is a GPU simulation, and we have already read contact force models
     // on the host. We allocate memory on device and copy the models over.
     GoutWI(3, "Copying contact force models to device ...");
     m_d_contactForce.reserve(GP::m_numContactPairs);
-    ContactForceModelFactory<T>::copyHostToDevice(Grains<T>::m_contactForce,
-                                                  m_d_contactForce);
+    ContactForceModelFactory<T>::copyHostToDevice(Grains<T>::m_contactForce, m_d_contactForce);
     GoutWI(3, "Copying contact force models to device completed!");
 
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     // Temporal setting and time integration
     // It is a GPU simulation, and we have already read time integration on the
     // host. We allocate memory on device and copy the scheme over.
     GoutWI(3, "Copying time integration scheme to device ...");
-    TimeIntegratorFactory<T>::copyHostToDevice(Grains<T>::m_timeIntegrator,
-                                               m_d_timeIntegrator);
+    TimeIntegratorFactory<T>::copyHostToDevice(Grains<T>::m_timeIntegrator, m_d_timeIntegrator);
     GoutWI(3, "Copying time integration scheme to device completed!");
 
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     // Setting up the component managers
-    m_d_components
-        = std::make_unique<ComponentManagerGPU<T>>(&m_d_rigidBodyList,
-                                                   GP::m_numObstacles,
-                                                   GP::m_numParticles);
+    m_d_components = std::make_unique<ComponentManagerGPU<T>>(&m_d_rigidBodyList,
+                                                              GP::m_numObstacles,
+                                                              GP::m_numParticles);
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // External force definition
 template <typename T>
 void GrainsGPU<T>::Forces(DOMElement* rootElement)
 {
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Additional features of the simulation: insertion, post-processing
 template <typename T>
 void GrainsGPU<T>::AdditionalFeatures(DOMElement* rootElement)
 {
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Explicit instantiation
 template class GrainsGPU<float>;
 template class GrainsGPU<double>;

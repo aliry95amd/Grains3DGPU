@@ -34,23 +34,22 @@ enum InsertionMode
     OVERTIME
 };
 
-/** @brief info required for comping up with an insertion position. It can be 
-either a value (T) that is used as the seed for random generator algorithm, a 
-string (std::string) that is used as the pathToFile, a 3d vector (vector3<T>) 
-for constant values, and a value (0) in case the default insertion option is 
+/** @brief info required for comping up with an insertion position. It can be
+either a value (T) that is used as the seed for random generator algorithm, a
+string (std::string) that is used as the pathToFile, a 3d vector (vector3<T>)
+for constant values, and a value (0) in case the default insertion option is
 desired. */
 template <typename T>
-using InsertionInfo
-    = std::variant<std::vector<InsertionWindow<T>>, std::ifstream, Vector3<T>>;
+using InsertionInfo = std::variant<std::vector<InsertionWindow<T>>, std::ifstream, Vector3<T>>;
 //@}
 
-// =============================================================================
+// =================================================================================================
 /** @brief The class Insertion.
 
     This class provides funtionalities to insert components in the simulation.
 
     @author A.YAZDANI - 2024 - Construction */
-// =============================================================================
+// =================================================================================================
 template <typename T>
 class Insertion
 {
@@ -85,7 +84,7 @@ public:
     Insertion();
 
     /** @brief Constructor with XML element
-		@param dn XML element */
+        @param dn XML element */
     __HOST__
     Insertion(DOMNode* dn);
 
@@ -111,10 +110,9 @@ public:
         @param type insertion type
         @param data insertion info */
     __HOST__
-    Vector3<T> fetchInsertionData(InsertionType const type,
-                                  InsertionInfo<T>&   data);
+    Vector3<T> fetchInsertionData(InsertionType const type, InsertionInfo<T>& data);
 
-    /** @brief Returns all required data members to insert components as a 
+    /** @brief Returns all required data members to insert components as a
         vector
         @param rigidBody rigid body buffer
         @param position position buffer

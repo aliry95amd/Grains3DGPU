@@ -4,13 +4,13 @@
 #include "Convex.hh"
 #include "ReaderXML.hh"
 
-// =============================================================================
+// =================================================================================================
 /** @brief The class Rectangle.
 
     Convex with the shape of a rectangle.
 
     @author A.Yazdani - 2024 - Construction */
-// =============================================================================
+// =================================================================================================
 template <typename T>
 class Rectangle : public Convex<T>
 {
@@ -115,24 +115,23 @@ public:
     __HOST__
     void writeConvex(std::ostream& fileOut) const final;
 
-    /** @brief Returns the number of points to write the rectangle in a 
+    /** @brief Returns the number of points to write the rectangle in a
         Paraview format */
     __HOST__
     int numberOfPoints_PARAVIEW() const final;
 
-    /** @brief Returns the number of elementary polytopes to write the 
+    /** @brief Returns the number of elementary polytopes to write the
         rectangle in a Paraview format */
     __HOST__
     int numberOfCells_PARAVIEW() const final;
 
-    /** @brief Returns a list of points describing the rectangle in a 
+    /** @brief Returns a list of points describing the rectangle in a
         Paraview format
         @param transform geometric transformation
         @param translation additional center of mass translation */
     __HOST__
-    std::list<Vector3<T>>
-        writePoints_PARAVIEW(const Transform3<T>& transform,
-                             Vector3<T> const*    translation) const final;
+    std::list<Vector3<T>> writePoints_PARAVIEW(const Transform3<T>& transform,
+                                               Vector3<T> const*    translation) const final;
 
     /** @brief Writes the connectivity of the rectangle in a Paraview format
         @param connectivity connectivity of Paraview polytopes

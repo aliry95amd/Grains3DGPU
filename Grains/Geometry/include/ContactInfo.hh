@@ -3,21 +3,21 @@
 
 #include "Vector3.hh"
 
-// =============================================================================
+// =================================================================================================
 /** @brief The class ContactInfo.
 
     Contains all the features of a contact point.
 
     @author A.Yazdani - 2024 - Construction */
-// =============================================================================
+// =================================================================================================
 template <typename T>
 class ContactInfo
 {
 protected:
     /** @name Parameters */
     //@{
-    Vector3<T> m_contactPoint; /**< contact point */
-    Vector3<T> m_contactVector; /**< contact vector */
+    Vector3<T> m_contactPoint;    /**< contact point */
+    Vector3<T> m_contactVector;   /**< contact vector */
     T          m_overlapDistance; /**< overlap distance */
     // int m_nbIterGJK; /**< number of iterations of GJK for convergence */
     //@}
@@ -30,8 +30,8 @@ public:
     ContactInfo();
 
     /** @brief Constructor with contact point location in the world reference
-        frame, overlap vector, overlap distance and number of iterations of GJK as 
-        input parameters
+        frame, overlap vector, overlap distance and number of iterations of GJK
+       as input parameters
         @param pt contact point
         @param vec contact vector
         @param distance_ overlap distance */
@@ -83,8 +83,7 @@ public:
     @param fileIn input stream
     @param c contact point object */
 template <typename T>
-__HOST__ std::ostream& operator<<(std::ostream&         fileOut,
-                                  const ContactInfo<T>& c);
+__HOST__ std::ostream& operator<<(std::ostream& fileOut, const ContactInfo<T>& c);
 
 /** @brief Input operator
     @param fileIn input stream

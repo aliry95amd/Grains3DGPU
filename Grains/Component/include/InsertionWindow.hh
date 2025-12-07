@@ -28,15 +28,15 @@ enum RandomGeneratorSeed
 };
 //@}
 
-// =============================================================================
+// =================================================================================================
 /** @brief The class InsertionWindow.
 
     This class defines a window of either box or annulus shape, and can return a
-    random point within the window with a uniform distribution. This class is 
+    random point within the window with a uniform distribution. This class is
     not optimized (performance-wise) for insertion over time.
 
     @author A.YAZDANI - 2024 - Construction */
-// =============================================================================
+// =================================================================================================
 template <typename T>
 class InsertionWindow
 {
@@ -69,7 +69,7 @@ public:
     InsertionWindow();
 
     /** @brief Constructor with XML node and the type of the seed
-		@param dn XML node
+        @param dn XML node
         @param seed random generator seed */
     __HOST__
     InsertionWindow(DOMNode* dn, RandomGeneratorSeed seed);

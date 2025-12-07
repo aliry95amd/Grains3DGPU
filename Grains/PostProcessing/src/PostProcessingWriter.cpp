@@ -1,26 +1,25 @@
 #include "PostProcessingWriter.hh"
 #include "GrainsUtils.hh"
 
-// ----------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
 // Default constructor
 template <typename T>
 PostProcessingWriter<T>::PostProcessingWriter()
 {
 }
 
-// ----------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
 // Destructor
 template <typename T>
 PostProcessingWriter<T>::~PostProcessingWriter()
 {
 }
 
-// ----------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
 // Removes post-processing files already in the directory
 template <typename T>
 void PostProcessingWriter<T>::clearPostProcessingFiles(
-    const std::filesystem::path&   directory,
-    const std::vector<std::regex>& patterns) const
+    const std::filesystem::path& directory, const std::vector<std::regex>& patterns) const
 {
     for(const auto& entry : std::filesystem::directory_iterator(directory))
     {
@@ -43,15 +42,14 @@ void PostProcessingWriter<T>::clearPostProcessingFiles(
                 std::error_code ec;
                 std::filesystem::remove(entry.path(), ec);
                 if(ec)
-                    std::cerr << "Failed to remove: " << filename << " ("
-                              << ec.message() << ")\n";
+                    std::cerr << "Failed to remove: " << filename << " (" << ec.message() << ")\n";
             }
         }
     }
     Gout("Post-processing files removed!");
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Explicit instantiation
 template class PostProcessingWriter<float>;
 template class PostProcessingWriter<double>;

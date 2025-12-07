@@ -3,7 +3,7 @@
 
 #include "Vector3.hh"
 
-// =============================================================================
+// =================================================================================================
 /** @brief The class Kinematics.
 
     Manages the kinematics (velocities or accelerations) of components.
@@ -17,7 +17,7 @@ protected:
     /** @name Parameters */
     //@{
     Vector3<T> m_translational; /**< Translational component */
-    Vector3<T> m_angular; /**< Angular component */
+    Vector3<T> m_angular;       /**< Angular component */
     //@}
 
 public:
@@ -74,7 +74,7 @@ public:
     __HOSTDEVICE__
     void addToAngularComponent(const Vector3<T>& angular);
 
-    /** @brief Returns the total velocity U + om x R given R 
+    /** @brief Returns the total velocity U + om x R given R
         @param R arm vector */
     __HOSTDEVICE__
     Vector3<T> kinematicsAtPoint(const Vector3<T>& R) const;
@@ -93,8 +93,7 @@ __HOST__ std::istream& operator>>(std::istream& fileIn, Kinematics<T>& k);
     @param fileOut output stream
     @param k kinematics */
 template <typename T>
-__HOST__ std::ostream& operator<<(std::ostream&        fileOut,
-                                  const Kinematics<T>& k);
+__HOST__ std::ostream& operator<<(std::ostream& fileOut, const Kinematics<T>& k);
 //@}
 
 #endif

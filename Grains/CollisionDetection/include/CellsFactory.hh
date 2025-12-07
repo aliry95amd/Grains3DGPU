@@ -6,9 +6,9 @@
 
 #include <cuda_runtime.h>
 
-/* ========================================================================== */
-/*                             Low-Level Methods                              */
-/* ========================================================================== */
+/* ============================================================================================== */
+/* Low-Level Methods                                                                              */
+/* ============================================================================================== */
 /** @brief GPU kernel to construct the Cells on device.
     This is mandatory as we cannot access device memory addresses on the host
     So, we pass a device memory address to a kernel.
@@ -29,30 +29,30 @@ __GLOBAL__ void createCells_Kernel(Cells<T, CO>** cells,
     if(tID > 0)
         return;
 
-    cells[index] = new Cells<T, CO>(Vector3<T>(minX, minY, minZ),
-                                    Vector3<T>(maxX, maxY, maxZ),
-                                    size);
-    *numCells    = cells[index]->getNumCells();
+    cells[index]
+        = new Cells<T, CO>(Vector3<T>(minX, minY, minZ), Vector3<T>(maxX, maxY, maxZ), size);
+    *numCells = cells[index]->getNumCells();
 }
 
-// =============================================================================
+// =================================================================================================
 /** @brief The class CellsFactory.
 
-	Creates cells object for the simulation.
+    Creates cells object for the simulation.
 
     @author A.YAZDANI - 2025 - Construction */
-// =============================================================================
+// =================================================================================================
+
 template <typename T, CellOrdering CO = CellOrdering::LINEAR>
 class CellsFactory
 {
 private:
     /**@name Contructors & Destructor */
     //@{
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief Default constructor (forbidden) */
     CellsFactory() = default;
 
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief Destructor (forbidden) */
     ~CellsFactory() = default;
     //@}
@@ -60,7 +60,7 @@ private:
 public:
     /**@name Methods */
     //@{
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief Creates and returns a buffer of cells with memory type handling
         @param minCorner Minimum corner of the domain
         @param maxCorner Maximum corner of the domain
@@ -83,17 +83,16 @@ public:
         }
     }
 
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief Creates and returns a buffer of cells on host
         @param minCorner Minimum corner of the domain
         @param maxCorner Maximum corner of the domain
         @param cellSize Size of each cell
         @param cells Memory buffer for storing the cell object(s) */
-    static uint
-        create_host(const Vector3<T>&                              minCorner,
-                    const Vector3<T>&                              maxCorner,
-                    const T                                        cellSize,
-                    GrainsMemBuffer<Cells<T, CO>*, MemType::HOST>& cells)
+    static uint create_host(const Vector3<T>&                              minCorner,
+                            const Vector3<T>&                              maxCorner,
+                            const T                                        cellSize,
+                            GrainsMemBuffer<Cells<T, CO>*, MemType::HOST>& cells)
     {
         // Safety check
         GAssert(cellSize > 0, "Cell size must be positive! Aborting Grains!");
@@ -102,17 +101,16 @@ public:
         return cells[0]->getNumCells();
     }
 
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief Creates and returns a buffer of cells on device
         @param minCorner Minimum corner of the domain
         @param maxCorner Maximum corner of the domain
         @param cellSize Size of each cell
         @param cells Memory buffer for storing the cell object(s) */
-    static uint
-        create_device(const Vector3<T>& minCorner,
-                      const Vector3<T>& maxCorner,
-                      const T           cellSize,
-                      GrainsMemBuffer<Cells<T, CO>*, MemType::DEVICE>& cells)
+    static uint create_device(const Vector3<T>&                                minCorner,
+                              const Vector3<T>&                                maxCorner,
+                              const T                                          cellSize,
+                              GrainsMemBuffer<Cells<T, CO>*, MemType::DEVICE>& cells)
     {
         GrainsMemBuffer<Cells<T, CO>*, MemType::HOST> h_cells(1);
         uint numCells = create_host(minCorner, maxCorner, cellSize, h_cells);
@@ -122,18 +120,17 @@ public:
         return numCells;
     }
 
-    // -------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     /** @brief Cells objects must be instantiated on device, if
-		we want to use them on device. Copying from host is not supported due to
-		runtime polymorphism for this class.
-		This function reads a host-side Cells object, and mimics it
-		in a given device buffer.
-		It calls a device kernel that is implemented in the source file.
-		@param h_LC Host-side Cells object
-		@param d_LC Device-side Cells object */
-    static void
-        copyHostToDevice(GrainsMemBuffer<Cells<T, CO>*, MemType::HOST>&   h_LC,
-                         GrainsMemBuffer<Cells<T, CO>*, MemType::DEVICE>& d_LC)
+        we want to use them on device. Copying from host is not supported due to
+        runtime polymorphism for this class.
+        This function reads a host-side Cells object, and mimics it
+        in a given device buffer.
+        It calls a device kernel that is implemented in the source file.
+        @param h_LC Host-side Cells object
+        @param d_LC Device-side Cells object */
+    static void copyHostToDevice(GrainsMemBuffer<Cells<T, CO>*, MemType::HOST>&   h_LC,
+                                 GrainsMemBuffer<Cells<T, CO>*, MemType::DEVICE>& d_LC)
     {
         // Allocate the device memory for the linked cells
         d_LC.initialize(h_LC.getSize());
@@ -161,15 +158,9 @@ public:
                                          maxCoordinate[Z],
                                          size,
                                          d_numCells);
-            cudaMemcpy(&h_numCells,
-                       d_numCells,
-                       sizeof(uint),
-                       cudaMemcpyDeviceToHost);
+            cudaMemcpy(&h_numCells, d_numCells, sizeof(uint), cudaMemcpyDeviceToHost);
             cudaDeviceSynchronize();
-            GoutWI(9,
-                   "LinkedCell with",
-                   h_numCells,
-                   "cells is created on device.");
+            GoutWI(9, "LinkedCell with", h_numCells, "cells is created on device.");
         }
         cudaDeviceSynchronize();
         cudaFree(d_numCells);

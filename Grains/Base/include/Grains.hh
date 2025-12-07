@@ -11,13 +11,13 @@
 #include "RigidBody.hh"
 #include "TimeIntegrator.hh"
 
-// =============================================================================
+// =================================================================================================
 /** @brief The class Grains.
 
     Standard Grains3D application as an abstract class.
 
     @author A.Yazdani - 2024 - Construction */
-// =============================================================================
+// =================================================================================================
 template <typename T>
 class Grains
 {
@@ -26,14 +26,14 @@ protected:
     //@{
     /** \brief Parameters used in the simulation on the host memory. */
     GrainsParameters<T> m_parameters;
-    /** \brief Buffer of rigid bodies. It is of size numComponents where the
-    first numObstacles are obstacles and the rest are particles. */
+    /** \brief Buffer of rigid bodies. It is of size numComponents where the first numObstacles are
+        obstacles and the rest are particles. */
     GrainsMemBuffer<RigidBody<T>*, MemType::HOST> m_rigidBodyList;
     /** \brief Insertion object. */
     std::unique_ptr<Insertion<T>> m_insertion;
-    /** \brief Manager of the components in the simulation on the host memory. 
-    We use a pointer here as we want to use runtime polymorphism for switching 
-    between ComponentManagerCPU and ComponentManagerGPU. */
+    /** \brief Manager of the components in the simulation on the host memory. We use a pointer here
+        as we want to use runtime polymorphism for switching between ComponentManagerCPU and
+        ComponentManagerGPU. */
     std::unique_ptr<ComponentManager<T, MemType::HOST>> m_components;
     /** \brief Buffer of contact forces. */
     GrainsMemBuffer<ContactForceModel<T>*, MemType::HOST> m_contactForce;
@@ -55,8 +55,8 @@ public:
 
     /** @name High-level methods */
     //@{
-    /** @brief Tasks to perform before time-stepping, mostly reading setting
-        variables in GrainsParameters.
+    /** @brief Tasks to perform before time-stepping, mostly reading setting variables in
+        GrainsParameters.
         @param rootElement XML root */
     virtual void initialize(DOMElement* rootElement);
 
@@ -65,13 +65,11 @@ public:
 
     /** @brief Performs post-processing
         @param cm ComponentManagerCPU object */
-    void postProcess(
-        const std::unique_ptr<ComponentManager<T, MemType::HOST>>& cm) const;
+    void postProcess(const std::unique_ptr<ComponentManager<T, MemType::HOST>>& cm) const;
 
     /** @brief Performs post-processing
         @param cm ComponentManagerGPU object */
-    void postProcess(
-        const std::unique_ptr<ComponentManager<T, MemType::DEVICE>>& cm);
+    void postProcess(const std::unique_ptr<ComponentManager<T, MemType::DEVICE>>& cm);
 
     /** @brief Tasks to perform after time-stepping */
     virtual void finalize();
@@ -79,8 +77,8 @@ public:
 
     /**@name Low-level methods */
     //@{
-    /** @brief Construction of the simulation: linked cell, particles &
-        obstacles, domain decomposition 
+    /** @brief Construction of the simulation: linked cell, particles & obstacles, domain
+        decomposition
         @param rootElement XML root */
     void Construction(DOMElement* rootElement);
 
@@ -88,8 +86,7 @@ public:
         @param rootElement XML root */
     void Forces(DOMElement* rootElement);
 
-    /** @brief Additional features of the simulation: insertion, 
-        post-processing
+    /** @brief Additional features of the simulation: insertion, post-processing
         @param rootElement XML root */
     void AdditionalFeatures(DOMElement* rootElement);
     //@}

@@ -64,10 +64,9 @@ TEST_F(RotationMathTest, PrincipalAxesRotations)
     std::vector<std::pair<Quaternion<double>, Matrix3<double>>> test_rotations
         = {{quat1, mat1}, {quat2, mat2}, {quat3, mat3}};
 
-    std::vector<Vector3<double>> test_vectors
-        = {Vector3<double>(1.0, 0.0, 0.0),
-           Vector3<double>(0.0, 1.0, 0.0),
-           Vector3<double>(0.0, 0.0, 1.0)};
+    std::vector<Vector3<double>> test_vectors = {Vector3<double>(1.0, 0.0, 0.0),
+                                                 Vector3<double>(0.0, 1.0, 0.0),
+                                                 Vector3<double>(0.0, 0.0, 1.0)};
 
     for(const auto& [quat, matrix] : test_rotations)
     {
@@ -87,10 +86,9 @@ TEST_F(RotationMathTest, PrincipalAxesInverseRotations)
     std::vector<std::pair<Quaternion<double>, Matrix3<double>>> test_rotations
         = {{quat1, mat1}, {quat2, mat2}, {quat3, mat3}};
 
-    std::vector<Vector3<double>> test_vectors
-        = {Vector3<double>(1.0, 0.0, 0.0),
-           Vector3<double>(0.0, 1.0, 0.0),
-           Vector3<double>(0.0, 0.0, 1.0)};
+    std::vector<Vector3<double>> test_vectors = {Vector3<double>(1.0, 0.0, 0.0),
+                                                 Vector3<double>(0.0, 1.0, 0.0),
+                                                 Vector3<double>(0.0, 0.0, 1.0)};
 
     for(const auto& [quat, matrix] : test_rotations)
     {
@@ -110,8 +108,7 @@ TEST_F(RotationMathTest, ArbitraryAxesRotations)
     std::vector<std::pair<Quaternion<double>, Matrix3<double>>> test_rotations
         = {{quat1, mat1}, {quat2, mat2}, {quat3, mat3}};
 
-    std::vector<Vector3<double>> test_vectors
-        = {test_vec1, test_vec2, test_vec3, test_vec4};
+    std::vector<Vector3<double>> test_vectors = {test_vec1, test_vec2, test_vec3, test_vec4};
 
     for(const auto& [quat, matrix] : test_rotations)
     {
@@ -131,8 +128,7 @@ TEST_F(RotationMathTest, ArbitraryAxesInverseRotations)
     std::vector<std::pair<Quaternion<double>, Matrix3<double>>> test_rotations
         = {{quat1, mat1}, {quat2, mat2}, {quat3, mat3}};
 
-    std::vector<Vector3<double>> test_vectors
-        = {test_vec1, test_vec2, test_vec3, test_vec4};
+    std::vector<Vector3<double>> test_vectors = {test_vec1, test_vec2, test_vec3, test_vec4};
 
     for(const auto& [quat, matrix] : test_rotations)
     {

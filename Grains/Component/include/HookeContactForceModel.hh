@@ -4,27 +4,27 @@
 #include "ContactForceModel.hh"
 #include "ReaderXML.hh"
 
-// =============================================================================
+// =================================================================================================
 /** @brief The class HookeContactForceModel.
 
     Contact force model involving a normal Hookean spring, a normal Dashpot and
-    a tangential Coulomb friction (HO-D-C) to compute the force and torque 
+    a tangential Coulomb friction (HO-D-C) to compute the force and torque
     induced by the contact between two rigid components.
 
     @author A.Yazdani - 2024 - Construction */
-// =============================================================================
+// =================================================================================================
 template <typename T>
 class HookeContactForceModel : public ContactForceModel<T>
 {
 private:
     /**@name Parameter */
     //@{
-    T m_kn; /**< Normal stiffness coefficient */
-    T m_en; /**< Normal restitution coefficient */
+    T m_kn;   /**< Normal stiffness coefficient */
+    T m_en;   /**< Normal restitution coefficient */
     T m_muen; /**< log(m_en) / sqrt( PI * PI + log(m_en) * log(m_en) ) */
     T m_etat; /**< Tangential damping coefficient */
-    T m_muc; /**< Tangential Coulomb friction coefficient */
-    T m_kr; /**< Rolling resistance coefficient */
+    T m_muc;  /**< Tangential Coulomb friction coefficient */
+    T m_kr;   /**< Rolling resistance coefficient */
     //@}
 
 public:
@@ -66,8 +66,7 @@ public:
         @param muc tangential Coulomb friction coefficient
         @param kr rolling resistance coefficient */
     __HOSTDEVICE__
-    void getContactForceModelParameters(
-        T& kn, T& en, T& etat, T& muc, T& kr) const;
+    void getContactForceModelParameters(T& kn, T& en, T& etat, T& muc, T& kr) const;
     //@}
 
     /**@name Methods */

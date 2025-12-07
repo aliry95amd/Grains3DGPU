@@ -37,19 +37,18 @@ void sortComponentsAndFindCellStart_kernel(uint const* componentCellHash,
 a thread-per-particle policy
 @param fix later */
 template <typename T, typename U>
-__GLOBAL__ void detectCollisionAndComputeContactForces_kernel(
-    LinkedCell<T> const* const*        LC,
-    RigidBody<T, U> const* const*      RB,
-    ContactForceModel<T> const* const* CF,
-    uint*                              m_rigidBodyId,
-    Transform3<T> const*               tr3d,
-    Torce<T>*                          m_torce,
-    int*                               m_compId,
-    uint*                              m_componentCellHash,
-    uint*                              m_cellHashStart,
-    uint*                              m_cellHashEnd,
-    int                                numComponents,
-    int*                               result);
+__GLOBAL__ void detectCollisionAndComputeContactForces_kernel(LinkedCell<T> const* const*        LC,
+                                                              RigidBody<T, U> const* const*      RB,
+                                                              ContactForceModel<T> const* const* CF,
+                                                              uint*                m_rigidBodyId,
+                                                              Transform3<T> const* tr3d,
+                                                              Torce<T>*            m_torce,
+                                                              int*                 m_compId,
+                                                              uint* m_componentCellHash,
+                                                              uint* m_cellHashStart,
+                                                              uint* m_cellHashEnd,
+                                                              int   numComponents,
+                                                              int*  result);
 //@}
 
 #endif

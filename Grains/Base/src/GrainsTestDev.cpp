@@ -22,14 +22,13 @@ namespace GrainsCPU
     {
         for(int i = 0; i < N; i++)
         {
-            dist[i]
-                = distanceRigidBodies(*(rb[0]), *(rb[1]), t1[i], t2[i], method);
+            dist[i] = distanceRigidBodies(*(rb[0]), *(rb[1]), t1[i], t2[i], method);
             // dist[i] = norm( t1[i].getOrigin() + t2[i].getOrigin() );
         }
     };
-} // GrainsCPU namespace end
+}  // GrainsCPU namespace end
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // ...
 namespace GrainsGPU
 {
@@ -44,31 +43,29 @@ namespace GrainsGPU
                               int const                  method,
                               int const                  N)
     {
-        int bid = gridDim.x * gridDim.y * blockIdx.z + blockIdx.y * gridDim.x
-                  + blockIdx.x;
+        int bid = gridDim.x * gridDim.y * blockIdx.z + blockIdx.y * gridDim.x + blockIdx.x;
         int tID = bid * blockDim.x + threadIdx.x;
 
-        dist[tID]
-            = distanceRigidBodies(*(rb[0]), *(rb[1]), t1[tID], t2[tID], method);
+        dist[tID] = distanceRigidBodies(*(rb[0]), *(rb[1]), t1[tID], t2[tID], method);
         // dist[tID] = norm( t1[tID].getOrigin() + t2[tID].getOrigin() );
     };
-} // GrainsGPU namespace end
+}  // GrainsGPU namespace end
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Default constructor
 template <typename T>
 GrainsTestDev<T>::GrainsTestDev()
 {
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Destructor
 template <typename T>
 GrainsTestDev<T>::~GrainsTestDev()
 {
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Runs the simulation over the prescribed time interval
 template <typename T>
 void GrainsTestDev<T>::simulate()
@@ -81,13 +78,13 @@ void GrainsTestDev<T>::simulate()
     // T r2 = T(0.05);
     // T r3 = T(0.05); // Radii for now!
 
-    // /* ====================================================================== */
-    // /* Creating two random Vector3 arrays for centers of pair-particles       */
-    // /* ====================================================================== */
-    // default_random_engine        generator;
-    // normal_distribution<T>       distribution1(-0.05, 0.005);
-    // normal_distribution<T>       distribution2(+0.05, 0.005);
-    // uniform_real_distribution<T> rotation(0, 2. * PI<T>);
+    // /* ======================================================================
+    // */
+    // /* Creating two random Vector3 arrays for centers of pair-particles */
+    // /* ======================================================================
+    // */ default_random_engine        generator; normal_distribution<T>
+    // distribution1(-0.05, 0.005); normal_distribution<T> distribution2(+0.05,
+    // 0.005); uniform_real_distribution<T> rotation(0, 2. * PI<T>);
 
     // // Allocating memory on host and device
     // Transform3<T>* h_tr1 = new Transform3<T>[N];
@@ -124,17 +121,19 @@ void GrainsTestDev<T>::simulate()
     //                         N * sizeof(Transform3<T>),
     //                         cudaMemcpyHostToDevice));
 
-    // /* ====================================================================== */
-    // /* Creating Particles                                                     */
-    // /* ====================================================================== */
+    // /* ======================================================================
+    // */
+    // /* Creating Particles */
+    // /* ======================================================================
+    // */
     // // Convex
     // // Convex<T> *h_convex1 = new Box<T>( 2 * r1, 2 * r2, 2 * r3 );
     // // Convex<T> *h_convex2 = new Box<T>( 2 * r1, 2 * r2, 2 * r3 );
     // // Convex<T> *h_convex1 = new Cylinder<T>( r1, r2 );
     // // Convex<T> *h_convex2 = new Cylinder<T>( r1, r2 );
-    // Convex<T>*        h_convex1 = new Superquadric<T>(r1, r2, r3, T(3.), T(3));
-    // Convex<T>*        h_convex2 = new Superquadric<T>(r1, r2, r3, T(3), T(3));
-    // RigidBody<T>** h_rb
+    // Convex<T>*        h_convex1 = new Superquadric<T>(r1, r2, r3, T(3.),
+    // T(3)); Convex<T>*        h_convex2 = new Superquadric<T>(r1, r2, r3,
+    // T(3), T(3)); RigidBody<T>** h_rb
     //     = (RigidBody<T>**)malloc(2 * sizeof(RigidBody<T>*));
     // h_rb[0] = new RigidBody<T>(h_convex1, T(0), 0, 1);
     // h_rb[1] = new RigidBody<T>(h_convex2, T(0), 0, 1);
@@ -144,10 +143,11 @@ void GrainsTestDev<T>::simulate()
     // RigidBodyCopyHostToDevice(h_rb, d_rb, 2);
     // cudaDeviceSynchronize();
 
-    // /* ====================================================================== */
-    // /* Collision detection                                                    */
-    // /* ====================================================================== */
-    // T* h_collision = new T[N];
+    // /* ======================================================================
+    // */
+    // /* Collision detection */
+    // /* ======================================================================
+    // */ T* h_collision = new T[N];
     // // Zeroing out
     // for(int i = 0; i < N; i++)
     // {
@@ -185,9 +185,11 @@ void GrainsTestDev<T>::simulate()
     // cudaErrCheck(cudaDeviceSynchronize());
     // auto d_end = chrono::high_resolution_clock::now();
 
-    // /* ====================================================================== */
-    // /* Results                                                                */
-    // /* ====================================================================== */
+    // /* ======================================================================
+    // */
+    // /* Results */
+    // /* ======================================================================
+    // */
     // // Time comparison
     // chrono::duration<double> h_time = h_end - h_start;
     // chrono::duration<double> d_time = d_end - d_start;
@@ -219,7 +221,7 @@ void GrainsTestDev<T>::simulate()
     // cudaFree(d_collision);
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Explicit instantiation
 template class GrainsTestDev<float>;
 template class GrainsTestDev<double>;

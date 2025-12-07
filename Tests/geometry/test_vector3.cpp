@@ -73,8 +73,7 @@ TEST_F(Vector3Test, NormalizationMethod)
     Vector3<double> test(3.0, 4.0, 0.0);
     test.normalize();
 
-    double mag_squared
-        = test[0] * test[0] + test[1] * test[1] + test[2] * test[2];
+    double mag_squared = test[0] * test[0] + test[1] * test[1] + test[2] * test[2];
     EXPECT_NEAR(mag_squared, 1.0, EPSILON);
 
     EXPECT_NEAR(test[0], 0.6, EPSILON);
@@ -103,9 +102,7 @@ TEST_F(Vector3Test, NormFunction)
 
     EXPECT_NEAR(norm(test_vec1), sqrt(50.0), EPSILON);
 
-    EXPECT_NEAR(norm(negative_vec),
-                sqrt(1.5 * 1.5 + 2.5 * 2.5 + 3.5 * 3.5),
-                EPSILON);
+    EXPECT_NEAR(norm(negative_vec), sqrt(1.5 * 1.5 + 2.5 * 2.5 + 3.5 * 3.5), EPSILON);
 }
 
 // Test norm2 function
@@ -141,15 +138,15 @@ TEST_F(Vector3Test, IsApproxZeroFunction)
 // Test round function (in-place)
 TEST_F(Vector3Test, RoundFunction)
 {
-    Vector3<double> decimal_vec(1e-12, 2e-12, -3e-12); // Very small values
-    round(decimal_vec, 1e-10); // Should round to zero
+    Vector3<double> decimal_vec(1e-12, 2e-12, -3e-12);  // Very small values
+    round(decimal_vec, 1e-10);                          // Should round to zero
 
     EXPECT_DOUBLE_EQ(decimal_vec[0], 0.0);
     EXPECT_DOUBLE_EQ(decimal_vec[1], 0.0);
     EXPECT_DOUBLE_EQ(decimal_vec[2], 0.0);
 
     Vector3<double> large_vec(0.1, -0.2, 0.3);
-    round(large_vec, 1e-10); // Should remain unchanged
+    round(large_vec, 1e-10);  // Should remain unchanged
     EXPECT_DOUBLE_EQ(large_vec[0], 0.1);
     EXPECT_DOUBLE_EQ(large_vec[1], -0.2);
     EXPECT_DOUBLE_EQ(large_vec[2], 0.3);

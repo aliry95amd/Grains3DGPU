@@ -3,21 +3,21 @@
 #include "GrainsParameters.hh"
 #include "VectorMath.hh"
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Default constructor
 template <typename T>
 GrainsCPU<T>::GrainsCPU()
 {
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Destructor
 template <typename T>
 GrainsCPU<T>::~GrainsCPU()
 {
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Runs the simulation over the prescribed time interval
 template <typename T>
 void GrainsCPU<T>::simulate()
@@ -34,8 +34,7 @@ void GrainsCPU<T>::simulate()
 
     cout << "Time \t TO \tend \tParticles \tIn \tOut" << endl;
     // time marching
-    for(GP::m_time = GP::m_tStart; GP::m_time <= GP::m_tEnd;
-        GP::m_time += GP::m_dt)
+    for(GP::m_time = GP::m_tStart; GP::m_time <= GP::m_tEnd; GP::m_time += GP::m_dt)
     {
         // Output time
         ostringstream oss;
@@ -53,7 +52,7 @@ void GrainsCPU<T>::simulate()
     }
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Explicit instantiation
 template class GrainsCPU<float>;
 template class GrainsCPU<double>;

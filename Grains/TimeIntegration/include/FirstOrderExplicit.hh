@@ -3,12 +3,12 @@
 
 #include "TimeIntegrator.hh"
 
-// =============================================================================
+// =================================================================================================
 /** @brief The class FirstOrderExplicit.
 
-    First order explicit integration scheme: x(t+dt) = x(t) + dt*v(t) and 
-    v(t+dt) = v(t) + dt*a(t). 
-    
+    First order explicit integration scheme: x(t+dt) = x(t) + dt*v(t) and
+    v(t+dt) = v(t) + dt*a(t).
+
     @author A.Yazdani - 2024 - Construction */
 // ============================================================================
 template <typename T>
@@ -44,10 +44,10 @@ public:
     TimeIntegrator<T>* clone() const final;
 
     /** @brief Computes the new velocity and transformation change over dt
-		@param momentum acceleration
-		@param velocity velocity 
-		@param transMotion translational motion over dt
-		@param rotMotion rotational motion over dt */
+        @param momentum acceleration
+        @param velocity velocity
+        @param transMotion translational motion over dt
+        @param rotMotion rotational motion over dt */
     __HOSTDEVICE__
     void Move(const Kinematics<T>& momentum,
               Kinematics<T>&       velocity,

@@ -5,22 +5,20 @@
 #include "Grains.hh"
 #include "ReaderXML.hh"
 
-// =============================================================================
+// =================================================================================================
 /** @brief The class GrainsGPU.
 
     Standard Grains3D application on GPU.
 
     @author A.Yazdani - 2024 - Construction */
-// =============================================================================
+// =================================================================================================
 template <typename T>
 class GrainsGPU : public Grains<T>
 {
 protected:
     /** \brief Memory buffer for rigid bodies on the device. */
     GrainsMemBuffer<RigidBody<T>*, MemType::DEVICE> m_d_rigidBodyList;
-    /** \brief Manager of the components in the simulation. We use a pointer 
-    here as we want to use runtime polymorphism for switching between 
-    ComponentManagerCPU and ComponentManagerGPU. */
+    /** \brief GPU manager of the components in the simulation. */
     std::unique_ptr<ComponentManager<T, MemType::DEVICE>> m_d_components;
     /** \brief Buffer of contact forces. */
     GrainsMemBuffer<ContactForceModel<T>*, MemType::DEVICE> m_d_contactForce;
@@ -44,7 +42,7 @@ public:
     /** @brief Sets up the GPU and its parameters */
     void setupGPUDevice();
 
-    /** @brief Tasks to perform before time-stepping 
+    /** @brief Tasks to perform before time-stepping
         // @param rootElement XML root */
     void initialize(DOMElement* rootElement) final;
 
@@ -58,7 +56,7 @@ public:
     /**@name Low-level methods */
     //@{
     /** @brief Construction of the simulation: linked cell, particles &
-        obstacles, domain decomposition 
+        obstacles, domain decomposition
         @param rootElement XML root */
     void Construction(DOMElement* rootElement);
 
@@ -66,7 +64,7 @@ public:
         @param rootElement XML root */
     void Forces(DOMElement* rootElement);
 
-    /** @brief Additional features of the simulation: insertion, 
+    /** @brief Additional features of the simulation: insertion,
         post-processing
         @param rootElement XML root */
     void AdditionalFeatures(DOMElement* rootElement);

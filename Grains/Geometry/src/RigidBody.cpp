@@ -6,7 +6,7 @@
 #include "RigidBody.hh"
 #include "VectorMath.hh"
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Default constructor
 template <typename T>
 __HOSTDEVICE__ RigidBody<T>::RigidBody()
@@ -14,11 +14,10 @@ __HOSTDEVICE__ RigidBody<T>::RigidBody()
 {
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Constructor with input parameters
 template <typename T>
-__HOSTDEVICE__
-    RigidBody<T>::RigidBody(Convex<T>* convex, T ct, T density, uint material)
+__HOSTDEVICE__ RigidBody<T>::RigidBody(Convex<T>* convex, T ct, T density, uint material)
     : m_convex(convex)
     , m_crustThickness(ct)
     , m_material(material)
@@ -28,7 +27,7 @@ __HOSTDEVICE__
     setInertia();
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Copy constructor
 template <typename T>
 __HOSTDEVICE__ RigidBody<T>::RigidBody(RigidBody<T> const& rb)
@@ -46,7 +45,7 @@ __HOSTDEVICE__ RigidBody<T>::RigidBody(RigidBody<T> const& rb)
     }
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Copy assignment operator
 template <typename T>
 __HOSTDEVICE__ RigidBody<T>& RigidBody<T>::operator=(const RigidBody<T>& other)
@@ -70,7 +69,7 @@ __HOSTDEVICE__ RigidBody<T>& RigidBody<T>::operator=(const RigidBody<T>& other)
     return *this;
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Move constructor
 template <typename T>
 __HOSTDEVICE__ RigidBody<T>::RigidBody(RigidBody<T>&& other)
@@ -98,7 +97,7 @@ __HOSTDEVICE__ RigidBody<T>::RigidBody(RigidBody<T>&& other)
     }
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Move assignment operator
 template <typename T>
 __HOSTDEVICE__ RigidBody<T>& RigidBody<T>::operator=(RigidBody<T>&& other)
@@ -133,7 +132,7 @@ __HOSTDEVICE__ RigidBody<T>& RigidBody<T>::operator=(RigidBody<T>&& other)
     return *this;
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Constructor with an XML input
 template <typename T>
 __HOST__ RigidBody<T>::RigidBody(DOMNode* root)
@@ -142,8 +141,7 @@ __HOST__ RigidBody<T>::RigidBody(DOMNode* root)
     DOMNode* shape = ReaderXML::getNode(root, "Convex");
     m_convex       = ConvexFactory<T>::create(shape);
     // Crust thickenss
-    m_crustThickness
-        = T(ReaderXML::getNodeAttr_Double(shape, "CrustThickness"));
+    m_crustThickness = T(ReaderXML::getNodeAttr_Double(shape, "CrustThickness"));
     // Volume and mass
     T volume  = m_convex->computeVolume();
     T density = T(0);
@@ -170,7 +168,7 @@ __HOST__ RigidBody<T>::RigidBody(DOMNode* root)
     m_material = GrainsParameters<T>::m_materialMap[material];
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Destructor
 template <typename T>
 __HOSTDEVICE__ RigidBody<T>::~RigidBody()
@@ -178,7 +176,7 @@ __HOSTDEVICE__ RigidBody<T>::~RigidBody()
     delete m_convex;
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Gets the rigid body's convex
 template <typename T>
 __HOSTDEVICE__ Convex<T>* RigidBody<T>::getConvex() const
@@ -186,7 +184,7 @@ __HOSTDEVICE__ Convex<T>* RigidBody<T>::getConvex() const
     return (m_convex);
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Gets the rigid body's inertia
 template <typename T>
 __HOSTDEVICE__ void RigidBody<T>::getInertia(T (&inertia)[6]) const
@@ -195,7 +193,7 @@ __HOSTDEVICE__ void RigidBody<T>::getInertia(T (&inertia)[6]) const
         inertia[i] = m_inertia[i];
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Gets the inverse of rigid body's inertia
 template <typename T>
 __HOSTDEVICE__ void RigidBody<T>::getInertia_1(T (&inertia_1)[6]) const
@@ -204,7 +202,7 @@ __HOSTDEVICE__ void RigidBody<T>::getInertia_1(T (&inertia_1)[6]) const
         inertia_1[i] = m_inertia_1[i];
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Gets the rigid body's crust thickness
 template <typename T>
 __HOSTDEVICE__ T RigidBody<T>::getCrustThickness() const
@@ -212,7 +210,7 @@ __HOSTDEVICE__ T RigidBody<T>::getCrustThickness() const
     return (m_crustThickness);
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Gets the rigid body's volume
 template <typename T>
 __HOSTDEVICE__ T RigidBody<T>::getVolume() const
@@ -220,7 +218,7 @@ __HOSTDEVICE__ T RigidBody<T>::getVolume() const
     return (m_convex->computeVolume());
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Gets the rigid body's volume
 template <typename T>
 __HOSTDEVICE__ T RigidBody<T>::getMass() const
@@ -228,7 +226,7 @@ __HOSTDEVICE__ T RigidBody<T>::getMass() const
     return (m_mass);
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Gets the rigid body's material ID
 template <typename T>
 __HOSTDEVICE__ uint RigidBody<T>::getMaterial() const
@@ -236,7 +234,7 @@ __HOSTDEVICE__ uint RigidBody<T>::getMaterial() const
     return (m_material);
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Gets the circumcribed radius of the rigid body
 template <typename T>
 __HOSTDEVICE__ T RigidBody<T>::getCircumscribedRadius() const
@@ -244,7 +242,7 @@ __HOSTDEVICE__ T RigidBody<T>::getCircumscribedRadius() const
     return (m_convex->computeCircumscribedRadius());
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Sets the inertia tensor and its inverse
 template <typename T>
 __HOSTDEVICE__ void RigidBody<T>::setInertia()
@@ -270,14 +268,13 @@ __HOSTDEVICE__ void RigidBody<T>::setInertia()
     }
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Computes the acceleration of the rigid body given a torce and angular
 // velocity in the body-fixed coordinate system -- In the body-fixed coordinate
 // system, the moment of inertia tensor is assumed to be diagonal.
 template <typename T>
-__HOSTDEVICE__ Kinematics<T>
-               RigidBody<T>::computeMomentum(const Vector3<T>& omega,
-                                  const Torce<T>&   t) const
+__HOSTDEVICE__ Kinematics<T> RigidBody<T>::computeMomentum(const Vector3<T>& omega,
+                                                           const Torce<T>&   t) const
 {
     // Translational momentum
     Vector3<T> transMomentum(t.getForce() / m_mass);
@@ -297,12 +294,13 @@ __HOSTDEVICE__ Kinematics<T>
     return (Kinematics<T>(transMomentum, angMomentum));
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Computes the acceleration of the rigid body given the angular velocity and a
 // torce in the space-fixed coordinate system
 template <typename T>
-__HOSTDEVICE__ Kinematics<T> RigidBody<T>::computeMomentum(
-    const Vector3<T>& omega, const Torce<T>& t, const Quaternion<T>& q) const
+__HOSTDEVICE__ Kinematics<T> RigidBody<T>::computeMomentum(const Vector3<T>&    omega,
+                                                           const Torce<T>&      t,
+                                                           const Quaternion<T>& q) const
 {
     // Angular momentum
     // Write omega in the body-fixed coordinates system
@@ -311,26 +309,22 @@ __HOSTDEVICE__ Kinematics<T> RigidBody<T>::computeMomentum(
     Vector3<T> angMomentum = q << t.getTorque();
 
     // Compute I.w in the body-fixed coordinates system
-    Vector3<T> angMomentumTemp(
-        m_inertia[0] * angVelocity[0] + m_inertia[1] * angVelocity[1]
-            + m_inertia[2] * angVelocity[2],
-        m_inertia[1] * angVelocity[0] + m_inertia[3] * angVelocity[1]
-            + m_inertia[4] * angVelocity[2],
-        m_inertia[2] * angVelocity[0] + m_inertia[4] * angVelocity[1]
-            + m_inertia[5] * angVelocity[2]);
+    Vector3<T> angMomentumTemp(m_inertia[0] * angVelocity[0] + m_inertia[1] * angVelocity[1]
+                                   + m_inertia[2] * angVelocity[2],
+                               m_inertia[1] * angVelocity[0] + m_inertia[3] * angVelocity[1]
+                                   + m_inertia[4] * angVelocity[2],
+                               m_inertia[2] * angVelocity[0] + m_inertia[4] * angVelocity[1]
+                                   + m_inertia[5] * angVelocity[2]);
 
     // Compute T + I.w ^ w in the body-fixed coordinates system
     angMomentum += angMomentumTemp ^ angVelocity;
 
     // Compute I^-1.(T + I.w ^ w) in body-fixed coordinates system
-    angMomentumTemp[0] = m_inertia_1[0] * angMomentum[0]
-                         + m_inertia_1[1] * angMomentum[1]
+    angMomentumTemp[0] = m_inertia_1[0] * angMomentum[0] + m_inertia_1[1] * angMomentum[1]
                          + m_inertia_1[2] * angMomentum[2];
-    angMomentumTemp[1] = m_inertia_1[1] * angMomentum[0]
-                         + m_inertia_1[3] * angMomentum[1]
+    angMomentumTemp[1] = m_inertia_1[1] * angMomentum[0] + m_inertia_1[3] * angMomentum[1]
                          + m_inertia_1[4] * angMomentum[2];
-    angMomentumTemp[2] = m_inertia_1[2] * angMomentum[0]
-                         + m_inertia_1[4] * angMomentum[1]
+    angMomentumTemp[2] = m_inertia_1[2] * angMomentum[0] + m_inertia_1[4] * angMomentum[1]
                          + m_inertia_1[5] * angMomentum[2];
     // Write I^-1.(T + I.w ^ w) in space-fixed coordinates system
     angMomentum = q >> angMomentumTemp;
@@ -341,7 +335,7 @@ __HOSTDEVICE__ Kinematics<T> RigidBody<T>::computeMomentum(
     return (Kinematics<T>(transMomentum, angMomentum));
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Explicit instantiation
 template class RigidBody<float>;
 template class RigidBody<double>;
