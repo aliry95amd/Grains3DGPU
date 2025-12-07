@@ -26,14 +26,9 @@ protected:
     //@{
     /** \brief Parameters used in the simulation on the host memory. */
     GrainsParameters<T> m_parameters;
-    /** \brief Buffer of particles rigid bodies. The pointer is used because we
-    want to use runtime polymorphism for switching between different particle
-    types. */
-    GrainsMemBuffer<RigidBody<T>*, MemType::HOST> m_particleRigidBodyList;
-    /** \brief Buffer of obstacles rigid bodies. The pointer is used because we 
-    want to use runtime polymorphism for switching between different obstacle 
-    types. */
-    GrainsMemBuffer<RigidBody<T>*, MemType::HOST> m_obstacleRigidBodyList;
+    /** \brief Buffer of rigid bodies. It is of size numComponents where the
+    first numObstacles are obstacles and the rest are particles. */
+    GrainsMemBuffer<RigidBody<T>*, MemType::HOST> m_rigidBodyList;
     /** \brief Insertion object. */
     std::unique_ptr<Insertion<T>> m_insertion;
     /** \brief Manager of the components in the simulation on the host memory. 

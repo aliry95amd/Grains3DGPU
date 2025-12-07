@@ -52,7 +52,4 @@ public:
     //@}
 };
 
-typedef ConvexFactory<float>  ConvexFactoryF;
-typedef ConvexFactory<double> ConvexFactoryD;
-
 #endif

@@ -11,15 +11,12 @@ ComponentManagerGPU<T>::ComponentManagerGPU() = default;
 // Constructor with the number of particles, and obstacles
 template <typename T>
 ComponentManagerGPU<T>::ComponentManagerGPU(
-    GrainsMemBuffer<RigidBody<T>*, MemType::DEVICE>* particleRB,
-    GrainsMemBuffer<RigidBody<T>*, MemType::DEVICE>* obstacleRB,
-    uint                                             nParticles,
-    uint                                             nObstacles)
-    : ComponentManager<T, MemType::DEVICE>(
-          particleRB, obstacleRB, nParticles, nObstacles)
+    GrainsMemBuffer<RigidBody<T>*, MemType::DEVICE>* rigidBody,
+    uint                                             nObstacles,
+    uint                                             nParticles)
+    : ComponentManager<T, MemType::DEVICE>(rigidBody, nObstacles, nParticles)
 {
-    allocate();
-    initialize();
+    this->initialize();
 }
 
 // -----------------------------------------------------------------------------
@@ -28,17 +25,25 @@ template <typename T>
 ComponentManagerGPU<T>::~ComponentManagerGPU() = default;
 
 // -----------------------------------------------------------------------------
-// Allocates memory for the component manager
-template <typename T>
-void ComponentManagerGPU<T>::allocate()
-{
-}
-
-// -------------------------------------------------------------------------
-// Initializes data members to default values
+// Initializes buffers for pair-dependent data
 template <typename T>
 void ComponentManagerGPU<T>::initialize()
 {
+    ComponentManager<T, MemType::DEVICE>::initialize();
+    uint maxPairs
+        = m_nObstacles * m_nParticles + m_nParticles * (m_nParticles - 1) / 2;
+    m_prefixScan.initialize(maxPairs);
+    m_activeIndex.initialize(maxPairs);
+}
+
+// -----------------------------------------------------------------------------
+// Resizes pair-dependent buffers based on current neighbor list size
+template <typename T>
+void ComponentManagerGPU<T>::resizePairBuffers(const uint size)
+{
+    ComponentManager<T, MemType::DEVICE>::resizePairBuffers(size);
+    m_prefixScan.resize(size);
+    m_activeIndex.resize(size);
 }
 
 // -----------------------------------------------------------------------------
@@ -48,10 +53,13 @@ void ComponentManagerGPU<T>::updateNeighborList()
 {
     if(m_neighborList->needsUpdate())
     {
-        m_neighborList->updateNeighborList(m_transform);
+        m_neighborList->updateNeighborList(m_position,
+                                           m_nObstacles,
+                                           m_nParticles);
 
-        // Resize pair-dependent buffers to match actual number of pairs
-        this->resizePairBuffers();
+        // Resize pair-dependent buffers in base, then GPU-specific buffers
+        const uint pairCount = m_neighborList->getSize();
+        this->resizePairBuffers(pairCount);
     }
 }
 
@@ -69,41 +77,18 @@ void ComponentManagerGPU<T>::computeRelativeTransformations()
 
     computeRelativeTransformations_Kernel<<<numBlocks, numThreads>>>(
         m_neighborList->getData(),
-        m_transform.getData(),
-        m_relTransform.getData(),
+        m_position.getData(),
+        m_quaternion.getData(),
+        m_relPosition.getData(),
+        m_relQuaternion.getData(),
         nPairs);
+    cudaDeviceSynchronize();
 }
 
 // -----------------------------------------------------------------------------
-// Detects collision between particles and obstacles
+// Detects collisions between components
 template <typename T>
-void ComponentManagerGPU<T>::detectCollisionsObstacles()
-{
-    using GP = GrainsParameters<T>;
-    // Kernel launch parameters
-    // const uint numThreads = GP::m_numThreads;
-    // const uint numBlocks  = GP::m_numBlocks;
-
-    // Invoke the kernel
-    // detectCollisionAndComputeContactForcesObstacles_Kernel<<<numBlocks,
-    //                                                          numThreads>>>(
-    //     particleRB,
-    //     obstacleRB,
-    //     CF,
-    //     m_rigidBodyId,
-    //     m_transform,
-    //     m_velocity,
-    //     m_torce,
-    //     m_obstacleRigidBodyId,
-    //     m_obstacleTransform,
-    //     m_nParticles,
-    //     m_nObstacles);
-}
-
-// -----------------------------------------------------------------------------
-// Detects collisions between particles and particles
-template <typename T>
-void ComponentManagerGPU<T>::detectCollisionsParticles()
+void ComponentManagerGPU<T>::detectCollisionsComponents()
 {
     uint nPairs = m_neighborList->getSize();
     uint numThreads, numBlocks;
@@ -112,12 +97,36 @@ void ComponentManagerGPU<T>::detectCollisionsParticles()
                                    numBlocks,
                                    numThreads);
 
-    detectCollisionsParticles_Kernel<<<numBlocks, numThreads>>>(
+    detectCollisionsComponents_Kernel<<<numBlocks, numThreads>>>(
         m_neighborList->getData(),
-        m_particleRB->getData(),
-        m_relTransform.getData(),
+        m_rigidBody->getData(),
+        m_relPosition.getData(),
+        m_relQuaternion.getData(),
         m_contactInfo.getData(),
         nPairs);
+    cudaDeviceSynchronize();
+}
+
+// -----------------------------------------------------------------------------
+// Transforms contact information to world frame
+template <typename T>
+void ComponentManagerGPU<T>::transformContactInfoToWorld()
+{
+    uint nPairs = m_neighborList->getSize();
+    uint numThreads, numBlocks;
+    computeOptimalThreadsAndBlocks(nPairs,
+                                   GrainsParameters<T>::m_GPU,
+                                   numBlocks,
+                                   numThreads);
+    transformContactInfo_Kernel<<<numBlocks, numThreads>>>(
+        m_neighborList->getData(),
+        m_position.getData(),
+        m_quaternion.getData(),
+        m_contactInfo.getData(),
+        m_contactInfoWorld.getData(),
+        m_activePairs.getData(),
+        nPairs);
+    cudaDeviceSynchronize();
 }
 
 // -----------------------------------------------------------------------------
@@ -131,11 +140,11 @@ void ComponentManagerGPU<T>::detectCollisions()
     // Computes the relative transformations
     computeRelativeTransformations();
 
-    // Particle-particle interactions
-    detectCollisionsParticles();
+    // Interactions
+    detectCollisionsComponents();
 
-    // Particle-obstacle interactions
-    detectCollisionsObstacles();
+    // Transforms contact info to world frame
+    transformContactInfoToWorld();
 }
 
 // -----------------------------------------------------------------------------
@@ -145,20 +154,42 @@ void ComponentManagerGPU<T>::computeContactForces(
     const GrainsMemBuffer<ContactForceModel<T>*, MemType::DEVICE>& CF)
 {
     uint nPairs = m_neighborList->getSize();
+    // // Build compact index of active pairs using the shared helper and persistent buffers
+    // const uint nActive = buildCompactActiveIndex(m_activePairs.getData(),
+    //                                              nPairs,
+    //                                              m_prefixScan.getData(),
+    //                                              m_activeIndex.getData());
+
+    // // Launch compact forces kernel
+    // uint numThreads, numBlocks;
+    // computeOptimalThreadsAndBlocks(nActive,
+    //                                GrainsParameters<T>::m_GPU,
+    //                                numBlocks,
+    //                                numThreads);
+    // computeContactForcesCompact_Kernel<<<numBlocks, numThreads>>>(
+    //     CF.getData(),
+    //     m_neighborList->getData(),
+    //     m_contactInfoWorld.getData(),
+    //     m_activeIndex.getData(),
+    //     m_rigidBody->getData(),
+    //     m_position.getData(),
+    //     m_velocity.getData(),
+    //     m_torce.getData(),
+    //     nActive);
+
     uint numThreads, numBlocks;
     computeOptimalThreadsAndBlocks(nPairs,
                                    GrainsParameters<T>::m_GPU,
                                    numBlocks,
                                    numThreads);
-
     computeContactForces_Kernel<<<numBlocks, numThreads>>>(
         CF.getData(),
         m_neighborList->getData(),
-        m_contactInfo.getData(),
-        m_particleRB->getData(),
+        m_contactInfoWorld.getData(),
+        m_rigidBody->getData(),
+        m_position.getData(),
         m_velocity.getData(),
         m_torce.getData(),
-        m_relTransform.getData(),
         nPairs);
 }
 
@@ -184,8 +215,9 @@ void ComponentManagerGPU<T>::addExternalForces()
     addExternalForces_Kernel<<<numBlocks, numThreads>>>(gX,
                                                         gY,
                                                         gZ,
-                                                        m_particleRB->getData(),
+                                                        m_rigidBody->getData(),
                                                         m_torce.getData(),
+                                                        m_nObstacles,
                                                         m_nParticles);
 }
 
@@ -202,12 +234,12 @@ void ComponentManagerGPU<T>::moveParticles(
                                    numThreads);
 
     moveParticles_Kernel<<<numBlocks, numThreads>>>(TI.getData(),
-                                                    m_particleRB->getData(),
-                                                    m_transform.getData(),
+                                                    m_rigidBody->getData(),
+                                                    m_position.getData(),
                                                     m_quaternion.getData(),
                                                     m_velocity.getData(),
                                                     m_torce.getData(),
-                                                    m_rigidBodyId.getData(),
+                                                    m_nObstacles,
                                                     m_nParticles);
 }
 

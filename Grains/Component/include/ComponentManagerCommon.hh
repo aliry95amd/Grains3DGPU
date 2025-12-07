@@ -6,7 +6,6 @@
 #include "ContactForceModelFactory.hh"
 #include "GrainsParameters.hh"
 #include "Kinematics.hh"
-#include "LinkedCell.hh"
 #include "Quaternion.hh"
 #include "QuaternionMath.hh"
 #include "RigidBody.hh"
@@ -29,116 +28,128 @@
 //@{
 /** @brief Computes relative transformations per pair
     @param pairList list of rigid bodies pairs
-    @param transform transformation of the rigid bodies
-    @param relativeTransform relative transformation of the rigid bodies
+    @param position position of the components
+    @param quaternion quaternion of the components
+    @param relativePosition output relative position of the components
+    @param relativeQuaternion output relative quaternion of the components
     @param pairID ID of the pair */
 template <typename T>
 __HOSTDEVICE__ static INLINE void
-    computeRelativeTransformations_common(const uint2*               pairList,
-                                          const rigidBody<T>* const* particleRB,
-                                          const Transform3<T>*       transform,
-                                          Transform3<T>* relativeTransform,
+    computeRelativeTransformations_common(const uint2*         pairList,
+                                          const Vector3<T>*    position,
+                                          const Quaternion<T>* quaternion,
+                                          Vector3<T>*          relativePosition,
+                                          Quaternion<T>* relativeQuaternion,
                                           const uint     pairID)
 {
-    const uint2 pair          = pairList[pairID];
-    const uint  idA           = pair.x;
-    const uint  idB           = pair.y;
-    relativeTransform[pairID] = transform[idB];
-    relativeTransform[pairID].relativeToTransform(transform[idA]);
-    // TODO: apply crust thickness
+    const uint2 pair         = pairList[pairID];
+    const uint  idA          = pair.x;
+    const uint  idB          = pair.y;
+    relativePosition[pairID] = quaternion[idA]
+                               << (position[idB] - position[idA]);
+    relativeQuaternion[pairID] = inverse(quaternion[idA]) * quaternion[idB];
 }
 
 // -----------------------------------------------------------------------------
-/** @brief Detects collisions between particles and obstacles
-    @param pairList list of rigid bodies pairs
-    @param particleRB rigid body of particles
-    @param obstacleRB rigid body of obstacles
-    @param transform transformation of the particles
-    @param obstacleTransform transformation of the obstacles
+/** @brief Detects collisions between components
+    @param pairList list of contact pairs
+    @param rigidBody rigid body
+    @param relPosition relative position of the components
+    @param relQuaternion relative quaternion of the components
     @param contactInfo contact information
     @param pairID ID of the pair */
 template <typename T>
 __HOSTDEVICE__ static INLINE void
-    detectCollisionsObstacles_common(const uint2*               pairList,
-                                     const RigidBody<T>* const* particleRB,
-                                     const RigidBody<T>* const* obstacleRB,
-                                     const Transform3<T>*       transform,
-                                     const Transform3<T>* obstacleTransform,
-                                     ContactInfo<T>*      contactInfo,
-                                     const uint           pairID)
+    detectCollisionsComponents_common(const uint2*               pairList,
+                                      const RigidBody<T>* const* rigidBody,
+                                      const Vector3<T>*          relPosition,
+                                      const Quaternion<T>*       relQuaternion,
+                                      ContactInfo<T>*            contactInfo,
+                                      const uint                 pairID)
 {
-    const uint2          pair = pairList[pairID];
-    const uint           idA  = pair.x;
-    const uint           idB  = pair.y;
-    const RigidBody<T>&  rbA  = *(particleRB[idA]);
-    const RigidBody<T>&  rbB  = *(obstacleRB[idB]);
-    const Transform3<T>& trA  = transform[idA];
-    const Transform3<T>& trB  = obstacleTransform[idB];
-    closestPointsRigidBodies(rbA, rbB, trA, trB, contactInfo[pairID]);
+    const uint2          pair  = pairList[pairID];
+    const uint           idA   = pair.x;
+    const uint           idB   = pair.y;
+    const RigidBody<T>&  rbA   = *(rigidBody[idA]);
+    const RigidBody<T>&  rbB   = *(rigidBody[idB]);
+    const Vector3<T>&    v_b2a = relPosition[pairID];
+    const Quaternion<T>& q_b2a = relQuaternion[pairID];
+    closestPointsRigidBodies(rbA, rbB, v_b2a, q_b2a, contactInfo[pairID]);
 }
 
 // -----------------------------------------------------------------------------
-/** @brief Detects collisions between particles and particles
-    @param pairList list of rigid bodies pairs
-    @param particleRB rigid body of particles
-    @param transform transformation of the particles
-    @param contactInfo contact information
+/** @brief Flags active contacts and transforms CI from A-local to world.
+    @param pairList list of contact pairs
+    @param position world positions of components
+    @param quaternion world orientations of components
+    @param contactInfoLocal CI computed in A-local frame (input)
+    @param contactInfoWorld CI written in world frame (output, only for actives)
+    @param active flag buffer (1 if active/contact, else 0)
     @param pairID ID of the pair */
 template <typename T>
 __HOSTDEVICE__ static INLINE void
-    detectCollisionsParticles_common(const uint2*               pairList,
-                                     const RigidBody<T>* const* particleRB,
-                                     const Transform3<T>*       transform,
-                                     ContactInfo<T>*            contactInfo,
-                                     const uint                 pairID)
+    transformContactInfo_common(const uint2*         pairList,
+                                const Vector3<T>*    position,
+                                const Quaternion<T>* quaternion,
+                                ContactInfo<T>*      contactInfoLocal,
+                                ContactInfo<T>*      contactInfoWorld,
+                                uint*                active,
+                                const uint           pairID)
 {
-    const uint2          pair = pairList[pairID];
-    const uint           idA  = pair.x;
-    const uint           idB  = pair.y;
-    const RigidBody<T>&  rbA  = *(particleRB[idA]);
-    const RigidBody<T>&  rbB  = *(particleRB[idB]);
-    const Transform3<T>& tr   = transform[pairID];
-    closestPointsRigidBodies(rbA, rbB, tr, contactInfo[pairID]);
+    ContactInfo<T>& ciL = contactInfoLocal[pairID];
+    active[pairID]      = (ciL.getOverlapDistance() < T(0)) ? 1 : 0;
+
+    // Transform point and vector from A-local to world using A's pose
+    const uint           idA = pairList[pairID].x;
+    ContactInfo<T>&      ciW = contactInfoWorld[pairID];
+    const Quaternion<T>& qA  = quaternion[idA];
+    ciW.setContactPoint((qA >> ciL.getContactPoint()) + position[idA]);
+    ciW.setContactVector((qA >> ciL.getContactVector()));
+    ciW.setOverlapDistance(ciL.getOverlapDistance());
+
+    // reset the distance so we don't compute the torce twice
+    ciL.setOverlapDistance(T(0));
 }
 
 // -----------------------------------------------------------------------------
 /** @brief Computes the contact forces
     @param CF contact force models
-    @param pairList list of rigid bodies pairs
-    @param contactInfo contact information
-    @param particleRB rigid body of particles
-    @param velocity kinematics of the particles
-    @param torce torce acting on the particles
-    @param relTransform transformation of the particles
+    @param pairList list of pairs
+    @param contactInfo contact information in the world frame
+    @param rigidBody rigid body of components
+    @param position position of the components
+    @param velocity kinematics of the components
+    @param torce torce acting on the components
     @param pairID ID of the pair */
 template <typename T>
 __HOSTDEVICE__ static INLINE void
     computeContactForces_common(const ContactForceModel<T>* const* CF,
                                 const uint2*                       pairList,
                                 const ContactInfo<T>*              contactInfo,
-                                const RigidBody<T>* const*         particleRB,
+                                const RigidBody<T>* const*         rigidBody,
+                                const Vector3<T>*                  position,
                                 const Kinematics<T>*               velocity,
                                 Torce<T>*                          torce,
-                                const Transform3<T>*               relTransform,
                                 const uint                         pairID)
 {
-    const ContactInfo<T>& ci = contactInfo[pairID];
+    ContactInfo<T>& ci = const_cast<ContactInfo<T>&>(contactInfo[pairID]);
     // Compute the forces
+    // On device path, this is redundant.
     if(ci.getOverlapDistance() < T(0))
     {
         const uint2         pair      = pairList[pairID];
         const uint          idA       = pair.x;
         const uint          idB       = pair.y;
-        const RigidBody<T>* rbA       = particleRB[idA];
+        const RigidBody<T>* rbA       = rigidBody[idA];
         const uint          materialA = rbA->getMaterial();
         const T             massA     = rbA->getMass();
-        const RigidBody<T>* rbB       = particleRB[idB];
+        const RigidBody<T>* rbB       = rigidBody[idB];
         const uint          materialB = rbB->getMaterial();
         const T             massB     = rbB->getMass();
         // CF ID given materialIDs
         uint contactForceID
             = ContactForceModelFactory<T>::computeHash(materialA, materialB);
-        // velocities of the particles
+        // velocities of the components
         const Kinematics<T>& vA(velocity[idA]);
         const Kinematics<T>& vB(velocity[idB]);
         // geometric point of contact
@@ -149,72 +160,77 @@ __HOSTDEVICE__ static INLINE void
         // relative angular velocity
         const Vector3<T>& relAngVel(vA.getAngularComponent()
                                     - vB.getAngularComponent());
+        // note that we will add torce to obstacles as well.
         CF[contactForceID]->computeForces(ci,
                                           relVel,
                                           relAngVel,
+                                          position[idA],
+                                          position[idB],
                                           massA,
                                           massB,
-                                          relTransform[pairID].getOrigin(),
                                           torce[idA],
                                           torce[idB]);
     }
+    // reset the distance so we don't compute the torce twice
+    ci.setOverlapDistance(T(0));
 }
 
 // -----------------------------------------------------------------------------
-/** @brief Adds gravity to the particle
-    @param particleRB the rigid body of the particle
-    @param rigidBodyId the rigid body ID of the particle
+/** @brief Adds gravity to the component
     @param g the gravitational acceleration vector
-    @param torce the torce acting on the particle */
+    @param rigidBody the rigid body of the component
+    @param torce the torce acting on the component
+    @param cID the ID of the component */
 template <typename T>
 __HOSTDEVICE__ static INLINE void
     addExternalForces_common(const Vector3<T>&          g,
-                             const RigidBody<T>* const* particleRB,
+                             const RigidBody<T>* const* rigidBody,
                              Torce<T>*                  torce,
-                             const uint                 pID)
+                             const uint                 cID)
 {
-    const RigidBody<T>* rb   = particleRB[pID];
+    const RigidBody<T>* rb   = rigidBody[cID];
     const T             mass = rb->getMass();
     // Adding the gravitational force to the torce
-    torce[pID].addForce(mass * g);
+    torce[cID].addForce(mass * g);
 }
 
 // -----------------------------------------------------------------------------
-/** @brief Moves a particle using the given time integration method
+/** @brief Moves a component using the given time integration method
     @param TI the time integrator
-    @param particleRB the rigid body of the particle
-    @param transform the transformation of the particle
-    @param kinematics the kinematics of the particle
-    @param torce the torce acting on the particle
-    @param rigidBodyId the rigid body ID of the particle
-    @param pID the ID of the particle */
+    @param rigidBody the rigid body of the components
+    @param position the position of the component
+    @param quaternion the quaternion of the component
+    @param kinematics the kinematics of the component
+    @param torce the torce acting on the component
+    @param cID the ID of the component */
 template <typename T>
 __HOSTDEVICE__ static INLINE void
     moveParticles_common(const TimeIntegrator<T>* const* TI,
-                         const RigidBody<T>* const*      particleRB,
-                         Transform3<T>*                  transform,
+                         const RigidBody<T>* const*      rigidBody,
+                         Vector3<T>*                     position,
                          Quaternion<T>*                  quaternion,
                          Kinematics<T>*                  kinematics,
                          Torce<T>*                       torce,
-                         const uint*                     rigidBodyId,
-                         const uint                      pID)
+                         const uint                      cID)
 {
     // Rigid body
-    const RigidBody<T>* rb = particleRB[pID];
+    const RigidBody<T>* rb = rigidBody[cID];
     // Computing momentums in the space-fixed coordinate
     const Kinematics<T>& momentum
-        = rb->computeMomentum(kinematics[pID].getAngularComponent(),
-                              torce[pID],
-                              quaternion[pID]);
+        = rb->computeMomentum(kinematics[cID].getAngularComponent(),
+                              torce[cID],
+                              quaternion[cID]);
     // Reset torces
-    torce[pID].reset();
+    torce[cID].reset();
     // Finally, we move particles using the given time integration
     Vector3<T>    transMotion;
     Quaternion<T> rotMotion;
-    TI[0]->Move(momentum, kinematics[pID], transMotion, rotMotion);
+    TI[0]->Move(momentum, kinematics[cID], transMotion, rotMotion);
 
-    quaternion[pID] *= rotMotion;
-    transform[pID].updateTransform(transMotion, rotMotion);
+    position[cID] += transMotion;
+    quaternion[cID] *= rotMotion;
+
+    const T* rotMotionBuffer = rotMotion.getBuffer();
 }
 
 #endif

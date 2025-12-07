@@ -55,13 +55,8 @@ __GLOBAL__ void createRigidBodyKernel(RigidBody<T>** rb,
         if(convexType == SUPERQUADRIC)
             convex = new Superquadric<T>(args...);
     }
-
-    if(!convex)
-    {
-        GAbort("Convex is not created! Aborting Grains!");
-    }
-
-    rb[index] = new RigidBody<T>(convex, crustThickness, material, density);
+    GAssert(convex, "Convex is not created! Aborting Grains!");
+    rb[index] = new RigidBody<T>(convex, crustThickness, density, material);
 }
 
 /* ========================================================================== */
@@ -70,28 +65,83 @@ __GLOBAL__ void createRigidBodyKernel(RigidBody<T>** rb,
 // Creates and stores a RigidBody object in the host memory.
 template <typename T>
 __HOST__ void RigidBodyFactory<T>::create(
-    DOMNode*                                       root,
-    GrainsMemBuffer<RigidBody<T>*, MemType::HOST>& refRB,
-    GrainsMemBuffer<Transform3<T>, MemType::HOST>& initTransform,
-    GrainsMemBuffer<uint, MemType::HOST>&          numEachRefParticle,
-    uint&                                          numParticles)
+    DOMNode*                        obstacles,
+    DOMNode*                        particles,
+    GrainsMemBuffer<RigidBody<T>*>& refObstacleRB,
+    GrainsMemBuffer<RigidBody<T>*>& refParticleRB,
+    GrainsMemBuffer<Vector3<T>>&    refObstacleInitialPosition,
+    GrainsMemBuffer<Vector3<T>>&    refParticleInitialPosition,
+    GrainsMemBuffer<Quaternion<T>>& refObstacleInitialOrientation,
+    GrainsMemBuffer<Quaternion<T>>& refParticleInitialOrientation,
+    GrainsMemBuffer<uint>&          numEachRefObstacle,
+    GrainsMemBuffer<uint>&          numEachRefParticle,
+    uint&                           numObstacles,
+    uint&                           numParticles)
 {
-    // Particles
-    DOMNodeList* allParticles = ReaderXML::getNodes(root);
+    // Obstacles
+    numObstacles              = 0;
+    DOMNodeList* allObstacles = ReaderXML::getNodes(obstacles);
     // Number of unique shapes (rigid bodies) in the simulation
-    numParticles         = 0;
+    uint numRefObstacles = allObstacles->getLength();
+    refObstacleRB.initialize(numRefObstacles);
+    refObstacleInitialPosition.initialize(numRefObstacles);
+    refObstacleInitialOrientation.initialize(numRefObstacles);
+    numEachRefObstacle.initialize(numRefObstacles);
+    for(uint i = 0; i < numRefObstacles; ++i)
+    {
+        DOMNode* nObstacle    = allObstacles->item(i);
+        numEachRefObstacle[i] = 1;
+        refObstacleRB[i]      = new RigidBody<T>(nObstacle);
+        DOMNode*   nTransform = ReaderXML::getNode(nObstacle, "Transformation");
+        Vector3<T> centre(T(0), T(0), T(0));
+        Quaternion<T> rotation(T(0), T(0), T(0), T(1));
+        if(nTransform)
+        {
+            DOMNode* nCentre = ReaderXML::getNode(nTransform, "Centre");
+            if(nCentre)
+                centre = Vector3<T>(nCentre);
+
+            DOMNode* nRotation
+                = ReaderXML::getNode(nTransform, "AngularPosition");
+            if(nRotation)
+                rotation = Quaternion<T>(nRotation);
+        }
+        refObstacleInitialPosition[i]    = centre;
+        refObstacleInitialOrientation[i] = rotation;
+        numObstacles += numEachRefObstacle[i];
+    }
+
+    // Particles
+    numParticles              = 0;
+    DOMNodeList* allParticles = ReaderXML::getNodes(particles);
+    // Number of unique shapes (rigid bodies) in the simulation
     uint numRefParticles = allParticles->getLength();
-    refRB.allocate(numRefParticles);
-    initTransform.allocate(numRefParticles);
-    numEachRefParticle.allocate(numRefParticles);
-    for(int i = 0; i < numRefParticles; ++i)
+    refParticleRB.initialize(numRefParticles);
+    refParticleInitialPosition.initialize(numRefParticles);
+    refParticleInitialOrientation.initialize(numRefParticles);
+    numEachRefParticle.initialize(numRefParticles);
+    for(uint i = 0; i < numRefParticles; ++i)
     {
         DOMNode* nParticle    = allParticles->item(i);
         numEachRefParticle[i] = static_cast<uint>(
             ReaderXML::getNodeAttr_Int(nParticle, "Number"));
-        refRB[i]            = new RigidBody<T>(nParticle);
-        DOMNode* nTransform = ReaderXML::getNode(nParticle, "Transformation");
-        initTransform[i]    = Transform3<T>(nTransform);
+        refParticleRB[i]      = new RigidBody<T>(nParticle);
+        DOMNode*   nTransform = ReaderXML::getNode(nParticle, "Transformation");
+        Vector3<T> centre(T(0), T(0), T(0));
+        Quaternion<T> rotation(T(0), T(0), T(0), T(1));
+        if(nTransform)
+        {
+            DOMNode* nCentre = ReaderXML::getNode(nTransform, "Centre");
+            if(nCentre)
+                centre = Vector3<T>(nCentre);
+
+            DOMNode* nRotation
+                = ReaderXML::getNode(nTransform, "AngularPosition");
+            if(nRotation)
+                rotation = Quaternion<T>(nRotation);
+        }
+        refParticleInitialPosition[i]    = centre;
+        refParticleInitialOrientation[i] = rotation;
         numParticles += numEachRefParticle[i];
     }
 }
@@ -103,6 +153,7 @@ __HOST__ void RigidBodyFactory<T>::copyHostToDevice(
     GrainsMemBuffer<RigidBody<T>*, MemType::HOST>&   h_RB,
     GrainsMemBuffer<RigidBody<T>*, MemType::DEVICE>& d_RB)
 {
+    d_RB.initialize(h_RB.getSize());
     for(uint i = 0; i < h_RB.getSize(); ++i)
     {
         // Extracting info from the host side object

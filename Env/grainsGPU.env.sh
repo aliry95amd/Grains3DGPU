@@ -1,10 +1,4 @@
 # Definition
-# Grains
-export GRAINS_HOME=${HOME}/Desktop/Work/Codes/GrainsGPU
-export GRAINS_ROOT=${GRAINS_HOME}/Grains
-# End Grains
-
-
 # CPU
 export GRAINS_CPP_COMPILER=g++
 export GRAINS_CPP_COMPILER_DIST="GNU"
@@ -23,6 +17,16 @@ export GRAINS_GPU_COMPILER_LIBDIR="${GRAINS_GPU_COMPILER_ROOT}/lib64"
 # End GPU
 
 
+# Grains
+export GRAINS_FULL_EXT=${GRAINS_CPP_COMPILER_DIST}-${GRAINS_CPP_COMPILER_VERSION}-${GRAINS_GPU_COMPILER_DIST}-${GRAINS_GPU_COMPILER_VERSION}
+export GRAINS_HOME=${HOME}/Desktop/Work/Codes/GrainsGPU
+export GRAINS_ROOT=${GRAINS_HOME}/Grains
+export GRAINS_INCDIR=${GRAINS_ROOT}/include
+export GRAINS_OBJDIR=${GRAINS_ROOT}/obj${GRAINS_FULL_EXT}
+export GRAINS_LIBDIR=${GRAINS_ROOT}/lib${GRAINS_FULL_EXT}
+# End Grains
+
+
 # Xerces
 export GRAINS_XERCES_ROOT=${GRAINS_HOME}/XERCES-2.8.0
 export GRAINS_XERCES_INCDIR="${GRAINS_XERCES_ROOT}/include"
@@ -31,9 +35,13 @@ export GRAINS_XERCES_LIBDIR="${GRAINS_XERCES_ROOT}/lib64-${GRAINS_CPP_COMPILER_D
 # End Xerces
 
 
-# Full extension
-export GRAINS_FULL_EXT=${GRAINS_CPP_COMPILER_DIST}-${GRAINS_CPP_COMPILER_VERSION}-${GRAINS_GPU_COMPILER_DIST}-${GRAINS_GPU_COMPILER_VERSION}
-# End Full extension
+# Grains Test
+export GTEST_ROOT=/usr
+export GTEST_INCLUDE_DIR=/usr/include
+export GTEST_LIBRARY_DIR=/usr/lib/x86_64-linux-gnu
+export GRAINS_TEST_TIMEOUT=300
+export GRAINS_TEST_PARALLEL_JOBS=8
+# End Testing
 
 
 # Display
@@ -47,6 +55,7 @@ echo -e '\033[31mGRAINS_GPU_COMPILER_VERSION\033[0m =' $GRAINS_GPU_COMPILER_VERS
 echo -e '\033[31mGRAINS_GPU_COMPILER_ROOT\033[0m =' $GRAINS_GPU_COMPILER_ROOT
 echo -e '\033[31mGRAINS_FULL_EXT\033[0m =' $GRAINS_FULL_EXT
 echo -e '\033[31mXERCES_ROOT\033[0m =' $GRAINS_XERCES_ROOT
+# End Display
 
 
 # Compilers
@@ -64,9 +73,9 @@ export GRAINS_GPU_COMPILER_FLAGS="-t=8 -x cu -m64 \
     -std=c++20 -arch=sm_75 -lineinfo \
     -cudart static -cudadevrt static \
     -use_fast_math -extra-device-vectorization -restrict \
+    --extended-lambda --expt-relaxed-constexpr \
     -Xcompiler "-rdynamic,-fPIC,-fopenmp" \
-    -pg -g \
-    -diag-suppress 554"
+    -pg -g"
 export GRAINS_GPU_LINKER_FLAGS="-O3 -dlto \
     -arch=sm_75 -lineinfo -lcudart \
     -use_fast_math -extra-device-vectorization -restrict \
@@ -81,10 +90,21 @@ export GRAINS_Z_FLAGS="-L${GRAINS_Z_LIB} -lz"
 # End Flags
 
 
+# CMake Configuration
+export CMAKE_CXX_STANDARD=20
+export CMAKE_BUILD_TYPE=Release
+export CMAKE_CUDA_ARCHITECTURES=75
+export CMAKE_CUDA_STANDARD=20
+export CMAKE_PREFIX_PATH="${GRAINS_XERCES_ROOT}:${GRAINS_GPU_COMPILER_ROOT}:${CMAKE_PREFIX_PATH}"
+export PKG_CONFIG_PATH="${GRAINS_XERCES_LIBDIR}/pkgconfig:${PKG_CONFIG_PATH}"
+# End CMake
+
+
 # LD_LIBRARY_PATH
 export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:${GRAINS_XERCES_LIBDIR}
 export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:${GRAINS_ROOT}/lib${GRAINS_FULL_EXT}
 # End LD_LIBRARY_PATH
+
 
 # Compatibilty for Xerces
 source $GRAINS_HOME/Env/grains_xerces.env.sh

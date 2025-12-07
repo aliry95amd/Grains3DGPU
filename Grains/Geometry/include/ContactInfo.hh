@@ -77,4 +77,20 @@ public:
     //@}
 };
 
+/** @name External Methods - I/O methods */
+//@{
+/** @brief Output operator
+    @param fileIn input stream
+    @param c contact point object */
+template <typename T>
+__HOST__ std::ostream& operator<<(std::ostream&         fileOut,
+                                  const ContactInfo<T>& c);
+
+/** @brief Input operator
+    @param fileIn input stream
+    @param c contact point object */
+template <typename T>
+__HOST__ std::istream& operator>>(std::istream& fileIn, ContactInfo<T>& c);
+//@}
+
 #endif

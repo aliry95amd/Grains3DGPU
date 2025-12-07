@@ -37,7 +37,7 @@ __HOST__ void ContactForceModelFactory<T>::create(
     DOMElement* root, GrainsMemBuffer<ContactForceModel<T>*, MemType::HOST>& CF)
 {
     uint numContactPairs = GrainsParameters<T>::m_numContactPairs;
-    CF.allocate(numContactPairs);
+    CF.initialize(numContactPairs);
     DOMNodeList* allContacts = ReaderXML::getNodes(root, "ContactForceModel");
     for(XMLSize_t i = 0; i < allContacts->getLength(); i++)
     {
@@ -82,7 +82,7 @@ __HOST__ void ContactForceModelFactory<T>::copyHostToDevice(
     GrainsMemBuffer<ContactForceModel<T>*, MemType::DEVICE>& d_CF)
 {
     // Allocate the device memory for the contact force models
-    d_CF.allocate(h_CF.getSize());
+    d_CF.initialize(h_CF.getSize());
     for(uint i = 0; i < h_CF.getSize(); ++i)
     {
         if(h_CF[i] == nullptr)

@@ -16,10 +16,8 @@ template <typename T>
 class GrainsGPU : public Grains<T>
 {
 protected:
-    /** \brief Memory buffer for particle rigid bodies on the device. */
-    GrainsMemBuffer<RigidBody<T>*, MemType::DEVICE> m_d_particleRigidBodyList;
-    /** \brief Memory buffer for obstacle rigid bodies on the device. */
-    GrainsMemBuffer<RigidBody<T>*, MemType::DEVICE> m_d_obstacleRigidBodyList;
+    /** \brief Memory buffer for rigid bodies on the device. */
+    GrainsMemBuffer<RigidBody<T>*, MemType::DEVICE> m_d_rigidBodyList;
     /** \brief Manager of the components in the simulation. We use a pointer 
     here as we want to use runtime polymorphism for switching between 
     ComponentManagerCPU and ComponentManagerGPU. */

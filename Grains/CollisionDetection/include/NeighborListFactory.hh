@@ -38,28 +38,49 @@ public:
     //@{
     // -------------------------------------------------------------------------
     /** @brief Creates and returns a buffer of NeighborList objects
-        @param NL Memory buffer for storing the neighbor list object
-        @param numParticles Total number of particles in the simulation */
-    static void create(NeighborList<T, M>*& NL)
+        @param rb Rigid body buffer
+        @param positions Positions buffer
+        @param quaternions Quaternions buffer
+        @param nObstacles number of obstacles
+        @param nParticles number of particles        
+        @param NL Memory buffer for storing the neighbor list object */
+    static void create(const GrainsMemBuffer<RigidBody<T>*, M>* rb,
+                       const GrainsMemBuffer<Vector3<T>, M>&    positions,
+                       const GrainsMemBuffer<Quaternion<T>, M>& quaternions,
+                       const uint                               nObstacles,
+                       const uint                               nParticles,
+                       NeighborList<T, M>*&                     NL)
     {
         using GP = GrainsParameters<T>;
 
-        if(GP::m_neighborListType == 0)
+        // Assertions
+        GAssert(rb->getSize() == nObstacles + nParticles,
+                "Rigid body size mismatch");
+        GAssert(positions.getSize() == nObstacles + nParticles,
+                "Positions size mismatch");
+        GAssert(quaternions.getSize() == nObstacles + nParticles,
+                "Quaternions size mismatch");
+
+        // Global parameters
+        const auto&      CD   = GP::m_collisionDetection;
+        NeighborListType type = CD.neighborListType;
+
+        if(type == NeighborListType::NSQ)
         {
-            // brute-force neighbor list
-            NL = new NeighborList_Nsq<T, M>(GP::m_numParticles);
+            NL = new NeighborList_Nsq<T, M>(nObstacles, nParticles);
         }
-        else if(GP::m_neighborListType == 1)
+        else if(type == NeighborListType::LINKEDCELL)
         {
-            T cellSize = T(2) * GP::m_maxRadius * GP::m_linkedCellSizeFactor;
-            // Linked cell neighbor list
-            NL = new NeighborList_LinkedCell<T, M>(GP::m_origin,
-                                                   GP::m_maxCoordinate,
-                                                   cellSize,
-                                                   GP::m_numParticles);
+            NL = new NeighborList_LinkedCell<T, M>(rb,
+                                                   positions,
+                                                   quaternions,
+                                                   CD.linkedCellParameters,
+                                                   nObstacles,
+                                                   nParticles);
         }
-        else
-            GAbort("Unknown neighbor list type! Aborting Grains!");
+
+        // Sanity check to ensure neighbor list was created
+        GAssert(NL != nullptr, "Neighbor list creation failed.");
     }
     //@}
 };

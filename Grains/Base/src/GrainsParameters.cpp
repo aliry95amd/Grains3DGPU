@@ -25,8 +25,6 @@ template <typename T>
 uint GrainsParameters<T>::m_numParticles = 0;
 template <typename T>
 uint GrainsParameters<T>::m_numObstacles = 0;
-template <typename T>
-T GrainsParameters<T>::m_maxRadius = T(0);
 
 /* Physical */
 template <typename T>
@@ -50,21 +48,8 @@ cudaDeviceProp GrainsParameters<T>::m_GPU = {};
 
 /* Collision Detection */
 template <typename T>
-uint GrainsParameters<T>::m_neighborListType = 0;
-template <typename T>
-uint GrainsParameters<T>::m_neighborListFrequency = 0;
-template <typename T>
-uint GrainsParameters<T>::m_linkedCellType = 0;
-template <typename T>
-uint GrainsParameters<T>::m_linkedCellSizeFactor = 0;
-template <typename T>
-uint GrainsParameters<T>::m_sortingFrequency = 0;
-template <typename T>
-uint GrainsParameters<T>::m_numCells = 0;
-template <typename T>
-uint GrainsParameters<T>::m_boundingVolumeType = 0;
-template <typename T>
-uint GrainsParameters<T>::m_narrowPhaseType = 0;
+typename GrainsParameters<T>::CollisionDetectionParameters
+    GrainsParameters<T>::m_collisionDetection;
 
 // -----------------------------------------------------------------------------
 // Explicit instantiation

@@ -16,29 +16,24 @@ __HOST__ HookeContactForceModel<T>::HookeContactForceModel(DOMNode* root)
 {
     DOMNode* parameter;
     parameter = ReaderXML::getNode(root, "kn");
-    if(!parameter)
-        GAbort("kn not defined! Aborting Grains!");
+    GAssert(parameter, "kn not defined! Aborting Grains!");
     m_kn = T(ReaderXML::getNodeValue_Double(parameter));
 
     parameter = ReaderXML::getNode(root, "en");
-    if(!parameter)
-        GAbort("en not defined! Aborting Grains!");
+    GAssert(parameter, "en not defined! Aborting Grains!");
     m_en   = T(ReaderXML::getNodeValue_Double(parameter));
     m_muen = log(m_en) / sqrt(PI<T> * PI<T> + log(m_en) * log(m_en));
 
     parameter = ReaderXML::getNode(root, "etat");
-    if(!parameter)
-        GAbort("etat not defined! Aborting Grains!");
+    GAssert(parameter, "etat not defined! Aborting Grains!");
     m_etat = T(ReaderXML::getNodeValue_Double(parameter));
 
     parameter = ReaderXML::getNode(root, "muc");
-    if(!parameter)
-        GAbort("muc not defined! Aborting Grains!");
+    GAssert(parameter, "muc not defined! Aborting Grains!");
     m_muc = T(ReaderXML::getNodeValue_Double(parameter));
 
     parameter = ReaderXML::getNode(root, "kr");
-    if(!parameter)
-        GAbort("kr not defined! Aborting Grains!");
+    GAssert(parameter, "kr not defined! Aborting Grains!");
     m_kr = T(ReaderXML::getNodeValue_Double(parameter));
 }
 
@@ -92,8 +87,8 @@ __HOSTDEVICE__ void HookeContactForceModel<T>::performForcesCalculus(
     const ContactInfo<T>& contactInfos,
     const Vector3<T>&     relVelocityAtContact,
     const Vector3<T>&     relAngVelocity,
-    T                     m1,
-    T                     m2,
+    const T               mA,
+    const T               mB,
     Vector3<T>&           delFN,
     Vector3<T>&           delFT,
     Vector3<T>&           delM) const
@@ -107,7 +102,7 @@ __HOSTDEVICE__ void HookeContactForceModel<T>::performForcesCalculus(
 
     // Unit normal vector at contact point
     penetration /= norm(penetration);
-    penetration.round();
+    round(penetration);
 
     Vector3<T> v_n = (relVelocityAtContact * penetration) * penetration;
     Vector3<T> v_t = relVelocityAtContact - v_n;
@@ -119,11 +114,11 @@ __HOSTDEVICE__ void HookeContactForceModel<T>::performForcesCalculus(
         tangent = v_t / normv_t;
 
     // Normal dissipative force
-    T avmass = m1 * m2 / (m1 + m2);
+    T avmass = mA * mB / (mA + mB);
     T omega0 = sqrt(m_kn / avmass);
     if(avmass == T(0))
     {
-        avmass = m2 == T(0) ? T(0.5) * m1 : T(0.5) * m2;
+        avmass = mB == T(0) ? T(0.5) * mA : T(0.5) * mB;
         omega0 = T(2) * sqrt(m_kn / avmass);
     }
     T muen = -omega0 * m_muen;
@@ -163,9 +158,10 @@ __HOSTDEVICE__ void HookeContactForceModel<T>::computeForces(
     const ContactInfo<T>& contactInfos,
     const Vector3<T>&     relVelocityAtContact,
     const Vector3<T>&     relAngVelocity,
-    T                     m1,
-    T                     m2,
-    const Vector3<T>&     trOrigin,
+    const Vector3<T>&     vA,
+    const Vector3<T>&     vB,
+    const T               mA,
+    const T               mB,
     Torce<T>&             torceA,
     Torce<T>&             torceB) const
 {
@@ -174,16 +170,16 @@ __HOSTDEVICE__ void HookeContactForceModel<T>::computeForces(
     performForcesCalculus(contactInfos,
                           relVelocityAtContact,
                           relAngVelocity,
-                          m1,
-                          m2,
+                          mA,
+                          mB,
                           delFN,
                           delFT,
                           delM);
 
     const Vector3<T>& geometricPointOfContact = contactInfos.getContactPoint();
     delFN += delFT;
-    torceA.addForce(delFN, geometricPointOfContact);
-    torceB.addForce(-delFN, geometricPointOfContact - trOrigin);
+    torceA.addForce(delFN, geometricPointOfContact - vA);
+    torceB.addForce(-delFN, geometricPointOfContact - vB);
     if(m_kr)
     {
         torceA.addTorque(delM);

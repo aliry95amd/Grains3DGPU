@@ -3,6 +3,7 @@
 
 #include "Basic.hh"
 #include "Vector3.hh"
+#include <unistd.h>
 
 // =============================================================================
 /** @brief Miscellaneous functionalities (mostly low-level) for Grains.
@@ -32,6 +33,25 @@ __HOST__ static INLINE void
         if(abort)
             exit(code);
     }
+}
+
+// -----------------------------------------------------------------------------
+/** @brief Returns the available memory on the host in bytes */
+__HOST__ static INLINE size_t getAvailableHostMemory()
+{
+    long pages     = sysconf(_SC_AVPHYS_PAGES);
+    long page_size = sysconf(_SC_PAGE_SIZE);
+    return pages * page_size;
+}
+
+// -----------------------------------------------------------------------------
+/** @brief Returns the available memory on the device in bytes */
+__HOST__ static INLINE size_t getAvailableDeviceMemory()
+{
+    size_t free_byte;
+    size_t total_byte;
+    cudaErrCheck(cudaMemGetInfo(&free_byte, &total_byte));
+    return free_byte;
 }
 
 // -----------------------------------------------------------------------------
@@ -123,7 +143,7 @@ __HOST__ static constexpr INLINE std::string
 {
     std::ostringstream oss;
     oss << vec;
-    return ("[" + oss.str() + "]");
+    return (oss.str());
 }
 
 // -----------------------------------------------------------------------------
@@ -155,12 +175,46 @@ __HOST__ INLINE void GoutWI(const int numShift, const Args&... args)
 /** @brief Writes a message to stdout with Indent (WI)
     @param numShift the number of shift characters at the beginning
     @param args the output messages */
+// Helper functions for device printf with different types
+__DEVICE__ INLINE void print_device_arg(const char* arg)
+{
+    printf("%s ", arg);
+}
+__DEVICE__ INLINE void print_device_arg(char* arg)
+{
+    printf("%s ", arg);
+}
+__DEVICE__ INLINE void print_device_arg(size_t arg)
+{
+    printf("%zu ", arg);
+}
+__DEVICE__ INLINE void print_device_arg(int arg)
+{
+    printf("%d ", arg);
+}
+__DEVICE__ INLINE void print_device_arg(uint arg)
+{
+    printf("%u ", arg);
+}
+__DEVICE__ INLINE void print_device_arg(long arg)
+{
+    printf("%ld ", arg);
+}
+__DEVICE__ INLINE void print_device_arg(float arg)
+{
+    printf("%f ", arg);
+}
+__DEVICE__ INLINE void print_device_arg(double arg)
+{
+    printf("%f ", arg);
+}
+
 template <typename... Args>
 __HOSTDEVICE__ INLINE void GAbort(const Args&... args)
 {
 #ifdef __CUDA_ARCH__
     printf("[DEVICE] ");
-    (printf("%s ", args), ...);
+    (print_device_arg(args), ...);
     printf("\n");
     __trap(); // aborts the kernel
 #else
@@ -169,6 +223,17 @@ __HOSTDEVICE__ INLINE void GAbort(const Args&... args)
     std::cerr << std::endl;
     std::abort();
 #endif
+}
+
+// -----------------------------------------------------------------------------
+/** @brief Assert function that aborts the program if the condition is false
+    @param condition the condition to check
+    @param args the message(s) to display if the assertion fails */
+template <typename... Args>
+__HOSTDEVICE__ INLINE void GAssert(bool condition, const Args&... args)
+{
+    if(!condition)
+        GAbort("GAssert failed:", args...);
 }
 
 #endif

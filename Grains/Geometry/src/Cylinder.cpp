@@ -1,4 +1,5 @@
 #include "Cylinder.hh"
+#include "VectorMath.hh"
 
 // multiple of 4
 #define visuNodeNbOnPer 32
@@ -144,8 +145,7 @@ __HOST__ void Cylinder<T>::readConvex(std::istream& fileIn)
 template <typename T>
 __HOST__ void Cylinder<T>::writeConvex(std::ostream& fileOut) const
 {
-    fileOut << "Cylinder with radius " << m_radius << ", and height "
-            << T(2) * m_halfHeight << ".\n";
+    fileOut << "Cylinder: " << m_radius << ", " << T(2) * m_halfHeight << ".\n";
 }
 
 // -----------------------------------------------------------------------------

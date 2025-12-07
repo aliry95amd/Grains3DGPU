@@ -15,7 +15,17 @@ __HOSTDEVICE__ Convex<T>::~Convex()
 }
 
 // -----------------------------------------------------------------------------
-// Destructor
+// Returns whether point p lies in the convex shape
+// @param p point
+template <typename T>
+__HOSTDEVICE__ bool Convex<T>::isInside(const Vector3<T>& p) const
+{
+    // Default implementation (for convex shapes that are not defined)
+    return true;
+}
+
+// -----------------------------------------------------------------------------
+//
 template <typename T>
 __HOST__ void
     Convex<T>::writePoints_PARAVIEW(std::ostream&        f,
@@ -30,29 +40,33 @@ __HOST__ void
     }
 }
 
-// // ----------------------------------------------------------------------------
-// // Input operator
-// template <typename T>
-// __HOST__
-// std::istream& Convex<T>::operator >> ( std::istream& fileIn,
-//                                        Convex<T>& convex )
-// {
-//   convex.readShape( fileIn );
-//   return ( fileIn );
-// }
+// -----------------------------------------------------------------------------
+// Output operator for Convex
+template <typename T>
+__HOST__ std::ostream& operator<<(std::ostream&    fileOut,
+                                  const Convex<T>& convex)
+{
+    convex.writeConvex(fileOut);
+    return fileOut;
+}
 
-// // ---------------------------------------------------------------------
-// // Output operator
-// template <typename T>
-// __HOST__
-// std::ostream& Convex<T>::operator << ( std::ostream& fileOut,
-//                                        Convex<T> const& convex )
-// {
-//   convex.writeShape( fileOut );
-//   return ( fileOut );
-// }
+// -----------------------------------------------------------------------------
+// Input operator for Convex
+template <typename T>
+__HOST__ std::istream& operator>>(std::istream& fileIn, Convex<T>& convex)
+{
+    convex.readConvex(fileIn);
+    return fileIn;
+}
 
 // -----------------------------------------------------------------------------
 // Explicit instantiation
 template class Convex<float>;
 template class Convex<double>;
+
+#define X(T)                                                                \
+    template std::ostream& operator<< <T>(std::ostream&, const Convex<T>&); \
+    template std::istream& operator>> <T>(std::istream&, Convex<T>&);
+X(float)
+X(double)
+#undef X

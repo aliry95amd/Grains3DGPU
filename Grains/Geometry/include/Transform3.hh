@@ -46,6 +46,12 @@ public:
     __HOSTDEVICE__
     Transform3(T const* buffer);
 
+    /** @brief Constructor with a quaternion and position
+         @param q the quaternion representing the rotation
+         @param p the position vector */
+    __HOSTDEVICE__
+    Transform3(const Quaternion<T>& q, const Vector3<T>& p);
+
     /** @brief Constructor with two tranformations. This constructs a 
         transformation which is equal to 't2 o inv( t1 )', representing t2 in
         local coordinate of t1.
@@ -54,15 +60,15 @@ public:
     __HOSTDEVICE__
     Transform3(const Transform3<T>& t1, const Transform3<T>& t2);
 
-    /** @brief Constructor with an XML node
-        @param root the xml node */
-    __HOST__
-    Transform3(DOMNode* root);
-
     /** @brief Copy constructor
-        @param t the transformation to be copied */
+     @param t the transformation to be copied */
     __HOSTDEVICE__
     Transform3(const Transform3<T>& t);
+
+    /** @brief Constructor with an XML node
+         @param root the xml node */
+    __HOST__
+    Transform3(DOMNode* root);
 
     /** @brief Destructor */
     __HOSTDEVICE__
@@ -71,6 +77,10 @@ public:
 
     /**@name Get methods */
     //@{
+    /** @brief Gets the rotation of the transformation */
+    __HOSTDEVICE__
+    Quaternion<T> getRotation() const;
+
     /** @brief Gets the orientation of the transformation */
     __HOSTDEVICE__
     Matrix3<T> getBasis() const;
@@ -96,7 +106,7 @@ public:
     void setBasis(const Matrix3<T>& m);
 
     /** @brief Sets the matrix part of the transformation with specified
-        rotations around each principal axis
+        rotations around each principal axis (radians)
         @param aX rotation around the x-axis
         @param aY rotation around the y-axis
         @param aZ rotation around the z-axis */
@@ -198,30 +208,23 @@ public:
         @param t the other Transform object */
     __HOSTDEVICE__
     Transform3<T>& operator=(const Transform3<T>& t);
-
-    /** @brief Conversion operator float */
-    __HOSTDEVICE__
-    operator Transform3<float>() const;
     //@}
 };
 
 /** @name External Methods - I/O methods */
 //@{
-/** @brief Input operator
-@param fileIn input stream
-@param v vector */
-template <typename T>
-__HOST__ std::istream& operator>>(std::istream& fileIn, Transform3<T>& t);
-
 /** @brief Output operator
-@param fileOut output stream
-@param v vector */
+ @param fileOut output stream
+ @param t transform object */
 template <typename T>
 __HOST__ std::ostream& operator<<(std::ostream&        fileOut,
                                   const Transform3<T>& t);
-//@}
 
-typedef Transform3<float>  Tr3F;
-typedef Transform3<double> Tr3D;
+/** @brief Input operator
+        @param fileIn input stream
+        @param t transform object */
+template <typename T>
+__HOST__ std::istream& operator>>(std::istream& fileIn, Transform3<T>& t);
+//@}
 
 #endif

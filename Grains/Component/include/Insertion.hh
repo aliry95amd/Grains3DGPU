@@ -1,11 +1,14 @@
 #ifndef _INSERTION_HH_
 #define _INSERTION_HH_
 
+#include <variant>
+
+#include "GrainsMemBuffer.hh"
 #include "InsertionWindow.hh"
 #include "Kinematics.hh"
+#include "Quaternion.hh"
 #include "ReaderXML.hh"
-#include "Transform3.hh"
-#include <variant>
+#include "RigidBody.hh"
 
 /** @name Enumerations */
 //@{
@@ -70,6 +73,8 @@ protected:
     InsertionInfo<T> m_translationalVelInsertionInfo;
     /** \brief info required for coming up with an insertion omega. */
     InsertionInfo<T> m_angularVelInsertionInfo;
+    /** \brief If insertion should be forced (true) or not (false) */
+    bool m_forceInsertion;
     //@}
 
 public:
@@ -106,13 +111,24 @@ public:
         @param type insertion type
         @param data insertion info */
     __HOST__
-    Vector3<T> fetchInsertionDataForEach(InsertionType const type,
-                                         InsertionInfo<T>&   data);
+    Vector3<T> fetchInsertionData(InsertionType const type,
+                                  InsertionInfo<T>&   data);
 
     /** @brief Returns all required data members to insert components as a 
-        vector */
+        vector
+        @param rigidBody rigid body buffer
+        @param position position buffer
+        @param quaternion quaternion buffer
+        @param velocity velocity buffer
+        @param numObstacles number of obstacles
+        @param numParticles number of particles */
     __HOST__
-    std::pair<Transform3<T>, Kinematics<T>> fetchInsertionData();
+    void insert(const GrainsMemBuffer<RigidBody<T>*>* rigidBody,
+                GrainsMemBuffer<Vector3<T>>&          position,
+                GrainsMemBuffer<Quaternion<T>>&       quaternion,
+                GrainsMemBuffer<Kinematics<T>>&       velocity,
+                const uint                            numObstacles,
+                const uint                            numParticles);
     //@}
 };
 

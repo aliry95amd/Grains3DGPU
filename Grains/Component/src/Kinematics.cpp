@@ -95,8 +95,9 @@ __HOSTDEVICE__ Vector3<T>
 template <typename T>
 __HOST__ std::ostream& operator<<(std::ostream& fileOut, const Kinematics<T>& k)
 {
-    fileOut << k.getTranslationalComponent() << std::endl
-            << k.getAngularComponent();
+    fileOut << "Translational Component: " << k.getTranslationalComponent()
+            << "\n"
+            << "Angular Component: " << k.getAngularComponent();
     return (fileOut);
 }
 
@@ -113,7 +114,7 @@ __HOST__ std::istream& operator>>(std::istream& fileIn, Kinematics<T>& k)
     return (fileIn);
 }
 
-// -----------------------------------------------------------------------------// -----------------------------------------------------------------------------
+// -----------------------------------------------------------------------------
 // Explicit instantiation
 template class Kinematics<float>;
 template class Kinematics<double>;

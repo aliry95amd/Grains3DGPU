@@ -7,7 +7,7 @@
 /* ========================================================================== */
 // Writes obstacles data
 template <typename T>
-void writeObstacles_Paraview(const GrainsMemBuffer<RigidBody<T>*>& obstacleRB,
+void writeObstacles_Paraview(const GrainsMemBuffer<RigidBody<T>*>&       rb,
                              const std::unique_ptr<ComponentManager<T>>& cm,
                              const std::string& obsFileName)
 {
@@ -18,9 +18,13 @@ void writeObstacles_Paraview(const GrainsMemBuffer<RigidBody<T>*>& obstacleRB,
         throw std::runtime_error("Cannot open file for writing: "
                                  + obsFileName);
     }
-    const uint numObstacles                   = cm->getNumberOfObstacles();
-    const GrainsMemBuffer<Transform3<T>>& tr  = cm->getObstaclesTransform();
-    const GrainsMemBuffer<Kinematics<T>>& kin = cm->getObstaclesVelocity();
+    const uint numObstacles                        = cm->getNumberOfObstacles();
+    const GrainsMemBuffer<Vector3<T>>&    position = cm->getPosition();
+    const GrainsMemBuffer<Quaternion<T>>& quaternion = cm->getQuaternion();
+    const GrainsMemBuffer<Kinematics<T>>& kin        = cm->getVelocity();
+    GrainsMemBuffer<Transform3<T>>        tr(numObstacles);
+    for(uint i = 0; i < numObstacles; ++i)
+        tr[i] = Transform3<T>(quaternion[i], position[i]);
 
     f << "<VTKFile type=\"UnstructuredGrid\" version=\"0.1\" "
       << "byte_order=\"LittleEndian\" ";
@@ -29,8 +33,8 @@ void writeObstacles_Paraview(const GrainsMemBuffer<RigidBody<T>*>& obstacleRB,
     uint nbpts = 0, nbcells = 0;
     for(uint i = 0; i < numObstacles; ++i)
     {
-        nbpts += obstacleRB[i]->getConvex()->numberOfPoints_PARAVIEW();
-        nbcells += obstacleRB[i]->getConvex()->numberOfCells_PARAVIEW();
+        nbpts += rb[i]->getConvex()->numberOfPoints_PARAVIEW();
+        nbcells += rb[i]->getConvex()->numberOfCells_PARAVIEW();
     }
     f << "<Piece NumberOfPoints=\"" << nbpts << "\"" << " NumberOfCells=\""
       << nbcells << "\">" << endl;
@@ -39,7 +43,7 @@ void writeObstacles_Paraview(const GrainsMemBuffer<RigidBody<T>*>& obstacleRB,
     f << "format=\"ascii\">";
     f << endl;
     for(uint i = 0; i < numObstacles; ++i)
-        obstacleRB[i]->getConvex()->writePoints_PARAVIEW(f, tr[i]);
+        rb[i]->getConvex()->writePoints_PARAVIEW(f, tr[i]);
     f << "</DataArray>" << endl;
     f << "</Points>" << endl;
 
@@ -47,12 +51,11 @@ void writeObstacles_Paraview(const GrainsMemBuffer<RigidBody<T>*>& obstacleRB,
     list<uint>::iterator ii;
     uint                 firstpoint_globalnumber = 0, last_offset = 0;
     for(uint i = 0; i < numObstacles; ++i)
-        obstacleRB[i]->getConvex()->writeConnection_PARAVIEW(
-            connectivity,
-            offsets,
-            cellstype,
-            firstpoint_globalnumber,
-            last_offset);
+        rb[i]->getConvex()->writeConnection_PARAVIEW(connectivity,
+                                                     offsets,
+                                                     cellstype,
+                                                     firstpoint_globalnumber,
+                                                     last_offset);
     f << "<Cells>" << endl;
     f << "<DataArray type=\"Int32\" Name=\"connectivity\" ";
     f << "format=\"ascii\">";
@@ -85,7 +88,7 @@ void writeObstacles_Paraview(const GrainsMemBuffer<RigidBody<T>*>& obstacleRB,
     {
         // double indic = obstacleRB[i]->getIndicator();
         double indic = 0;
-        int    nc    = obstacleRB[i]->getConvex()->numberOfCells_PARAVIEW();
+        int    nc    = rb[i]->getConvex()->numberOfCells_PARAVIEW();
         for(uint j = 0; j < nc; ++j)
             f << indic << " ";
     }
@@ -102,7 +105,7 @@ void writeObstacles_Paraview(const GrainsMemBuffer<RigidBody<T>*>& obstacleRB,
 // -----------------------------------------------------------------------------
 // Writes particles data
 template <typename T>
-void writeParticles_Paraview(const GrainsMemBuffer<RigidBody<T>*>& particleRB,
+void writeParticles_Paraview(const GrainsMemBuffer<RigidBody<T>*>&       rb,
                              const std::unique_ptr<ComponentManager<T>>& cm,
                              const std::string& parFileName)
 {
@@ -113,19 +116,25 @@ void writeParticles_Paraview(const GrainsMemBuffer<RigidBody<T>*>& particleRB,
         throw std::runtime_error("Cannot open file for writing: "
                                  + parFileName);
     }
-    const uint numParticles                   = cm->getNumberOfParticles();
-    const GrainsMemBuffer<Transform3<T>>& tr  = cm->getTransform();
-    const GrainsMemBuffer<Kinematics<T>>& kin = cm->getVelocity();
+    const uint numObstacles                        = cm->getNumberOfObstacles();
+    const uint numParticles                        = cm->getNumberOfParticles();
+    const GrainsMemBuffer<Vector3<T>>&    position = cm->getPosition();
+    const GrainsMemBuffer<Quaternion<T>>& quaternion = cm->getQuaternion();
+    const GrainsMemBuffer<Kinematics<T>>& kin        = cm->getVelocity();
+    GrainsMemBuffer<Transform3<T>>        tr(numParticles);
+    for(uint i = 0; i < numParticles; ++i)
+        tr[i] = Transform3<T>(quaternion[numObstacles + i],
+                              position[numObstacles + i]);
 
     f << "<VTKFile type=\"UnstructuredGrid\" version=\"0.1\" "
       << "byte_order=\"LittleEndian\" ";
     f << ">" << endl;
     f << "<UnstructuredGrid>" << endl;
     uint nbpts = 0, nbcells = 0;
-    for(uint i = 0; i < numParticles; ++i)
+    for(uint i = numObstacles; i < numObstacles + numParticles; ++i)
     {
-        nbpts += particleRB[i]->getConvex()->numberOfPoints_PARAVIEW();
-        nbcells += particleRB[i]->getConvex()->numberOfCells_PARAVIEW();
+        nbpts += rb[i]->getConvex()->numberOfPoints_PARAVIEW();
+        nbcells += rb[i]->getConvex()->numberOfCells_PARAVIEW();
     }
 
     f << "<Piece NumberOfPoints=\"" << nbpts << "\"" << " NumberOfCells=\""
@@ -137,7 +146,7 @@ void writeParticles_Paraview(const GrainsMemBuffer<RigidBody<T>*>& particleRB,
 
     for(uint i = 0; i < numParticles; ++i)
     {
-        particleRB[i]->getConvex()->writePoints_PARAVIEW(f, tr[i]);
+        rb[numObstacles + i]->getConvex()->writePoints_PARAVIEW(f, tr[i]);
     }
     f << "</DataArray>" << endl;
     f << "</Points>" << endl;
@@ -146,7 +155,7 @@ void writeParticles_Paraview(const GrainsMemBuffer<RigidBody<T>*>& particleRB,
     list<uint>::iterator ii;
     uint                 firstpoint_globalnumber = 0, last_offset = 0;
     for(uint i = 0; i < numParticles; ++i)
-        particleRB[i]->getConvex()->writeConnection_PARAVIEW(
+        rb[numObstacles + i]->getConvex()->writeConnection_PARAVIEW(
             connectivity,
             offsets,
             cellstype,
@@ -182,10 +191,10 @@ void writeParticles_Paraview(const GrainsMemBuffer<RigidBody<T>*>& particleRB,
     f << "<DataArray type=\"Float32\" Name=\"NormU\" ";
     f << "format=\"ascii\">" << endl;
 
-    for(uint i = 0; i < numParticles; ++i)
+    for(uint i = numObstacles; i < numObstacles + numParticles; ++i)
     {
         T    normU = norm(kin[i].getTranslationalComponent());
-        uint nc    = particleRB[i]->getConvex()->numberOfCells_PARAVIEW();
+        uint nc    = rb[i]->getConvex()->numberOfCells_PARAVIEW();
         for(uint j = 0; j < nc; ++j)
             f << normU << " ";
     }
@@ -195,10 +204,10 @@ void writeParticles_Paraview(const GrainsMemBuffer<RigidBody<T>*>& particleRB,
     f << "<DataArray type=\"Float32\" Name=\"NormOm\" ";
     f << "format=\"ascii\">" << endl;
 
-    for(uint i = 0; i < numParticles; ++i)
+    for(uint i = numObstacles; i < numObstacles + numParticles; ++i)
     {
         T    normOm = norm(kin[i].getAngularComponent());
-        uint nc     = particleRB[i]->getConvex()->numberOfCells_PARAVIEW();
+        uint nc     = rb[i]->getConvex()->numberOfCells_PARAVIEW();
         for(uint j = 0; j < nc; ++j)
             f << normOm << " ";
     }
@@ -208,10 +217,10 @@ void writeParticles_Paraview(const GrainsMemBuffer<RigidBody<T>*>& particleRB,
     f << "<DataArray type=\"Float32\" Name=\"CoordNumb\" ";
     f << "format=\"ascii\">" << endl;
 
-    for(uint i = 0; i < numParticles; ++i)
+    for(uint i = numObstacles; i < numObstacles + numParticles; ++i)
     {
         T    coordNum = 0;
-        uint nc       = particleRB[i]->getConvex()->numberOfCells_PARAVIEW();
+        uint nc       = rb[i]->getConvex()->numberOfCells_PARAVIEW();
         for(uint j = 0; j < nc; ++j)
             f << coordNum << " ";
     }
@@ -313,8 +322,7 @@ void ParaviewPostProcessingWriter<T>::PostProcessing_start()
 // Writes data
 template <typename T>
 void ParaviewPostProcessingWriter<T>::PostProcessing(
-    const GrainsMemBuffer<RigidBody<T>*>&       particleRB,
-    const GrainsMemBuffer<RigidBody<T>*>&       obstacleRB,
+    const GrainsMemBuffer<RigidBody<T>*>&       rb,
     const std::unique_ptr<ComponentManager<T>>& cm,
     const T                                     currentTime)
 {
@@ -346,7 +354,7 @@ void ParaviewPostProcessingWriter<T>::PostProcessing(
     f << "</Collection>" << endl;
     f << "</VTKFile>" << endl;
     f.close();
-    writeObstacles_Paraview(obstacleRB, cm, obsFileNamePath);
+    writeObstacles_Paraview(rb, cm, obsFileNamePath);
 
     // Particles
     std::string parFileName
@@ -370,7 +378,7 @@ void ParaviewPostProcessingWriter<T>::PostProcessing(
     g << "</VTKFile>" << endl;
     g.close();
 
-    writeParticles_Paraview(particleRB, cm, parFileNamePath);
+    writeParticles_Paraview(rb, cm, parFileNamePath);
     m_ParaviewCycleNumber++;
 }
 

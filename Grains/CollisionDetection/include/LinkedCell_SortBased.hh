@@ -2,14 +2,11 @@
 #define _LINKEDCELL_SORTBASED_HH_
 
 #include "thrust/device_ptr.h"
-#include "thrust/for_each.h"
-#include "thrust/iterator/zip_iterator.h"
 #include "thrust/sort.h"
 
 #include "GrainsMemBuffer.hh"
 #include "LinkedCell.hh"
 #include "LinkedCell_Kernels.hh"
-#include "Misc_Kernels.hh"
 
 // =============================================================================
 /** @brief The class LinkedCell_SortBased.
@@ -29,11 +26,13 @@ template <typename T>
 class LinkedCell_SortBased : public LinkedCell<T, MemType::DEVICE>
 {
     using LC = LinkedCell<T, MemType::DEVICE>;
+    using LC::m_cellID;
     using LC::m_cells;
     using LC::m_neighborCells;
     using LC::m_numCells;
-    using LC::m_particleHash;
+    using LC::m_numParticles;
     using LC::m_particleID;
+    using LC::m_useAdaptiveSkin;
 
 protected:
     /** @name Parameters */
@@ -51,16 +50,25 @@ public:
 
     // -------------------------------------------------------------------------
     /** @brief Constructor with parameters
-        @param minCorner minimum corner of the domain
-        @param maxCorner maximum corner of the domain
-        @param cellSize size of the cell
+        @param rb Rigid body buffer
+        @param positions Positions buffer
+        @param quaternions Quaternions buffer
+        @param linkedCellParameters Linked cell parameters
+        @param nObstacles number of obstacles
         @param nParticles number of particles */
-    LinkedCell_SortBased(const Vector3<T>& minCorner,
-                         const Vector3<T>& maxCorner,
-                         const T           cellSize,
-                         const uint        nParticles)
-        : LinkedCell<T, MemType::DEVICE>(
-              minCorner, maxCorner, cellSize, nParticles)
+    LinkedCell_SortBased(
+        const GrainsMemBuffer<RigidBody<T>*, MemType::DEVICE>* rb,
+        const GrainsMemBuffer<Vector3<T>, MemType::DEVICE>&    positions,
+        const GrainsMemBuffer<Quaternion<T>, MemType::DEVICE>& quaternions,
+        const LinkedCellParameters<T>& linkedCellParameters,
+        const uint                     nObstacles,
+        const uint                     nParticles)
+        : LinkedCell<T, MemType::DEVICE>(rb,
+                                         positions,
+                                         quaternions,
+                                         linkedCellParameters,
+                                         nObstacles,
+                                         nParticles)
         , m_cellStartID(m_numCells)
     {
     }
@@ -73,43 +81,66 @@ public:
     /** @name Get methods */
     //@{
     // -------------------------------------------------------------------------
-    /** @brief Gets cell start IDs */
-    const uint* getCellStartIDs() const
+    /** @brief Gets cell IDs */
+    const uint* getCellStartIDs() const override
     {
-        return m_cellStartID.getData();
+        return this->m_cellStartID.getData();
+    }
+
+    // -------------------------------------------------------------------------
+    /** @brief Gets particle IDs array */
+    const uint* getParticleIDArray() const override
+    {
+        GAbort("LinkedCell_SortBased::getParticleIDArray is not supported");
+        return nullptr;
+    }
+
+    // -------------------------------------------------------------------------
+    /** @brief Gets number of particles prefix sums */
+    const uint* getNumParticlesPrefixSums() const override
+    {
+        GAbort(
+            "LinkedCell_SortBased::getNumParticlesPrefixSums is not supported");
+        return nullptr;
     }
     //@}
 
     /** @name Methods */
     //@{
     // -------------------------------------------------------------------------
-    /** @brief Updates the linked cells based on the transformations
-    @param transforms buffer of transformations */
-    void updateLinkedCells(
-        GrainsMemBuffer<Transform3<T>, MemType::DEVICE>& transforms)
+    /** @brief Updates the linked cells based on the transformations */
+    bool updateLinkedCells()
     {
-        const uint numParticles = transforms.getSize();
-        // Update the particle hashes
-        this->updateParticlesHash(transforms);
+        // Update the cells only if needed
+        bool updated;
+        if(m_useAdaptiveSkin)
+            updated = this->updateCellAdaptive();
+        else
+            updated = this->updateCellFixed();
+
+        if(!updated)
+            return false;
 
         // Sorting the particle ids according to the cell hash
         thrust::sort_by_key(
-            thrust::device_ptr<uint>(m_particleHash.getData()),
-            thrust::device_ptr<uint>(m_particleHash.getData() + numParticles),
+            thrust::device_ptr<uint>(m_cellID.getData()),
+            thrust::device_ptr<uint>(m_cellID.getData() + m_numParticles),
             thrust::device_ptr<uint>(m_particleID.getData()));
 
         // Finding the start of each cell
         m_cellStartID.fill(UINT_MAX);
         uint numBlocks, numThreads;
-        computeOptimalThreadsAndBlocks(numParticles,
+        computeOptimalThreadsAndBlocks(m_numParticles,
                                        GrainsParameters<T>::m_GPU,
                                        numBlocks,
                                        numThreads);
         uint sMemSize = sizeof(uint) * (numThreads + 1);
         computeCellStart_Kernel<<<numBlocks, numThreads, sMemSize>>>(
-            m_particleHash.getData(),
-            numParticles,
+            m_cellID.getData(),
+            m_numParticles,
             m_cellStartID.getData());
+
+        return true;
     }
 };
 

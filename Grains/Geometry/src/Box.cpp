@@ -71,8 +71,7 @@ __HOSTDEVICE__ void Box<T>::setExtent(T x, T y, T z)
 template <typename T>
 __HOSTDEVICE__ Convex<T>* Box<T>::clone() const
 {
-    return (
-        new Box<T>(T(2) * m_extent[X], T(2) * m_extent[Y], T(2) * m_extent[Z]));
+    return (new Box<T>(m_extent));
 }
 
 // -----------------------------------------------------------------------------
@@ -111,7 +110,7 @@ __HOSTDEVICE__ void Box<T>::computeInertia(T (&inertia)[6],
 template <typename T>
 __HOSTDEVICE__ T Box<T>::computeCircumscribedRadius() const
 {
-    return (m_extent.norm());
+    return (norm(m_extent));
 }
 
 // -----------------------------------------------------------------------------
@@ -146,7 +145,7 @@ __HOST__ void Box<T>::readConvex(std::istream& fileIn)
 template <typename T>
 __HOST__ void Box<T>::writeConvex(std::ostream& fileOut) const
 {
-    fileOut << "Box with dimensions " << m_extent << ".\n";
+    fileOut << "Box: " << T(2) * m_extent << ".\n";
 }
 
 // -----------------------------------------------------------------------------

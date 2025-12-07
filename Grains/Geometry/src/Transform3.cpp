@@ -1,4 +1,5 @@
 #include "Transform3.hh"
+#include "GrainsUtils.hh"
 #include "MatrixMath.hh"
 
 // -----------------------------------------------------------------------------
@@ -29,6 +30,16 @@ __HOSTDEVICE__ Transform3<T>::Transform3(T const* buffer)
 }
 
 // -----------------------------------------------------------------------------
+// Constructor with a quaternion and position
+template <typename T>
+__HOSTDEVICE__ Transform3<T>::Transform3(const Quaternion<T>& q,
+                                         const Vector3<T>&    p)
+{
+    m_basis  = q.toMatrix();
+    m_origin = p;
+}
+
+// -----------------------------------------------------------------------------
 // Constructor with a two transformations such that 'this = b2w o inv(a2w) = b2a'
 template <typename T>
 __HOSTDEVICE__ Transform3<T>::Transform3(const Transform3<T>& a2w,
@@ -36,6 +47,15 @@ __HOSTDEVICE__ Transform3<T>::Transform3(const Transform3<T>& a2w,
     : Transform3<T>(b2w)
 {
     this->relativeToTransform(a2w);
+}
+
+// -----------------------------------------------------------------------------
+// Copy constructor
+template <typename T>
+__HOSTDEVICE__ Transform3<T>::Transform3(const Transform3<T>& t)
+{
+    m_basis  = t.m_basis;
+    m_origin = t.m_origin;
 }
 
 // -----------------------------------------------------------------------------
@@ -69,12 +89,11 @@ __HOST__ Transform3<T>::Transform3(DOMNode* root)
         std::istringstream inValues(values.c_str());
         inValues >> mat;
         setBasis(mat);
-        // Check that the matrix is a rotation matrix
-        // if(!m_basis.isRotation())
-        //     GAbort("A matrix in one of the AngularPosition XML nodes is"
-        //            " not a rotation matrix !!!");
+        GAssert(isRotation(mat),
+                "Input matrix is not a valid rotation matrix in "
+                "Quaternion::setQuaternion!");
     }
-    else if(type == "Angles")
+    else if(type == "Angle")
     {
         // read in degree
         T aX = T(ReaderXML::getNodeAttr_Double(angPos, "aX"));
@@ -93,19 +112,18 @@ __HOST__ Transform3<T>::Transform3(DOMNode* root)
 }
 
 // -----------------------------------------------------------------------------
-// Copy constructor
-template <typename T>
-__HOSTDEVICE__ Transform3<T>::Transform3(const Transform3<T>& t)
-{
-    m_basis  = t.m_basis;
-    m_origin = t.m_origin;
-}
-
-// -----------------------------------------------------------------------------
 // Destructor
 template <typename T>
 __HOSTDEVICE__ Transform3<T>::~Transform3()
 {
+}
+
+// -----------------------------------------------------------------------------
+// Gets the rotation of the transformation as a quaternion
+template <typename T>
+__HOSTDEVICE__ Quaternion<T> Transform3<T>::getRotation() const
+{
+    return (Quaternion<T>(m_basis));
 }
 
 // -----------------------------------------------------------------------------
@@ -147,15 +165,7 @@ __HOSTDEVICE__ void Transform3<T>::setBasis(const Matrix3<T>& m)
 template <typename T>
 __HOSTDEVICE__ void Transform3<T>::setBasis(T aX, T aY, T aZ)
 {
-    m_basis = Matrix3<T>(cos(aZ) * cos(aY),
-                         cos(aZ) * sin(aY) * sin(aX) - sin(aZ) * cos(aX),
-                         cos(aZ) * sin(aY) * cos(aX) + sin(aZ) * sin(aX),
-                         sin(aZ) * cos(aY),
-                         sin(aZ) * sin(aY) * sin(aX) + cos(aZ) * cos(aX),
-                         sin(aZ) * sin(aY) * cos(aX) - cos(aZ) * sin(aX),
-                         -sin(aY),
-                         cos(aY) * sin(aX),
-                         cos(aY) * cos(aX));
+    m_basis = Matrix3<T>(aX, aY, aZ);
 }
 
 // -----------------------------------------------------------------------------
@@ -182,9 +192,9 @@ __HOSTDEVICE__ void Transform3<T>::setToInverseTransform(const Transform3<T>& t,
                                                          bool isRotation)
 {
     if(isRotation)
-        m_basis = t.m_basis.transpose();
+        m_basis = transpose(t.m_basis);
     else
-        m_basis = t.m_basis.inverse();
+        m_basis = inverse(t.m_basis);
     m_origin.setValue((-m_basis * t.m_origin).getBuffer());
 }
 
@@ -205,7 +215,7 @@ __HOSTDEVICE__ void
 template <typename T>
 __HOSTDEVICE__ void Transform3<T>::composeWithScaling(const Vector3<T>& v)
 {
-    m_basis.scale(v);
+    scale(m_basis, v);
 }
 
 // -----------------------------------------------------------------------------
@@ -309,7 +319,7 @@ __HOSTDEVICE__ void
 template <typename T>
 __HOSTDEVICE__ void Transform3<T>::relativeToTransform(const Transform3<T>& t)
 {
-    Matrix3<T> const inverseRotation = (t.m_basis).transpose();
+    Matrix3<T> const inverseRotation = transpose(t.m_basis);
     m_basis                          = inverseRotation * m_basis;
     m_origin = inverseRotation * (m_origin - t.m_origin);
 }
@@ -347,36 +357,13 @@ __HOSTDEVICE__ Transform3<T>& Transform3<T>::operator=(const Transform3<T>& t)
 }
 
 // -----------------------------------------------------------------------------
-// Conversion operator to float
-template <>
-__HOSTDEVICE__ Transform3<double>::operator Transform3<float>() const
-{
-    Matrix3<double> const m     = m_basis;
-    Vector3<double> const v     = m_origin;
-    float const           t[12] = {(float)m[X][X],
-                                   (float)m[X][Y],
-                                   (float)m[X][Z],
-                                   (float)m[Y][X],
-                                   (float)m[Y][Y],
-                                   (float)m[Y][Z],
-                                   (float)m[Z][X],
-                                   (float)m[Z][Y],
-                                   (float)m[Z][Z],
-                                   (float)v[X],
-                                   (float)v[Y],
-                                   (float)v[X]};
-    return (Transform3<float>(t));
-}
-
 // -----------------------------------------------------------------------------
 // Output operator
 template <typename T>
 __HOST__ std::ostream& operator<<(std::ostream& fileOut, const Transform3<T>& t)
 {
-    fileOut << "Position: " << std::endl;
-    fileOut << t.getOrigin() << std::endl;
-    fileOut << "Orientation: " << std::endl;
-    fileOut << t.getBasis();
+    // Orientation first, followed by the position
+    fileOut << t.getBasis() << " " << t.getOrigin() << std::endl;
     return (fileOut);
 }
 

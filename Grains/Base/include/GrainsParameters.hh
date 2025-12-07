@@ -3,6 +3,65 @@
 
 #include "Vector3.hh"
 
+/** @brief Type of neighbor list */
+enum class NeighborListType
+{
+    /** @brief N-Squared neighbor list */
+    NSQ = 0,
+    /** @brief Linked cell neighbor list */
+    LINKEDCELL = 1
+};
+
+/** @brief Type of linked cell */
+enum class LinkedCellType
+{
+    /** @brief Host linked cells */
+    HOST = 0,
+    /** @brief Sort-based linked cells for device */
+    SORTBASED = 1,
+    /** @brief Atomic linked cells for device */
+    ATOMIC = 2
+};
+
+/** @brief Type of bounding volume */
+enum class BoundingVolumeType
+{
+    /** @brief No bounding volume */
+    OFF = 0,
+    /** @brief Oriented Bounding Box */
+    OBB = 1,
+    /** @brief Oriented Bounding Cylinder */
+    OBC = 2
+};
+
+/** @brief Type of narrow-phase detection */
+enum class NarrowPhaseType
+{
+    /** @brief Gilbert-Johnson-Keerthi algorithm */
+    GJK = 0
+};
+
+/** @brief Parameters for linked cell configuration */
+template <typename T>
+struct LinkedCellParameters
+{
+    /** \brief Minimum corner of the linked cell domain */
+    Vector3<T> minCorner = Vector3<T>(0, 0, 0);
+    /** \brief Maximum corner of the linked cell domain */
+    Vector3<T> maxCorner = Vector3<T>(0, 0, 0);
+    /** \brief Type of linked cell */
+    LinkedCellType type = LinkedCellType::HOST;
+    /** \brief Linked cell size factor */
+    T cellSizeFactor = 1;
+    /** \brief If using adaptive skin, this is the desired number of 
+        iterations that the skin should be valid for.
+        If it is set to 0, then we don't use adaptive skin. */
+    uint updateFrequency = 1;
+    /** \brief If using Morton ordering, this is the number of iterations 
+        between each sorting */
+    uint sortFrequency = 0;
+};
+
 // =============================================================================
 /** @brief Parameters needed for Grains.
 
@@ -37,8 +96,6 @@ public:
     static uint m_numParticles;
     /** @brief Number of obstacles in simulation */
     static uint m_numObstacles;
-    /** @brief Maximum radius among all particles */
-    static T m_maxRadius;
 
     /* Physical */
     /** \brief Gravity vector */
@@ -61,22 +118,20 @@ public:
     static cudaDeviceProp m_GPU;
 
     /* Collision Detection */
-    /** \brief Type of neighbor list */
-    static uint m_neighborListType;
-    /** \brief Frequency of updating neighbor list */
-    static uint m_neighborListFrequency;
-    /** \brief Type of linked cell */
-    static uint m_linkedCellType;
-    /** \brief Linked cell size factor */
-    static uint m_linkedCellSizeFactor;
-    /** \brief Frequency of sorting particles */
-    static uint m_sortingFrequency;
-    /** @brief Number of cells in linked cell */
-    static uint m_numCells;
-    /** \brief Type of bounding volume */
-    static uint m_boundingVolumeType;
-    /** \brief Type of narrow-phase detection */
-    static uint m_narrowPhaseType;
+    struct CollisionDetectionParameters
+    {
+        /** \brief Type of neighbor list */
+        NeighborListType neighborListType = NeighborListType::NSQ;
+        /** \brief LinkedCell parameters */
+        LinkedCellParameters<T> linkedCellParameters;
+        /** \brief Type of bounding volume */
+        BoundingVolumeType boundingVolumeType = BoundingVolumeType::OFF;
+        /** \brief Type of narrow-phase detection */
+        NarrowPhaseType narrowPhaseType = NarrowPhaseType::GJK;
+    };
+
+    /** \brief Collision detection parameters */
+    static CollisionDetectionParameters m_collisionDetection;
     //@}
 };
 

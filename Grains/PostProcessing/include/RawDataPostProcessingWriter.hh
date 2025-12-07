@@ -82,13 +82,11 @@ public:
     void PostProcessing_start();
 
     /** @brief Writes post-processing data
-        @param particleRB Arrays of particles rigid bodies
-        @param obstacleRB Arrays of obstacles rigid bodies
+        @param rb Arrays of rigid bodies
         @param cm Component manager
         @param currentTime Current simulation time */
 
-    void PostProcessing(const GrainsMemBuffer<RigidBody<T>*>&       particleRB,
-                        const GrainsMemBuffer<RigidBody<T>*>&       obstacleRB,
+    void PostProcessing(const GrainsMemBuffer<RigidBody<T>*>&       rb,
                         const std::unique_ptr<ComponentManager<T>>& cm,
                         const T currentTime) final;
 

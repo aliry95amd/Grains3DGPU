@@ -26,20 +26,16 @@ protected:
     //@{
     /** \brief Convex shape */
     Convex<T>* m_convex;
-    /** \brief Crust thickness */
-    T m_crustThickness;
-    /** \brief Scaling vector related to crust thickness */
-    Vector3<T> m_scaling;
-    /** \brief Material ID */
-    uint m_material;
-    /** \brief Volume */
-    T m_volume;
-    /** \brief Mass */
-    T m_mass;
     /** \brief Inertia tensor */
     T m_inertia[6];
     /** \brief Inverse of the inertia tensor */
     T m_inertia_1[6];
+    /** \brief Crust thickness */
+    T m_crustThickness;
+    /** \brief Mass */
+    T m_mass;
+    /** \brief Material ID */
+    uint m_material;
     //@}
 
 public:
@@ -53,15 +49,10 @@ public:
         density
         @param convex convex
         @param ct crust thickness of the rigid body 
-        @param material material ID
-        @param density density */
+        @param density density
+        @param material material ID */
     __HOSTDEVICE__
-    RigidBody(Convex<T>* convex, T ct, uint material, T density);
-
-    /** @brief Constructor with an XML input
-        @param root XML input */
-    __HOST__
-    RigidBody(DOMNode* root);
+    RigidBody(Convex<T>* convex, T ct, T density, uint material);
 
     /** @brief Copy constructor
         @param rb RigidBody object to be copied */
@@ -69,9 +60,24 @@ public:
     RigidBody(RigidBody<T> const& rb);
 
     /** @brief Copy assignment operator
-        @param other RigidBody object to be assigned */
+         @param other RigidBody object to be assigned */
     __HOSTDEVICE__
     RigidBody<T>& operator=(const RigidBody<T>& other);
+
+    /** @brief Move constructor
+          @param other RigidBody object to be moved */
+    __HOSTDEVICE__
+    RigidBody(RigidBody<T>&& other);
+
+    /** @brief Move assignment operator
+          @param other RigidBody object to be moved */
+    __HOSTDEVICE__
+    RigidBody<T>& operator=(RigidBody<T>&& other);
+
+    /** @brief Constructor with an XML input
+          @param root XML input */
+    __HOST__
+    RigidBody(DOMNode* root);
 
     /** @brief Destructor */
     __HOSTDEVICE__
@@ -84,26 +90,6 @@ public:
     __HOSTDEVICE__
     Convex<T>* getConvex() const;
 
-    /** @brief Gets the rigid body's crust thickness */
-    __HOSTDEVICE__
-    T getCrustThickness() const;
-
-    /** @brief Gets the scaling vector related to crust thickness */
-    __HOSTDEVICE__
-    Vector3<T> getScalingVector() const;
-
-    /** @brief Gets the rigid body's material ID */
-    __HOSTDEVICE__
-    uint getMaterial() const;
-
-    /** @brief Gets the rigid body's volume */
-    __HOSTDEVICE__
-    T getVolume() const;
-
-    /** @brief Gets the rigid body's mass */
-    __HOSTDEVICE__
-    T getMass() const;
-
     /** @brief Gets the rigid body's inertia
         @param inertia the destination for inertia */
     __HOSTDEVICE__
@@ -114,9 +100,31 @@ public:
     __HOSTDEVICE__
     void getInertia_1(T (&inertia_1)[6]) const;
 
+    /** @brief Gets the rigid body's crust thickness */
+    __HOSTDEVICE__
+    T getCrustThickness() const;
+
+    /** @brief Gets the rigid body's volume */
+    __HOSTDEVICE__
+    T getVolume() const;
+
+    /** @brief Gets the rigid body's mass */
+    __HOSTDEVICE__
+    T getMass() const;
+
+    /** @brief Gets the rigid body's material ID */
+    __HOSTDEVICE__
+    uint getMaterial() const;
+
     /** @brief Gets the circumcribed radius of the rigid body */
     __HOSTDEVICE__
     T getCircumscribedRadius() const;
+    //@}
+
+    /**@name Set methods */
+    //@{
+    __HOSTDEVICE__
+    void setInertia();
     //@}
 
     /**@name Methods */

@@ -26,6 +26,11 @@ void GrainsGPU<T>::setupGPUDevice()
 {
     using GP = GrainsParameters<T>;
 
+    // Check available devices first
+    int deviceCount = 0;
+    cudaErrCheck(cudaGetDeviceCount(&deviceCount));
+    GAssert(deviceCount > 0, "No CUDA devices found!");
+
     // Set the device to the first one
     uint device = 0;
     cudaErrCheck(cudaSetDevice(device));
@@ -60,7 +65,7 @@ void GrainsGPU<T>::setupGPUDevice()
 template <typename T>
 void GrainsGPU<T>::initialize(DOMElement* rootElement)
 {
-    // We first read using the base class Grains<T>
+    // Read using the base class Grains<T> with GPU context ready
     Grains<T>::initialize(rootElement);
 
     // Reading different blocks of the input XML
@@ -126,34 +131,12 @@ void GrainsGPU<T>::Construction(DOMElement* rootElement)
 {
     using GP = GrainsParameters<T>;
 
-    // Get the Construction block. We don't check if it exists. It has been
-    // already checked in the base class
-    DOMNode* root = ReaderXML::getNode(rootElement, "Construction");
-
     // -------------------------------------------------------------------------
     // Particles
-    GoutWI(3, "Copying particle types to device ...");
-    m_d_particleRigidBodyList.reserve(GP::m_numParticles);
-    RigidBodyFactory<T>::copyHostToDevice(Grains<T>::m_particleRigidBodyList,
-                                          m_d_particleRigidBodyList);
-    GoutWI(3, "Copying particle types to device completed!");
-
-    // -------------------------------------------------------------------------
-    // Obstacles
-    GoutWI(3, "Copying obstacle types to device ...");
-    m_d_obstacleRigidBodyList.reserve(GP::m_numObstacles);
-    RigidBodyFactory<T>::copyHostToDevice(Grains<T>::m_obstacleRigidBodyList,
-                                          m_d_obstacleRigidBodyList);
-    cudaDeviceSynchronize();
-    GoutWI(3, "Copying obstacle types to device completed!");
-
-    // -------------------------------------------------------------------------
-    // Setting up the component managers
-    m_d_components
-        = std::make_unique<ComponentManagerGPU<T>>(&m_d_particleRigidBodyList,
-                                                   &m_d_obstacleRigidBodyList,
-                                                   GP::m_numParticles,
-                                                   GP::m_numObstacles);
+    GoutWI(3, "Copying rigid bodies to device ...");
+    RigidBodyFactory<T>::copyHostToDevice(Grains<T>::m_rigidBodyList,
+                                          m_d_rigidBodyList);
+    GoutWI(3, "Copying rigid bodies to device completed!");
 
     // -------------------------------------------------------------------------
     // Contact force models
@@ -173,6 +156,13 @@ void GrainsGPU<T>::Construction(DOMElement* rootElement)
     TimeIntegratorFactory<T>::copyHostToDevice(Grains<T>::m_timeIntegrator,
                                                m_d_timeIntegrator);
     GoutWI(3, "Copying time integration scheme to device completed!");
+
+    // -------------------------------------------------------------------------
+    // Setting up the component managers
+    m_d_components
+        = std::make_unique<ComponentManagerGPU<T>>(&m_d_rigidBodyList,
+                                                   GP::m_numObstacles,
+                                                   GP::m_numParticles);
 }
 
 // -----------------------------------------------------------------------------

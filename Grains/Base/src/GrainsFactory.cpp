@@ -97,8 +97,7 @@ template <typename T>
 Grains<T>* GrainsFactory<T>::create(DOMElement* root)
 {
     // Preconditions
-    if(!root)
-        GAbort("Invalid XML file! Aborting Grains!");
+    GAssert(root, "Invalid XML file! Aborting Grains!");
 
     Grains<T>* grains = NULL;
 
@@ -113,8 +112,7 @@ Grains<T>* GrainsFactory<T>::create(DOMElement* root)
         grains = new GrainsTestDev<T>();
 
     // Postconditions
-    if(!grains)
-        GAbort("Invalid Mode! Aborting Grains!");
+    GAssert(grains, "Invalid Mode! Aborting Grains!");
 
     return (grains);
 }

@@ -105,7 +105,7 @@ __HOSTDEVICE__ T Rectangle<T>::computeCircumscribedRadius() const
 template <typename T>
 __HOSTDEVICE__ Vector3<T> Rectangle<T>::computeBoundingBox() const
 {
-    return (Vector3<T>(m_LX, m_LY, T(0)));
+    return (Vector3<T>(m_LX, m_LY, EPS<T>));
 }
 
 // -----------------------------------------------------------------------------
@@ -117,6 +117,14 @@ __HOSTDEVICE__ Vector3<T> Rectangle<T>::support(const Vector3<T>& v) const
     return (Vector3<T>(v[X] < T(0) ? -m_LX : m_LX,
                        v[Y] < T(0) ? -m_LY : m_LY,
                        T(0)));
+}
+
+// -----------------------------------------------------------------------------
+// Returns if a point is inside the rectangle
+template <typename T>
+__HOSTDEVICE__ bool Rectangle<T>::isInside(const Vector3<T>& p) const
+{
+    return (p[X] >= -m_LX && p[X] <= m_LX && p[Y] >= -m_LY && p[Y] <= m_LY);
 }
 
 // -----------------------------------------------------------------------------
@@ -132,8 +140,7 @@ __HOST__ void Rectangle<T>::readConvex(std::istream& fileIn)
 template <typename T>
 __HOST__ void Rectangle<T>::writeConvex(std::ostream& fileOut) const
 {
-    fileOut << "Rectangle with dimensions " << T(2) * m_LX << ", and "
-            << T(2) * m_LY << ".\n";
+    fileOut << "Rectangle: " << T(2) * m_LX << ", " << T(2) * m_LY << ".\n";
 }
 
 // -----------------------------------------------------------------------------

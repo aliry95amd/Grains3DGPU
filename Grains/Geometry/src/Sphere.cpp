@@ -126,7 +126,7 @@ __HOST__ void Sphere<T>::readConvex(std::istream& fileIn)
 template <typename T>
 __HOST__ void Sphere<T>::writeConvex(std::ostream& fileOut) const
 {
-    fileOut << "Sphere with radius " << m_radius << ".\n";
+    fileOut << "Sphere: " << m_radius << ".\n";
 }
 
 // -----------------------------------------------------------------------------

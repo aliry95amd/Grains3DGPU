@@ -32,9 +32,7 @@ protected:
     /** \brief Pair list */
     GrainsMemBuffer<uint2, M> m_pairList;
     /** \brief Pair count */
-    GrainsMemBuffer<uint, M> m_pairCount;
-    /** \brief Pair count */
-    GrainsMemBuffer<uint, MemType::HOST> m_hPairCount;
+    uint* m_pairCount;
     /** \brief If neighbor list needs update */
     bool m_needsUpdate;
     //@}
@@ -43,12 +41,33 @@ public:
     /** @name Constructors */
     //@{
     // -------------------------------------------------------------------------
-    /** @brief Default constructor (forbidden except in derived classes) */
-    NeighborList() = default;
+    /** @brief Default constructor */
+    NeighborList()
+    {
+        if constexpr(M == MemType::DEVICE)
+        {
+            cudaErrCheck(cudaMallocManaged(&m_pairCount, sizeof(uint)));
+        }
+        else
+        {
+            m_pairCount = new uint;
+        }
+        *m_pairCount = 0;
+    }
 
     // -------------------------------------------------------------------------
     /** @brief Destructor */
-    virtual ~NeighborList() = default;
+    virtual ~NeighborList()
+    {
+        if constexpr(M == MemType::DEVICE)
+        {
+            cudaErrCheck(cudaFree(m_pairCount));
+        }
+        else
+        {
+            delete m_pairCount;
+        }
+    }
     //@}
 
     /** @name Get methods */
@@ -71,20 +90,18 @@ public:
     /** @brief Gets size of pair list */
     uint getSize() const
     {
-        if constexpr(M == MemType::HOST)
-            return m_pairCount[0];
-        else if constexpr(M == MemType::DEVICE)
-            return m_hPairCount[0];
+        return *m_pairCount;
     }
     //@}
 
     /** @name Methods */
     //@{
     // -------------------------------------------------------------------------
-    /** @brief Updates the neighbor list 
-    @param transforms array of transformations */
-    virtual void
-        updateNeighborList(GrainsMemBuffer<Transform3<T>, M>& transforms)
+    /** @brief Updates the neighbor list
+    @param positions array of positions */
+    virtual void updateNeighborList(GrainsMemBuffer<Vector3<T>, M>& positions,
+                                    const uint                      nObstacles,
+                                    const uint                      nParticles)
         = 0;
 
     // -------------------------------------------------------------------------

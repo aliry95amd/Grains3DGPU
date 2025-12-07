@@ -26,6 +26,7 @@
 #include <cuda_runtime.h>
 #include <curand.h>
 #include <curand_kernel.h>
+
 #include <omp.h>
 
 #include "ReaderXML.hh"
@@ -39,21 +40,22 @@
 /** @name Macros */
 //@{
 /** @brief Compiler macros */
-// -----------------------------------------------------------------------------
-#ifdef __NVCC__
+#if defined(__NVCC__)
 #define __HOST__ __host__
 #define __DEVICE__ __device__
 #define __HOSTDEVICE__ __host__ __device__
+#define __MANAGED__ __managed__
 #define __GLOBAL__ __global__
 #define INLINE __inline__
 #define __RESTRICT__ __restrict__
 #else
+// For testing or non-CUDA compilation, use simplified macros
 #define __HOST__
-#define __DEVICE__ __device__
+#define __DEVICE__
 #define __HOSTDEVICE__
 #define __GLOBAL__
 #define INLINE inline
-#define __RESTRICT__ restrict
+#define __RESTRICT__
 #endif
 
 // -----------------------------------------------------------------------------

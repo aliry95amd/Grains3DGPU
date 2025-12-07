@@ -32,6 +32,10 @@
 *.out
 *.app
 
+# Data files
+*.dat
+*.vtu
+*.pvd
 
 ### CUDA ###
 *.i
@@ -51,6 +55,7 @@ Grains/lib*
 Grains/DraftCodes/
 Main/obj*
 Main/bin*
+Tests/build*
 Tools/PrePost/*/bin*
 Tools/PrePost/*/obj*
 

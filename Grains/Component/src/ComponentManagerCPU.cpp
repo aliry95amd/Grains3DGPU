@@ -12,15 +12,12 @@ ComponentManagerCPU<T>::ComponentManagerCPU() = default;
 // Constructor with the number of particles, and obstacles
 template <typename T>
 ComponentManagerCPU<T>::ComponentManagerCPU(
-    GrainsMemBuffer<RigidBody<T>*, MemType::HOST>* particleRB,
-    GrainsMemBuffer<RigidBody<T>*, MemType::HOST>* obstacleRB,
-    uint                                           nParticles,
-    uint                                           nObstacles)
-    : ComponentManager<T, MemType::HOST>(
-          particleRB, obstacleRB, nParticles, nObstacles)
+    GrainsMemBuffer<RigidBody<T>*, MemType::HOST>* rigidBody,
+    uint                                           nObstacles,
+    uint                                           nParticles)
+    : ComponentManager<T, MemType::HOST>(rigidBody, nObstacles, nParticles)
 {
-    allocate();
-    initialize();
+    this->initialize();
 }
 
 // -----------------------------------------------------------------------------
@@ -29,30 +26,18 @@ template <typename T>
 ComponentManagerCPU<T>::~ComponentManagerCPU() = default;
 
 // -----------------------------------------------------------------------------
-// Allocates memory for the component manager
-template <typename T>
-void ComponentManagerCPU<T>::allocate()
-{
-}
-
-// -------------------------------------------------------------------------
-// Initializes data members to default values
-template <typename T>
-void ComponentManagerCPU<T>::initialize()
-{
-}
-
-// -----------------------------------------------------------------------------
 // Updates neighbor list if needed
 template <typename T>
 void ComponentManagerCPU<T>::updateNeighborList()
 {
     if(m_neighborList->needsUpdate())
     {
-        m_neighborList->updateNeighborList(m_transform);
+        m_neighborList->updateNeighborList(m_position,
+                                           m_nObstacles,
+                                           m_nParticles);
 
         // Resize pair-dependent buffers to match actual number of pairs
-        this->resizePairBuffers();
+        this->resizePairBuffers(m_neighborList->getSize());
     }
 }
 
@@ -62,35 +47,49 @@ template <typename T>
 void ComponentManagerCPU<T>::computeRelativeTransformations()
 {
     uint nPairs = m_neighborList->getSize();
-    for(uint pID = 0; pID < nPairs; ++pID)
+    for(uint cID = 0; cID < nPairs; ++cID)
     {
         computeRelativeTransformations_common(m_neighborList->getData(),
-                                              m_transform.getData(),
-                                              m_relTransform.getData(),
-                                              pID);
+                                              m_position.getData(),
+                                              m_quaternion.getData(),
+                                              m_relPosition.getData(),
+                                              m_relQuaternion.getData(),
+                                              cID);
     }
 }
 
 // -----------------------------------------------------------------------------
-// Detects collision between particles and obstacles
+// Detects collisions
 template <typename T>
-void ComponentManagerCPU<T>::detectCollisionsObstacles()
-{
-}
-
-// -----------------------------------------------------------------------------
-// Detects collisions between particles and particles
-template <typename T>
-void ComponentManagerCPU<T>::detectCollisionsParticles()
+void ComponentManagerCPU<T>::detectCollisionsComponents()
 {
     uint nPairs = m_neighborList->getSize();
     for(uint i = 0; i < nPairs; ++i)
     {
-        detectCollisionsParticles_common(m_neighborList->getData(),
-                                         m_particleRB->getData(),
-                                         m_relTransform.getData(),
-                                         m_contactInfo.getData(),
-                                         i);
+        detectCollisionsComponents_common(m_neighborList->getData(),
+                                          m_rigidBody->getData(),
+                                          m_relPosition.getData(),
+                                          m_relQuaternion.getData(),
+                                          m_contactInfo.getData(),
+                                          i);
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Transforms contact information to world frame
+template <typename T>
+void ComponentManagerCPU<T>::transformContactInfoToWorld()
+{
+    uint nPairs = m_neighborList->getSize();
+    for(uint i = 0; i < nPairs; ++i)
+    {
+        transformContactInfo_common(m_neighborList->getData(),
+                                    m_position.getData(),
+                                    m_quaternion.getData(),
+                                    m_contactInfo.getData(),
+                                    m_contactInfoWorld.getData(),
+                                    m_activePairs.getData(),
+                                    i);
     }
 }
 
@@ -105,11 +104,11 @@ void ComponentManagerCPU<T>::detectCollisions()
     // Computes the relative transformations
     computeRelativeTransformations();
 
-    // Particle-particle interactions
-    detectCollisionsParticles();
+    // Interactions
+    detectCollisionsComponents();
 
-    // Particle-obstacle interactions
-    detectCollisionsObstacles();
+    // Transforms contact info to world frame
+    transformContactInfoToWorld();
 }
 
 // -----------------------------------------------------------------------------
@@ -123,11 +122,11 @@ void ComponentManagerCPU<T>::computeContactForces(
     {
         computeContactForces_common(CF.getData(),
                                     m_neighborList->getData(),
-                                    m_contactInfo.getData(),
-                                    m_particleRB->getData(),
+                                    m_contactInfoWorld.getData(),
+                                    m_rigidBody->getData(),
+                                    m_position.getData(),
                                     m_velocity.getData(),
                                     m_torce.getData(),
-                                    m_relTransform.getData(),
                                     i);
     }
 }
@@ -138,10 +137,11 @@ template <typename T>
 void ComponentManagerCPU<T>::addExternalForces()
 {
     // #pragma omp parallel for
-    for(uint pID = 0; pID < m_nParticles; ++pID)
+    for(uint pID = m_nObstacles; pID < m_nObstacles + m_nParticles; ++pID)
     {
+        // Only add to the particles
         addExternalForces_common(GrainsParameters<T>::m_gravity,
-                                 m_particleRB->getData(),
+                                 m_rigidBody->getData(),
                                  m_torce.getData(),
                                  pID);
     }
@@ -154,15 +154,14 @@ void ComponentManagerCPU<T>::moveParticles(
     const GrainsMemBuffer<TimeIntegrator<T>*, MemType::HOST>& TI)
 {
     // #pragma omp parallel for
-    for(uint pID = 0; pID < m_nParticles; ++pID)
+    for(uint pID = m_nObstacles; pID < m_nObstacles + m_nParticles; ++pID)
     {
         moveParticles_common(TI.getData(),
-                             m_particleRB->getData(),
-                             m_transform.getData(),
+                             m_rigidBody->getData(),
+                             m_position.getData(),
                              m_quaternion.getData(),
                              m_velocity.getData(),
                              m_torce.getData(),
-                             m_rigidBodyId.getData(),
                              pID);
     }
 }

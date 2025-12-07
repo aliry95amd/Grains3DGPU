@@ -81,6 +81,11 @@ public:
         @param v direction vector */
     __HOSTDEVICE__
     virtual Vector3<T> support(const Vector3<T>& v) const = 0;
+
+    /** @brief Returns whether point p lies in the convex shape
+        @param p point */
+    __HOSTDEVICE__
+    virtual bool isInside(const Vector3<T>& p) const;
     //@}
 
     /** @name I/O methods */
@@ -138,24 +143,22 @@ public:
                                           uint& last_offset) const
         = 0;
     //@}
-
-    // /** @name Operators */
-    // //@{
-    // /** @brief Input operator
-    // @param fileIn input stream
-    // @param convex Convex object*/
-    // std::istream& operator >> ( std::istream& fileIn,
-    //                             Convex<T>& convex );
-
-    // /** @brief Output operator
-    // @param fileOut output stream
-    // @param convex Convex object */
-    // std::ostream& operator << ( std::ostream& fileOut,
-    //                             Convex<T> const& convex );
-    // //@}
 };
 
-typedef Convex<float>  ConvexF;
-typedef Convex<double> ConvexD;
+/** @name External Methods - I/O methods */
+//@{
+/** @brief Output operator for Convex: delegates to virtual writeConvex
+    @param fileOut output stream
+    @param convex convex object */
+template <typename T>
+__HOST__ std::ostream& operator<<(std::ostream&    fileOut,
+                                  const Convex<T>& convex);
+
+/** @brief Input operator for Convex: delegates to virtual readConvex
+    @param fileIn input stream
+    @param convex convex object */
+template <typename T>
+__HOST__ std::istream& operator>>(std::istream& fileIn, Convex<T>& convex);
+//@}
 
 #endif
