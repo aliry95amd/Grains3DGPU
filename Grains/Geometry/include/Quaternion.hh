@@ -8,8 +8,7 @@
 // =================================================================================================
 /** @brief The class Quaternion.
 
-    A quaternion in a 3D space, i.e., a scalar w plus a Vector3 vector vqt as
-    [ w, vqt ].
+    A quaternion in a 3D space, i.e., a scalar w plus a Vector3 vector vqt as [ w, vqt ].
 
     @author F.PRADEL - Institut Francais du Petrole - 2000 - Modification
     @author A.WACHS  - 2019 - Modification
@@ -19,14 +18,14 @@ template <typename T>
 class alignas(16) Quaternion
 {
 protected:
-    /**@name Parameters */
+    /** @name Parameters */
     //@{
     Vector3<T> m_vqt; /**< Vectorial part of the quaternion */
     T          m_w;   /**< scalar part of the quaternion */
     //@}
 
 public:
-    /**@name Constructors */
+    /** @name Constructors */
     //@{
     /** @brief Default constructor */
     __HOSTDEVICE__
@@ -46,8 +45,8 @@ public:
     __HOSTDEVICE__
     Quaternion(const Vector3<T>& vec, T w = T(0)) noexcept;
 
-    /** @brief Constructor with a vector given by its 3 components (x,y,z)
-        and a scalar d. Quaternion is initialized as [ d, (x,y,z) ]
+    /** @brief Constructor with a vector given by its 3 components (x,y,z) and a scalar d.
+        Quaternion is initialized as [ d, (x,y,z) ].
         @param x x-component of the vector
         @param y y-component of the vector
         @param z z-component of the vector
@@ -60,12 +59,11 @@ public:
     __HOSTDEVICE__
     Quaternion(const T* buffer) noexcept;
 
-    /** @brief Constructor from Euler angles (radians)
-    Builds a quaternion from intrinsic Z-Y-X rotations:
-    R = Rz(aZ) * Ry(aY) * Rx(aX).
-    @param aX rotation about X (roll)
-    @param aY rotation about Y (pitch)
-    @param aZ rotation about Z (yaw) */
+    /** @brief Constructor from Euler angles (radians). Builds a quaternion from intrinsic Z-Y-X
+        rotations: R = Rz(aZ) * Ry(aY) * Rx(aX).
+        @param aX rotation about X (roll)
+        @param aY rotation about Y (pitch)
+        @param aZ rotation about Z (yaw) */
     __HOSTDEVICE__
     Quaternion(T aX, T aY, T aZ) noexcept;
 
@@ -104,7 +102,7 @@ public:
     ~Quaternion() noexcept;
     //@}
 
-    /**@name Get methods */
+    /** @name Get methods */
     //@{
     /** @brief Returns the pointer to the buffer */
     __HOSTDEVICE__
@@ -131,15 +129,15 @@ public:
     __HOSTDEVICE__
     void setScalar(T w) noexcept;
 
-    /** @brief Sets the quaternion with a Vector3 vector vec and a scalar d.
-        Quaternion is set to [ d, vec ]
+    /** @brief Sets the quaternion with a Vector3 vector vec and a scalar d. Quaternion is set
+        to [ d, vec ]
         @param vec the Vector3 vector
         @param w value of the scalar */
     __HOSTDEVICE__
     void setQuaternion(const Vector3<T>& vec, T w) noexcept;
 
-    /** @brief Sets the quaternion with a vector given by its 3 components
-        (x,y,z) and a scalar d. Quaternion is set to [ d, (x,y,z) ]
+    /** @brief Sets the quaternion with a vector given by its 3 components (x,y,z) and a scalar d.
+        Quaternion is set to [ d, (x,y,z) ].
         @param x x-component of the vector
         @param y y-component of the vector
         @param z z-component of the vector
@@ -152,16 +150,16 @@ public:
     __HOSTDEVICE__
     void setQuaternion(const Matrix3<T>& rot) noexcept;
 
-    /** @brief Sets the quaternion from Euler angles (radians)
-    Intrinsic Z-Y-X order: R = Rz(aZ) * Ry(aY) * Rx(aX)
+    /** @brief Sets the quaternion from Euler angles (radians). Intrinsic Z-Y-X order:
+        R = Rz(aZ) * Ry(aY) * Rx(aX).
         @param aX rotation about X (roll)
         @param aY rotation about Y (pitch)
         @param aZ rotation about Z (yaw) */
     __HOSTDEVICE__
     void setQuaternion(T aX, T aY, T aZ) noexcept;
 
-    /** @brief Builds a unit quaternion representing the rotation, from
-        u to v. The input vectors need not to be normalised.
+    /** @brief Builds a unit quaternion representing the rotation, from u to v. The input vectors
+        need not to be normalised.
         @param u First vector
         @param v Second vector */
     __HOSTDEVICE__
@@ -174,9 +172,8 @@ public:
     __HOSTDEVICE__
     Matrix3<T> toMatrix() const noexcept;
 
-    /** @brief Multiplies the quaternion on the right by another quaternion
-        rhs, i.e., performs this x rhs, and return the vectorial part of
-        this x rhs
+    /** @brief Multiplies the quaternion on the right by another quaternion rhs, i.e., performs
+        this x rhs, and return the vectorial part of this x rhs.
         @param q the other quaternion */
     __HOSTDEVICE__
     Vector3<T> multToVector3(const Quaternion<T>& q) const noexcept;
@@ -189,8 +186,8 @@ public:
     __HOSTDEVICE__
     T operator[](size_t i) const noexcept;
 
-    /** @brief ith-component accessor: (0,1,2) for the vector components and
-        3 for the scalar - modifiable lvalue
+    /** @brief ith-component accessor: (0,1,2) for the vector components and 3 for the scalar -
+        modifiable lvalue.
         @param i index */
     __HOSTDEVICE__
     T& operator[](size_t i) noexcept;

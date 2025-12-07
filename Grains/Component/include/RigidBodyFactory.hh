@@ -27,23 +27,16 @@ private:
 public:
     /**@name Methods */
     //@{
-    /** @brief Creates and returns a buffer of reference rigid bodies given an
-        XML node
+    /** @brief Creates and returns a buffer of reference rigid bodies given an XML node
         @param root XML node
         @param refObstacleRB Memory buffer for storing the reference obstacles
         @param refParticleRB Memory buffer for storing the reference particles
-        @param refObstacleInitialPosition Memory buffer for storing the initial
-       positions of obstacles
-        @param refParticleInitialPosition Memory buffer for storing the initial
-       positions of particles
-        @param refObstacleInitialOrientation Memory buffer for storing the
-       initial orientations of obstacles
-        @param refParticleInitialOrientation Memory buffer for storing the
-       initial orientations of particles
-        @param numEachRefObstacle Memory buffer for storing the number of each
-       reference obstacle
-        @param numEachRefParticle Memory buffer for storing the number of each
-       reference particle
+        @param refObstacleInitialPosition Memory buffer for the initial positions of obstacles
+        @param refParticleInitialPosition Memory buffer for the initial positions of particles
+        @param refObstacleInitialOrientation Memory buffer for the initial orientations of obstacles
+        @param refParticleInitialOrientation Memory buffer for the initial orientations of particles
+        @param numEachRefObstacle number of each reference obstacle
+        @param numEachRefParticle number of each reference particle
         @param numObstacles Total number of obstacles in the simulation
         @param numParticles Total number of particles in the simulation */
     static void create(DOMNode*                        obstacles,
@@ -59,12 +52,10 @@ public:
                        uint&                           numObstacles,
                        uint&                           numParticles);
 
-    /** @brief RigidBody objects must be instantiated on device, if
-        we want to use them on device. Copying from host is not supported due to
-        runtime polymorphism for this class.
-        This function reads a host-side RigidBody object, and mimics it
-        in a given device buffer.
-        It calls a device kernel that is implemented in the source file.
+    /** @brief RigidBody objects must be instantiated on device, if we want to use them on device.
+        Copying from host is not supported due to runtime polymorphism for this class. This
+        function reads a host-side RigidBody object, and mimics it in a given device buffer. It
+        calls a device kernel that is implemented in the source file.
         @param h_RB Host-side RigidBody object
         @param d_RB Device-side RigidBody object */
     static void copyHostToDevice(GrainsMemBuffer<RigidBody<T>*, MemType::HOST>&   h_RB,

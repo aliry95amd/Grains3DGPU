@@ -51,8 +51,8 @@ __HOST__ static INLINE size_t getAvailableDeviceMemory()
 }
 
 // -------------------------------------------------------------------------------------------------
-/** @brief computes the optimal number of threads and blocks for a given number
-    of elements and an architecture
+/** @brief computes the optimal number of threads and blocks for a given number of elements and an
+    architecture
     @param numElements the number of elements
     @param numThreads the number of threads per block
     @param numBlocks the minimum number of blocks
@@ -108,8 +108,8 @@ __HOST__ static constexpr INLINE std::string realToString(const T& figure, const
 }
 
 // -------------------------------------------------------------------------------------------------
-/** @brief Writes a float number with a prescribed format and a prescribed
-    number of digits after the decimal point in a string
+/** @brief Writes a float number with a prescribed format and a prescribed number of digits after
+    the decimal point in a string.
     @param format the format
     @param digits number of digits after the decimal point
     @param number the float number */

@@ -43,7 +43,7 @@ public:
     /** @brief Default constructor */
     ComponentManagerGPU();
 
-    /** @brief Constructor with the number of particles, and obstacles
+    /** @brief Constructor with the number of particles, and obstacles.
         @param rigidBody Pointer to the components rigid body buffer
         @param nObstacles Number of obstacles
         @param nParticles Number of particles */
@@ -68,8 +68,7 @@ public:
     /** @brief Initializes buffers for pair-dependent data */
     void initialize();
 
-    /** @brief Resizes pair-dependent buffers based on current neighbor list
-        size
+    /** @brief Resizes pair-dependent buffers based on current neighbor list size.
         @param size New size for the pair-dependent buffers */
     void resizePairBuffers(const uint size);
     //@}

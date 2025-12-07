@@ -42,7 +42,7 @@ __HOSTDEVICE__ static INLINE void set_max(T& x, T y) noexcept
 }
 
 // -------------------------------------------------------------------------------------------------
-/** @brief Returns an angle in radians given an angle in degrees
+/** @brief Returns an angle in radians given an angle in degrees.
     @param x angle in degrees */
 template <typename T>
 __HOSTDEVICE__ static INLINE T rads(T x) noexcept
@@ -51,7 +51,7 @@ __HOSTDEVICE__ static INLINE T rads(T x) noexcept
 }
 
 // -------------------------------------------------------------------------------------------------
-/** @brief Returns an angle in degrees given an angle in radians
+/** @brief Returns an angle in degrees given an angle in radians.
     @param x angle in radians */
 template <typename T>
 __HOSTDEVICE__ static INLINE T degs(T x) noexcept
@@ -60,7 +60,7 @@ __HOSTDEVICE__ static INLINE T degs(T x) noexcept
 }
 
 // -------------------------------------------------------------------------------------------------
-/** @brief Returns the sign of the real number
+/** @brief Returns the sign of the real number.
     @param x the real number */
 template <typename T>
 __HOSTDEVICE__ static INLINE int sgn(T x) noexcept

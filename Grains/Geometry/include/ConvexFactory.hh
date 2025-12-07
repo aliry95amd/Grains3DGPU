@@ -24,11 +24,11 @@ private:
     /** @brief Constructor */
     ConvexFactory();
 
-    /** @brief Copy constructor
+    /** @brief Copy constructor.
     @param cb the other ConvexFactory object */
     ConvexFactory(ConvexFactory<T> const& cb);
 
-    /** @brief Equal operator to another ConvexFactory object
+    /** @brief Equal operator to another ConvexFactory object.
         @param cb the other ConvexFactory object */
     ConvexFactory<T>& operator=(ConvexFactory<T> const& cb);
 

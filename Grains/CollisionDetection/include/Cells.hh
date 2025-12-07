@@ -17,10 +17,9 @@ enum class CellOrdering
 // =================================================================================================
 /** @brief The class Cells.
 
-    The broad-phase detection is done through Cells class. It limits the number
-    of potential collisions for collision to the neighboring components.
-    Neighboring components are those who belong to adjacent cells given a
-    uniform Cartesian grid for cells.
+    The broad-phase detection is done through Cells class. It limits the number of potential
+    collisions for collision to the neighboring components. Neighboring components are those who
+    belong to adjacent cells given a uniform Cartesian grid for cells.
 
     The cell ID ordering can be specified via template parameter:
     - LINEAR: Traditional linear indexing (z * ny + y) * nx + x
@@ -40,9 +39,9 @@ protected:
     Vector3<T> m_minCorner;
     /** \brief Max corner point of the domain */
     Vector3<T> m_maxCorner;
-    /** \brief Min corner point of the linked cell. This might be different from
-        m_minCorner since some offsets might have been applied to make the
-        domain fit symmetrically within the linked cell. */
+    /** \brief Min corner point of the linked cell. This might be different from m_minCorner since
+        some offsets might have been applied to make the domain fit symmetrically within the linked
+        cell. */
     Vector3<T> m_minCornerLinkedCell;
     /** \brief Number of cells per each direction + total number of cells */
     uint4 m_numCells;
@@ -58,7 +57,7 @@ public:
     /** @brief Default constructor (forbidden except in derived classes) */
     __HOSTDEVICE__ Cells();
 
-    /** @brief Constructor with parameters
+    /** @brief Constructor with parameters.
         @param minCorner minimum corner of the domain
         @param maxCorner maximum corner of the domain
         @param cellSize size of the cell */
@@ -102,16 +101,15 @@ public:
 
     /** @name Methods */
     //@{
-    /** @brief Resizes the linked cells
+    /** @brief Resizes the linked cells.
         @param cellSize new size of the cell */
     __HOSTDEVICE__
     void resize(const T cellSize);
 
-    /** @brief Generates neighbor list for cells
-        @note On device side, the list is generated using a threadPerCell
-        strategy. Starting position for each cell is given by the `start`
-        parameter. On host side, there is no need for this parameter, as the
-        list is generated with a single thread.
+    /** @brief Generates neighbor list for cells.
+        @note On device side, the list is generated using a threadPerCell strategy. Starting
+        position for each cell is given by the `start` parameter. On host side, there is no need
+        for this parameter, as the list is generated with a single thread.
         @param neighborCells output array for neighbor cells
         @param start starting index for neighbor cells
         @param end ending index for neighbor cells */
@@ -123,7 +121,7 @@ public:
     __HOSTDEVICE__
     bool isValid(const uint3& id) const;
 
-    /** @brief Returns the 3d Id of the cell which the point belongs to
+    /** @brief Returns the 3d Id of the cell which the point belongs to.
         @param p point
         @param checkIfValid flag to check if the cell ID is valid */
     __HOSTDEVICE__
@@ -145,35 +143,33 @@ public:
     __HOSTDEVICE__
     uint computeCellHash(const uint3& cellId) const;
 
-    /** @brief Returns the cell hash from the 3d Id of the cell (using Morton
-       code)
+    /** @brief Returns the cell hash from the 3d Id of the cell (using Morton code).
         @param i position of the cell in the x-direction
         @param j position of the cell in the y-direction
         @param k position of the cell in the z-direction */
     __HOSTDEVICE__
     uint computeCellHash(uint i, uint j, uint k) const;
 
-    /** @brief Returns dense linear index [0..numCells) from a point. Returns
-        UINT_MAX when out of bounds if checkIfValid=false.
+    /** @brief Returns dense linear index [0..numCells) from a point. Returns UINT_MAX when out of
+        bounds if checkIfValid=false.
         @param p point
         @param checkIfValid whether to assert on invalid cell */
     __HOSTDEVICE__
     uint computeDenseIndex(const Vector3<T>& p, bool checkIfValid = false) const;
 
-    /** @brief Returns dense linear index [0..numCells) from a 3D cell id.
-        Returns UINT_MAX when out of bounds. */
+    /** @brief Returns dense linear index [0..numCells) from a 3D cell id. Returns UINT_MAX when
+        out of bounds. */
     __HOSTDEVICE__
     uint computeDenseIndex(const uint3& cellId) const;
 
-    /** @brief Returns dense linear index [0..numCells) from i,j,k (no wrap).
-        Returns UINT_MAX when out of bounds. */
+    /** @brief Returns dense linear index [0..numCells) from i,j,k (no wrap). Returns UINT_MAX when
+        out of bounds. */
     __HOSTDEVICE__
     uint computeDenseIndex(uint i, uint j, uint k) const;
 
-    /** @brief Compute Morton key for a given dense linear cell index by
-        decoding to (i,j,k) then encoding with Morton. This is valid
-        regardless of current ordering scheme, but meaningful for Morton
-        ordering. */
+    /** @brief Compute Morton key for a given dense linear cell index by decoding to (i,j,k) then
+        encoding with Morton. This is valid regardless of current ordering scheme, but meaningful
+        for Morton ordering. */
     __HOSTDEVICE__
     uint mortonKeyFromLinearIndex(uint linearIndex) const;
 
@@ -197,8 +193,7 @@ private:
 
     /** @name Morton Code Helper Functions */
     //@{
-    /** @brief Expands a 10-bit integer into 30 bits by inserting 2 zeros after
-       each bit
+    /** @brief Expands a 10-bit integer into 30 bits by inserting 2 zeros after each bit.
         @param v 10-bit integer value
         @return 30-bit expanded value */
     __HOSTDEVICE__
@@ -225,20 +220,5 @@ private:
     uint3 decodeMortonCode(uint code) const;
     //@}
 };
-
-// =================================================================================================
-/** @brief Convenience type aliases for different cell ordering schemes */
-// =================================================================================================
-template <typename T>
-using CellsLinear = Cells<T, CellOrdering::LINEAR>;
-
-template <typename T>
-using CellsMorton = Cells<T, CellOrdering::MORTON>;
-
-// Common instantiations
-using CellsLinear_f = CellsLinear<float>;
-using CellsLinear_d = CellsLinear<double>;
-using CellsMorton_f = CellsMorton<float>;
-using CellsMorton_d = CellsMorton<double>;
 
 #endif

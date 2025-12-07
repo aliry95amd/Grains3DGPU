@@ -44,7 +44,7 @@ public:
     __HOSTDEVICE__
     RigidBody();
 
-    /** @brief Constructor with a convex, crust thickness, material, and density
+    /** @brief Constructor with a convex, crust thickness, material, and density.
         @param convex convex
         @param ct crust thickness of the rigid body
         @param density density

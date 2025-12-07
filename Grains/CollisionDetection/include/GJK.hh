@@ -23,11 +23,10 @@ enum class GJKType
 // =================================================================================================
 /** @name GJK : External methods */
 //@{
-/** @brief Returns whether 2 convex shapes intersect - relative transformation
+/** @brief Returns whether 2 convex shapes intersect - relative transformation.
     @param a convex shape A
     @param b convex shape B
-    @param b2a geometric transformation describing convex B in the A's reference
-    frame */
+    @param b2a geometric transformation describing convex B in the A's reference frame */
 template <typename T>
 __HOSTDEVICE__ bool intersectGJK(const Convex<T>& a, const Convex<T>& b, const Transform3<T>& b2a);
 

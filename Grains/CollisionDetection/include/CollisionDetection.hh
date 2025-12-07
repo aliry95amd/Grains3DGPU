@@ -14,7 +14,7 @@
 // =================================================================================================
 /** @name CollisionDetection : External methods */
 //@{
-/** @brief Returns whether 2 rigid bodies intersect - relative transformation
+/** @brief Returns whether 2 rigid bodies intersect - relative transformation.
     @param rbA first rigid body
     @param rbB second rigid body
     @param v_b2a position describing convex B in the A's reference frame
@@ -25,7 +25,7 @@ __HOSTDEVICE__ bool intersectRigidBodies(const RigidBody<T>&  rbA,
                                          const Vector3<T>&    v_b2a,
                                          const Quaternion<T>& q_b2a);
 
-/** @brief Returns whether 2 rigid bodies intersect
+/** @brief Returns whether 2 rigid bodies intersect.
     @param rbA first rigid body
     @param rbB second rigid body
     @param v_a2w position describing convex A in the world reference frame
@@ -70,7 +70,7 @@ __HOSTDEVICE__ void closestPointsRigidBodies(const RigidBody<T>&  rbA,
                                              const Quaternion<T>& q_b2w,
                                              ContactInfo<T>&      contactInfo);
 
-/** @brief Returns the di (if any) for 2 rigid bodies
+/** @brief Returns the di (if any) for 2 rigid bodies.
     @param rbA first rigid body
     @param rbB second rigid body
     @param a2w geometric tramsformation describing convex A in the world reference frame

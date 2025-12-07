@@ -7,9 +7,8 @@
 // =================================================================================================
 /** @brief Miscellaneous Quaternion functions and operators as header-only.
 
-    Defining important quaternion functions and operators as static functions.
-    It will increase the binary size, but the performance gain is much more
-    appreciated.
+    Defining important quaternion functions and operators as static functions. It will increase the
+    binary size, but the performance gain is much more appreciated.
 
     @author A.Yazdani - 2024 - Construction */
 // =================================================================================================
@@ -420,8 +419,7 @@ __HOSTDEVICE__ static INLINE Quaternion<T> operator-(const Quaternion<T>& q) noe
 }
 
 // -------------------------------------------------------------------------------------------------
-/** @brief Fused Math for Minkowski difference of two points;
-    w = a - q_b2a(b) + v.
+/** @brief Fused Math for Minkowski difference of two points; w = a - q_b2a(b) + v.
     @param a the first point
     @param b the second point
     @param v the relative position vector from body2 to body1

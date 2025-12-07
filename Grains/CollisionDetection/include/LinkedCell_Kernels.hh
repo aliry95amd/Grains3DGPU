@@ -12,8 +12,8 @@
 // =================================================================================================
 /** @brief The class LinkedCell_Kernels.
 
-    This header file contains the declarations of the various kernels used for
-    updating the linked cells in the simulation.
+    This header file contains the declarations of the various kernels used for updating the linked
+    cells in the simulation.
 
     @author A.Yazdani - 2025 - Construction */
 // =================================================================================================
@@ -181,8 +181,8 @@ static __GLOBAL__ void linkObstacles_Device(const RigidBody<T>* const* rb,
 }
 
 // -------------------------------------------------------------------------------------------------
-/** @brief Finds the start of each cell
-    The cellStart array will contain the start index for each cell hash,
+/** @brief Finds the start of each cell. The cellStart array will contain the start index for each
+    cell hash.
     @param particleHash Array of particle hashes
     @param numParticles Number of particles
     @param cellStart Output array to store start indices for each cell hash */
@@ -199,8 +199,8 @@ static __GLOBAL__ void
     if(tid < numParticles)
     {
         hash = particleHash[tid];
-        // Load hash data into shared memory so that we can look at neighboring
-        // particle's hash value without loading two hash values per thread
+        // Load hash data into shared memory so that we can look at neighboring particle's hash
+        // value without loading two hash values per thread
         sharedHash[threadIdx.x + 1] = hash;
         // first thread in block must load neighboring particle hash as well
         if(tid > 0 && threadIdx.x == 0)
@@ -210,10 +210,9 @@ static __GLOBAL__ void
 
     if(tid < numParticles)
     {
-        // If this particle has a different cell hash value to the previous
-        // particle then it must be the first particle in the cell.
-        // As it isn't the first particle, it must also be the end of the
-        // previous particle's cell.
+        // If this particle has a different cell hash value to the previous particle then it must
+        // be the first particle in the cell. As it isn't the first particle, it must also be the
+        // end of the previous particle's cell.
         if(tid == 0 || hash != sharedHash[threadIdx.x])
         {
             cellStart[hash] = tid;

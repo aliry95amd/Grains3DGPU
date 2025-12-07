@@ -1,18 +1,17 @@
 #ifndef _CELLSFACTORY_HH_
 #define _CELLSFACTORY_HH_
 
+#include <cuda_runtime.h>
+
 #include "Cells.hh"
 #include "GrainsMemBuffer.hh"
-
-#include <cuda_runtime.h>
 
 /* ============================================================================================== */
 /* Low-Level Methods                                                                              */
 /* ============================================================================================== */
-/** @brief GPU kernel to construct the Cells on device.
-    This is mandatory as we cannot access device memory addresses on the host
-    So, we pass a device memory address to a kernel.
-    Memory address is then populated within the kernel. */
+/** @brief GPU kernel to construct the Cells on device. This is mandatory as we cannot access
+    device memory addresses on the host. So, we pass a device memory address to a kernel. Memory
+    address is then populated within the kernel. */
 template <typename T, CellOrdering CO, typename... Arguments>
 __GLOBAL__ void createCells_Kernel(Cells<T, CO>** cells,
                                    uint           index,
@@ -41,7 +40,6 @@ __GLOBAL__ void createCells_Kernel(Cells<T, CO>** cells,
 
     @author A.YAZDANI - 2025 - Construction */
 // =================================================================================================
-
 template <typename T, CellOrdering CO = CellOrdering::LINEAR>
 class CellsFactory
 {
@@ -121,12 +119,10 @@ public:
     }
 
     // ---------------------------------------------------------------------------------------------
-    /** @brief Cells objects must be instantiated on device, if
-        we want to use them on device. Copying from host is not supported due to
-        runtime polymorphism for this class.
-        This function reads a host-side Cells object, and mimics it
-        in a given device buffer.
-        It calls a device kernel that is implemented in the source file.
+    /** @brief Cells objects must be instantiated on device, if we want to use them on device.
+        Copying from host is not supported due to runtime polymorphism for this class. This
+        function reads a host-side Cells object, and mimics it in a given device buffer. It calls a
+        device kernel that is implemented in the source file.
         @param h_LC Host-side Cells object
         @param d_LC Device-side Cells object */
     static void copyHostToDevice(GrainsMemBuffer<Cells<T, CO>*, MemType::HOST>&   h_LC,

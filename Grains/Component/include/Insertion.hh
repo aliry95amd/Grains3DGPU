@@ -106,14 +106,13 @@ public:
     __HOST__
     std::pair<InsertionType, InsertionInfo<T>> readTypeAndData(DOMNode* root);
 
-    /** @brief Returns a vector of Vector3 accroding to type and data
+    /** @brief Returns a vector of Vector3 accroding to type and data.
         @param type insertion type
         @param data insertion info */
     __HOST__
     Vector3<T> fetchInsertionData(InsertionType const type, InsertionInfo<T>& data);
 
-    /** @brief Returns all required data members to insert components as a
-        vector
+    /** @brief Returns all required data members to insert components as a vector.
         @param rigidBody rigid body buffer
         @param position position buffer
         @param quaternion quaternion buffer

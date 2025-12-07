@@ -57,7 +57,7 @@ public:
     void setExtent(T x, T y, T z);
 
     /** @brief Sets the extent values according to the convex which we want to fit the BoundingBox
-        around.
+       around.
         @param convex convex object */
     __HOSTDEVICE__
     void setExtent(Convex<T> const& convex);
