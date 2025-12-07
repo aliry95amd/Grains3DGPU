@@ -7,7 +7,7 @@ if [ $1 ]
   then
     ROOT_FILE=$1
   else
-    ROOT_FILE=Grains/Init/B1_N1
+    ROOT_FILE=Grains/Init/insert
 fi
 INPUT_FILE=$ROOT_FILE.xml
 
