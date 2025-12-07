@@ -7,12 +7,10 @@
 #include "Transform3.hh"
 
 // =================================================================================================
-/** @brief The header for the axis-aligned and oriented bounding boxes collision
-    detection.
+/** @brief The header for the axis-aligned and oriented bounding boxes collision detection.
 
-    Axis-aligned Bounding Boxes (AABB) and Oriented Bounding Boxes (OBB)
-    routines to find whether bounding boxes are in contact or not.
-    AABB is deprecated, so try to use OBB.
+    Axis-aligned Bounding Boxes (AABB) and Oriented Bounding Boxes (OBB) routines to find whether
+    bounding boxes are in contact or not. AABB is deprecated, so try to use OBB.
 
     @author A.Yazdani - 2024 - Construction */
 // =================================================================================================
@@ -32,8 +30,8 @@
         + b[(j + 1) % 3] * oriAbs[i][(j + 2) % 3] + b[(j + 2) % 3] * oriAbs[i][(j + 1) % 3]))
 
 // -------------------------------------------------------------------------------------------------
-/** @brief Returns whether the bounding boxes are in contact using OBB test -
-    absolute transformation
+/** @brief Returns whether the bounding boxes are in contact using OBB test - absolute
+    transformation.
     @param a The first bounding box
     @param b The second bounding box
     @param trA2W The transformation from A's local space to world space
@@ -102,8 +100,8 @@ __HOSTDEVICE__ bool intersectOrientedBoundingBox(const Vector3<T>&    a,
 }
 
 // -------------------------------------------------------------------------------------------------
-/** @brief Returns whether the bounding boxes are in contact using OBB test -
-    relative transformation
+/** @brief Returns whether the bounding boxes are in contact using OBB test - relative
+    transformation.
     @param a The first bounding box
     @param b The second bounding box
     @param trB2A The transformation from B's local space to A's local space */
@@ -164,8 +162,7 @@ __HOSTDEVICE__ bool intersectOrientedBoundingBox(const Vector3<T>&    a,
 }
 
 // -------------------------------------------------------------------------------------------------
-/** @brief Returns whether the bounding boxes are in contact using OBB test -
-    quaternion version
+/** @brief Returns whether the bounding boxes are in contact using OBB test - quaternion version.
     @param a The first bounding box
     @param b The second bounding box
     @param v_a2w The translation from A's local space to world space
@@ -236,8 +233,8 @@ __HOSTDEVICE__ bool intersectOrientedBoundingBox(const Vector3<T>&    a,
 }
 
 // -------------------------------------------------------------------------------------------------
-/** @brief Returns whether the bounding boxes are in contact using OBB test -
-    quaternion relative version
+/** @brief Returns whether the bounding boxes are in contact using OBB test - quaternion relative
+    version.
     @param a The first bounding box
     @param b The second bounding box
     @param v_b2a The translation from B's local space to A's local space
@@ -301,8 +298,8 @@ __HOSTDEVICE__ bool intersectOrientedBoundingBox(const Vector3<T>&    a,
 }
 
 // -------------------------------------------------------------------------------------------------
-/** @brief Returns whether the bounding boxes are in contact using AABB test -
-    absolute transformation
+/** @brief Returns whether the bounding boxes are in contact using AABB test - absolute
+    transformation.
     @param a The first bounding box
     @param b The second bounding box
     @param trA2W The transformation from A's local space to world space
@@ -328,8 +325,8 @@ __HOSTDEVICE__ bool intersectAxisAlignedBoundingBox(const Vector3<T>&    a,
 }
 
 // -------------------------------------------------------------------------------------------------
-/** @brief Returns whether the bounding boxes are in contact using AABB test -
-    relative transformation
+/** @brief Returns whether the bounding boxes are in contact using AABB test - relative
+    transformation.
     @param a The first bounding box
     @param b The second bounding box
     @param trB2A The transformation from B's local space to A's local space */
@@ -352,8 +349,7 @@ __HOSTDEVICE__ bool intersectAxisAlignedBoundingBox(const Vector3<T>&    a,
 }
 
 // -------------------------------------------------------------------------------------------------
-/** @brief Returns whether the bounding boxes are in contact using AABB test -
-    quaternion version
+/** @brief Returns whether the bounding boxes are in contact using AABB test - quaternion version.
     @param a The first bounding box
     @param b The second bounding box
     @param v_a2w The translation from A's local space to world space
@@ -380,8 +376,8 @@ __HOSTDEVICE__ bool intersectAxisAlignedBoundingBox(const Vector3<T>&    a,
 }
 
 // -------------------------------------------------------------------------------------------------
-/** @brief Returns whether the bounding boxes are in contact using AABB test -
-    quaternion relative version
+/** @brief Returns whether the bounding boxes are in contact using AABB test - quaternion relative
+    version.
     @param a The first bounding box
     @param b The second bounding box
     @param v_b2a The translation from B's local space to A's local space

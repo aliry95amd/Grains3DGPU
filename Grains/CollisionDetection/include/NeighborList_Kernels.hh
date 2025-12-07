@@ -1,8 +1,6 @@
 #ifndef _NEIGHBORLIST_KERNELS_HH_
 #define _NEIGHBORLIST_KERNELS_HH_
 
-#include "Transform3.hh"
-
 // =================================================================================================
 /** @brief The class NeighborList_Kernels.
 
@@ -14,21 +12,21 @@
 // =================================================================================================
 /** @name NeighborList_Kernels: External Kernels */
 //@{
-/** @brief Updates the neighbor list on host using an O(n^2) algorithm
+/** @brief Updates the neighbor list on host using an O(n^2) algorithm.
     @param nObstacles number of obstacles
     @param nParticles number of particles
     @param pairList array of pairs */
 __HOST__ void
     updateNeighborList_Nsq_Host(const uint nObstacles, const uint nParticles, uint2* pairList);
 
-/** @brief Updates the neighbor list on device using an O(n^2) algorithm
+/** @brief Updates the neighbor list on device using an O(n^2) algorithm.
     @param nObstacles number of obstacles
     @param nParticles number of particles
     @param pairList array of pairs */
 __GLOBAL__ void
     updateNeighborList_Nsq_Device(const uint nObstacles, const uint nParticles, uint2* pairList);
 
-/** @brief Updates the neighbor list on host using a linked cell approach
+/** @brief Updates the neighbor list on host using a linked cell approach.
     @param cellNeighborsList array of neighboring cells for each cell
     @param obstacleIDs array of obstacle IDs
     @param obstacleCellIDs array of obstacle cell IDs
@@ -52,7 +50,7 @@ __HOST__ void updateNeighborList_LC_Host(const uint*                         cel
                                          uint2*                              pairList,
                                          uint*                               pairCount);
 
-/** @brief Generate obstacle-particle pairs on device (sort-based)
+/** @brief Generate obstacle-particle pairs on device (sort-based).
     @param obstacleIDs array of obstacle IDs and cell counts
     @param obstacleCellIDs array of obstacle cell IDs
     @param cellStartIDs array of start IDs for each cell
@@ -75,7 +73,7 @@ __GLOBAL__ void generateObstacleParticlePairs_SB_Device(const uint2* obstacleIDs
                                                         uint2*       pairList,
                                                         uint*        pairCount);
 
-/** @brief Generate obstacle-particle pairs on device (atomic-based)
+/** @brief Generate obstacle-particle pairs on device (atomic-based).
     @param obstacleIDs array of obstacle IDs and cell counts
     @param obstacleCellIDs array of obstacle cell IDs
     @param particleInCells array of particle IDs organized by cell
@@ -100,7 +98,7 @@ __GLOBAL__ void generateObstacleParticlePairs_AT_Device(const uint2* obstacleIDs
                                                         uint2*       pairList,
                                                         uint*        pairCount);
 
-/** @brief Count neighbors per particle using linked cells
+/** @brief Count neighbors per particle using linked cells.
     @param cellNeighborsList array of neighboring cells for each cell
     @param particleIDs array of particle IDs
     @param cellIDs array of cell IDs
@@ -114,8 +112,7 @@ __GLOBAL__ void countNeighbors_Device(const uint* cellNeighborsList,
                                       const uint  numParticles,
                                       uint*       neighborCounts);
 
-/** @brief Updates the neighbor list on device using a sort-based linked cell
-    approach
+/** @brief Updates the neighbor list on device using a sort-based linked cell approach.
     @param cellNeighborsList array of neighboring cells for each cell
     @param particleIDs array of particle IDs
     @param cellIDs array of cell IDs
@@ -137,8 +134,7 @@ __GLOBAL__ void updateNeighborList_LC_SB_Device(const uint* cellNeighborsList,
                                                 uint2*      pairList,
                                                 uint*       pairCount);
 
-/** @brief Updates the neighbor list on device using an atomic-based linked cell
-    approach
+/** @brief Updates the neighbor list on device using an atomic-based linked cell approach.
     @param cellNeighborsList array of neighboring cells for each cell
     @param particleIDs array of particle IDs
     @param cellIDs array of cell IDs

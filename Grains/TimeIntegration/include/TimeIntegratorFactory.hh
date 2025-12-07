@@ -30,17 +30,16 @@ private:
 public:
     /**@name Methods */
     //@{
-    /** @brief Creates and returns the time integration scheme
+    /** @brief Creates and returns the time integration scheme.
         @param root XML node
         @param dt time step
         @param TI time integrator buffer */
     __HOST__
     static void create(DOMNode* root, T dt, GrainsMemBuffer<TimeIntegrator<T>*, MemType::HOST>& TI);
 
-    /** @brief TimeIntegrator objects must be instantiated on device, if we want
-        to use them on device. Copying from host is not supported due to runtime
-        polymorphism for this class. This function reads a host-side
-        TimeIntegrator object, and mimics it in a given device buffer.
+    /** @brief TimeIntegrator objects must be instantiated on device, if we want to use them on
+        device. Copying from host is not supported due to runtime polymorphism for this class. This
+        function reads a host-side TimeIntegrator object, and mimics it in a given device buffer.
         It calls a device kernel that is implemented in the source file.
         @param h_TI Host-side TimeIntegrator object
         @param d_TI Device-side TimeIntegrator object */
@@ -49,8 +48,5 @@ public:
                                  GrainsMemBuffer<TimeIntegrator<T>*, MemType::DEVICE>& d_TI);
     //@}
 };
-
-typedef TimeIntegratorFactory<float>  TimeIntegratorFactoryF;
-typedef TimeIntegratorFactory<double> TimeIntegratorFactoryD;
 
 #endif

@@ -31,20 +31,18 @@ enum class GJKType
 template <typename T>
 __HOSTDEVICE__ bool intersectGJK(const Convex<T>& a, const Convex<T>& b, const Transform3<T>& b2a);
 
-/** @brief Returns whether 2 convex shapes intersect
+/** @brief Returns whether 2 convex shapes intersect.
     @param a convex shape A
     @param b convex shape B
-    @param a2w geometric transformation describing convex A in the world
-    reference frame
-    @param b2w geometric transformation describing convex B in the world
-    reference frame */
+    @param a2w geometric transformation describing convex A in the world reference frame
+    @param b2w geometric transformation describing convex B in the world reference frame */
 template <typename T>
 __HOSTDEVICE__ bool intersectGJK(const Convex<T>&     a,
                                  const Convex<T>&     b,
                                  const Transform3<T>& a2w,
                                  const Transform3<T>& b2w);
 
-/** @brief Returns whether 2 convex shapes intersect - relative transformation
+/** @brief Returns whether 2 convex shapes intersect - relative transformation.
     @param a convex shape A
     @param b convex shape B
     @param v_b2a position describing convex B in the A's reference frame
@@ -55,7 +53,7 @@ __HOSTDEVICE__ bool intersectGJK(const Convex<T>&     a,
                                  const Vector3<T>&    v_b2a,
                                  const Quaternion<T>& q_b2a);
 
-/** @brief Returns whether 2 convex shapes intersect
+/** @brief Returns whether 2 convex shapes intersect.
     @param a convex shape A
     @param b convex shape B
     @param v_a2w position describing convex A in the world reference frame
@@ -70,18 +68,15 @@ __HOSTDEVICE__ bool intersectGJK(const Convex<T>&     a,
                                  const Quaternion<T>& q_a2w,
                                  const Quaternion<T>& q_b2w);
 
-/** @brief Returns the minimal distance between 2 convex shapes and a point per
-    convex shape that represents the tips of the minimal distance segment --
-    relative transformation
+/** @brief Returns the minimal distance between 2 convex shapes and a point per convex shape that
+    represents the tips of the minimal distance segment -- relative transformation.
     @param a convex shape A
     @param b convex shape B
-    @param b2a geometric transformation describing convex B in the reference
-    frame of A
+    @param b2a geometric transformation describing convex B in the reference frame of A
     @param crustA crust/skin thickness on A (shrinks A along search dir)
     @param crustB crust/skin thickness on B (shrinks B along search dir)
     @param pa point representing one tip of the minimal distance segment on A
-    @param pb point representing the other tip of the minimal distance segment
-    on B
+    @param pb point representing the other tip of the minimal distance segment on B
     @param nbIter number of iterations of GJK for convergence */
 template <typename T, GJKType GJKType, bool Acceleration = false, T Tolerance = EPS<T>>
 __HOSTDEVICE__ T computeClosestPoints_GJK(const Convex<T>&     a,
@@ -93,14 +88,12 @@ __HOSTDEVICE__ T computeClosestPoints_GJK(const Convex<T>&     a,
                                           Vector3<T>&          pb,
                                           uint&                nbIter);
 
-/** @brief Returns the minimal distance between 2 convex shapes and a point per
-    convex shape that represents the tips of the minimal distance segment
+/** @brief Returns the minimal distance between 2 convex shapes and a point per convex shape that
+    represents the tips of the minimal distance segment.
     @param a convex shape A
     @param b convex shape B
-    @param a2w geometric transformation describing convex A in the world
-    reference frame
-    @param b2w geometric transformation describing convex B in the world
-    reference frame
+    @param a2w geometric transformation describing convex A in the world reference frame
+    @param b2w geometric transformation describing convex B in the world reference frame
     @param crustA crust/skin thickness on A (shrinks A along search dir)
     @param crustB crust/skin thickness on B (shrinks B along search dir)
     @param pa point representing one tip of the minimal distance segment on A
@@ -117,9 +110,8 @@ __HOSTDEVICE__ T computeClosestPoints_GJK(const Convex<T>&     a,
                                           Vector3<T>&          pb,
                                           uint&                nbIter);
 
-/** @brief Returns the minimal distance between 2 convex shapes and a point per
-    convex shape that represents the tips of the minimal distance segment --
-    relative transformation
+/** @brief Returns the minimal distance between 2 convex shapes and a point per convex shape that
+    represents the tips of the minimal distance segment -- relative transformation.
     @param a convex shape A
     @param b convex shape B
     @param v_b2a position describing convex B in the A's reference frame
@@ -140,8 +132,8 @@ __HOSTDEVICE__ T computeClosestPoints_GJK(const Convex<T>&     a,
                                           Vector3<T>&          pb,
                                           uint&                nbIter);
 
-/** @brief Returns the minimal distance between 2 convex shapes and a point per
-    convex shape that represents the tips of the minimal distance segment
+/** @brief Returns the minimal distance between 2 convex shapes and a point per convex shape that
+    represents the tips of the minimal distance segment.
     @param a convex shape A
     @param b convex shape B
     @param v_a2w position describing convex A in the world reference frame

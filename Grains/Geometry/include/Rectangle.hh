@@ -75,8 +75,7 @@ public:
     __HOSTDEVICE__
     T computeVolume() const final;
 
-    /** @brief Computes the inertia tensor and the inverse of the inertia
-        tensor
+    /** @brief Computes the inertia tensor and the inverse of the inertia tensor.
         @param inertia inertia tensor
         @param inertia_1 inverse of the inertia tensor */
     __HOSTDEVICE__
@@ -86,8 +85,8 @@ public:
     __HOSTDEVICE__
     T computeCircumscribedRadius() const final;
 
-    /** @ Returns the half-length of the bounding box fitted to the
-        rectangle without considering the transformation */
+    /** @brief Returns the half-length of the bounding box fitted to the rectangle without
+        considering the transformation */
     __HOSTDEVICE__
     Vector3<T> computeBoundingBox() const final;
 
@@ -115,18 +114,16 @@ public:
     __HOST__
     void writeConvex(std::ostream& fileOut) const final;
 
-    /** @brief Returns the number of points to write the rectangle in a
-        Paraview format */
+    /** @brief Returns the number of points to write the rectangle in a Paraview format. */
     __HOST__
     int numberOfPoints_PARAVIEW() const final;
 
-    /** @brief Returns the number of elementary polytopes to write the
-        rectangle in a Paraview format */
+    /** @brief Returns the number of elementary polytopes to write the rectangle in a Paraview
+        format. */
     __HOST__
     int numberOfCells_PARAVIEW() const final;
 
-    /** @brief Returns a list of points describing the rectangle in a
-        Paraview format
+    /** @brief Returns a list of points describing the rectangle in a Paraview format.
         @param transform geometric transformation
         @param translation additional center of mass translation */
     __HOST__
@@ -147,8 +144,5 @@ public:
                                   uint&            last_offset) const final;
     //@}
 };
-
-typedef Rectangle<float>  RectangleF;
-typedef Rectangle<double> RectangleD;
 
 #endif

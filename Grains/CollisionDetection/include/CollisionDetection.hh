@@ -53,7 +53,7 @@ __HOSTDEVICE__ void closestPointsRigidBodies(const RigidBody<T>&  rbA,
                                              const Quaternion<T>& q_b2a,
                                              ContactInfo<T>&      contactInfo);
 
-/** @brief Returns the contact information (if any) for 2 rigid bodies
+/** @brief Returns the contact information (if any) for 2 rigid bodies.
     @param rbA first rigid body
     @param rbB second rigid body
     @param v_a2w position describing convex A in the world reference frame
@@ -73,10 +73,8 @@ __HOSTDEVICE__ void closestPointsRigidBodies(const RigidBody<T>&  rbA,
 /** @brief Returns the di (if any) for 2 rigid bodies
     @param rbA first rigid body
     @param rbB second rigid body
-    @param a2w geometric tramsformation describing convex A in the world
-    reference frame
-    @param b2w geometric tramsformation describing convex B in the world
-    reference frame */
+    @param a2w geometric tramsformation describing convex A in the world reference frame
+    @param b2w geometric tramsformation describing convex B in the world reference frame */
 template <typename T>
 __HOSTDEVICE__ T distanceRigidBodies(const RigidBody<T>&  rbA,
                                      const RigidBody<T>&  rbB,

@@ -72,8 +72,7 @@ public:
     __HOSTDEVICE__
     T computeVolume() const final;
 
-    /** @brief Computes the inertia tensor and the inverse of the inertia
-        tensor
+    /** @brief Computes the inertia tensor and the inverse of the inertia tensor.
         @param inertia inertia tensor
         @param inertia_1 inverse of the inertia tensor */
     __HOSTDEVICE__
@@ -107,18 +106,16 @@ public:
     __HOST__
     void writeConvex(std::ostream& fileOut) const final;
 
-    /** @brief Returns the number of points to write the sphere in a
-        Paraview format */
+    /** @brief Returns the number of points to write the sphere in a Paraview format. */
     __HOST__
     int numberOfPoints_PARAVIEW() const final;
 
-    /** @brief Returns the number of elementary polytopes to write the
-        sphere in a Paraview format */
+    /** @brief Returns the number of elementary polytopes to write the sphere in a Paraview
+        format. */
     __HOST__
     int numberOfCells_PARAVIEW() const final;
 
-    /** @brief Returns a list of points describing the sphere in a Paraview
-        format
+    /** @brief Returns a list of points describing the sphere in a Paraview format.
         @param transform geometric transformation
         @param translation additional center of mass translation */
     __HOST__

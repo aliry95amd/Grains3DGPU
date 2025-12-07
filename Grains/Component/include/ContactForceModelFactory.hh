@@ -98,23 +98,21 @@ private:
 public:
     /**@name Methods */
     //@{
-    /** @brief Creates and returns the contact force model given an XML node
+    /** @brief Creates and returns the contact force model given an XML node.
         @param root XML node
         @param CF Memory buffer for storing contact force models */
     static void create(DOMElement* root, GrainsMemBuffer<ContactForceModel<T>*, MemType::HOST>& CF);
 
-    /** @brief Hash function to map a pair of material IDs x and y to a
-        single ID to access the contact force model between them
+    /** @brief Hash function to map a pair of material IDs x and y to a single ID to access the
+        contact force model between them.
         @param x 1st material ID
         @param y 2nd material ID */
     __HOSTDEVICE__
     static uint computeHash(uint x, uint y);
 
-    /** @brief ContactForceModel objects must be instantiated on device, if
-        we want to use them on device. Copying from host is not supported due to
-        runtime polymorphism for this class.
-        This function reads a host-side ContactForceModel object, and mimics it
-        in a given device buffer.
+    /** @brief ContactForceModel objects must be instantiated on device, if we want to use them on
+        device. Copying from host is not supported due to runtime polymorphism for this class. This
+        function reads a host-side ContactForceModel object, and mimics it in a given device buffer.
         It calls a device kernel that is implemented in the source file.
         @param h_CF Host-side ContactForceModel object
         @param d_CF Device-side ContactForceModel object */

@@ -102,7 +102,7 @@ public:
     void setBasis(const Matrix3<T>& m);
 
     /** @brief Sets the matrix part of the transformation with specified rotations around each
-        principal axis (radians)
+        principal axis (radians).
         @param aX rotation around the x-axis
         @param aY rotation around the y-axis
         @param aZ rotation around the z-axis */
@@ -118,14 +118,14 @@ public:
     __HOSTDEVICE__
     void setIDentity();
 
-    /** @brief Sets the transformation to the inverse of another transformation
+    /** @brief Sets the transformation to the inverse of another transformation.
         @param t the other transformation
         @param isRotation if the other transformation is rotation. Default is false */
     __HOSTDEVICE__
     void setToInverseTransform(const Transform3<T>& t, bool isRotation = false);
 
-    /** @brief Sets the transformation composition of affine transformations
-        this = t2 o t1 (t1 first followed by t2)
+    /** @brief Sets the transformation composition of affine transformations: this = t2 o t1
+        (t1 first followed by t2).
         @param t1 1st affine transformation
         @param t2 2nd affine transformation */
     __HOSTDEVICE__
@@ -134,7 +134,7 @@ public:
 
     /**@name Methods */
     //@{
-    /** @brief Composition with a scaling transformation: this = this o scaling
+    /** @brief Composition with a scaling transformation: this = this o scaling.
         @param v diagonal entries of the scaling matrix */
     __HOSTDEVICE__
     void composeWithScaling(const Vector3<T>& v);
@@ -147,36 +147,36 @@ public:
     void composeLeftByRotation(const Transform3<T>& t);
 
     /** @brief Composition on the left by a rotation described by a quaternion:
-        this = rot( quaternion ) o this ( this first followed by rot( quaternion ) )
+        this = rot( quaternion ) o this ( this first followed by rot( quaternion ) ).
         @param q quaternion describing the rotation */
     __HOSTDEVICE__
     void composeLeftByRotation(const Quaternion<T>& q);
 
     /** @brief Composition on the left by a translation:
-        this = trans(vector) o this (this first followed by trans(vector))
+        this = trans(vector) o this (this first followed by trans(vector)).
         @param v translation vector */
     __HOSTDEVICE__
     void composeLeftByTranslation(const Vector3<T>& v);
 
     /** @brief Composition on the left by another affine transformation:
-        this = t o this (this first followed by t)
+        this = t o this (this first followed by t).
         @param t the other affine transformation */
     __HOSTDEVICE__
     void composeLeftByTransform(const Transform3<T>& t);
 
     /** @brief Composition on the right by another affine transformation:
-        this = this o t (t first followed by this)
+        this = this o t (t first followed by this).
         @param t the other affine transformation */
     __HOSTDEVICE__
     void composeRightByTransform(const Transform3<T>& t);
 
-    /** @brief Composition in a way that it is now the relative transformation with respect to t
+    /** @brief Composition in a way that it is now the relative transformation with respect to t.
         @param t the other affine transformation */
     __HOSTDEVICE__
     void relativeToTransform(const Transform3<T>& t);
 
     /** @brief Updates the transformation with a given displacement (vector) and a given rotation
-        (quaternion)
+        (quaternion).
         @param transMotion displacement vector
         @param rotMotion rotation quaternion */
     __HOSTDEVICE__

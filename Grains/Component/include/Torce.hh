@@ -79,8 +79,7 @@ public:
     __HOSTDEVICE__
     void addForce(const Vector3<T>& f);
 
-    /** @brief Adds a force to the torce with accounting for the additional
-        torque
+    /** @brief Adds a force to the torce with accounting for the additional torque.
         @param f added force
         @param p point of application */
     __HOSTDEVICE__

@@ -71,8 +71,7 @@ public:
     __HOSTDEVICE__
     T computeVolume() const final;
 
-    /** @brief Computes the inertia tensor and the inverse of the inertia
-        tensor
+    /** @brief Computes the inertia tensor and the inverse of the inertia tensor.
         @param inertia inertia tensor
         @param inertia_1 inverse of the inertia tensor */
     __HOSTDEVICE__
@@ -88,8 +87,8 @@ public:
     __HOSTDEVICE__
     Vector3<T> computeBoundingBox() const final;
 
-    /** @brief Cone support function, returns the support point P,
-        i.e. point on the surface of the cone that satisfies max(P.v)
+    /** @brief Cone support function, returns the support point P, i.e. point on the surface of the
+        cone that satisfies max(P.v)
         @param v direction */
     __HOSTDEVICE__
     Vector3<T> support(const Vector3<T>& v) const final;
@@ -107,26 +106,22 @@ public:
     __HOST__
     void writeConvex(std::ostream& fileOut) const final;
 
-    /** @brief Returns the number of points to write the cone in a
-        Paraview format */
+    /** @brief Returns the number of points to write the cone in a Paraview format. */
     __HOST__
     int numberOfPoints_PARAVIEW() const final;
 
-    /** @brief Returns the number of elementary polytopes to write the
-        cone in a Paraview format */
+    /** @brief Returns the number of elementary polytopes to write the cone in a Paraview format. */
     __HOST__
     int numberOfCells_PARAVIEW() const final;
 
-    /** @brief Returns a list of points describing the cone in a
-        Paraview format
+    /** @brief Returns a list of points describing the cone in a Paraview format.
         @param transform geometric transformation
         @param translation additional center of mass translation */
     __HOST__
     std::list<Vector3<T>> writePoints_PARAVIEW(const Transform3<T>& transform,
                                                Vector3<T> const*    translation) const final;
 
-    /** @brief Writes the connectivity of the cone in a Paraview
-        format
+    /** @brief Writes the connectivity of the cone in a Paraview format
         @param connectivity connectivity of Paraview polytopes
         @param offsets connectivity offsets
         @param cellstype Paraview polytopes type

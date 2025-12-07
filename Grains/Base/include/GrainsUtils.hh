@@ -15,7 +15,7 @@
 // Macro for outputting CUDA errors
 #define cudaErrCheck(ans) cudaAssert((ans), __FILE__, __LINE__);
 
-/** @brief Returns CUDA error
+/** @brief Returns CUDA error.
     @param code the error code
     @param file the file name
     @param line the line number
