@@ -36,8 +36,10 @@
 *.dat
 *.vtu
 *.pvd
+*.vtk
+*.tmp
 
-### CUDA ###
+# CUDA generated files
 *.i
 *.ii
 *.gpu
@@ -45,8 +47,7 @@
 *.cubin
 *.fatbin
 
-
-### Folders ###
+# Folders
 DoxyGRAINS/
 XERCES-2.8.0/
 Grains/include/
@@ -58,7 +59,8 @@ Main/bin*
 Tests/build*
 Tools/PrePost/*/bin*
 Tools/PrePost/*/obj*
+Tools/XMLGenerators/*.xml
 
-### MISC ###
+# IDEs and editors
 *.vscode
 *.ncu-rep
