@@ -59,7 +59,7 @@ Main/bin*
 Tests/build*
 Tools/PrePost/*/bin*
 Tools/PrePost/*/obj*
-Tools/XMLGenerators/*.xml
+Tools/XMLGenerators/*/**.xml
 
 # IDEs and editors
 *.vscode

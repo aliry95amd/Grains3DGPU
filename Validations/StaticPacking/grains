@@ -1,6 +1,6 @@
 #!/bin/bash
 
-source /home/alireza/Desktop/Work/Codes/GrainsGPU/Env/grainsGPU.env.sh
+source ../../Env/grainsGPU.env.sh
 
 # Input file
 if [ $1 ]
