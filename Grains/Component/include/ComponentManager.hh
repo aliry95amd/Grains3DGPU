@@ -20,8 +20,7 @@
 // =================================================================================================
 /** @brief The class ComponentManager.
 
-    This is just an abstract class to make sure all derived classess follow the
-    same set of methods.
+    This is just an abstract class to make sure all derived classess follow the same set of methods.
 
     @author A.Yazdani - 2024 - Construction */
 // =================================================================================================

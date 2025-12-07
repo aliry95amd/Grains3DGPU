@@ -40,8 +40,7 @@ __HOSTDEVICE__ bool intersectRigidBodies(const RigidBody<T>&  rbA,
                                          const Quaternion<T>& q_a2w,
                                          const Quaternion<T>& q_b2w);
 
-/** @brief Returns the contact information (if any) for 2 rigid bodies -
-    relative transformation
+/** @brief Returns the contact information (if any) for 2 rigid bodies - relative transformation.
     @param rbA first rigid body
     @param rbB second rigid body
     @param v_b2a position describing convex B in the A's reference frame

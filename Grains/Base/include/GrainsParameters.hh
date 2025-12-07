@@ -53,12 +53,10 @@ struct LinkedCellParameters
     LinkedCellType type = LinkedCellType::HOST;
     /** \brief Linked cell size factor */
     T cellSizeFactor = 1;
-    /** \brief If using adaptive skin, this is the desired number of
-        iterations that the skin should be valid for.
-        If it is set to 0, then we don't use adaptive skin. */
+    /** \brief If using adaptive skin, this is the desired number of iterations that the skin should
+        be valid for. If it is set to 0, then we don't use adaptive skin. */
     uint updateFrequency = 1;
-    /** \brief If using Morton ordering, this is the number of iterations
-        between each sorting */
+    /** \brief If using Morton ordering, this is the number of iterations between each sorting. */
     uint sortFrequency = 0;
 };
 

@@ -18,9 +18,8 @@
 // =================================================================================================
 /** @brief The class NeighborList_LinkedCell.
 
-    This is a derived class of NeighborList. It implements the neighbor list
-    creation using an O(n) algorithm. This is useful for systems with large
-    number of components.
+    This is a derived class of NeighborList. It implements the neighbor list creation using an O(n)
+    algorithm. This is useful for systems with large number of components.
 
     @author A.Yazdani - 2025 - Construction */
 // =================================================================================================

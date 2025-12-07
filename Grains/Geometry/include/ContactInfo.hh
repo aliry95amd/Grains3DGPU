@@ -29,9 +29,8 @@ public:
     __HOSTDEVICE__
     ContactInfo();
 
-    /** @brief Constructor with contact point location in the world reference
-        frame, overlap vector, overlap distance and number of iterations of GJK
-       as input parameters
+    /** @brief Constructor with contact point location in the world reference frame, overlap vector,
+        overlap distance and number of iterations of GJK as input parameters.
         @param pt contact point
         @param vec contact vector
         @param distance_ overlap distance */

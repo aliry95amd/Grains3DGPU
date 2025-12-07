@@ -16,8 +16,7 @@ enum TimeIntegratorType
 // =================================================================================================
 /** @brief The class TimeIntegrator.
 
-    Numerical scheme for the time integration of the Newton's law and the
-    kinematic equations.
+    Numerical scheme for the time integration of the Newton's law and the kinematic equations.
 
     @author A.YAZDANI - 2024 - Construction */
 // =================================================================================================
@@ -67,8 +66,8 @@ public:
     __HOSTDEVICE__
     virtual TimeIntegrator<T>* clone() const = 0;
 
-    /** @brief Computes the quaternion change over the time step given an
-        average for the angular velocity over the time step
+    /** @brief Computes the quaternion change over the time step given an average for the angular
+        velocity over the time step
         @param v average of the angular velocity over the time step */
     __HOSTDEVICE__
     Quaternion<T> computeQuaternionChange(const Vector3<T>& v) const;

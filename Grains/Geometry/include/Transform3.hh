@@ -8,9 +8,8 @@
 // =================================================================================================
 /** @brief The class Transform3.
 
-    A position/origin described by a Vector3 and an orientation described by a
-    Matrix3. Note that the Matrix3 portion can also contain a scaling component
-    and is hence not necessarily unitary.
+    A position/origin described by a Vector3 and an orientation described by a Matrix3. Note that
+    the Matrix3 portion can also contain a scaling component and is hence not necessarily unitary.
 
     @author A.Yazdani - 2024 - Construction */
 // =================================================================================================
@@ -32,16 +31,15 @@ public:
     __HOSTDEVICE__
     Transform3(T def = T());
 
-    /** @brief Constructor with origin coordinates as inputs and matrix as
-        identity
+    /** @brief Constructor with origin coordinates as inputs and matrix as identity.
         @param x origin x-coordinate
         @param y origin y-coordinate
         @param z origin z-coordinate */
     __HOSTDEVICE__
     Transform3(T x, T y, T z);
 
-    /** @brief Constructor with a 1D array of 12 values as inputs containing
-        the rotation matrix coefficients following by the origin coordinates
+    /** @brief Constructor with a 1D array of 12 values as inputs containing the rotation matrix
+        coefficients following by the origin coordinates.
         @param buffer 1D array contanining 12 values */
     __HOSTDEVICE__
     Transform3(T const* buffer);
@@ -52,9 +50,8 @@ public:
     __HOSTDEVICE__
     Transform3(const Quaternion<T>& q, const Vector3<T>& p);
 
-    /** @brief Constructor with two tranformations. This constructs a
-        transformation which is equal to 't2 o inv( t1 )', representing t2 in
-        local coordinate of t1.
+    /** @brief Constructor with two tranformations. This constructs a transformation which is equal
+        to 't2 o inv( t1 )', representing t2 in local coordinate of t1.
         @param t1 primary transformation
         @param t2 secondary transformation */
     __HOSTDEVICE__
@@ -92,11 +89,10 @@ public:
 
     /**@name Set methods */
     //@{
-    /** @brief Sets the transformation with an 1D array of 12 values as
-        inputs. The 1D array must be organized as: 0=Mxx, 1=Mxy, 2=Mxz, 3=Myx,
-        4=Myy, 5=Myz, 6=Mzx, 7=Mzy, 8=Mzz, 9=Ox, 10=Oy, 11=Oz
-        @param buffer the 1D array of values containing the tranformation
-        coefficients */
+    /** @brief Sets the transformation with an 1D array of 12 values as inputs. The 1D array must
+        be organized as:
+        0=Mxx, 1=Mxy, 2=Mxz, 3=Myx, 4=Myy, 5=Myz, 6=Mzx, 7=Mzy, 8=Mzz, 9=Ox, 10=Oy, 11=Oz
+        @param buffer the 1D array of values containing the tranformation coefficients */
     __HOSTDEVICE__
     void setValue(T const* buffer);
 
@@ -105,8 +101,8 @@ public:
     __HOSTDEVICE__
     void setBasis(const Matrix3<T>& m);
 
-    /** @brief Sets the matrix part of the transformation with specified
-        rotations around each principal axis (radians)
+    /** @brief Sets the matrix part of the transformation with specified rotations around each
+        principal axis (radians)
         @param aX rotation around the x-axis
         @param aY rotation around the y-axis
         @param aZ rotation around the z-axis */
@@ -122,11 +118,9 @@ public:
     __HOSTDEVICE__
     void setIDentity();
 
-    /** @brief Sets the transformation to the inverse of another
-        transformation
+    /** @brief Sets the transformation to the inverse of another transformation
         @param t the other transformation
-        @param isRotation if the other transformation is rotation. Default is
-        false */
+        @param isRotation if the other transformation is rotation. Default is false */
     __HOSTDEVICE__
     void setToInverseTransform(const Transform3<T>& t, bool isRotation = false);
 
@@ -140,24 +134,20 @@ public:
 
     /**@name Methods */
     //@{
-    /** @brief Composition with a scaling transformation:
-        this = this o scaling
+    /** @brief Composition with a scaling transformation: this = this o scaling
         @param v diagonal entries of the scaling matrix */
     __HOSTDEVICE__
     void composeWithScaling(const Vector3<T>& v);
 
-    /** @brief Composition on the left by a rotation described by a
-        transform:
+    /** @brief Composition on the left by a rotation described by a transform:
         this = rot o this (this first followed by rot).
-        This composition leaves the origin unchanged but does not check that rot
-        is indeed a rotation
+        This composition leaves the origin unchanged but does not check that rot is indeed rotation.
         @param t the other transformation describing a rotation */
     __HOSTDEVICE__
     void composeLeftByRotation(const Transform3<T>& t);
 
-    /** @brief Composition on the left by a rotation described by a
-        quaternion: this = rot( quaternion ) o this ( this first followed by
-        rot( quaternion ) )
+    /** @brief Composition on the left by a rotation described by a quaternion:
+        this = rot( quaternion ) o this ( this first followed by rot( quaternion ) )
         @param q quaternion describing the rotation */
     __HOSTDEVICE__
     void composeLeftByRotation(const Quaternion<T>& q);
@@ -180,14 +170,13 @@ public:
     __HOSTDEVICE__
     void composeRightByTransform(const Transform3<T>& t);
 
-    /** @brief Composition in a way that it is now the relative
-        transformation with respect to t
+    /** @brief Composition in a way that it is now the relative transformation with respect to t
         @param t the other affine transformation */
     __HOSTDEVICE__
     void relativeToTransform(const Transform3<T>& t);
 
-    /** @brief Updates the transformation with a given displacement (vector)
-        and a given rotation (quaternion)
+    /** @brief Updates the transformation with a given displacement (vector) and a given rotation
+        (quaternion)
         @param transMotion displacement vector
         @param rotMotion rotation quaternion */
     __HOSTDEVICE__
@@ -196,8 +185,7 @@ public:
 
     /**@name Operators */
     //@{
-    /** @brief Returns result of applying the transformation to the input
-        vector
+    /** @brief Returns result of applying the transformation to the input vector
         @param v input vector */
     __HOSTDEVICE__
     Vector3<T> operator()(const Vector3<T>& v) const;

@@ -16,10 +16,7 @@ enum ConvexType
 };
 
 // =================================================================================================
-/** @brief The class Convex.
-
-    Convex bodies - The base class for various particle shapes.
-
+/** @brief The class Convex. Convex bodies - The base class for various particle shapes.
     @author A.Yazdani - 2023 - Construction
     @author A.Yazdani - 2024 - Modificiation */
 // =================================================================================================
@@ -59,25 +56,23 @@ public:
     __HOSTDEVICE__
     virtual T computeVolume() const = 0;
 
-    /** @brief Computes the inertia tensor and the inverse of the inertia
-        tensor
+    /** @brief Computes the inertia tensor and the inverse of the inertia tensor
         @param inertia inertia tensor
         @param inertia_1 inverse of the inertia tensor */
     __HOSTDEVICE__
     virtual void computeInertia(T (&inertia)[6], T (&inertia_1)[6]) const = 0;
 
-    /** @brief Computes and returns the circumscribed radius of the
-        reference convex shape */
+    /** @brief Computes and returns the circumscribed radius of the reference convex shape */
     __HOSTDEVICE__
     virtual T computeCircumscribedRadius() const = 0;
 
-    /** @brief Returns the half-length of the bounding box fitted to the
-        convex without considering the transformation */
+    /** @brief Returns the half-length of the bounding box fitted to the convex without considering
+        the transformation */
     __HOSTDEVICE__
     virtual Vector3<T> computeBoundingBox() const = 0;
 
-    /** @brief Convex support function, returns the support point P, i.e.
-        the point on the surface of the convex shape that satisfies max(P.v)
+    /** @brief Convex support function, returns the support point P, i.e. the point on the surface
+        of the convex shape that satisfies max(P.v)
         @param v direction vector */
     __HOSTDEVICE__
     virtual Vector3<T> support(const Vector3<T>& v) const = 0;
@@ -100,18 +95,17 @@ public:
     __HOST__
     virtual void writeConvex(std::ostream& fileOut) const = 0;
 
-    /** @brief Returns the number of points to write the convex in a
-        Paraview format */
+    /** @brief Returns the number of points to write the convex in a Paraview format */
     __HOST__
     virtual int numberOfPoints_PARAVIEW() const = 0;
 
-    /** @brief Returns the number of elementary polytopes to write the
-        convex in a Paraview format */
+    /** @brief Returns the number of elementary polytopes to write the convex in a Paraview format
+     */
     __HOST__
     virtual int numberOfCells_PARAVIEW() const = 0;
 
     /** @brief Writes the list of points describing the convex to an stream
-      @param f output stream
+        @param f output stream
         @param transform geometric transformation
         @param translation additional center of mass translation */
     __HOST__
@@ -119,8 +113,7 @@ public:
                               const Transform3<T>& transform,
                               const Vector3<T>*    translation = NULL) const;
 
-    /** @brief Returns a list of points describing the convex in a Paraview
-        format
+    /** @brief Returns a list of points describing the convex in a Paraview format
         @param transform geometric transformation
         @param translation additional center of mass translation */
     __HOST__

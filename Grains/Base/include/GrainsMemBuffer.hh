@@ -26,7 +26,7 @@ enum class MemType
 // =================================================================================================
 /** @name GrainsMemBuffer: External Methods */
 //@{
-/** @brief Fills a buffer to default
+/** @brief Fills a buffer to default.
     @param buffer the buffer to be initialized
     @param size size of the buffer
     @param value the default value to be set (default is T()) */
@@ -40,7 +40,7 @@ __GLOBAL__ void fill_Kernel(T* buffer, const size_t size, const T& value = T())
 }
 
 // -------------------------------------------------------------------------------------------------
-/** @brief fills a buffer with incremental values
+/** @brief fills a buffer with incremental values.
     @param buffer the buffer to be initialized
     @param size size of the buffer
     @param start the starting value (default is 0) */
@@ -88,7 +88,7 @@ public:
     }
 
     // ---------------------------------------------------------------------------------------------
-    /** @brief Constructor with the size and default value
+    /** @brief Constructor with the size and default value.
         @param size size of the buffer
         @param value default value to fill the buffer */
     GrainsMemBuffer(size_t size, const T& value)
@@ -105,7 +105,7 @@ public:
     }
 
     // ---------------------------------------------------------------------------------------------
-    /** @brief Copy constructor
+    /** @brief Copy constructor.
         @param other the other buffer to copy from */
     template <MemType srcM>
     GrainsMemBuffer(const GrainsMemBuffer<T, srcM>& other)
@@ -114,7 +114,7 @@ public:
     }
 
     // ---------------------------------------------------------------------------------------------
-    /** @brief Copy assignment operator
+    /** @brief Copy assignment operator.
         @param other the other buffer to copy from */
     template <MemType srcM>
     GrainsMemBuffer<T, M>& operator=(const GrainsMemBuffer<T, srcM>& other)
@@ -249,7 +249,7 @@ public:
     /** @name Set methods */
     //@{
     // ---------------------------------------------------------------------------------------------
-    /** @brief Sets the size of the buffer without reallocation
+    /** @brief Sets the size of the buffer without reallocation.
         @param new_size new size of the buffer (must be <= capacity) */
     void setSize(size_t new_size)
     {
@@ -262,7 +262,7 @@ public:
     /** @name Methods */
     //@{
     // ---------------------------------------------------------------------------------------------
-    /** @brief Reserves memory for the buffer
+    /** @brief Reserves memory for the buffer.
         @param new_capacity new capacity of the buffer */
     void reserve(size_t new_capacity)
     {
@@ -339,7 +339,7 @@ public:
     }
 
     // ---------------------------------------------------------------------------------------------
-    /** @brief Resizes the buffer (changes logical size, may grow capacity)
+    /** @brief Resizes the buffer (changes logical size, may grow capacity).
         @param new_size new size of the buffer */
     void resize(size_t new_size)
     {
@@ -356,8 +356,8 @@ public:
     }
 
     // ---------------------------------------------------------------------------------------------
-    /** @brief Clears the buffer (sets size to 0, keeps capacity) Useful when you want to "empty"
-        the buffer but keep memory allocated */
+    /** @brief Clears the buffer (sets size to 0, keeps capacity). Useful when you want to "empty"
+        the buffer but keep memory allocated. */
     void clear()
     {
         m_size = 0;
@@ -365,14 +365,14 @@ public:
 
     // ---------------------------------------------------------------------------------------------
     /** @brief Resets the buffer completely (frees memory, size=0, capacity=0). Useful when you want
-        to completely reinitialize the buffer */
+        to completely reinitialize the buffer. */
     void reset()
     {
         free();
     }
 
     // ---------------------------------------------------------------------------------------------
-    /** @brief Pushes a new element to the back of the buffer
+    /** @brief Pushes a new element to the back of the buffer.
         @param value value to push */
     void push_back(const T& value)
     {
@@ -480,7 +480,7 @@ public:
     }
 
     // ---------------------------------------------------------------------------------------------
-    /** @brief Copy to another buffer (host/device aware)
+    /** @brief Copy to another buffer (host/device aware).
         @param dest destination buffer */
     template <MemType destM>
     void copyTo(GrainsMemBuffer<T, destM>& dest)
@@ -502,7 +502,7 @@ public:
     }
 
     // ---------------------------------------------------------------------------------------------
-    /** @brief Copy from another buffer (host/device aware)
+    /** @brief Copy from another buffer (host/device aware).
         @param src source buffer */
     template <MemType srcM>
     void copyFrom(const GrainsMemBuffer<T, srcM>& src)
@@ -532,7 +532,7 @@ public:
     }
 
     // ---------------------------------------------------------------------------------------------
-    /** @brief at method to access elements with bounds checking
+    /** @brief at method to access elements with bounds checking.
         @param index index of the element to access */
     const T& at(size_t index) const
     {
@@ -595,7 +595,7 @@ public:
     }
 
     // ---------------------------------------------------------------------------------------------
-    /** @brief Fills the buffer with a user-provided value
+    /** @brief Fills the buffer with a user-provided value.
         @param count number of elements
         @param value value to initialize with */
     void fill(const T& value)
@@ -615,7 +615,7 @@ public:
     }
 
     // ---------------------------------------------------------------------------------------------
-    /** @brief Fills the buffer incrementally with values starting from a given value
+    /** @brief Fills the buffer incrementally with values starting from a given value.
         @param start the starting value (default is 0) */
     void sequence(const T& start = T(0))
     {

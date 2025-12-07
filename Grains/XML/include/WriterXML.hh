@@ -13,7 +13,6 @@ using namespace std;
 /** @brief The class WriterXML.
 
     Utilities to write a file in an XML format with Xerces.
-
     @author GRAINS Project - IFP - 2007 - Creation
     @author A.WACHS - 2019 - Major cleaning & refactoring
     @author A.YAZDANI - 2024 - Porting to GPU */

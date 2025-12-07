@@ -42,8 +42,8 @@ public:
     /** @brief Sets up the GPU and its parameters */
     void setupGPUDevice();
 
-    /** @brief Tasks to perform before time-stepping
-        // @param rootElement XML root */
+    /** @brief Tasks to perform before time-stepping.
+        @param rootElement XML root */
     void initialize(DOMElement* rootElement) final;
 
     /** @brief Runs the simulation over the prescribed time interval */
@@ -55,8 +55,8 @@ public:
 
     /**@name Low-level methods */
     //@{
-    /** @brief Construction of the simulation: linked cell, particles &
-        obstacles, domain decomposition
+    /** @brief Construction of the simulation: linked cell, particles & obstacles, domain
+        decomposition.
         @param rootElement XML root */
     void Construction(DOMElement* rootElement);
 
@@ -64,8 +64,7 @@ public:
         @param rootElement XML root */
     void Forces(DOMElement* rootElement);
 
-    /** @brief Additional features of the simulation: insertion,
-        post-processing
+    /** @brief Additional features of the simulation: insertion, post-processing.
         @param rootElement XML root */
     void AdditionalFeatures(DOMElement* rootElement);
     //@}

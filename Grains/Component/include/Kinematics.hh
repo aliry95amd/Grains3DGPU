@@ -9,7 +9,7 @@
     Manages the kinematics (velocities or accelerations) of components.
 
     @author A.YAZDANI - 2024 - Construction */
-// ============================================================================
+// =================================================================================================
 template <typename T>
 class Kinematics
 {

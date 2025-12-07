@@ -7,15 +7,13 @@
 // =================================================================================================
 /** @brief The class NeighborList.
 
-    This class provides functionalities to create a neighbor list for components
-    in the simulation. It is used to limit the collision detection to only
-    neighboring components. It is one of the main differences between the
-   Grains3D and its GPU version as it is useful to avoid thread divergence. This
-   is the base class and derived classes should implement the methods. This
-   design gives the flexibility to use different types of neighbor lists. For
-   instance, the neighbor list can be created using an O(n^2) algorithm for
-    systems with a small number of components or using a more sophisticated
-    algorithm for larger systems.
+    This class provides functionalities to create a neighbor list for components in the simulation.
+    It is used to limit the collision detection to only neighboring components. It is one of the
+    main differences between the Grains3D and its GPU version as it is useful to avoid thread
+    divergence. This is the base class and derived classes should implement the methods. This design
+    gives the flexibility to use different types of neighbor lists. For instance, the neighbor list
+    can be created using an O(n^2) algorithm for systems with a small number of components or using
+    a more sophisticated algorithm for larger systems.
 
     @author A.Yazdani - 2025 - Construction */
 // =================================================================================================

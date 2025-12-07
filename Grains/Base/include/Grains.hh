@@ -78,7 +78,7 @@ public:
     /**@name Low-level methods */
     //@{
     /** @brief Construction of the simulation: linked cell, particles & obstacles, domain
-        decomposition
+        decomposition.
         @param rootElement XML root */
     void Construction(DOMElement* rootElement);
 
@@ -86,7 +86,7 @@ public:
         @param rootElement XML root */
     void Forces(DOMElement* rootElement);
 
-    /** @brief Additional features of the simulation: insertion, post-processing
+    /** @brief Additional features of the simulation: insertion, post-processing.
         @param rootElement XML root */
     void AdditionalFeatures(DOMElement* rootElement);
     //@}

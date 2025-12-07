@@ -10,11 +10,10 @@
 // =================================================================================================
 /** @brief The class RigidBody.
 
-    Rigid bodies comprising their shapes and physical attributes. The precision
-    is managed by two typenames "T" and "U". "T" corresponds to the precision of
-    the rigid body, and "U" represents the precision of the bounding volume
-    encapsulating the rigid body. We explicitly instantiate three classes out of
-    this template; (T, U) = (double, double), (double, float), (float, float).
+    Rigid bodies comprising their shapes and physical attributes. The precision is managed by two
+    typenames "T" and "U". "T" corresponds to the precision of the rigid body, and "U" represents
+    the precision of the bounding volume encapsulating the rigid body. We explicitly instantiate
+    three classes out of this template; (T, U) = (double, double), (double, float), (float, float).
 
     @author A.Yazdani - 2024 - Construction */
 // =================================================================================================
@@ -45,8 +44,7 @@ public:
     __HOSTDEVICE__
     RigidBody();
 
-    /** @brief Constructor with a convex, crust thickness, material, and
-        density
+    /** @brief Constructor with a convex, crust thickness, material, and density
         @param convex convex
         @param ct crust thickness of the rigid body
         @param density density
@@ -60,7 +58,7 @@ public:
     RigidBody(RigidBody<T> const& rb);
 
     /** @brief Copy assignment operator
-         @param other RigidBody object to be assigned */
+        @param other RigidBody object to be assigned */
     __HOSTDEVICE__
     RigidBody<T>& operator=(const RigidBody<T>& other);
 
@@ -70,12 +68,12 @@ public:
     RigidBody(RigidBody<T>&& other);
 
     /** @brief Move assignment operator
-          @param other RigidBody object to be moved */
+        @param other RigidBody object to be moved */
     __HOSTDEVICE__
     RigidBody<T>& operator=(RigidBody<T>&& other);
 
     /** @brief Constructor with an XML input
-          @param root XML input */
+        @param root XML input */
     __HOST__
     RigidBody(DOMNode* root);
 
@@ -129,18 +127,17 @@ public:
 
     /**@name Methods */
     //@{
-    /** @brief Computes the acceleration of the rigid body as a kinematics
-        object after imposing a torce (Torque + Force). The assumption is that
-        the torce is given in the body-fixed coordinate system, hence, there is
-        no need to have the quaternion
+    /** @brief Computes the acceleration of the rigid body as a kinematics object after imposing a
+        torce (Torque + Force). The assumption is that the torce is given in the body-fixed
+        coordinate system, hence, there is no need to have the quaternion.
         @param omega angular velocity in the body-fixed coordinate system
         @param t imposed torce in the body-fixed coordinate system */
     __HOSTDEVICE__
     Kinematics<T> computeMomentum(const Vector3<T>& omega, const Torce<T>& t) const;
 
-    /** @brief Computes the acceleration of the rigid body as a kinematics
-        object after imposing a torce (Torque + Force). The assumption is that
-        the torce is given in the space-fixed coordinate system.
+    /** @brief Computes the acceleration of the rigid body as a kinematics object after imposing a
+        torce (Torque + Force). The assumption is that the torce is given in the space-fixed
+        coordinate system.
         @param omega angular velocity in the space-fixed coordinate system
         @param t imposed torce in the space-fixed coordinate system
         @param q quaternion of rotation from space to body coordinate systems */

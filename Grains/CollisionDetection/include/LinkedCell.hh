@@ -43,9 +43,8 @@ class LinkedCell
 protected:
     /** @name Parameters */
     //@{
-    /** \brief Non-owning pointer to the rigid bodies buffer (stable address)
-        We assume that this buffer remains valid during the lifetime of this
-        object. */
+    /** \brief Non-owning pointer to the rigid bodies buffer (stable address). We assume that this
+        buffer remains valid during the lifetime of this object. */
     const GrainsMemBuffer<RigidBody<T>*, M>* m_rb = nullptr;
     /** \brief Non-owning pointer to positions buffer */
     const GrainsMemBuffer<Vector3<T>, M>* m_positions = nullptr;
@@ -53,34 +52,33 @@ protected:
     const GrainsMemBuffer<Quaternion<T>, M>* m_quaternions = nullptr;
     /** \brief Particles position in the last update */
     GrainsMemBuffer<Vector3<T>, M> m_oldPosition;
-    /** \brief Cells object. We allocate a buffer for later if we want to work
-        with multiple cells objects */
+    /** \brief Cells object. We allocate a buffer for later if we want to work with multiple cells
+        objects. */
     GrainsMemBuffer<Cells<T>*, M> m_cells;
     /** \brief Buffer to store neighbor cell IDs */
     GrainsMemBuffer<uint, M> m_neighborCells;
     /** \brief Buffer of particle IDs */
     GrainsMemBuffer<uint, M> m_particleID;
-    /** \brief Buffer of cells that particles belong to. This is a one-to-one
-        mapping from particle IDs to cell IDs, i.e., for index i,
-        m_particleID[i] is the ID of particle i (p_i), and m_cellID[i] is the ID
-        of the cell that particle p_i belongs to. */
+    /** \brief Buffer of cells that particles belong to. This is a one-to-one mapping from particle
+        IDs to cell IDs, i.e., for index i, m_particleID[i] is the ID of particle i (p_i), and
+        m_cellID[i] is the ID of the cell that particle p_i belongs to. */
     GrainsMemBuffer<uint, M> m_cellID;
     /** \brief Buffer of number of particles per cell */
     GrainsMemBuffer<uint, M> m_numParticlesPerCell;
-    /** \brief Buffer of obstacle IDs and the number of cells that have to be
-        checked for a possible contact with a particle. This is essentially the
-        number of cells each obstacle occupies + one-ring.*/
+    /** \brief Buffer of obstacle IDs and the number of cells that have to be checked for a possible
+        contact with a particle. This is essentially the number of cells each obstacle occupies +
+        one-ring. */
     GrainsMemBuffer<uint2, M> m_obstacleID;
-    /** \brief Buffer of the cell IDs that that have to be checked for a
-        possible contact with an obstacle. */
+    /** \brief Buffer of the cell IDs that that have to be checked for a possible contact with an
+        obstacle. */
     GrainsMemBuffer<uint, M> m_obstacleCellID;
-    /** \brief Cell size. This is the minimum possible size for the cells. skin
-        thickness will be added to this value. */
+    /** \brief Cell size. This is the minimum possible size for the cells. Skin thickness will be
+        added to this value. */
     T m_cellSizeWithoutSkin;
     /** \brief Skin thickness */
     T m_skinThickness;
-    /** \brief Maximum displacement of particles since the last update. Note
-        that we store the squared value */
+    /** \brief Maximum displacement of particles since the last update. Note that we store the
+        squared value. */
     T m_maxDisplacementSquared;
     /** \brief Update frequency */
     uint m_updateFrequency;
@@ -336,7 +334,7 @@ public:
     /** @name Methods */
     //@{
     // ---------------------------------------------------------------------------------------------
-    /** @brief Computes the maximum radius of rigid bodies given an interval
+    /** @brief Computes the maximum radius of rigid bodies given an interval.
         @param startID start ID of the interval
         @param endID end ID of the interval */
     T computeMaxRadius(const uint startID, const uint endID) const
