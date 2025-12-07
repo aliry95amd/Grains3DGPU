@@ -65,7 +65,6 @@ void GrainsGPU<T>::setupGPUDevice()
 template <typename T>
 void GrainsGPU<T>::initialize(DOMElement* rootElement)
 {
-
     // Read using the base class Grains<T> with GPU context ready
     Grains<T>::initialize(rootElement);
 

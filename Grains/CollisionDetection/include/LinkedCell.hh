@@ -156,27 +156,10 @@ public:
         // Initialize the LinkedCell buffer
         // Note that we start with smallest size possible (largest number of
         // cells) so the buffers are allocated with the largest size possible.
-        m_cells.reserve(1);
-        if constexpr(M == MemType::HOST)
-        {
-            CellsFactory<T>::create(minCorner,
-                                    maxCorner,
-                                    m_cellSizeWithoutSkin,
-                                    m_cells,
-                                    &m_numCells);
-        }
-        else if constexpr(M == MemType::DEVICE)
-        {
-            GrainsMemBuffer<Cells<T>*, MemType::HOST> h_cells(1);
-            CellsFactory<T>::create(minCorner,
-                                    maxCorner,
-                                    m_cellSizeWithoutSkin,
-                                    h_cells,
-                                    &m_numCells);
-            CellsFactory<T>::copyHostToDevice(h_cells, m_cells);
-            // Free the host buffer
-            delete h_cells[0];
-        }
+        m_numCells = CellsFactory<T>::template create<M>(minCorner,
+                                                         maxCorner,
+                                                         m_cellSizeWithoutSkin,
+                                                         m_cells);
 
         // Initialize number of particles per cell buffer
         m_numParticlesPerCell.initialize(m_numCells);

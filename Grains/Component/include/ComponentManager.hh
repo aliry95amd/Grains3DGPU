@@ -15,6 +15,7 @@
 #include "ContactInfo.hh"
 #include "NeighborList.hh"
 #include "NeighborListFactory.hh"
+#include "ParticleSorter.hh"
 
 // =============================================================================
 /** @brief The class ComponentManager.
@@ -47,13 +48,10 @@ protected:
     /** \brief Components Id */
     GrainsMemBuffer<uint, M> m_componentId;
 
-    /** \brief Number of particles in manager */
-    uint m_nParticles;
-    /** \brief Number of obstacles in manager */
-    uint m_nObstacles;
-
     /** \brief Neighbor list object */
     NeighborList<T, M>* m_neighborList;
+    /** \brief Particle sorter for Morton code-based reordering */
+    ParticleSorter<T, M> m_particleSorter;
     /** \brief Relative position */
     GrainsMemBuffer<Vector3<T>, M> m_relPosition;
     /** \brief Relative quaternion */
@@ -64,8 +62,11 @@ protected:
     GrainsMemBuffer<ContactInfo<T>, M> m_contactInfoWorld;
     /** \brief Active contact pairs */
     GrainsMemBuffer<uint, M> m_activePairs;
-    // /** \brief Rigid bodies bounding volume */
-    // GrainsMemBuffer<BoundingVolume<T>, M> m_boundingVolume;
+
+    /** \brief Number of particles in manager */
+    uint m_nParticles;
+    /** \brief Number of obstacles in manager */
+    uint m_nObstacles;
     //@}
 
 public:
@@ -90,8 +91,10 @@ public:
         , m_velocity(nParticles + nObstacles)
         , m_torce(nParticles + nObstacles)
         , m_componentId(nParticles + nObstacles)
-        , m_nParticles(nParticles)
+        , m_neighborList(nullptr)
+        , m_particleSorter(nObstacles, nParticles)
         , m_nObstacles(nObstacles)
+        , m_nParticles(nParticles)
     {
         GAssert(m_rigidBody->getSize() == m_nParticles + m_nObstacles,
                 "Rigid body size mismatch");
@@ -490,6 +493,20 @@ public:
                                 m_velocity,
                                 m_nObstacles,
                                 m_nParticles);
+    }
+
+    // -------------------------------------------------------------------------
+    /** @brief Sorts particles by Morton codes for improved cache efficiency */
+    virtual void sortParticlesByMorton()
+    {
+        m_particleSorter.sortParticles(m_position,
+                                       m_velocity,
+                                       m_quaternion,
+                                       m_torce,
+                                       m_rigidBodyId,
+                                       m_componentId,
+                                       m_nObstacles,
+                                       m_nParticles);
     }
 
     // -------------------------------------------------------------------------
