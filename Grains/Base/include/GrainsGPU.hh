@@ -56,7 +56,7 @@ public:
     /**@name Low-level methods */
     //@{
     /** @brief Construction of the simulation: linked cell, particles & obstacles, domain
-       decomposition.
+        decomposition.
         @param rootElement XML root */
     void Construction(DOMElement* rootElement);
 

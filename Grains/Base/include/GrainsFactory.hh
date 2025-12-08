@@ -30,7 +30,7 @@ public:
     /**@name Static methods */
     //@{
     /** @brief Adds the path to the dtd files using the GRAINS_HOME variable to a copy of the input
-       file. Returns the name of this copy.
+        file. Returns the name of this copy.
         @param filename input file name */
     static string init(string const& filename);
 
