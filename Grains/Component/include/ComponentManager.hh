@@ -63,9 +63,9 @@ protected:
     GrainsMemBuffer<uint, M> m_activePairs;
 
     /** \brief Number of particles in manager */
-    uint m_nParticles;
+    uint m_numParticles;
     /** \brief Number of obstacles in manager */
-    uint m_nObstacles;
+    uint m_numObstacles;
     //@}
 
 public:
@@ -90,10 +90,11 @@ public:
         , m_componentId(nParticles + nObstacles)
         , m_neighborList(nullptr)
         , m_particleSorter(nObstacles, nParticles)
-        , m_nObstacles(nObstacles)
-        , m_nParticles(nParticles)
+        , m_numObstacles(nObstacles)
+        , m_numParticles(nParticles)
     {
-        GAssert(m_rigidBody->getSize() == m_nParticles + m_nObstacles, "Rigid body size mismatch");
+        GAssert(m_rigidBody->getSize() == m_numParticles + m_numObstacles,
+                "Rigid body size mismatch");
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -240,14 +241,14 @@ public:
     /** @brief Gets the number of particles in manager */
     uint getNumberOfParticles() const
     {
-        return m_nParticles;
+        return m_numParticles;
     }
 
     // ---------------------------------------------------------------------------------------------
     /** @brief Gets the number of obstacles in manager */
     uint getNumberOfObstacles() const
     {
-        return m_nObstacles;
+        return m_numObstacles;
     }
     //@}
 
@@ -344,8 +345,8 @@ public:
         NeighborListFactory<T, M>::create(m_rigidBody,
                                           m_position,
                                           m_quaternion,
-                                          m_nObstacles,
-                                          m_nParticles,
+                                          m_numObstacles,
+                                          m_numParticles,
                                           m_neighborList);
 
         // Get the amount of memory available
@@ -357,9 +358,10 @@ public:
 
         // Initialize with maximum possible pairs for dynamic sizing
         constexpr uint initialPairPerComponent = 20;
-        size_t         estimatedPairs = (m_nObstacles + m_nParticles) * initialPairPerComponent;
-        size_t maxPairs = m_nObstacles * m_nParticles + m_nParticles * (m_nParticles - 1) / 2;
-        estimatedPairs  = std::min(estimatedPairs, maxPairs);
+        size_t         estimatedPairs = (m_numObstacles + m_numParticles) * initialPairPerComponent;
+        size_t         maxPairs
+            = m_numObstacles * m_numParticles + m_numParticles * (m_numParticles - 1) / 2;
+        estimatedPairs = std::min(estimatedPairs, maxPairs);
         size_t sizePerPair
             = sizeof(m_relPosition.getData()[0]) + sizeof(m_relQuaternion.getData()[0])
               + sizeof(m_contactInfo.getData()[0]) + sizeof(m_contactInfoWorld.getData()[0])
@@ -377,8 +379,7 @@ public:
     }
 
     // ---------------------------------------------------------------------------------------------
-    /** @brief Resizes pair-dependent buffers based on current neighbor list
-        size
+    /** @brief Resizes pair-dependent buffers based on current neighbor list size.
         @param size new size for the pair buffers */
     virtual void resizePairBuffers(const uint size)
     {
@@ -443,7 +444,7 @@ public:
                       "initializing on host first, and copy to device. Aborting Grains!");
         // Making sure that we have data for all components and the number of
         // initial TR matches the number of RBs
-        uint nComponents = m_nParticles + m_nObstacles;
+        uint nComponents = m_numParticles + m_numObstacles;
         assert(initPosition.getSize() == nComponents && initOrientation.getSize() == nComponents);
 
         // Assigning
@@ -465,22 +466,39 @@ public:
                       "host first, and copy to device. Aborting Grains!");
 
         // This adds all particles to the system all at once in the beginning
-        insertionPolicy
-            ->insert(m_rigidBody, m_position, m_quaternion, m_velocity, m_nObstacles, m_nParticles);
+        insertionPolicy->insert(m_rigidBody,
+                                m_position,
+                                m_quaternion,
+                                m_velocity,
+                                m_numObstacles,
+                                m_numParticles);
     }
 
     // ---------------------------------------------------------------------------------------------
     /** @brief Sorts particles by Morton codes for improved cache efficiency */
-    virtual void sortParticlesByMorton()
+    virtual void sortParticles()
     {
-        m_particleSorter.sortParticles(m_position,
-                                       m_velocity,
-                                       m_quaternion,
-                                       m_torce,
-                                       m_rigidBodyId,
-                                       m_componentId,
-                                       m_nObstacles,
-                                       m_nParticles);
+        using GP = GrainsParameters<T>;
+        auto& SS = GP::m_simulationState;
+        auto& LC = GP::m_collisionDetection.linkedCellParameters;
+
+        // Increment update counter and sort if needed
+        if(LC.sortFrequency > 0 && SS.neighborListUpdateCount % LC.sortFrequency == 0)
+        {
+            m_particleSorter.sortParticles(m_position,
+                                           m_velocity,
+                                           m_quaternion,
+                                           m_torce,
+                                           m_rigidBodyId,
+                                           m_componentId,
+                                           m_numObstacles,
+                                           m_numParticles);
+            SS.particlesSorted = true;
+        }
+        else
+        {
+            SS.particlesSorted = false;
+        }
     }
 
     // ---------------------------------------------------------------------------------------------

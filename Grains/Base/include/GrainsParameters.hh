@@ -3,6 +3,9 @@
 
 #include "Vector3.hh"
 
+/** @name Enumerations */
+//@{
+// -------------------------------------------------------------------------------------------------
 /** @brief Type of neighbor list */
 enum class NeighborListType
 {
@@ -12,6 +15,7 @@ enum class NeighborListType
     LINKEDCELL = 1
 };
 
+// -------------------------------------------------------------------------------------------------
 /** @brief Type of linked cell */
 enum class LinkedCellType
 {
@@ -23,6 +27,7 @@ enum class LinkedCellType
     ATOMIC = 2
 };
 
+// -------------------------------------------------------------------------------------------------
 /** @brief Type of bounding volume */
 enum class BoundingVolumeType
 {
@@ -34,34 +39,79 @@ enum class BoundingVolumeType
     OBC = 2
 };
 
+// -------------------------------------------------------------------------------------------------
 /** @brief Type of narrow-phase detection */
 enum class NarrowPhaseType
 {
     /** @brief Gilbert-Johnson-Keerthi algorithm */
     GJK = 0
 };
+//@}
 
+/** @name Structs */
+//@{
+// -------------------------------------------------------------------------------------------------
+/** @brief Parameters to track dynamic simulation state during runtime. */
+template <typename T>
+struct SimulationState
+{
+    /** @brief Current simulation time. */
+    T time = 0;
+    /** @brief Number of obstacles. */
+    uint numObstacles = 0;
+    /** @brief Number of particles. */
+    uint numParticles = 0;
+    /** @brief Number of times neighbor list has been updated. */
+    uint neighborListUpdateCount = 0;
+    /** @brief did obstacles move in the last step? */
+    bool obstaclesMoved = true;
+    /** @brief did particles get sorted in the last step? */
+    bool particlesSorted = true;
+};
+
+// -------------------------------------------------------------------------------------------------
 /** @brief Parameters for linked cell configuration */
 template <typename T>
 struct LinkedCellParameters
 {
-    /** \brief Minimum corner of the linked cell domain */
+    /** \brief Minimum corner of the linked cell domain. */
     Vector3<T> minCorner = Vector3<T>(0, 0, 0);
-    /** \brief Maximum corner of the linked cell domain */
+    /** \brief Maximum corner of the linked cell domain. */
     Vector3<T> maxCorner = Vector3<T>(0, 0, 0);
-    /** \brief Type of linked cell */
+    /** \brief Type of linked cell. */
     LinkedCellType type = LinkedCellType::HOST;
-    /** \brief Linked cell size factor */
+    /** \brief Minimum linked cell size. */
+    T minCellSize = 0;
+    /** \brief Linked cell size factor. */
     T cellSizeFactor = 1;
+    /** \brief Maximum number of cells that one obstacle can occupy. */
+    uint maxNumCellsPerObstacle = 0;
     /** \brief If using adaptive skin, this is the desired number of iterations that the skin should
-        be valid for. If it is set to 0, then we don't use adaptive skin. */
-    uint updateFrequency = 1;
-    /** \brief If using Morton ordering, this is the number of iterations between each sorting. */
+        be valid for. If it is set to 0, then we don't use adaptive skin. If set to 1, the skin is
+        updated every iteration and trivially it gives worse performance. */
+    uint updateFrequency = 0;
+    /** \brief Number of iterations between each sorting. */
     uint sortFrequency = 0;
 };
 
+// -------------------------------------------------------------------------------------------------
+/** @brief Parameters for collision detection configuration. */
+template <typename T>
+struct CollisionDetectionParameters
+{
+    /** \brief Type of neighbor list. */
+    NeighborListType neighborListType = NeighborListType::NSQ;
+    /** \brief LinkedCell parameters. */
+    LinkedCellParameters<T> linkedCellParameters;
+    /** \brief Type of bounding volume. */
+    BoundingVolumeType boundingVolumeType = BoundingVolumeType::OFF;
+    /** \brief Type of narrow-phase detection. */
+    NarrowPhaseType narrowPhaseType = NarrowPhaseType::GJK;
+};
+//@}
+
 // =================================================================================================
-/** @brief Parameters needed for Grains.
+/** @brief Global Parameters in Grains.
 
     @author A.Yazdani - 2024 - Construction */
 // =================================================================================================
@@ -71,6 +121,16 @@ class GrainsParameters
 public:
     /** @name Parameters */
     //@{
+    /* GPU */
+    /** \brief is simulation on GPU? */
+    static bool m_isGPU;
+    /** \brief GPU device properties */
+    static cudaDeviceProp m_GPU;
+
+    /* Dynamic Settings */
+    /** \brief Simulation state */
+    static SimulationState<T> m_simulationState;
+
     /* Spatial */
     /** @brief Global domain origin */
     static Vector3<T> m_origin;
@@ -79,25 +139,9 @@ public:
     /** @brief Is simulation periodic? */
     static bool m_isPeriodic;
 
-    /* Temporal */
-    /** @brief Initial simulation time */
-    static T m_tStart;
-    /** @brief End simulation time */
-    static T m_tEnd;
-    /** @brief Simulation time step */
-    static T m_dt;
-    /** @brief Physical time */
-    static T m_time;
-
-    /* Numbers */
-    /** @brief Number of particles in simulation */
-    static uint m_numParticles;
-    /** @brief Number of obstacles in simulation */
-    static uint m_numObstacles;
-
-    /* Physical */
-    /** \brief Gravity vector */
-    static Vector3<T> m_gravity;
+    /* Collision Detection */
+    /** \brief Collision detection parameters. */
+    static CollisionDetectionParameters<T> m_collisionDetection;
 
     /* Material */
     /** \brief Map from material name to an uint ID */
@@ -105,31 +149,23 @@ public:
     /** \brief Number of different possible contact pairs (incl. obs-obs) */
     static uint m_numContactPairs;
 
+    /* Temporal */
+    /** @brief Initial simulation time */
+    static T m_tStart;
+    /** @brief End simulation time */
+    static T m_tEnd;
+    /** @brief Simulation time step */
+    static T m_dt;
+    /** @brief is time integrator leap-frog? */
+    static bool m_isLeapFrog;
+
+    /* Physical */
+    /** \brief Gravity vector */
+    static Vector3<T> m_gravity;
+
     /* Post-Processing */
     /** \brief Queue of simulation time to write Post-Processing */
     static std::queue<T> m_tSave;
-
-    /* GPU */
-    /** \brief is simulation on GPU? */
-    static bool m_isGPU;
-    /** \brief GPU device properties */
-    static cudaDeviceProp m_GPU;
-
-    /* Collision Detection */
-    struct CollisionDetectionParameters
-    {
-        /** \brief Type of neighbor list */
-        NeighborListType neighborListType = NeighborListType::NSQ;
-        /** \brief LinkedCell parameters */
-        LinkedCellParameters<T> linkedCellParameters;
-        /** \brief Type of bounding volume */
-        BoundingVolumeType boundingVolumeType = BoundingVolumeType::OFF;
-        /** \brief Type of narrow-phase detection */
-        NarrowPhaseType narrowPhaseType = NarrowPhaseType::GJK;
-    };
-
-    /** \brief Collision detection parameters */
-    static CollisionDetectionParameters m_collisionDetection;
     //@}
 };
 

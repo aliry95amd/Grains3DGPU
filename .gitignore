@@ -57,6 +57,7 @@ Grains/DraftCodes/
 Main/obj*
 Main/bin*
 Tests/build*
+Tests/smoke/*/
 Tools/PrePost/*/bin*
 Tools/PrePost/*/obj*
 Tools/XMLGenerators/*/**.xml

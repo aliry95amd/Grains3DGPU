@@ -7,6 +7,7 @@
 
 /** @name Enumerations */
 //@{
+// -------------------------------------------------------------------------------------------------
 /** @brief Various supported insertion window types */
 enum InsertionWindowType
 {
@@ -16,6 +17,7 @@ enum InsertionWindowType
     ANNULUSWINDOW
 };
 
+// -------------------------------------------------------------------------------------------------
 /** @brief Random generator seed */
 enum RandomGeneratorSeed
 {

@@ -223,11 +223,7 @@ public:
         m_oldCellID.copyFrom(m_cellID);
 
         // Update particle hashes with new positions
-        bool updated;
-        if(m_useAdaptiveSkin)
-            updated = this->updateCellAdaptive();
-        else
-            updated = this->updateCellFixed();
+        bool updated = this->updateCell();
 
         if(!updated)
             return false;

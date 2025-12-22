@@ -269,7 +269,7 @@ __HOST__ void Insertion<T>::insert(const GrainsMemBuffer<RigidBody<T>*>* rigidBo
                                    const uint                            numParticles)
 {
     using GP = GrainsParameters<T>;
-    GoutWI(3, "Inserting", std::to_string(numParticles), "particles ...");
+    GoutWI(3, "Inserting", numParticles, "particles ...");
 
     if(m_forceInsertion)
     {
@@ -296,8 +296,7 @@ __HOST__ void Insertion<T>::insert(const GrainsMemBuffer<RigidBody<T>*>* rigidBo
         const uint maxAttempts = 1000;
 
         // Build a temporary linked-cell structure for strict insertion checks
-        auto LCParameters = GP::m_collisionDetection.linkedCellParameters;
-        LCParameters.type = LinkedCellType::HOST;  // Ensure HOST type
+        const auto&        LCParameters = GP::m_collisionDetection.linkedCellParameters;
         LinkedCell_Host<T> LC(rigidBody,
                               position,
                               orientation,

@@ -121,7 +121,6 @@ __GLOBAL__ void countNeighbors_Device(const uint* cellNeighborsList,
     @param numObstacles number of obstacles
     @param numParticles number of particles
     @param numCells number of cells
-    @param pairCount pointer to device memory for storing the total pair count
     @param pairList array of pairs */
 __GLOBAL__ void updateNeighborList_LC_SB_Device(const uint* cellNeighborsList,
                                                 const uint* particleIDs,
@@ -131,8 +130,7 @@ __GLOBAL__ void updateNeighborList_LC_SB_Device(const uint* cellNeighborsList,
                                                 const uint  numObstacles,
                                                 const uint  numParticles,
                                                 const uint  numCells,
-                                                uint2*      pairList,
-                                                uint*       pairCount);
+                                                uint2*      pairList);
 
 /** @brief Updates the neighbor list on device using an atomic-based linked cell approach.
     @param cellNeighborsList array of neighboring cells for each cell
@@ -145,9 +143,7 @@ __GLOBAL__ void updateNeighborList_LC_SB_Device(const uint* cellNeighborsList,
     @param numObstacles number of obstacles
     @param numParticles number of particles
     @param numCells number of cells
-    @param pairList array of pairs
-    @param pairCount pointer to device memory for storing the total pair count
- */
+    @param pairList array of pairs */
 __GLOBAL__ void updateNeighborList_LC_AT_Device(const uint* cellNeighborsList,
                                                 const uint* particleIDs,
                                                 const uint* cellIDs,
@@ -158,8 +154,7 @@ __GLOBAL__ void updateNeighborList_LC_AT_Device(const uint* cellNeighborsList,
                                                 const uint  numObstacles,
                                                 const uint  numParticles,
                                                 const uint  numCells,
-                                                uint2*      pairList,
-                                                uint*       pairCount);
+                                                uint2*      pairList);
 //@}
 
 #endif

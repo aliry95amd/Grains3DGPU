@@ -28,7 +28,7 @@ template <typename T>
 void ComponentManagerGPU<T>::initialize()
 {
     ComponentManager<T, MemType::DEVICE>::initialize();
-    uint maxPairs = m_nObstacles * m_nParticles + m_nParticles * (m_nParticles - 1) / 2;
+    uint maxPairs = m_numObstacles * m_numParticles + m_numParticles * (m_numParticles - 1) / 2;
     m_prefixScan.initialize(maxPairs);
     m_activeIndex.initialize(maxPairs);
 }
@@ -48,13 +48,16 @@ void ComponentManagerGPU<T>::resizePairBuffers(const uint size)
 template <typename T>
 void ComponentManagerGPU<T>::updateNeighborList()
 {
-    if(m_neighborList->needsUpdate())
-    {
-        m_neighborList->updateNeighborList(m_position, m_nObstacles, m_nParticles);
+    // Static reference to simulation state
+    auto& SS = GrainsParameters<T>::m_simulationState;
 
+    bool updated = m_neighborList->updateNeighborList(m_position, m_numObstacles, m_numParticles);
+    if(updated)
+    {
         // Resize pair-dependent buffers in base, then GPU-specific buffers
-        const uint pairCount = m_neighborList->getSize();
-        this->resizePairBuffers(pairCount);
+        this->resizePairBuffers(m_neighborList->getSize());
+        // Increment update counter and sort if needed
+        SS.neighborListUpdateCount++;
     }
 }
 
@@ -117,6 +120,9 @@ void ComponentManagerGPU<T>::transformContactInfoToWorld()
 template <typename T>
 void ComponentManagerGPU<T>::detectCollisions()
 {
+    // Sorts particles by Morton codes for improved cache efficiency
+    this->sortParticles();
+
     // Updates links between components and linked cell
     updateNeighborList();
 
@@ -181,10 +187,10 @@ void ComponentManagerGPU<T>::addExternalForces()
     using GP = GrainsParameters<T>;
 
     uint numThreads, numBlocks;
-    computeOptimalThreadsAndBlocks(GP::m_numParticles, GP::m_GPU, numBlocks, numThreads);
+    computeOptimalThreadsAndBlocks(m_numParticles, GP::m_GPU, numBlocks, numThreads);
 
-    // since g is a host-side vector, we need to break it into three components
-    // to be able to pass it to the kernel
+    // since g is a host-side vector, we need to break it into three components to be able to pass
+    // it to the kernel
     const T gX = GP::m_gravity[X];
     const T gY = GP::m_gravity[Y];
     const T gZ = GP::m_gravity[Z];
@@ -194,8 +200,8 @@ void ComponentManagerGPU<T>::addExternalForces()
                                                         gZ,
                                                         m_rigidBody->getData(),
                                                         m_torce.getData(),
-                                                        m_nObstacles,
-                                                        m_nParticles);
+                                                        m_numObstacles,
+                                                        m_numParticles);
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -205,7 +211,7 @@ void ComponentManagerGPU<T>::moveParticles(
     const GrainsMemBuffer<TimeIntegrator<T>*, MemType::DEVICE>& TI)
 {
     uint numThreads, numBlocks;
-    computeOptimalThreadsAndBlocks(GrainsParameters<T>::m_numParticles,
+    computeOptimalThreadsAndBlocks(m_numParticles,
                                    GrainsParameters<T>::m_GPU,
                                    numBlocks,
                                    numThreads);
@@ -216,8 +222,8 @@ void ComponentManagerGPU<T>::moveParticles(
                                                     m_quaternion.getData(),
                                                     m_velocity.getData(),
                                                     m_torce.getData(),
-                                                    m_nObstacles,
-                                                    m_nParticles);
+                                                    m_numObstacles,
+                                                    m_numParticles);
 }
 
 // -------------------------------------------------------------------------------------------------

@@ -30,8 +30,6 @@ protected:
     GrainsMemBuffer<uint2, M> m_pairList;
     /** \brief Pair count */
     uint* m_pairCount;
-    /** \brief If neighbor list needs update */
-    bool m_needsUpdate;
     //@}
 
 public:
@@ -96,18 +94,10 @@ public:
     // ---------------------------------------------------------------------------------------------
     /** @brief Updates the neighbor list
     @param positions array of positions */
-    virtual void updateNeighborList(GrainsMemBuffer<Vector3<T>, M>& positions,
+    virtual bool updateNeighborList(GrainsMemBuffer<Vector3<T>, M>& positions,
                                     const uint                      nObstacles,
                                     const uint                      nParticles)
         = 0;
-
-    // ---------------------------------------------------------------------------------------------
-    /** @brief Returns true if update is needed
-    @param transforms array of transformations */
-    bool needsUpdate() const
-    {
-        return m_needsUpdate;
-    }
     //@}
 };
 

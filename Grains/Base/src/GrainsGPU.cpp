@@ -86,6 +86,7 @@ template <typename T>
 void GrainsGPU<T>::simulate()
 {
     using GP = GrainsParameters<T>;
+    auto& SS = GP::m_simulationState;
 
     Gout(std::string(80, '='));
     Gout("Starting the simulation on GPU");
@@ -98,12 +99,12 @@ void GrainsGPU<T>::simulate()
     Grains<T>::m_components->copyTo(m_d_components);
     cout << "Copying completed!" << endl;
     cout << "\nTime \t TO \tend \tParticles \tIn \tOut" << endl;
-    for(GP::m_time = GP::m_tStart; GP::m_time <= GP::m_tEnd; GP::m_time += GP::m_dt)
+    for(SS.time = GP::m_tStart; SS.time <= GP::m_tEnd; SS.time += GP::m_dt)
     {
         // Output time
         ostringstream oss;
         oss.width(10);
-        oss << left << GP::m_time;
+        oss << left << SS.time;
         std::cout << '\r' << oss.str() << "  \t" << GP::m_tEnd << std::flush;
 
         m_d_components->detectCollisions();
@@ -126,6 +127,7 @@ template <typename T>
 void GrainsGPU<T>::Construction(DOMElement* rootElement)
 {
     using GP = GrainsParameters<T>;
+    auto& SS = GP::m_simulationState;
 
     // ---------------------------------------------------------------------------------------------
     // Particles
@@ -153,8 +155,8 @@ void GrainsGPU<T>::Construction(DOMElement* rootElement)
     // ---------------------------------------------------------------------------------------------
     // Setting up the component managers
     m_d_components = std::make_unique<ComponentManagerGPU<T>>(&m_d_rigidBodyList,
-                                                              GP::m_numObstacles,
-                                                              GP::m_numParticles);
+                                                              SS.numObstacles,
+                                                              SS.numParticles);
 }
 
 // -------------------------------------------------------------------------------------------------

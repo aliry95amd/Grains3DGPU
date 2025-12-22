@@ -280,8 +280,7 @@ __GLOBAL__ void updateNeighborList_LC_SB_Device(const uint* cellNeighborsList,
                                                 const uint  numObstacles,
                                                 const uint  numParticles,
                                                 const uint  numCells,
-                                                uint2*      pairList,
-                                                uint*       pairCount)
+                                                uint2*      pairList)
 {
     // constexpr variables
     constexpr uint NUM_NEIGHBOR_CELLS = 27;  // Number of neighboring cells
@@ -289,12 +288,6 @@ __GLOBAL__ void updateNeighborList_LC_SB_Device(const uint* cellNeighborsList,
     uint tID = blockIdx.x * blockDim.x + threadIdx.x;
     if(tID >= numParticles)
         return;
-
-    // initialize pair count to zero by the first thread only if there is no
-    // obstacles
-    if(tID == 0 && numObstacles == 0)
-        *pairCount = 0;
-    __syncthreads();
 
     const uint i    = particleIDs[tID];
     const uint cell = cellIDs[i];
@@ -362,8 +355,7 @@ __GLOBAL__ void updateNeighborList_LC_AT_Device(const uint* cellNeighborsList,
                                                 const uint  numObstacles,
                                                 const uint  numParticles,
                                                 const uint  numCells,
-                                                uint2*      pairList,
-                                                uint*       pairCount)
+                                                uint2*      pairList)
 {
     // constexpr variables
     constexpr uint NUM_NEIGHBOR_CELLS = 27;  // Number of neighboring cells
@@ -371,12 +363,6 @@ __GLOBAL__ void updateNeighborList_LC_AT_Device(const uint* cellNeighborsList,
     uint tID = blockIdx.x * blockDim.x + threadIdx.x;
     if(tID >= numParticles)
         return;
-
-    // initialize pair count to zero by the first thread only if there is no
-    // obstacles
-    if(tID == 0 && numObstacles == 0)
-        *pairCount = 0;
-    __syncthreads();
 
     const uint i    = particleIDs[tID];
     const uint cell = cellIDs[i];

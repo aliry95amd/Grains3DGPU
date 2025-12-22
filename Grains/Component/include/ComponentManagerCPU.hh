@@ -14,8 +14,8 @@ template <typename T>
 class ComponentManagerCPU : public ComponentManager<T, MemType::HOST>
 {
     using CM = ComponentManager<T, MemType::HOST>;
-    using CM::m_nObstacles;
-    using CM::m_nParticles;
+    using CM::m_numObstacles;
+    using CM::m_numParticles;
 
     using CM::m_componentId;
     using CM::m_position;

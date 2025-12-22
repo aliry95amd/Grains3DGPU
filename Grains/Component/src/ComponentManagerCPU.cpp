@@ -28,12 +28,16 @@ ComponentManagerCPU<T>::~ComponentManagerCPU() = default;
 template <typename T>
 void ComponentManagerCPU<T>::updateNeighborList()
 {
-    if(m_neighborList->needsUpdate())
-    {
-        m_neighborList->updateNeighborList(m_position, m_nObstacles, m_nParticles);
+    // Static reference to simulation state
+    auto& SS = GrainsParameters<T>::m_simulationState;
 
+    bool updated = m_neighborList->updateNeighborList(m_position, m_numObstacles, m_numParticles);
+    if(updated)
+    {
         // Resize pair-dependent buffers to match actual number of pairs
         this->resizePairBuffers(m_neighborList->getSize());
+        // Increment update counter and sort if needed
+        SS.neighborListUpdateCount++;
     }
 }
 
@@ -94,6 +98,9 @@ void ComponentManagerCPU<T>::transformContactInfoToWorld()
 template <typename T>
 void ComponentManagerCPU<T>::detectCollisions()
 {
+    // Sorts particles by Morton codes for improved cache efficiency
+    this->sortParticles();
+
     // Updates links between components and linked cell
     updateNeighborList();
 
@@ -133,7 +140,7 @@ template <typename T>
 void ComponentManagerCPU<T>::addExternalForces()
 {
     // #pragma omp parallel for
-    for(uint pID = m_nObstacles; pID < m_nObstacles + m_nParticles; ++pID)
+    for(uint pID = m_numObstacles; pID < m_numObstacles + m_numParticles; ++pID)
     {
         // Only add to the particles
         addExternalForces_common(GrainsParameters<T>::m_gravity,
@@ -150,7 +157,7 @@ void ComponentManagerCPU<T>::moveParticles(
     const GrainsMemBuffer<TimeIntegrator<T>*, MemType::HOST>& TI)
 {
     // #pragma omp parallel for
-    for(uint pID = m_nObstacles; pID < m_nObstacles + m_nParticles; ++pID)
+    for(uint pID = m_numObstacles; pID < m_numObstacles + m_numParticles; ++pID)
     {
         moveParticles_common(TI.getData(),
                              m_rigidBody->getData(),

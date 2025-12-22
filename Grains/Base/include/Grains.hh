@@ -63,13 +63,10 @@ public:
     /** @brief Runs the simulation over the prescribed time interval */
     virtual void simulate() = 0;
 
-    /** @brief Performs post-processing
-        @param cm ComponentManagerCPU object */
-    void postProcess(const std::unique_ptr<ComponentManager<T, MemType::HOST>>& cm) const;
-
-    /** @brief Performs post-processing
-        @param cm ComponentManagerGPU object */
-    void postProcess(const std::unique_ptr<ComponentManager<T, MemType::DEVICE>>& cm);
+    /** @brief Performs post-processing.
+        @param cm ComponentManager object */
+    template <MemType M>
+    void postProcess(const std::unique_ptr<ComponentManager<T, M>>& cm);
 
     /** @brief Tasks to perform after time-stepping */
     virtual void finalize();

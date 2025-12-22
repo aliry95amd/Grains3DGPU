@@ -24,6 +24,7 @@ void GrainsCPU<T>::simulate()
 {
     using G  = Grains<T>;
     using GP = GrainsParameters<T>;
+    auto& SS = GP::m_simulationState;
 
     Gout(std::string(80, '='));
     Gout("Starting the simulation on CPU");
@@ -34,12 +35,12 @@ void GrainsCPU<T>::simulate()
 
     cout << "Time \t TO \tend \tParticles \tIn \tOut" << endl;
     // time marching
-    for(GP::m_time = GP::m_tStart; GP::m_time <= GP::m_tEnd; GP::m_time += GP::m_dt)
+    for(SS.time = GP::m_tStart; SS.time <= GP::m_tEnd; SS.time += GP::m_dt)
     {
         // Output time
         ostringstream oss;
         oss.width(10);
-        oss << left << GP::m_time;
+        oss << left << SS.time;
         std::cout << '\r' << oss.str() << "  \t" << GP::m_tEnd << std::flush;
 
         G::m_components->detectCollisions();

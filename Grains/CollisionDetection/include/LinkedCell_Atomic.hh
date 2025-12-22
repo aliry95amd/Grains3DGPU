@@ -108,17 +108,12 @@ public:
     bool updateLinkedCells()
     {
         // Update the cells only if needed
-        bool updated;
-        if(m_useAdaptiveSkin)
-            updated = this->updateCellAdaptive();
-        else
-            updated = this->updateCellFixed();
+        bool updated = this->updateCell();
 
         if(!updated)
             return false;
 
-        // Prefix sum to find the start index of each cell in the
-        // particleIDArray
+        // Prefix sum to find the start index of each cell in the particleIDArray
         thrust::device_ptr<uint> numParticles_ptr(m_numParticlesPerCell.getData());
         thrust::device_ptr<uint> prefixSums_ptr(m_numParticlesPrefixSums.getData());
         thrust::exclusive_scan(numParticles_ptr, numParticles_ptr + m_numCells, prefixSums_ptr);
@@ -139,6 +134,7 @@ public:
 
         return true;
     }
+    //@}
 };
 
 #endif

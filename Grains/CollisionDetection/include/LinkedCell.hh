@@ -133,27 +133,26 @@ public:
         m_quaternions = &quaternions;
         GAssert(positions.getSize() == nObstacles + nParticles
                     && quaternions.getSize() == nObstacles + nParticles,
-                "LinkedCell: positions or quaternions size does not match "
-                "nObstacles + nParticles");
+                "LinkedCell: positions or quaternions size does not match the number of bodies!");
 
         // Extract parameters
-        const Vector3<T>& minCorner      = linkedCellParameters.minCorner;
-        const Vector3<T>& maxCorner      = linkedCellParameters.maxCorner;
-        const T           cellSizeFactor = linkedCellParameters.cellSizeFactor;
-        m_updateFrequency                = linkedCellParameters.updateFrequency;
-        m_useAdaptiveSkin                = (m_updateFrequency > 0);
-
-        // Find the maximum circumscribed radius of particles
-        T maxRadiusParticles = computeMaxRadius(nObstacles, m_rb->getSize());
+        const Vector3<T>& minCorner              = linkedCellParameters.minCorner;
+        const Vector3<T>& maxCorner              = linkedCellParameters.maxCorner;
+        const T           minCellSize            = linkedCellParameters.minCellSize;
+        const T           cellSizeFactor         = linkedCellParameters.cellSizeFactor;
+        const uint        maxNumCellsPerObstacle = linkedCellParameters.maxNumCellsPerObstacle;
+        m_updateFrequency                        = linkedCellParameters.updateFrequency;
+        m_useAdaptiveSkin                        = (m_updateFrequency > 0);
 
         // The minimum cell size should be at least twice the maximum radius
         // of particles. We multiply this value by a factor (>=1) to get the
         // final cell size.
-        m_cellSizeWithoutSkin = T(2) * maxRadiusParticles * cellSizeFactor;
+        m_cellSizeWithoutSkin = minCellSize * cellSizeFactor;
 
         // Initialize the LinkedCell buffer
-        // Note that we start with smallest size possible (largest number of
-        // cells) so the buffers are allocated with the largest size possible.
+        // Note that we start with smallest size possible (largest number of cells) so the buffers
+        // are allocated with the largest size possible.
+        m_cells.initialize(1);
         m_numCells = CellsFactory<T>::template create<M>(minCorner,
                                                          maxCorner,
                                                          m_cellSizeWithoutSkin,
@@ -172,16 +171,13 @@ public:
         m_skinThickness = 0.1 * m_cellSizeWithoutSkin;
 
         // Adjust the maximum number of cells per obstacle
-        T maxRadiusObstacles = computeMaxRadius(0, nObstacles);
-        T maxCellsPerObstaclePerDim
-            = static_cast<uint>(ceil(T(2) * maxRadiusObstacles / m_cellSizeWithoutSkin));
-        m_maxCellsPerObstacle
-            = maxCellsPerObstaclePerDim * maxCellsPerObstaclePerDim * maxCellsPerObstaclePerDim;
-        m_maxCellsPerObstacle = std::min(m_maxCellsPerObstacle, m_numCells);
+        m_maxCellsPerObstacle = std::min(maxNumCellsPerObstacle, m_numCells);
         m_obstacleCellID.initialize(m_maxCellsPerObstacle * nObstacles);
 
-        // Force update at the first step
-        bool updated = updateCellFixed<true>();
+        // Setup obstacle
+        linkObstacles();
+        setParticleID();
+        setCellID();
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -334,52 +330,6 @@ public:
     /** @name Methods */
     //@{
     // ---------------------------------------------------------------------------------------------
-    /** @brief Computes the maximum radius of rigid bodies given an interval.
-        @param startID start ID of the interval
-        @param endID end ID of the interval */
-    T computeMaxRadius(const uint startID, const uint endID) const
-    {
-        GAssert(endID >= startID, "LinkedCell::computeMaxRadius: endID must be >= startID");
-
-        T maxRadius = T(0), radius = T(0);
-        if constexpr(M == MemType::HOST)
-        {
-            for(uint i = startID; i < endID; ++i)
-            {
-                radius = m_rb->at(i)->getCircumscribedRadius();
-                if(radius > maxRadius)
-                    maxRadius = radius;
-            }
-        }
-        if constexpr(M == MemType::DEVICE)
-        {
-            GrainsMemBuffer<T, MemType::DEVICE> radii(endID - startID, T(0));
-
-            // Launch kernel to extract radii
-            uint numBlocks, numThreads;
-            computeOptimalThreadsAndBlocks(endID - startID,
-                                           GrainsParameters<T>::m_GPU,
-                                           numBlocks,
-                                           numThreads);
-
-            computeMaxRadius_Device<<<numBlocks, numThreads>>>(m_rb->getData(),
-                                                               startID,
-                                                               endID,
-                                                               radii.getData());
-            cudaDeviceSynchronize();
-
-            // Use thrust to find maximum
-            maxRadius
-                = thrust::reduce(thrust::device_pointer_cast(radii.getData()),
-                                 thrust::device_pointer_cast(radii.getData() + radii.getSize()),
-                                 T(0),
-                                 thrust::maximum<T>());
-        }
-
-        return (maxRadius);
-    }
-
-    // ---------------------------------------------------------------------------------------------
     /** @brief Generates neighbor cells */
     void generateNeighborCells()
     {
@@ -403,39 +353,6 @@ public:
     }
 
     // ---------------------------------------------------------------------------------------------
-    /** @brief Determines if obstacles have moved */
-    bool haveObstaclesMoved() const
-    {
-        if(m_numObstacles == 0)
-            return false;
-
-        if constexpr(M == MemType::HOST)
-        {
-            for(uint i = 0; i < m_numObstacles; ++i)
-            {
-                if(m_positions->at(i) != m_oldPosition[i])
-                    return true;
-            }
-        }
-        else if constexpr(M == MemType::DEVICE)
-        {
-            auto pos_begin = thrust::device_pointer_cast(m_positions->getData());
-            auto old_begin = thrust::device_pointer_cast(m_oldPosition.getData());
-            auto ids_begin = thrust::make_counting_iterator<uint>(0);
-
-            auto zip_begin
-                = thrust::make_zip_iterator(thrust::make_tuple(ids_begin, pos_begin, old_begin));
-            auto zip_end = zip_begin + m_numObstacles;
-
-            obstacle_has_moved moved_pred;
-            auto               it = thrust::find_if(zip_begin, zip_end, moved_pred);
-            return it != zip_end;
-        }
-
-        return false;
-    }
-
-    // ---------------------------------------------------------------------------------------------
     /** @brief Links obstacles to cells */
     void linkObstacles()
     {
@@ -445,12 +362,10 @@ public:
 
         if constexpr(M == MemType::HOST)
         {
-            // Lambda to extract support point from rigid body in given world
-            // direction
+            // Lambda to extract support point from rigid body in given world direction
             auto support
                 = [this](uint obstacleIndex, const Vector3<T>& worldDirection) -> Vector3<T> {
-                // Transform world direction to local coordinates using inverse
-                // rotation
+                // Transform world direction to local coordinates using inverse rotation
                 const Quaternion<T>& q              = m_quaternions->at(obstacleIndex);
                 const Vector3<T>     localDirection = q << worldDirection;
                 Vector3<T> supPt = (*m_rb)[obstacleIndex]->getConvex()->support(localDirection);
@@ -612,82 +527,83 @@ public:
 
     // ---------------------------------------------------------------------------------------------
     /** @brief Determines if an update is required and updates cells if so */
-    bool updateCellAdaptive()
+    bool updateCell()
     {
-        T cellSize = T(0);
+        auto& SS = GrainsParameters<T>::m_simulationState;
 
-        // Increment the number of iterations since last update
-        ++m_numIterationsSinceLastUpdate;
-
-        // Compute the maximum displacement
-        m_maxDisplacementSquared = computeMaxDisplacement();
-
-        // Condition to check if an update is needed:
-        // d_max > skinThickness / 2
-        // But we are using d_max^2, so we need to square the skin thickness
-        bool needsUpdate = (T(4) * m_maxDisplacementSquared > m_skinThickness * m_skinThickness);
-
-        // If no update is needed, check if obstacles relinking is required
-        // Otherwise, we always relink obstacles during an update
-        if(!needsUpdate)
+        if(m_useAdaptiveSkin)
         {
-            // TODO: We should pass a flag from upstream to indicate if
-            // obstacles have moved. This would avoid checking again here.
-            // if(haveObstaclesMoved() == true)
-            // {
-            //     linkObstacles();
-            //     return true;
-            // }
-            // else
-            return false;
+            // Increment the number of iterations since last update
+            ++m_numIterationsSinceLastUpdate;
+
+            // Compute the maximum displacement
+            m_maxDisplacementSquared = computeMaxDisplacement();
+
+            // Condition to check if an update is needed:
+            // d_max > skinThickness / 2
+            // But we are using d_max^2, so we need to square the skin thickness
+            bool needUpdate = (T(4) * m_maxDisplacementSquared > m_skinThickness * m_skinThickness);
+
+            // If no update is needed, check if obstacles relinking is required.
+            if(!SS.particlesSorted && !needUpdate)
+            {
+                if(SS.obstaclesMoved)
+                {
+                    linkObstacles();
+                    return true;
+                }
+                else
+                    return false;
+            }
+
+            // If we reach here, an update is needed -- Adjust skin thickness
+            m_skinThickness = computeSkinThickness();
+            T cellSize      = m_cellSizeWithoutSkin + m_skinThickness;
+
+            // Update old positions
+            m_oldPosition.copyFrom(*m_positions);
+
+            // Resize the cells
+            if constexpr(M == MemType::HOST)
+            {
+                m_cells[0]->resize(cellSize);
+                m_numCells = m_cells[0]->getNumCells();
+            }
+            else if constexpr(M == MemType::DEVICE)
+            {
+                uint* d_numCells;
+                cudaMalloc(&d_numCells, sizeof(uint));
+                resizeCells_Device<<<1, 1>>>(m_cells.getData(), cellSize, d_numCells);
+                cudaMemcpy(&m_numCells, d_numCells, sizeof(uint), cudaMemcpyDeviceToHost);
+                cudaFree(d_numCells);
+            }
+
+            // Since Cell size may have changed, we need to recompute the neighbor cells
+            // Note: reserve does not change the size if the capacity is enough
+            m_neighborCells.reserve(m_numCells * 27);  // 26 neighbors + self
+            m_neighborCells.fill(UINT_MAX);
+            generateNeighborCells();
+
+            // Reset number of particles per cell
+            m_numParticlesPerCell.reserve(m_numCells);
+            m_numParticlesPerCell.fill(0);
+
+            // Update obstacles, particleIDs, and cellIDs
+            linkObstacles();
+            setParticleID();
+            setCellID();
+
+            // Reset parameters
+            m_maxDisplacementSquared       = T(0);
+            m_numIterationsSinceLastUpdate = 0;
         }
-
-        // If we reach here, an update is needed
-        // Adjust skin thickness
-        m_skinThickness = computeSkinThickness();
-        cellSize        = m_cellSizeWithoutSkin + m_skinThickness;
-
-        // Update old positions
-        m_oldPosition.copyFrom(*m_positions);
-
-        // Resize the cells
-        if constexpr(M == MemType::HOST)
+        else
         {
-            m_cells[0]->resize(cellSize);
-            m_numCells = m_cells[0]->getNumCells();
+            if(SS.obstaclesMoved)
+                linkObstacles();
+            setParticleID();
+            setCellID();
         }
-        else if constexpr(M == MemType::DEVICE)
-        {
-            uint* d_numCells;
-            cudaMalloc(&d_numCells, sizeof(uint));
-            resizeCells_Device<<<1, 1>>>(m_cells.getData(), cellSize, d_numCells);
-            cudaMemcpy(&m_numCells, d_numCells, sizeof(uint), cudaMemcpyDeviceToHost);
-            cudaFree(d_numCells);
-        }
-
-        // Since Cell size may have changed, we need to recompute the neighbor
-        // cells
-        // Note: reserve does not change the size if the capacity is enough
-        m_neighborCells.reserve(m_numCells * 27);  // 26 neighbors + self
-        m_neighborCells.fill(UINT_MAX);
-        generateNeighborCells();
-
-        // Reset number of particles per cell
-        m_numParticlesPerCell.reserve(m_numCells);
-        m_numParticlesPerCell.fill(0);
-
-        // link obstacles
-        linkObstacles();
-
-        // Set the particle IDs
-        setParticleID();
-
-        // Set the cell IDs
-        setCellID();
-
-        // Reset parameters
-        m_maxDisplacementSquared       = T(0);
-        m_numIterationsSinceLastUpdate = 0;
 
         // Finally, update the cell IDs of the particles
         updateCellIDs();
@@ -696,50 +612,8 @@ public:
     }
 
     // ---------------------------------------------------------------------------------------------
-    /** @brief Updates links on the current fixed grid (no resizing/skin) */
-    template <bool forceUpdate = false>
-    bool updateCellFixed()
-    {
-        if constexpr(forceUpdate)
-        {
-            // Relink obstacles on the existing grid
-            linkObstacles();
-            setParticleID();
-            setCellID();
-        }
-        else
-        {
-            if(haveObstaclesMoved() == true)
-            {
-                // Relink obstacles on the existing grid
-                linkObstacles();
-                setParticleID();
-                setCellID();
-            }
-        }
-
-        // Update particle cell IDs
-        updateCellIDs();
-
-        // We performed an update
-        return true;
-    }
-
-    // ---------------------------------------------------------------------------------------------
     /** @brief Updates the linked cells and returns whether the LinkedCell has been updated. */
     virtual bool updateLinkedCells() = 0;
-    //@}
-
-    // ---------------------------------------------------------------------------------------------
-    /** @name Functors */
-    //@{
-    struct obstacle_has_moved
-    {
-        __device__ bool operator()(const thrust::tuple<uint, Vector3<T>, Vector3<T>>& t) const
-        {
-            return thrust::get<1>(t) != thrust::get<2>(t);
-        }
-    };
     //@}
 };
 

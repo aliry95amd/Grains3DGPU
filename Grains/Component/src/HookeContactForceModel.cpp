@@ -14,27 +14,19 @@ __HOSTDEVICE__ HookeContactForceModel<T>::HookeContactForceModel()
 template <typename T>
 __HOST__ HookeContactForceModel<T>::HookeContactForceModel(DOMNode* root)
 {
-    DOMNode* parameter;
-    parameter = ReaderXML::getNode(root, "kn");
-    GAssert(parameter, "kn not defined! Aborting Grains!");
-    m_kn = T(ReaderXML::getNodeValue_Double(parameter));
+    GAssert(ReaderXML::hasNodeAttr(root, "kn"), "kn not defined! Aborting Grains!");
+    GAssert(ReaderXML::hasNodeAttr(root, "en"), "en not defined! Aborting Grains!");
+    GAssert(ReaderXML::hasNodeAttr(root, "etat"), "etat not defined! Aborting Grains!");
+    GAssert(ReaderXML::hasNodeAttr(root, "muc"), "muc not defined! Aborting Grains!");
+    GAssert(ReaderXML::hasNodeAttr(root, "kr"), "kr not defined! Aborting Grains!");
 
-    parameter = ReaderXML::getNode(root, "en");
-    GAssert(parameter, "en not defined! Aborting Grains!");
-    m_en   = T(ReaderXML::getNodeValue_Double(parameter));
+    m_kn   = T(ReaderXML::getNodeAttr_Double(root, "kn"));
+    m_en   = T(ReaderXML::getNodeAttr_Double(root, "en"));
+    m_etat = T(ReaderXML::getNodeAttr_Double(root, "etat"));
+    m_muc  = T(ReaderXML::getNodeAttr_Double(root, "muc"));
+    m_kr   = T(ReaderXML::getNodeAttr_Double(root, "kr"));
+
     m_muen = log(m_en) / sqrt(PI<T> * PI<T> + log(m_en) * log(m_en));
-
-    parameter = ReaderXML::getNode(root, "etat");
-    GAssert(parameter, "etat not defined! Aborting Grains!");
-    m_etat = T(ReaderXML::getNodeValue_Double(parameter));
-
-    parameter = ReaderXML::getNode(root, "muc");
-    GAssert(parameter, "muc not defined! Aborting Grains!");
-    m_muc = T(ReaderXML::getNodeValue_Double(parameter));
-
-    parameter = ReaderXML::getNode(root, "kr");
-    GAssert(parameter, "kr not defined! Aborting Grains!");
-    m_kr = T(ReaderXML::getNodeValue_Double(parameter));
 }
 
 // -------------------------------------------------------------------------------------------------

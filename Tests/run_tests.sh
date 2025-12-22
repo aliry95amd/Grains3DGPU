@@ -1,8 +1,7 @@
 #!/bin/bash
-
 # GrainsGPU Test Runner Script
 
-set -e  # Exit on any error
+set -e
 
 echo "=== GrainsGPU Test Suite ==="
 
@@ -41,25 +40,29 @@ build_tests() {
     echo "Build complete"
 }
 
-# Run different test categories
-run_unit_tests() {
-    echo "Running unit tests..."
-    ./build/grains_tests --gtest_filter="*Test.*" --gtest_output=xml:unit_test_results.xml
+run_geometry_tests() {
+    echo "Running geometry tests..."
+    ./build/grains_tests --gtest_filter="*GeometryTest.*" --gtest_output=xml:geometry_test_results.xml
 }
 
-run_integration_tests() {
-    echo "Running integration tests..."
-    ./build/grains_tests --gtest_filter="*IntegrationTest.*" --gtest_output=xml:integration_test_results.xml
+run_collision_tests() {
+    echo "Running collision tests..."
+    ./build/grains_tests --gtest_filter="*CollisionTest.*" --gtest_output=xml:collision_test_results.xml
 }
 
-run_cuda_tests() {
-    echo "Running CUDA tests..."
-    ./build/grains_tests --gtest_filter="*CudaTest.*" --gtest_output=xml:cuda_test_results.xml
-}
-
-run_performance_tests() {
-    echo "Running performance tests..."
-    ./build/grains_tests --gtest_filter="*PerformanceTest.*" --gtest_output=xml:performance_test_results.xml
+run_smoke_tests() {
+    echo "Running smoke tests..."
+    cd smoke
+    if [ -f "run_smoke_tests.sh" ]; then
+        ./run_smoke_tests.sh
+        local exit_code=$?
+        cd ..
+        return $exit_code
+    else
+        echo "Error: smoke/run_smoke_tests.sh not found"
+        cd ..
+        return 1
+    fi
 }
 
 # Generate coverage report
@@ -76,39 +79,36 @@ generate_coverage() {
     fi
 }
 
-# Main execution
 main() {
     local test_type="${1:-all}"
     
-    check_dependencies
-    build_tests
-    
     case $test_type in
-        "unit")
-            run_unit_tests
+        "geometry")
+            check_dependencies
+            build_tests
+            run_geometry_tests
             ;;
-        "integration")
-            run_integration_tests
+        "collision")
+            check_dependencies
+            build_tests
+            run_collision_tests
             ;;
-        "cuda")
-            run_cuda_tests
-            ;;
-        "performance")
-            run_performance_tests
+        "smoke")
+            run_smoke_tests
             ;;
         "all")
-            run_unit_tests
-            run_integration_tests
-            run_cuda_tests
-            run_performance_tests
+            check_dependencies
+            build_tests
+            run_geometry_tests
+            run_collision_tests
+            run_smoke_tests
+            generate_coverage
             ;;
         *)
-            echo "Usage: $0 [unit|integration|cuda|performance|all]"
+            echo "Usage: $0 [geometry|collision|smoke|all]"
             exit 1
             ;;
     esac
-    
-    generate_coverage
     
     echo "=== Test Suite Complete ==="
 }

@@ -106,11 +106,7 @@ public:
     bool updateLinkedCells()
     {
         // Update the cells only if needed
-        bool updated;
-        if(m_useAdaptiveSkin)
-            updated = this->updateCellAdaptive();
-        else
-            updated = this->updateCellFixed();
+        bool updated = this->updateCell();
 
         if(!updated)
             return false;

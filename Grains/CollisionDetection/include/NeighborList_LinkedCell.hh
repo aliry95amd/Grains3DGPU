@@ -27,7 +27,6 @@ template <typename T, MemType M>
 class NeighborList_LinkedCell : public NeighborList<T, M>
 {
     using NL = NeighborList<T, M>;
-    using NL::m_needsUpdate;
     using NL::m_pairCount;
     using NL::m_pairList;
 
@@ -40,6 +39,8 @@ protected:
     GrainsMemBuffer<uint, M> m_numNeighbors;
     /** \brief Buffer of prefix sums for neighbor counts */
     GrainsMemBuffer<uint, M> m_numNeighborsPrefixSums;
+    /** \brief Number of obstacle-particle pairs */
+    uint* m_obstacleParticlePairCount;
     //@}
 
 public:
@@ -77,8 +78,6 @@ public:
         m_pairList.initialize(nObstacles * nParticles + nParticles * (nParticles - 1) / 2);
         m_pairList.fill();
 
-        *m_pairCount = 0;
-
         if constexpr(M == MemType::DEVICE)
         {
             // Initialize neighbor counting buffers
@@ -89,7 +88,15 @@ public:
             m_numNeighborsPrefixSums.fill(0);
         }
 
-        m_needsUpdate = true;  // Initially, we need to create the list
+        // Allocate obstacle-particle pair count
+        if constexpr(M == MemType::DEVICE)
+        {
+            cudaErrCheck(cudaMallocManaged(&m_obstacleParticlePairCount, sizeof(uint)));
+        }
+        else
+        {
+            m_pairCount = new uint;
+        }
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -104,22 +111,19 @@ public:
         @param positions array of positions
         @param nObstacles number of obstacles
         @param nParticles number of particles */
-    void updateNeighborList(GrainsMemBuffer<Vector3<T>, M>& positions,
+    bool updateNeighborList(GrainsMemBuffer<Vector3<T>, M>& positions,
                             const uint                      nObstacles,
                             const uint                      nParticles) final
     {
-        if(!m_needsUpdate)
-            return;
+        // Update linked cells
+        bool LC_updated = m_LinkedCell->updateLinkedCells();
 
-        if constexpr(M == MemType::HOST)
+        if(LC_updated)
         {
-            auto* LC_host    = static_cast<LinkedCell_Host<T>*>(m_LinkedCell);
-            bool  LC_updated = LC_host->updateLinkedCells();
-            // Check if the linked cell structure was updated.
-            // If not, we bypass the neighbor list update.
-            if(LC_updated)
+            if constexpr(M == MemType::HOST)
             {
                 m_pairList.clear();
+                auto* LC_host = static_cast<LinkedCell_Host<T>*>(m_LinkedCell);
                 updateNeighborList_LC_Host(LC_host->getCellNeighborsList(),
                                            LC_host->getObstacleIDs(),
                                            LC_host->getObstacleCellIDs(),
@@ -132,16 +136,8 @@ public:
                                            m_pairList.getData(),
                                            m_pairCount);
             }
-        }
-        else if constexpr(M == MemType::DEVICE)
-        {
-            bool LC_updated = m_LinkedCell->updateLinkedCells();
-
-            // Check if the linked cell structure was updated.
-            // If not, we bypass the neighbor list update.
-            if(LC_updated)
+            else if constexpr(M == MemType::DEVICE)
             {
-                // Determine the type linked cell used
                 using GP = GrainsParameters<T>;
                 auto& CD = GP::m_collisionDetection;
                 auto& LC = CD.linkedCellParameters;
@@ -164,7 +160,7 @@ public:
                             nParticles,
                             m_LinkedCell->getNumCells(),
                             m_pairList.getData(),
-                            m_pairCount);
+                            m_obstacleParticlePairCount);
                     }
                     else if(LC.type == LinkedCellType::SORTBASED)
                     {
@@ -178,7 +174,7 @@ public:
                             nParticles,
                             m_LinkedCell->getNumCells(),
                             m_pairList.getData(),
-                            m_pairCount);
+                            m_obstacleParticlePairCount);
                     }
                 }
 
@@ -223,7 +219,7 @@ public:
                 uint totalPairs = lastPrefixSum + lastNeighborCount;
                 // Add obstacle-particle pairs
                 if(nObstacles > 0)
-                    totalPairs += *m_pairCount;
+                    totalPairs += *m_obstacleParticlePairCount;
 
                 // Increase pair list size if needed
                 if(totalPairs > m_pairList.getSize())
@@ -246,8 +242,7 @@ public:
                         nObstacles,
                         nParticles,
                         m_LinkedCell->getNumCells(),
-                        m_pairList.getData(),
-                        m_pairCount);  // Offset for obstacle pairs
+                        m_pairList.getData());
                 }
                 else if(LC.type == LinkedCellType::SORTBASED)
                 {
@@ -260,14 +255,14 @@ public:
                         nObstacles,
                         nParticles,
                         m_LinkedCell->getNumCells(),
-                        m_pairList.getData(),
-                        m_pairCount);  // Offset for obstacle pairs
+                        m_pairList.getData());
                 }
                 cudaDeviceSynchronize();
             }
+            return true;
         }
-
-        m_needsUpdate = true;
+        else
+            return false;
     }
     //@}
 };

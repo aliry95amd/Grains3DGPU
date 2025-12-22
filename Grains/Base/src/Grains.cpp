@@ -47,45 +47,34 @@ void Grains<T>::initialize(DOMElement* rootElement)
 }
 
 // -------------------------------------------------------------------------------------------------
-// Performs post-processing on the host
+// Performs post-processing
 template <typename T>
-void Grains<T>::postProcess(const std::unique_ptr<ComponentManager<T, MemType::HOST>>& cm) const
+template <MemType MT>
+void Grains<T>::postProcess(const std::unique_ptr<ComponentManager<T, MT>>& cm)
 {
     using GP = GrainsParameters<T>;
+    auto& SS = GP::m_simulationState;
 
     if(GP::m_tSave.empty())
         return;
 
-    if(GP::m_tSave.front() - GP::m_time < 0.01 * GP::m_dt)
+    if(GP::m_tSave.front() - SS.time < 0.01 * GP::m_dt)
     {
         GP::m_tSave.pop();
-        for(auto& pp : m_postProcessor)
-            pp->PostProcessing(m_rigidBodyList, cm, GP::m_time);
+        if constexpr(MT == MemType::DEVICE)
+        {
+            cm->copyTo_PostProcessing(m_components);
+            for(auto& pp : m_postProcessor)
+                pp->PostProcessing(m_rigidBodyList, m_components, SS.time);
+        }
+        else
+        {
+            for(auto& pp : m_postProcessor)
+                pp->PostProcessing(m_rigidBodyList, cm, SS.time);
+        }
     }
     // In case we get past the saveTime, we need to remove it from the queue
-    if(!GP::m_tSave.empty() && GP::m_time > GP::m_tSave.front())
-        GP::m_tSave.pop();
-}
-
-// -------------------------------------------------------------------------------------------------
-// Performs post-processing on the device
-template <typename T>
-void Grains<T>::postProcess(const std::unique_ptr<ComponentManager<T, MemType::DEVICE>>& cm)
-{
-    using GP = GrainsParameters<T>;
-
-    if(GP::m_tSave.empty())
-        return;
-
-    if(GP::m_tSave.front() - GP::m_time < 0.01 * GP::m_dt)
-    {
-        GP::m_tSave.pop();
-        cm->copyTo_PostProcessing(m_components);
-        for(auto& pp : m_postProcessor)
-            pp->PostProcessing(m_rigidBodyList, m_components, GP::m_time);
-    }
-    // In case we get past the saveTime, we need to remove it from the queue
-    if(GP::m_time > GP::m_tSave.front())
+    if(!GP::m_tSave.empty() && SS.time > GP::m_tSave.front())
         GP::m_tSave.pop();
 }
 
@@ -107,6 +96,9 @@ template <typename T>
 void Grains<T>::Construction(DOMElement* rootElement)
 {
     using GP = GrainsParameters<T>;
+    auto& SS = GP::m_simulationState;
+    auto& CD = GP::m_collisionDetection;
+    auto& LC = CD.linkedCellParameters;
 
     // Output message
     GoutWI(3, "Construction");
@@ -208,16 +200,38 @@ void Grains<T>::Construction(DOMElement* rootElement)
             offset += numEachRefParticle[i];
         }
     }
-    GP::m_numObstacles = numObstacles;
-    GP::m_numParticles = numParticles;
+
+    // ---------------------------------------------------------------------------------------------
+    // Setting up some parameters
+    SS.numObstacles = numObstacles;
+    SS.numParticles = numParticles;
+
+    // Calculate minCellSize based on maximum particle radius (needed for insertion checks)
+    T maxParticleRadius = 0;
+    for(uint i = 0; i < refParticleRigidBodyList.getSize(); ++i)
+    {
+        auto refParticle = refParticleRigidBodyList[i];
+        T    radius      = refParticle->getCircumscribedRadius();
+        if(radius > maxParticleRadius)
+            maxParticleRadius = radius;
+    }
+
+    // Calculate maximum obstacle radius for cell occupancy
+    T maxObstacleRadius = 0;
+    for(uint i = 0; i < refObstacleRigidBodyList.getSize(); ++i)
+    {
+        auto refObstacle = refObstacleRigidBodyList[i];
+        T    radius      = refObstacle->getCircumscribedRadius();
+        if(radius > maxObstacleRadius)
+            maxObstacleRadius = radius;
+    }
 
     // ---------------------------------------------------------------------------------------------
     // Setting up collision detection
     GoutWI(6, "Reading collision detection ...");
-    auto&    CD                 = GP::m_collisionDetection;
-    auto&    LC                 = CD.linkedCellParameters;
     DOMNode* collisionDetection = ReaderXML::getNode(root, "CollisionDetection");
     GAssert(collisionDetection, "CollisionDetection node is mandatory!");
+
     // Neighbor list
     DOMNode* nNeighborList = ReaderXML::getNode(collisionDetection, "NeighborList");
     GAssert(nNeighborList, "NeighborList node is mandatory!");
@@ -234,9 +248,7 @@ void Grains<T>::Construction(DOMElement* rootElement)
     if(CD.neighborListType == NeighborListType::LINKEDCELL)
     {
         DOMNode* nLinkedCell = ReaderXML::getNode(collisionDetection, "LinkedCell");
-        GAssert(nLinkedCell,
-                "LinkedCell node is mandatory when using LinkedCell "
-                "neighbor list!");
+        GAssert(nLinkedCell, "LinkedCell node is mandatory when using LinkedCell neighbor list!");
         std::string linkedCellType = ReaderXML::getNodeAttr_String(nLinkedCell, "Type");
         if(linkedCellType == "Host")
             LC.type = LinkedCellType::HOST;
@@ -247,8 +259,20 @@ void Grains<T>::Construction(DOMElement* rootElement)
         else
             GAbort("Unknown LinkedCell type! Aborting Grains!");
 
-        // Cell size factor and sorting frequency
-        LC.cellSizeFactor  = T(ReaderXML::getNodeAttr_Double(nLinkedCell, "CellSizeFactor"));
+        // Minimum cell size
+        LC.minCellSize = 2 * maxParticleRadius;
+
+        // Cell size factor
+        LC.cellSizeFactor = T(ReaderXML::getNodeAttr_Double(nLinkedCell, "CellSizeFactor"));
+
+        // Adjusting maxNumCellsPerObstacle
+        uint adjustedMaxNumCellsPerObstaclePerDim = static_cast<uint>(
+            std::ceil((2 * maxObstacleRadius) / (LC.cellSizeFactor * LC.minCellSize)));
+        LC.maxNumCellsPerObstacle = adjustedMaxNumCellsPerObstaclePerDim
+                                    * adjustedMaxNumCellsPerObstaclePerDim
+                                    * adjustedMaxNumCellsPerObstaclePerDim;
+
+        // Update and sort frequency
         LC.updateFrequency = ReaderXML::getNodeAttr_Int(nLinkedCell, "UpdatingFrequency");
         LC.sortFrequency   = ReaderXML::getNodeAttr_Int(nLinkedCell, "SortingFrequency");
 
@@ -261,6 +285,19 @@ void Grains<T>::Construction(DOMElement* rootElement)
                    + std::to_string(LC.cellSizeFactor) + ", updating frequency "
                    + std::to_string(LC.updateFrequency) + ", sorting frequency "
                    + std::to_string(LC.sortFrequency) + " ...");
+    }
+    else  // BruteForce - still need basic LinkedCell params for insertion checks
+    {
+        LC.type                                   = LinkedCellType::HOST;
+        LC.cellSizeFactor                         = T(1.0);
+        LC.minCorner                              = GP::m_origin;
+        LC.maxCorner                              = GP::m_maxCoordinate;
+        LC.minCellSize                            = 2 * maxParticleRadius;
+        uint adjustedMaxNumCellsPerObstaclePerDim = static_cast<uint>(
+            std::ceil((2 * maxObstacleRadius) / (LC.cellSizeFactor * LC.minCellSize)));
+        LC.maxNumCellsPerObstacle = adjustedMaxNumCellsPerObstaclePerDim
+                                    * adjustedMaxNumCellsPerObstaclePerDim
+                                    * adjustedMaxNumCellsPerObstaclePerDim;
     }
 
     // Bounding volume
@@ -331,8 +368,8 @@ void Grains<T>::Construction(DOMElement* rootElement)
     // ---------------------------------------------------------------------------------------------
     // Setting up the component managers
     m_components = std::make_unique<ComponentManagerCPU<T>>(&m_rigidBodyList,
-                                                            GP::m_numObstacles,
-                                                            GP::m_numParticles);
+                                                            SS.numObstacles,
+                                                            SS.numParticles);
     // Initialize components
     m_components->initializeComponents(initialPosition, initialOrientation);
 }
@@ -433,3 +470,11 @@ void Grains<T>::AdditionalFeatures(DOMElement* rootElement)
 // Explicit instantiation
 template class Grains<float>;
 template class Grains<double>;
+template void Grains<float>::postProcess<MemType::HOST>(
+    const std::unique_ptr<ComponentManager<float, MemType::HOST>>&);
+template void Grains<float>::postProcess<MemType::DEVICE>(
+    const std::unique_ptr<ComponentManager<float, MemType::DEVICE>>&);
+template void Grains<double>::postProcess<MemType::HOST>(
+    const std::unique_ptr<ComponentManager<double, MemType::HOST>>&);
+template void Grains<double>::postProcess<MemType::DEVICE>(
+    const std::unique_ptr<ComponentManager<double, MemType::DEVICE>>&);
