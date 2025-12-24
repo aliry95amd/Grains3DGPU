@@ -155,6 +155,39 @@ __GLOBAL__ void updateNeighborList_LC_AT_Device(const uint* cellNeighborsList,
                                                 const uint  numParticles,
                                                 const uint  numCells,
                                                 uint2*      pairList);
+
+/** @brief Updates the neighbor list on device using a sort-based linked cell approach with packed
+   keys.
+    @param cellNeighborsList array of neighboring cells for each cell
+    @param sortedKeys packed uint64 array (upper 32 bits = cellID, lower 32 bits = particleID)
+    @param cellStartIDs array of start IDs for each cell
+    @param numNeighborsPrefixSums array of prefix sums of neighbors
+    @param numObstacles number of obstacles
+    @param numParticles number of particles
+    @param numCells number of cells
+    @param pairList array of pairs */
+__GLOBAL__ void updateNeighborList_LC_SB_Packed_Device(const uint*     cellNeighborsList,
+                                                       const uint64_t* sortedKeys,
+                                                       const uint*     cellStartIDs,
+                                                       const uint*     numNeighborsPrefixSums,
+                                                       const uint      numObstacles,
+                                                       const uint      numParticles,
+                                                       const uint      numCells,
+                                                       uint2*          pairList);
+
+/** @brief Count neighbors per particle using linked cells with packed keys.
+    @param cellNeighborsList array of neighboring cells for each cell
+    @param sortedKeys packed uint64 array (upper 32 bits = cellID, lower 32 bits = particleID)
+    @param cellStartIDs array of start IDs for each cell
+    @param numParticles number of particles
+    @param numCells number of cells
+    @param neighborCounts output array of neighbor counts per particle */
+__GLOBAL__ void countNeighbors_Packed_Device(const uint*     cellNeighborsList,
+                                             const uint64_t* sortedKeys,
+                                             const uint*     cellStartIDs,
+                                             const uint      numParticles,
+                                             const uint      numCells,
+                                             uint*           neighborCounts);
 //@}
 
 #endif

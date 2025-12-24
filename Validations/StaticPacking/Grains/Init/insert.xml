@@ -7,7 +7,7 @@
 
 	<CollisionDetection>
 		<NeighborList Type="LinkedCell" UpdateFrequency="1"/>
-		<LinkedCell Type="Device_Atomic" CellOrdering="Morton" CellSizeFactor="1.0" UpdatingFrequency="0" SortingFrequency="0"/>
+		<LinkedCell Type="Device_Atomic" CellSizeFactor="1.0" UpdatingFrequency="0" SortingFrequency="0"/>
 		<BoundingVolume Type="OBB"/>
 		<NarrowPhase Type="GJK"/>
 	</CollisionDetection>
@@ -15,23 +15,17 @@
 	<ContactForceModels>
 		<ContactForceModel Type='Hooke'>
 			<Material materialA="matP" materialB="matP"/>
-			<Parameters>
-				<kn>120000000.0</kn>
-				<en>0.1</en>
-				<etat>100.0</etat>
-				<muc>0.5</muc>
-				<kr>0.0</kr>
-			</Parameters>
+			<Parameters kn="120000000.0" en="0.1" etat="100.0" muc="0.5" kr="0.0"/>
 		</ContactForceModel>
 	</ContactForceModels>
 
 	<TemporalSetting>
-		<TimeInterval Start="0." End="1e-04" dt="1e-05"/>
+		<TimeInterval Start="0." End="1e-00" dt="1e-05"/>
 		<TimeIntegration Type="FirstOrderExplicit"/>
 	</TemporalSetting>
 
 	<Particles>
-		<Particle Number="4096" Density="1000" Material="matP">
+		<Particle Number="1024" Density="1000" Material="matP">
 			<Convex CrustThickness="0.0002">
 				<Superquadric a="0.01" b="0.01" c="0.08" n1="2.0" n2="2.0"/>
 			</Convex>
@@ -97,7 +91,7 @@
 			<Windows>
 				<Window Type="Box">
 					<MinPoint X="0.0" Y="0.0" Z="0.0"/>
-					<MaxPoint X="1.152" Y="1.152" Z="1.152"/>
+					<MaxPoint X="1.10" Y="1.10" Z="1.10"/>
 				</Window>
 			</Windows>
 		</InitialPosition>
@@ -111,7 +105,7 @@
 		</InitialOrientation>
 	</ParticleInsertion>
 	<PostProcessing>
-		<TimeSave dt="1e-04"/>
+		<TimeSave dt="1e-2"/>
 		<Writers>
 			<Paraview Directory="./Grains/Init" RootName="S4_N2"/>
 			<RawData  Directory="./Grains/Init" RootName="S4_N2"/>

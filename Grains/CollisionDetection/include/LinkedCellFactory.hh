@@ -5,6 +5,7 @@
 #include "GrainsParameters.hh"
 #include "LinkedCell.hh"
 #include "LinkedCell_Atomic.hh"
+#include "LinkedCell_AtomicFixed.hh"
 #include "LinkedCell_Host.hh"
 #include "LinkedCell_SortBased.hh"
 
@@ -83,6 +84,21 @@ public:
                                               linkedCellParameters,
                                               nObstacles,
                                               nParticles);
+            }
+            else if(type == LinkedCellType::ATOMICFIXED)
+            {
+                // Use maxNumCellsPerObstacle as maxParticlesPerCell proxy for now
+                // TODO: Add separate parameter in LinkedCellParameters if needed
+                uint maxPerCell = linkedCellParameters.maxNumCellsPerObstacle > 0
+                                      ? linkedCellParameters.maxNumCellsPerObstacle
+                                      : 64;  // Default fallback
+                LC              = new LinkedCell_AtomicFixed<T>(rb,
+                                                   positions,
+                                                   quaternions,
+                                                   linkedCellParameters,
+                                                   nObstacles,
+                                                   nParticles,
+                                                   maxPerCell);
             }
             else
                 GAbort("LinkedCell type not supported on device. Aborting "

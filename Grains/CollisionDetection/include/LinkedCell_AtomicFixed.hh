@@ -1,27 +1,28 @@
-#ifndef _LINKEDCELL_SORTBASED_HH_
-#define _LINKEDCELL_SORTBASED_HH_
-
-#include "thrust/device_ptr.h"
-#include "thrust/sort.h"
+#ifndef _LINKEDCELL_ATOMICFIXED_HH_
+#define _LINKEDCELL_ATOMICFIXED_HH_
 
 #include "GrainsMemBuffer.hh"
 #include "LinkedCell.hh"
 #include "LinkedCell_Kernels.hh"
 
 // =================================================================================================
-/** @brief The class LinkedCell_SortBased.
+/** @brief The class LinkedCell_AtomicFixed.
 
-    This class provides functionalities to manage linked cells for collision detection in the
-    simulation using a sort-based approach. It is a derived class of LinkedCell and implements the
-    update of linked cells based on sorting the particle hashes. This is designed to work on the
-    device (GPU). This has optimal space complexity, while the time complexity is O(n) for computing
-    the particle hashes and O(nk) for sorting the particle IDs using a parallel radix sort
-    algorithm, where n is the number of particles and k is the number of cells.
+    This class provides functionalities to manage linked cells for collision detection using a
+    pre-sized fixed array approach. Unlike LinkedCell_Atomic which uses dynamic sizing with prefix
+    sums, this variant allocates a fixed 2D array [numCells × maxParticlesPerCell] for direct
+    particle insertion.
+
+    Best for: Dense/uniform particle distributions where memory overhead is acceptable in exchange
+    for faster updates (no prefix sum needed).
+
+    Trade-off: Wastes memory for sparse distributions but provides O(1) insertion without prefix sum
+    overhead.
 
     @author A.Yazdani - 2025 - Construction */
 // =================================================================================================
 template <typename T>
-class LinkedCell_SortBased : public LinkedCell<T, MemType::DEVICE>
+class LinkedCell_AtomicFixed : public LinkedCell<T, MemType::DEVICE>
 {
     using LC = LinkedCell<T, MemType::DEVICE>;
     using LC::m_cells;
@@ -40,15 +41,17 @@ class LinkedCell_SortBased : public LinkedCell<T, MemType::DEVICE>
 protected:
     /** @name Parameters */
     //@{
-    /** \brief Packed uint64 buffer: upper 32 bits = cellID, lower 32 bits = particleID */
-    GrainsMemBuffer<uint64_t, MemType::DEVICE> m_packedCellParticleIDs;
-    /** \brief Buffer to store start ID for each cell */
-    GrainsMemBuffer<uint, MemType::DEVICE> m_cellStartID;
+    /** \brief Buffer of number of particles per cell */
+    GrainsMemBuffer<uint, MemType::DEVICE> m_numParticlesPerCell;
+    /** \brief Buffer storing particles: [numCells x maxParticlesPerCell] */
+    GrainsMemBuffer<uint, MemType::DEVICE> m_cellParticles;
+    /** \brief Maximum number of particles that can fit in a single cell */
+    uint m_maxParticlesPerCell;
     /** \brief CUDA streams for concurrent kernel execution */
     cudaEvent_t  m_resizeComplete;  // Event to track cell resize completion
-    cudaStream_t m_stream0;         // Neighbor cell generation
-    cudaStream_t m_stream1;         // Old position copy
-    cudaStream_t m_stream2;         // Cell start initialization + particle packing
+    cudaStream_t m_stream0;         // Old position copy
+    cudaStream_t m_stream1;         // Neighbor cell generation
+    cudaStream_t m_stream2;         // Particle insertion
     //@}
 
 public:
@@ -56,7 +59,7 @@ public:
     //@{
     // ---------------------------------------------------------------------------------------------
     /** @brief Default constructor */
-    LinkedCell_SortBased() = default;
+    LinkedCell_AtomicFixed() = default;
 
     // ---------------------------------------------------------------------------------------------
     /** @brief Constructor with parameters
@@ -65,18 +68,23 @@ public:
         @param quaternions Quaternions buffer
         @param linkedCellParameters Linked cell parameters
         @param nObstacles number of obstacles
-        @param nParticles number of particles */
-    LinkedCell_SortBased(const GrainsMemBuffer<RigidBody<T>*, MemType::DEVICE>* rb,
-                         const GrainsMemBuffer<Vector3<T>, MemType::DEVICE>&    positions,
-                         const GrainsMemBuffer<Quaternion<T>, MemType::DEVICE>& quaternions,
-                         const LinkedCellParameters<T>& linkedCellParameters,
-                         const uint                     nObstacles,
-                         const uint                     nParticles)
+        @param nParticles number of particles
+        @param maxParticlesPerCell maximum particles per cell (fixed allocation) */
+    LinkedCell_AtomicFixed(const GrainsMemBuffer<RigidBody<T>*, MemType::DEVICE>* rb,
+                           const GrainsMemBuffer<Vector3<T>, MemType::DEVICE>&    positions,
+                           const GrainsMemBuffer<Quaternion<T>, MemType::DEVICE>& quaternions,
+                           const LinkedCellParameters<T>& linkedCellParameters,
+                           const uint                     nObstacles,
+                           const uint                     nParticles,
+                           const uint                     maxParticlesPerCell = 64)
         : LinkedCell<T, MemType::DEVICE>(
               rb, positions, quaternions, linkedCellParameters, nObstacles, nParticles)
-        , m_packedCellParticleIDs(nParticles)
-        , m_cellStartID(m_numCells)
+        , m_numParticlesPerCell(m_numCells)
+        , m_cellParticles(m_numCells * maxParticlesPerCell)
+        , m_maxParticlesPerCell(maxParticlesPerCell)
     {
+        m_numParticlesPerCell.fill(0);
+        m_cellParticles.fill(UINT_MAX);
         cudaEventCreate(&m_resizeComplete);
         cudaStreamCreate(&m_stream0);
         cudaStreamCreate(&m_stream1);
@@ -85,7 +93,7 @@ public:
 
     // ---------------------------------------------------------------------------------------------
     /** @brief Destructor */
-    virtual ~LinkedCell_SortBased()
+    virtual ~LinkedCell_AtomicFixed()
     {
         cudaEventDestroy(m_resizeComplete);
         cudaStreamDestroy(m_stream0);
@@ -97,18 +105,24 @@ public:
     /** @name Get methods */
     //@{
     // ---------------------------------------------------------------------------------------------
-    /** @brief Gets packed cell-particle IDs .
-        packed uint64: upper 32 bits = cellID, lower 32 bits = particleID */
-    const uint64_t* getPackedCellParticleIDs() const override
+    /** @brief Gets particle IDs array */
+    const uint* getParticleIDArray() const override
     {
-        return m_packedCellParticleIDs.getData();
+        return m_cellParticles.getData();
     }
 
     // ---------------------------------------------------------------------------------------------
-    /** @brief Gets cell IDs */
-    const uint* getCellStartIDs() const override
+    /** @brief Gets number of particles per cell */
+    const uint* getNumParticlesPerCell() const override
     {
-        return m_cellStartID.getData();
+        return m_numParticlesPerCell.getData();
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    /** @brief Gets maximum particles per cell */
+    uint getMaxParticlesPerCell() const
+    {
+        return m_maxParticlesPerCell;
     }
     //@}
 
@@ -122,24 +136,25 @@ public:
         Timeline (adaptive skin mode):
         ┌─────────────────────────────────────────────────────────────────────────┐
         │ Default Stream: resizeCells_Device → cudaMemcpyAsync (D2H) → [event]    │
-        └──────────────────────────────────────────┬──────────────────────────────┘
-                                                   │ (resize complete event)
-                                                   │
-        ┌──────────────────────────────────────────▼──────────────────────────────┐
-        │ Stream 0: [wait event] → memset(neighbors) → generateNeighborCells      │
+        └──────────────────────────────────────┬──────────────────────────────────┘
+                                               │ (resize complete event)
+                                               │
+        ┌──────────────────────────────────────▼──────────────────────────────────┐
+        │ Stream 1: [wait event] → memset(neighbors) → generateNeighborCells      │
         └─────────────────────────────────────────────────────────────────────────┘
 
         ┌─────────────────────────────────────────────────────────────────────────┐
-        │ Stream 1: cudaMemcpyAsync (old positions, D2D) [independent]            │
+        │ Stream 0: cudaMemcpyAsync (old positions, D2D) [independent]            │
         └─────────────────────────────────────────────────────────────────────────┘
 
         ┌─────────────────────────────────────────────────────────────────────────┐
-        │ Stream 2: memset(cellStart) → packCellParticleIDs [independent]         │
+        │ Stream 2: memset(particleCounts) → memset(cellParticles) → directInsert │
         └─────────────────────────────────────────────────────────────────────────┘
 
         Dependencies:
-        - Stream 0 waits for resize completion (cudaStreamWaitEvent)
-        - Streams 1 and 2 are fully independent and run concurrently
+        - Stream 1 waits for resize completion (cudaStreamWaitEvent)
+        - Stream 2's memsets must complete before insert (atomic insertion needs clean state)
+        - Streams 0, 1, 2 run concurrently
         - All streams synchronized at end before returning */
     void prepareLinkedCellUpdate()
     {
@@ -154,9 +169,10 @@ public:
         if(m_useAdaptiveSkin)
         {
             m_skinThickness                = this->computeSkinThickness();
-            T cellSize                     = m_cellSizeWithoutSkin + m_skinThickness;
             m_maxDisplacementSquared       = T(0);
             m_numIterationsSinceLastUpdate = 0;
+
+            T cellSize = m_cellSizeWithoutSkin + m_skinThickness;
 
             // Resize cells on default stream (blocking but minimal impact)
             uint* d_numCells;
@@ -169,20 +185,22 @@ public:
 
             // Resize buffers
             m_neighborCells.reserve(m_numCells * 27);
-            m_cellStartID.reserve(m_numCells);
+            m_numParticlesPerCell.reserve(m_numCells);
+            m_cellParticles.reserve(m_numCells * m_maxParticlesPerCell);
 
-            // Copy old positions on stream1 (independent)
+            // Copy old positions on stream0 (independent)
             cudaMemcpyAsync(m_oldPosition.getData() + m_numObstacles,
                             m_positions->getData() + m_numObstacles,
                             m_numParticles * sizeof(Vector3<T>),
                             cudaMemcpyDeviceToDevice,
-                            m_stream1);
+                            m_stream0);
         }
 
         /* Launch concurrent operations */
-        // Stream 0: Generate neighbor cells (waits for resize if needed)
+
+        // Stream 1: Generate neighbor cells (waits for resize if needed)
         if(m_useAdaptiveSkin)
-            cudaStreamWaitEvent(m_stream0, m_resizeComplete, 0);
+            cudaStreamWaitEvent(m_stream1, m_resizeComplete, 0);
 
         uint numBlocksCells, numThreadsCells;
         computeOptimalThreadsAndBlocks(m_numCells,
@@ -192,28 +210,34 @@ public:
         cudaMemsetAsync(m_neighborCells.getData(),
                         0xFF,
                         m_neighborCells.getSize() * sizeof(uint),
-                        m_stream0);
-        generateNeighborCells_Device<<<numBlocksCells, numThreadsCells, 0, m_stream0>>>(
+                        m_stream1);
+        generateNeighborCells_Device<<<numBlocksCells, numThreadsCells, 0, m_stream1>>>(
             m_cells.getData(),
             m_numCells,
             m_neighborCells.getData());
 
-        // Stream 2: Initialize cell start + pack particles (both independent)
-        cudaMemsetAsync(m_cellStartID.getData(),
-                        0xFF,
-                        m_cellStartID.getSize() * sizeof(uint),
+        // Stream 2: Reset counts + clear array + insert particles (sequential within stream)
+        cudaMemsetAsync(m_numParticlesPerCell.getData(),
+                        0,
+                        m_numParticlesPerCell.getSize() * sizeof(uint),
                         m_stream2);
-        packCellParticleIDs_Device<<<numBlocks, numThreads, 0, m_stream2>>>(
+        cudaMemsetAsync(m_cellParticles.getData(),
+                        0xFF,
+                        m_cellParticles.getSize() * sizeof(uint),
+                        m_stream2);
+        directInsert_Device<<<numBlocks, numThreads, 0, m_stream2>>>(
             m_cells.getData(),
             m_positions->getData() + m_numObstacles,
             m_numParticles,
             m_numObstacles,
-            m_packedCellParticleIDs.getData());
+            m_cellParticles.getData(),
+            m_numParticlesPerCell.getData(),
+            m_maxParticlesPerCell);
 
         // Synchronize all streams before returning
-        cudaStreamSynchronize(m_stream0);
-        cudaStreamSynchronize(m_stream1);
-        cudaStreamSynchronize(m_stream2);
+        cudaStreamSynchronize(m_stream0);  // Old position copy
+        cudaStreamSynchronize(m_stream1);  // Neighbor generation
+        cudaStreamSynchronize(m_stream2);  // Particle insertion
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -224,37 +248,22 @@ public:
 
         if(this->needsUpdate())
         {
-            prepareLinkedCellUpdate();
-            // Relink obstacles
+            // Complete preparation: resize, insert particles, generate neighbors, link obstacles
+            this->prepareLinkedCellUpdate();
+            // relink obstacles
             this->linkObstacles();
         }
         else
         {
-            // Relink obstacles if they moved
+            // Only relink obstacles if they moved
             if(SS.obstaclesMoved)
                 this->linkObstacles();
             return false;
         }
 
-        // Sort packed uint64 keys (faster than sort_by_key)
-        thrust::sort(
-            thrust::device_ptr<uint64_t>(m_packedCellParticleIDs.getData()),
-            thrust::device_ptr<uint64_t>(m_packedCellParticleIDs.getData() + m_numParticles));
-
-        // Compute cell start indices from sorted packed keys
-        uint numBlocks, numThreads;
-        computeOptimalThreadsAndBlocks(m_numParticles,
-                                       GrainsParameters<T>::m_GPU,
-                                       numBlocks,
-                                       numThreads);
-        uint sMemSize = sizeof(uint) * (numThreads + 1);
-        computeCellStart_Kernel<<<numBlocks, numThreads, sMemSize>>>(
-            m_packedCellParticleIDs.getData(),
-            m_numParticles,
-            m_cellStartID.getData());
-
         return true;
     }
+    //@}
 };
 
 #endif

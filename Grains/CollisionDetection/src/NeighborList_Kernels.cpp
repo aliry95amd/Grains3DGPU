@@ -408,3 +408,129 @@ __GLOBAL__ void updateNeighborList_LC_AT_Device(const uint* cellNeighborsList,
         }
     }
 }
+
+// -------------------------------------------------------------------------------------------------
+// Count neighbors per particle using linked cells with packed keys
+__GLOBAL__ void countNeighbors_Packed_Device(const uint*     cellNeighborsList,
+                                             const uint64_t* sortedKeys,
+                                             const uint*     cellStartIDs,
+                                             const uint      numParticles,
+                                             const uint      numCells,
+                                             uint*           neighborCounts)
+{
+    constexpr uint NUM_NEIGHBOR_CELLS = 27;
+
+    uint tID = blockIdx.x * blockDim.x + threadIdx.x;
+    if(tID >= numParticles)
+        return;
+
+    // Unpack cellID and particleID from uint64
+    const uint64_t packed = sortedKeys[tID];
+    const uint     cell   = (uint)(packed >> 32);
+    const uint     i      = (uint)(packed & 0xFFFFFFFF);
+
+    if(cell == UINT_MAX)
+    {
+        neighborCounts[i] = 0;
+        return;
+    }
+
+    const uint* neighborCells  = &cellNeighborsList[NUM_NEIGHBOR_CELLS * cell];
+    uint        totalNeighbors = 0;
+
+    // Loop over all neighboring cells
+    for(uint cID = 0; cID < NUM_NEIGHBOR_CELLS; ++cID)
+    {
+        uint c = neighborCells[cID];
+
+        if(c == UINT_MAX)
+            continue;
+
+        // Calculate number of particles in cell from cellStartIDs
+        uint cellStart = cellStartIDs[c];
+        if(cellStart == UINT_MAX)
+            continue;
+
+        // Find end of cell
+        uint k = c;
+        uint cellEnd;
+        do
+        {
+            ++k;
+            cellEnd = cellStartIDs[k];
+        } while(cellEnd == UINT_MAX && k < numCells);
+
+        if(k == numCells)
+            cellEnd = numParticles;
+
+        totalNeighbors += (cellEnd - cellStart);
+    }
+
+    neighborCounts[i] = totalNeighbors;
+}
+
+// -------------------------------------------------------------------------------------------------
+// Updates the neighbor list on device using a sort-based linked cell approach with packed keys
+__GLOBAL__ void updateNeighborList_LC_SB_Packed_Device(const uint*     cellNeighborsList,
+                                                       const uint64_t* sortedKeys,
+                                                       const uint*     cellStartIDs,
+                                                       const uint*     numNeighborsPrefixSums,
+                                                       const uint      numObstacles,
+                                                       const uint      numParticles,
+                                                       const uint      numCells,
+                                                       uint2*          pairList)
+{
+    constexpr uint NUM_NEIGHBOR_CELLS = 27;
+
+    uint tID = blockIdx.x * blockDim.x + threadIdx.x;
+    if(tID >= numParticles)
+        return;
+
+    // Unpack cellID and particleID from uint64
+    const uint64_t packed = sortedKeys[tID];
+    const uint     cell   = (uint)(packed >> 32);
+    const uint     i      = (uint)(packed & 0xFFFFFFFF);
+
+    if(cell == UINT_MAX || cell >= numCells)
+        return;
+
+    const uint* neighborCells = &cellNeighborsList[NUM_NEIGHBOR_CELLS * cell];
+    uint        insertIndex   = numNeighborsPrefixSums[i];
+
+    // Loop over all neighboring cells
+    for(uint cID = 0; cID < NUM_NEIGHBOR_CELLS; ++cID)
+    {
+        uint c = neighborCells[cID];
+
+        if(c == UINT_MAX || c < cell)
+            continue;
+
+        uint cellStart = cellStartIDs[c];
+        if(cellStart == UINT_MAX)
+            continue;
+
+        // Find end of cell
+        uint k = c;
+        uint cellEnd;
+        do
+        {
+            ++k;
+            cellEnd = cellStartIDs[k];
+        } while(cellEnd == UINT_MAX && k < numCells);
+
+        if(k == numCells)
+            cellEnd = numParticles;
+
+        // Loop through particles in the neighbor cell
+        for(uint p = cellStart; p < cellEnd; ++p)
+        {
+            // Unpack particle ID from sorted keys
+            const uint j = (uint)(sortedKeys[p] & 0xFFFFFFFF);
+
+            if(i >= j)
+                continue;
+
+            pairList[insertIndex++] = make_uint2(i, j);
+        }
+    }
+}

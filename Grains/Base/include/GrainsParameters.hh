@@ -24,7 +24,9 @@ enum class LinkedCellType
     /** @brief Sort-based linked cells for device */
     SORTBASED = 1,
     /** @brief Atomic linked cells for device */
-    ATOMIC = 2
+    ATOMIC = 2,
+    /** @brief Atomic fixed-size linked cells for device (pre-sized 2D array) */
+    ATOMICFIXED = 3
 };
 
 // -------------------------------------------------------------------------------------------------

@@ -16,10 +16,9 @@
 // =================================================================================================
 /** @brief The class LinkedCell_Host.
 
-    This class provides functionalities to manage linked cells for
-    collision detection in the simulation on the host. It uses std::vector
-    of std::list for each cell to efficiently manage particle assignments.
-    When updating, it checks if particle cell IDs have changed and moves
+    This class provides functionalities to manage linked cells for collision detection in the
+    simulation on the host. It uses std::vector of std::list for each cell to efficiently manage
+    particle assignments. When updating, it checks if particle cell IDs have changed and moves
     particles between cells accordingly.
 
     @author A.Yazdani - 2025 - Construction */
@@ -28,25 +27,27 @@ template <typename T>
 class LinkedCell_Host : public LinkedCell<T, MemType::HOST>
 {
     using LC = LinkedCell<T, MemType::HOST>;
-    using LC::m_cellID;
     using LC::m_cells;
     using LC::m_neighborCells;
     using LC::m_numCells;
     using LC::m_numObstacles;
     using LC::m_numParticles;
-    using LC::m_particleID;
     using LC::m_useAdaptiveSkin;
 
 private:
     /** @name Host-specific storage */
     //@{
+    /** \brief Buffer of particle IDs (Host-specific: needed for iteration) */
+    GrainsMemBuffer<uint, MemType::HOST> m_particleID;
+    /** \brief Buffer of cells that particles belong to (Host-specific: needed for updates) */
+    GrainsMemBuffer<uint, MemType::HOST> m_cellID;
+    /** \brief Temporary buffer to store old particle hashes during updates */
+    GrainsMemBuffer<uint, MemType::HOST> m_oldCellID;
     /** \brief Vector of lists, one list per cell containing particle IDs */
     std::vector<std::list<uint>> m_cellParticles;
     /** \brief Map to store iterators to particle positions in cell lists for
         O(1) removal */
     std::unordered_map<uint, std::list<uint>::iterator> m_particleIteratorMap;
-    /** \brief Temporary buffer to store old particle hashes during updates */
-    GrainsMemBuffer<uint, MemType::HOST> m_oldCellID;
     //@}
 
 public:
@@ -68,15 +69,19 @@ public:
                     const uint                                           nParticles)
         : LinkedCell<T, MemType::HOST>(
               rb, positions, quaternions, linkedCellParameters, nObstacles, nParticles)
+        , m_particleID(nParticles)
+        , m_cellID(nParticles)
+        , m_oldCellID(nParticles)
     {
+        // Initialize particle and cell ID buffers
+        m_particleID.sequence(m_numObstacles);
+        m_cellID.fill(UINT_MAX);
+        m_oldCellID.fill(UINT_MAX);
+
         // Initialize vector of lists for each cell
         m_cellParticles.resize(m_numCells);
         // Reserve space in iterator map for efficiency
         m_particleIteratorMap.reserve(nParticles);
-        // Initialize old cell IDs buffer with maximum size to accommodate all
-        // possible particles
-        m_oldCellID.initialize(m_numParticles);
-        m_oldCellID.fill(UINT_MAX);
 
         // Populate initial cell assignments
         populateInitialCells();
@@ -89,6 +94,20 @@ public:
 
     /** @name Get methods */
     //@{
+    // ---------------------------------------------------------------------------------------------
+    /** @brief Gets particle IDs */
+    const uint* getParticleIDs() const override
+    {
+        return m_particleID.getData();
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    /** @brief Gets cell IDs */
+    const uint* getCellIDs() const override
+    {
+        return m_cellID.getData();
+    }
+
     // ---------------------------------------------------------------------------------------------
     /** @brief Gets all cell particle lists */
     const std::vector<std::list<uint>>& getCellParticles() const
@@ -103,38 +122,18 @@ public:
     {
         return m_cellParticles[cellID];
     }
-
-    // ---------------------------------------------------------------------------------------------
-    /** @brief Gets cell start IDs (unsupported on host variant) */
-    const uint* getCellStartIDs() const override
-    {
-        GAbort("LinkedCell_Host::getCellStartIDs is not supported in host "
-               "variant");
-        return nullptr;
-    }
-
-    // ---------------------------------------------------------------------------------------------
-    /** @brief Gets particle IDs array (unsupported on host variant) */
-    const uint* getParticleIDArray() const override
-    {
-        GAbort("LinkedCell_Host::getParticleIDArray is not supported in host "
-               "variant");
-        return nullptr;
-    }
-
-    // ---------------------------------------------------------------------------------------------
-    /** @brief Gets number of particles prefix sums (unsupported on host
-     * variant) */
-    const uint* getNumParticlesPrefixSums() const override
-    {
-        GAbort("LinkedCell_Host::getNumParticlesPrefixSums is not supported in "
-               "host variant");
-        return nullptr;
-    }
     //@}
 
     /** @name Methods */
     //@{
+    // ---------------------------------------------------------------------------------------------
+    /** @brief Sets the particle ID (already initialized in constructor) */
+    void setParticleID() override {}
+
+    // ---------------------------------------------------------------------------------------------
+    /** @brief Sets the cell ID (already initialized in constructor) */
+    void setCellID() override {}
+
     // ---------------------------------------------------------------------------------------------
     /** @brief Populates initial cell assignments for all components */
     void populateInitialCells()
@@ -196,52 +195,35 @@ public:
     }
 
     // ---------------------------------------------------------------------------------------------
-    /** @brief Handles cell grid resize by updating particle lists */
-    void handleCellResize()
-    {
-        if(m_cellParticles.size() != m_numCells)
-        {
-            // Clear all existing assignments
-            m_cellParticles.clear();
-            m_particleIteratorMap.clear();
-
-            // Resize to new cell count
-            m_cellParticles.resize(m_numCells);
-
-            // Repopulate all particles
-            populateInitialCells();
-        }
-    }
-
-    // ---------------------------------------------------------------------------------------------
     /** @brief Updates the linked cells based on particle transformations */
     bool updateLinkedCells() override
     {
+        auto& SS = GrainsParameters<T>::m_simulationState;
+
         // Store old cell IDs before updating
-        // Manually copy to preserve m_oldCellID's maximum size.
-        // copyFrom resizes it
         m_oldCellID.copyFrom(m_cellID);
 
-        // Update particle hashes with new positions
-        bool updated = this->updateCell();
+        // Re-link obstacles if they moved
+        if(SS.obstaclesMoved)
+            this->linkObstacles();
 
-        if(!updated)
-            return false;
-
-        // Handle potential cell grid resize
-        handleCellResize();
-
-        // Process particles that have changed cells
+        // Update particle cell IDs and move particles that changed cells
+        bool              hasChanges = false;
+        const Vector3<T>* p          = m_positions->getData() + m_numObstacles;
         for(uint i = 0; i < m_numParticles; ++i)
         {
             uint particleID = m_particleID[i];
-            uint newCellID  = m_cellID[i];
             uint oldCellID  = m_oldCellID[i];
+            uint newCellID  = m_cells[0]->computeCellHash(p[i]);
+            m_cellID[i]     = newCellID;
             if(oldCellID != newCellID)
+            {
                 moveParticleToCell(particleID, oldCellID, newCellID);
+                hasChanges = true;
+            }
         }
 
-        return true;
+        return hasChanges;
     }
 
     // ---------------------------------------------------------------------------------------------

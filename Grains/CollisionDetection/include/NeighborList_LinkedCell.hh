@@ -186,13 +186,28 @@ public:
                                                numThreads);
 
                 // Phase 1: Count neighbors per particle
-                countNeighbors_Device<<<numBlocks, numThreads>>>(
-                    m_LinkedCell->getCellNeighborsList(),
-                    m_LinkedCell->getParticleIDs(),
-                    m_LinkedCell->getCellIDs(),
-                    m_LinkedCell->getNumParticlesPerCell(),
-                    nParticles,
-                    m_numNeighbors.getData());
+                if(LC.type == LinkedCellType::SORTBASED)
+                {
+                    // Use packed kernel for sort-based (avoids unpacking overhead)
+                    countNeighbors_Packed_Device<<<numBlocks, numThreads>>>(
+                        m_LinkedCell->getCellNeighborsList(),
+                        m_LinkedCell->getPackedCellParticleIDs(),
+                        m_LinkedCell->getCellStartIDs(),
+                        nParticles,
+                        m_LinkedCell->getNumCells(),
+                        m_numNeighbors.getData());
+                }
+                else
+                {
+                    // Use standard kernel for atomic-based
+                    countNeighbors_Device<<<numBlocks, numThreads>>>(
+                        m_LinkedCell->getCellNeighborsList(),
+                        m_LinkedCell->getParticleIDs(),
+                        m_LinkedCell->getCellIDs(),
+                        m_LinkedCell->getNumParticlesPerCell(),
+                        nParticles,
+                        m_numNeighbors.getData());
+                }
 
                 // Phase 2: Compute prefix sum (using Thrust)
                 thrust::device_ptr<uint> numNeighbors_ptr(m_numNeighbors.getData());
@@ -246,10 +261,10 @@ public:
                 }
                 else if(LC.type == LinkedCellType::SORTBASED)
                 {
-                    updateNeighborList_LC_SB_Device<<<numBlocks, numThreads>>>(
+                    // Use packed kernel for sort-based (works directly with uint64 keys)
+                    updateNeighborList_LC_SB_Packed_Device<<<numBlocks, numThreads>>>(
                         m_LinkedCell->getCellNeighborsList(),
-                        m_LinkedCell->getParticleIDs(),
-                        m_LinkedCell->getCellIDs(),
+                        m_LinkedCell->getPackedCellParticleIDs(),
                         m_LinkedCell->getCellStartIDs(),
                         m_numNeighborsPrefixSums.getData(),
                         nObstacles,

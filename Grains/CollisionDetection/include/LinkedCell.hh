@@ -57,14 +57,6 @@ protected:
     GrainsMemBuffer<Cells<T>*, M> m_cells;
     /** \brief Buffer to store neighbor cell IDs */
     GrainsMemBuffer<uint, M> m_neighborCells;
-    /** \brief Buffer of particle IDs */
-    GrainsMemBuffer<uint, M> m_particleID;
-    /** \brief Buffer of cells that particles belong to. This is a one-to-one mapping from particle
-        IDs to cell IDs, i.e., for index i, m_particleID[i] is the ID of particle i (p_i), and
-        m_cellID[i] is the ID of the cell that particle p_i belongs to. */
-    GrainsMemBuffer<uint, M> m_cellID;
-    /** \brief Buffer of number of particles per cell */
-    GrainsMemBuffer<uint, M> m_numParticlesPerCell;
     /** \brief Buffer of obstacle IDs and the number of cells that have to be checked for a possible
         contact with a particle. This is essentially the number of cells each obstacle occupies +
         one-ring. */
@@ -119,8 +111,6 @@ public:
                const uint                               nObstacles,
                const uint                               nParticles)
         : m_oldPosition(nObstacles + nParticles)
-        , m_particleID(nParticles)
-        , m_cellID(nParticles)
         , m_obstacleID(nObstacles)
         , m_maxDisplacementSquared(0)
         , m_numIterationsSinceLastUpdate(0)
@@ -157,10 +147,6 @@ public:
                                                          maxCorner,
                                                          m_cellSizeWithoutSkin,
                                                          m_cells);
-
-        // Initialize number of particles per cell buffer
-        m_numParticlesPerCell.initialize(m_numCells);
-        m_numParticlesPerCell.fill(0);
 
         // Initialize neighbor cells buffer
         m_neighborCells.initialize(m_numCells * 27);  // 26 neighbors + self
@@ -220,24 +206,35 @@ public:
     }
 
     // ---------------------------------------------------------------------------------------------
-    /** @brief Gets particle IDs */
-    const uint* getParticleIDs() const
+    /** @brief Gets particle IDs (implementation-specific) */
+    virtual const uint* getParticleIDs() const
     {
-        return m_particleID.getData();
+        GAbort("LinkedCell::getParticleIDs is not supported in this variant");
+        return nullptr;
     }
 
     // ---------------------------------------------------------------------------------------------
-    /** @brief Gets cell IDs */
-    const uint* getCellIDs() const
+    /** @brief Gets cell IDs (implementation-specific) */
+    virtual const uint* getCellIDs() const
     {
-        return m_cellID.getData();
+        GAbort("LinkedCell::getCellIDs is not supported in this variant");
+        return nullptr;
     }
 
     // ---------------------------------------------------------------------------------------------
-    /** @brief Gets number of particles per cell */
-    const uint* getNumParticlesPerCell() const
+    /** @brief Gets number of particles per cell (implementation-specific) */
+    virtual const uint* getNumParticlesPerCell() const
     {
-        return m_numParticlesPerCell.getData();
+        GAbort("LinkedCell::getNumParticlesPerCell is not supported in this variant");
+        return nullptr;
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    /** @brief Gets sorted keys (packed uint64 cellID+particleID, implementation-specific) */
+    virtual const uint64_t* getPackedCellParticleIDs() const
+    {
+        GAbort("LinkedCell::getPackedCellParticleIDs is not supported in this variant");
+        return nullptr;
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -256,15 +253,27 @@ public:
 
     // ---------------------------------------------------------------------------------------------
     /** @brief Gets cell start IDs (implementation-specific) */
-    virtual const uint* getCellStartIDs() const = 0;
+    virtual const uint* getCellStartIDs() const
+    {
+        GAbort("LinkedCell::getCellStartIDs is not supported in this variant");
+        return nullptr;
+    }
 
     // ---------------------------------------------------------------------------------------------
     /** @brief Gets particle IDs array (implementation-specific) */
-    virtual const uint* getParticleIDArray() const = 0;
+    virtual const uint* getParticleIDArray() const
+    {
+        GAbort("LinkedCell::getParticleIDArray is not supported in this variant");
+        return nullptr;
+    }
 
     // ---------------------------------------------------------------------------------------------
     /** @brief Gets number of particles prefix sums (implementation-specific) */
-    virtual const uint* getNumParticlesPrefixSums() const = 0;
+    virtual const uint* getNumParticlesPrefixSums() const
+    {
+        GAbort("LinkedCell::getNumParticlesPrefixSums is not supported in this variant");
+        return nullptr;
+    }
 
     // ---------------------------------------------------------------------------------------------
     /** @brief Gets cell size without skin thickness */
@@ -312,23 +321,37 @@ public:
     /** @name Set methods */
     //@{
     // ---------------------------------------------------------------------------------------------
-    /** @brief Sets the particle ID */
-    void setParticleID()
-    {
-        // Initialize with sequence starting from m_numObstacles
-        m_particleID.sequence(m_numObstacles);
-    }
+    /** @brief Sets the particle ID (implementation-specific) */
+    virtual void setParticleID() {}
 
     // ---------------------------------------------------------------------------------------------
-    /** @brief Sets the cell ID */
-    void setCellID()
-    {
-        m_cellID.fill(UINT_MAX);
-    }
+    /** @brief Sets the cell ID (implementation-specific) */
+    virtual void setCellID() {}
     //@}
 
     /** @name Methods */
     //@{
+    // ---------------------------------------------------------------------------------------------
+    /** @brief Checks if linked cell update is needed based on adaptive skin and displacement
+        @return true if full update is needed, false otherwise */
+    bool needsUpdate()
+    {
+        auto& SS = GrainsParameters<T>::m_simulationState;
+
+        if(!m_useAdaptiveSkin)
+            return true;  // Always update in non-adaptive mode
+
+        if(SS.particlesSorted)
+            return true;  // Always update if particles were sorted
+
+        // Adaptive skin: check if update is needed
+        ++m_numIterationsSinceLastUpdate;
+        m_maxDisplacementSquared = computeMaxDisplacement();
+
+        // Check if update is needed: d_max > skinThickness / 2
+        return (T(4) * m_maxDisplacementSquared > m_skinThickness * m_skinThickness);
+    }
+
     // ---------------------------------------------------------------------------------------------
     /** @brief Generates neighbor cells */
     void generateNeighborCells()
@@ -496,38 +519,17 @@ public:
     }
 
     // ---------------------------------------------------------------------------------------------
-    /** @brief Updates the cells particles belong to */
-    void updateCellIDs()
-    {
-        if constexpr(M == MemType::HOST)
-        {
-            const Vector3<T>* p = m_positions->getData() + m_numObstacles;
-
-            for(uint i = 0; i < m_numParticles; ++i)
-            {
-                uint cellHash = m_cells[0]->computeCellHash(p[i]);
-                m_cellID[i]   = cellHash;
-                m_numParticlesPerCell[cellHash]++;
-            }
-        }
-        else if constexpr(M == MemType::DEVICE)
-        {
-            uint numBlocks, numThreads;
-            computeOptimalThreadsAndBlocks(m_numParticles,
-                                           GrainsParameters<T>::m_GPU,
-                                           numBlocks,
-                                           numThreads);
-            computeHash_Device<<<numBlocks, numThreads>>>(m_cells.getData(),
-                                                          m_positions->getData() + m_numObstacles,
-                                                          m_numParticles,
-                                                          m_cellID.getData(),
-                                                          m_numParticlesPerCell.getData());
-        }
-    }
+    /** @brief Resets particle count per cell (implementation-specific) */
+    virtual void resetParticleCount() {}
 
     // ---------------------------------------------------------------------------------------------
-    /** @brief Determines if an update is required and updates cells if so */
-    bool updateCell()
+    /** @brief Updates the cells particles belong to (virtual for specialization) */
+    virtual void updateCellIDs() = 0;
+
+    // ---------------------------------------------------------------------------------------------
+    /** @brief Determines if an update is required and updates cells if so (virtual for
+     * specialization) */
+    virtual bool updateCell()
     {
         auto& SS = GrainsParameters<T>::m_simulationState;
 
@@ -584,9 +586,8 @@ public:
             m_neighborCells.fill(UINT_MAX);
             generateNeighborCells();
 
-            // Reset number of particles per cell
-            m_numParticlesPerCell.reserve(m_numCells);
-            m_numParticlesPerCell.fill(0);
+            // Reset number of particles per cell (if needed by derived class)
+            resetParticleCount();
 
             // Update obstacles, particleIDs, and cellIDs
             linkObstacles();

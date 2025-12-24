@@ -256,6 +256,8 @@ void Grains<T>::Construction(DOMElement* rootElement)
             LC.type = LinkedCellType::SORTBASED;
         else if(linkedCellType == "Device_Atomic")
             LC.type = LinkedCellType::ATOMIC;
+        else if(linkedCellType == "Device_AtomicFixed")
+            LC.type = LinkedCellType::ATOMICFIXED;
         else
             GAbort("Unknown LinkedCell type! Aborting Grains!");
 
