@@ -68,20 +68,45 @@ export GRAINS_CPP_LINKER_FLAGS="${GRAINS_CPP_COMPILER_FLAGS} -shared"
 ###########
 export GRAINS_GPU_COMPILER="${GRAINS_GPU_COMPILER_BINDIR}/${GRAINS_GPU_COMPILER}"
 export GRAINS_GPU_LINKER="${GRAINS_GPU_COMPILER_BINDIR}/${GRAINS_GPU_COMPILER}"
-export GRAINS_GPU_COMPILER_FLAGS="-t=8 -x cu -m64 \
+# Release mode flags (optimized for performance)
+export GRAINS_GPU_COMPILER_FLAGS_RELEASE="-t=8 -x cu -m64 \
     -O3 -dlto -dc \
     -std=c++20 -arch=sm_75 -lineinfo \
     -cudart static -cudadevrt static \
     -use_fast_math -extra-device-vectorization -restrict \
     --extended-lambda --expt-relaxed-constexpr \
     -Xcompiler "-rdynamic,-fPIC,-fopenmp" \
-    -pg -g"
-export GRAINS_GPU_LINKER_FLAGS="-O3 -dlto \
+    -g"
+export GRAINS_GPU_LINKER_FLAGS_RELEASE="-O3 -dlto \
     -arch=sm_75 -lineinfo -lcudart \
     -use_fast_math -extra-device-vectorization -restrict \
     -lcudart -lcudadevrt \
     -lgomp \
-    -pg -g"
+    -g"
+
+# Debug mode flags (full debug info, no optimization)
+export GRAINS_GPU_COMPILER_FLAGS_DEBUG="-t=8 -x cu -m64 \
+    -O0 -G -dc \
+    -std=c++20 -arch=sm_75 \
+    -cudart static -cudadevrt static \
+    --extended-lambda --expt-relaxed-constexpr \
+    -Xcompiler "-rdynamic,-fPIC,-fopenmp" \
+    -g -DDEBUG"
+export GRAINS_GPU_LINKER_FLAGS_DEBUG="-O0 -G \
+    -arch=sm_75 -lcudart \
+    -lcudart -lcudadevrt \
+    -lgomp \
+    -g"
+
+# Set active flags based on MODE (default: release)
+export MODE=${MODE:-release}
+if [ "$MODE" = "debug" ]; then
+    export GRAINS_GPU_COMPILER_FLAGS="$GRAINS_GPU_COMPILER_FLAGS_DEBUG"
+    export GRAINS_GPU_LINKER_FLAGS="$GRAINS_GPU_LINKER_FLAGS_DEBUG"
+else
+    export GRAINS_GPU_COMPILER_FLAGS="$GRAINS_GPU_COMPILER_FLAGS_RELEASE"
+    export GRAINS_GPU_LINKER_FLAGS="$GRAINS_GPU_LINKER_FLAGS_RELEASE"
+fi
 ###########
 export GRAINS_XERCES_FLAGS="-L${GRAINS_XERCES_LIBDIR} -lxerces-c -lxerces-depdom"
 ###########

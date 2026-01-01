@@ -1,8 +1,8 @@
 #ifndef _LINKEDCELL_SORTBASED_HH_
 #define _LINKEDCELL_SORTBASED_HH_
 
-#include "thrust/device_ptr.h"
-#include "thrust/sort.h"
+#include <thrust/device_ptr.h>
+#include <thrust/sort.h>
 
 #include "GrainsMemBuffer.hh"
 #include "LinkedCell.hh"
@@ -41,9 +41,9 @@ protected:
     /** @name Parameters */
     //@{
     /** \brief Packed uint64 buffer: upper 32 bits = cellID, lower 32 bits = particleID */
-    GrainsMemBuffer<uint64_t, MemType::DEVICE> m_packedCellParticleIDs;
-    /** \brief Buffer to store start ID for each cell */
-    GrainsMemBuffer<uint, MemType::DEVICE> m_cellStartID;
+    GrainsMemBuffer<uint64_t, MemType::DEVICE> m_cellParticleIDs;
+    /** \brief Buffer to store cell prefix sums (start indices for each cell) */
+    GrainsMemBuffer<uint, MemType::DEVICE> m_cellPrefixSums;
     /** \brief CUDA streams for concurrent kernel execution */
     cudaEvent_t  m_resizeComplete;  // Event to track cell resize completion
     cudaStream_t m_stream0;         // Neighbor cell generation
@@ -74,8 +74,8 @@ public:
                          const uint                     nParticles)
         : LinkedCell<T, MemType::DEVICE>(
               rb, positions, quaternions, linkedCellParameters, nObstacles, nParticles)
-        , m_packedCellParticleIDs(nParticles)
-        , m_cellStartID(m_numCells)
+        , m_cellParticleIDs(nParticles)
+        , m_cellPrefixSums(m_numCells)
     {
         cudaEventCreate(&m_resizeComplete);
         cudaStreamCreate(&m_stream0);
@@ -97,18 +97,17 @@ public:
     /** @name Get methods */
     //@{
     // ---------------------------------------------------------------------------------------------
-    /** @brief Gets packed cell-particle IDs .
-        packed uint64: upper 32 bits = cellID, lower 32 bits = particleID */
-    const uint64_t* getPackedCellParticleIDs() const override
+    /** @brief Gets packed cell-particle IDs. */
+    const uint64_t* getCellParticleIDs() const override
     {
-        return m_packedCellParticleIDs.getData();
+        return m_cellParticleIDs.getData();
     }
 
     // ---------------------------------------------------------------------------------------------
-    /** @brief Gets cell IDs */
-    const uint* getCellStartIDs() const override
+    /** @brief Gets cell prefix sums (start indices for each cell) */
+    const uint* getCellPrefixSums() const override
     {
-        return m_cellStartID.getData();
+        return m_cellPrefixSums.getData();
     }
     //@}
 
@@ -134,7 +133,7 @@ public:
         └─────────────────────────────────────────────────────────────────────────┘
 
         ┌─────────────────────────────────────────────────────────────────────────┐
-        │ Stream 2: memset(cellStart) → packCellParticleIDs [independent]         │
+        │ Stream 2: memset(cellStart) → computeCellParticleIDs [independent]      │
         └─────────────────────────────────────────────────────────────────────────┘
 
         Dependencies:
@@ -167,9 +166,9 @@ public:
             cudaFree(d_numCells);
             cudaEventRecord(m_resizeComplete, 0);
 
-            // Resize buffers
-            m_neighborCells.reserve(m_numCells * 27);
-            m_cellStartID.reserve(m_numCells);
+            // Resize buffers with appropriate streams
+            m_neighborCells.reserve(m_numCells * 27, m_stream0);
+            m_cellPrefixSums.reserve(m_numCells, m_stream2);
 
             // Copy old positions on stream1 (independent)
             cudaMemcpyAsync(m_oldPosition.getData() + m_numObstacles,
@@ -189,26 +188,20 @@ public:
                                        GrainsParameters<T>::m_GPU,
                                        numBlocksCells,
                                        numThreadsCells);
-        cudaMemsetAsync(m_neighborCells.getData(),
-                        0xFF,
-                        m_neighborCells.getSize() * sizeof(uint),
-                        m_stream0);
+        m_neighborCells.fill(UINT_MAX, m_stream0);
         generateNeighborCells_Device<<<numBlocksCells, numThreadsCells, 0, m_stream0>>>(
             m_cells.getData(),
             m_numCells,
             m_neighborCells.getData());
 
         // Stream 2: Initialize cell start + pack particles (both independent)
-        cudaMemsetAsync(m_cellStartID.getData(),
-                        0xFF,
-                        m_cellStartID.getSize() * sizeof(uint),
-                        m_stream2);
-        packCellParticleIDs_Device<<<numBlocks, numThreads, 0, m_stream2>>>(
+        m_cellPrefixSums.fill(UINT_MAX, m_stream2);
+        computeCellParticleIDs_Device<<<numBlocks, numThreads, 0, m_stream2>>>(
             m_cells.getData(),
             m_positions->getData() + m_numObstacles,
             m_numParticles,
             m_numObstacles,
-            m_packedCellParticleIDs.getData());
+            m_cellParticleIDs.getData());
 
         // Synchronize all streams before returning
         cudaStreamSynchronize(m_stream0);
@@ -233,13 +226,12 @@ public:
             // Relink obstacles if they moved
             if(SS.obstaclesMoved)
                 this->linkObstacles();
-            return false;
+            return true;
         }
 
         // Sort packed uint64 keys (faster than sort_by_key)
-        thrust::sort(
-            thrust::device_ptr<uint64_t>(m_packedCellParticleIDs.getData()),
-            thrust::device_ptr<uint64_t>(m_packedCellParticleIDs.getData() + m_numParticles));
+        thrust::sort(thrust::device_ptr<uint64_t>(m_cellParticleIDs.getData()),
+                     thrust::device_ptr<uint64_t>(m_cellParticleIDs.getData() + m_numParticles));
 
         // Compute cell start indices from sorted packed keys
         uint numBlocks, numThreads;
@@ -248,10 +240,9 @@ public:
                                        numBlocks,
                                        numThreads);
         uint sMemSize = sizeof(uint) * (numThreads + 1);
-        computeCellStart_Kernel<<<numBlocks, numThreads, sMemSize>>>(
-            m_packedCellParticleIDs.getData(),
-            m_numParticles,
-            m_cellStartID.getData());
+        computeCellStart_Kernel<<<numBlocks, numThreads, sMemSize>>>(m_cellParticleIDs.getData(),
+                                                                     m_numParticles,
+                                                                     m_cellPrefixSums.getData());
 
         return true;
     }

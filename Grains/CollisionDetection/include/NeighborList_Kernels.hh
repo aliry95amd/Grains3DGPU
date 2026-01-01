@@ -50,144 +50,95 @@ __HOST__ void updateNeighborList_LC_Host(const uint*                         cel
                                          uint2*                              pairList,
                                          uint*                               pairCount);
 
-/** @brief Generate obstacle-particle pairs on device (sort-based).
+/** @brief Generate obstacle-particle pairs on device.
     @param obstacleIDs array of obstacle IDs and cell counts
     @param obstacleCellIDs array of obstacle cell IDs
-    @param cellStartIDs array of start IDs for each cell
-    @param particleIDs array of particle IDs
+    @param cellParticleIDs packed uint64 array (u32 bits = cellID, l32 bits = particleID)
+    @param cellPrefixSums prefix sum array for cell particle positions
     @param maxCellsPerObstacle maximum number of cells per obstacle
     @param numObstacles number of obstacles
     @param numParticles number of particles
     @param numCells number of cells
     @param pairList array of pairs
-    @param pairCount pointer to device memory for storing the total pair count
- */
-__GLOBAL__ void generateObstacleParticlePairs_SB_Device(const uint2* obstacleIDs,
-                                                        const uint*  obstacleCellIDs,
-                                                        const uint*  cellStartIDs,
-                                                        const uint*  particleIDs,
-                                                        const uint   maxCellsPerObstacle,
-                                                        const uint   numObstacles,
-                                                        const uint   numParticles,
-                                                        const uint   numCells,
-                                                        uint2*       pairList,
-                                                        uint*        pairCount);
-
-/** @brief Generate obstacle-particle pairs on device (atomic-based).
-    @param obstacleIDs array of obstacle IDs and cell counts
-    @param obstacleCellIDs array of obstacle cell IDs
-    @param particleInCells array of particle IDs organized by cell
-    @param numParticlesPerCell array of number of particles per cell
-    @param numParticlesPrefixSums array of prefix sums for particles per cell
-    @param maxCellsPerObstacle maximum number of cells per obstacle
-    @param numObstacles number of obstacles
-    @param numParticles number of particles
-    @param numCells number of cells
-    @param pairList array of pairs
-    @param pairCount pointer to device memory for storing the total pair count
- */
-__GLOBAL__ void generateObstacleParticlePairs_AT_Device(const uint2* obstacleIDs,
-                                                        const uint*  obstacleCellIDs,
-                                                        const uint*  particleInCells,
-                                                        const uint*  numParticlesPerCell,
-                                                        const uint*  numParticlesPrefixSums,
-                                                        const uint   maxCellsPerObstacle,
-                                                        const uint   numObstacles,
-                                                        const uint   numParticles,
-                                                        const uint   numCells,
-                                                        uint2*       pairList,
-                                                        uint*        pairCount);
-
-/** @brief Count neighbors per particle using linked cells.
-    @param cellNeighborsList array of neighboring cells for each cell
-    @param particleIDs array of particle IDs
-    @param cellIDs array of cell IDs
-    @param numParticlesPerCell array of number of particles per cell
-    @param numParticles number of particles
-    @param neighborCounts output array of neighbor counts per particle */
-__GLOBAL__ void countNeighbors_Device(const uint* cellNeighborsList,
-                                      const uint* particleIDs,
-                                      const uint* cellIDs,
-                                      const uint* numParticlesPerCell,
-                                      const uint  numParticles,
-                                      uint*       neighborCounts);
-
-/** @brief Updates the neighbor list on device using a sort-based linked cell approach.
-    @param cellNeighborsList array of neighboring cells for each cell
-    @param particleIDs array of particle IDs
-    @param cellIDs array of cell IDs
-    @param cellStartIDs array of start IDs for each cell
-    @param numNeighborsPrefixSums array of prefix sums of neighbors
-    @param numObstacles number of obstacles
-    @param numParticles number of particles
-    @param numCells number of cells
-    @param pairList array of pairs */
-__GLOBAL__ void updateNeighborList_LC_SB_Device(const uint* cellNeighborsList,
-                                                const uint* particleIDs,
-                                                const uint* cellIDs,
-                                                const uint* cellStartIDs,
-                                                const uint* numNeighborsPrefixSums,
-                                                const uint  numObstacles,
-                                                const uint  numParticles,
-                                                const uint  numCells,
-                                                uint2*      pairList);
-
-/** @brief Updates the neighbor list on device using an atomic-based linked cell approach.
-    @param cellNeighborsList array of neighboring cells for each cell
-    @param particleIDs array of particle IDs
-    @param cellIDs array of cell IDs
-    @param particleInCells array of particle IDs organized by cell
-    @param numParticlesPerCell array of number of particles per cell
-    @param numParticlesPrefixSums array of prefix sums for particles per cell
-    @param numNeighborsPrefixSums array of prefix sums of neighbors
-    @param numObstacles number of obstacles
-    @param numParticles number of particles
-    @param numCells number of cells
-    @param pairList array of pairs */
-__GLOBAL__ void updateNeighborList_LC_AT_Device(const uint* cellNeighborsList,
-                                                const uint* particleIDs,
-                                                const uint* cellIDs,
-                                                const uint* particleInCells,
-                                                const uint* numParticlesPerCell,
-                                                const uint* numParticlesPrefixSums,
-                                                const uint* numNeighborsPrefixSums,
-                                                const uint  numObstacles,
-                                                const uint  numParticles,
-                                                const uint  numCells,
-                                                uint2*      pairList);
-
-/** @brief Updates the neighbor list on device using a sort-based linked cell approach with packed
-   keys.
-    @param cellNeighborsList array of neighboring cells for each cell
-    @param sortedKeys packed uint64 array (upper 32 bits = cellID, lower 32 bits = particleID)
-    @param cellStartIDs array of start IDs for each cell
-    @param numNeighborsPrefixSums array of prefix sums of neighbors
-    @param numObstacles number of obstacles
-    @param numParticles number of particles
-    @param numCells number of cells
-    @param pairList array of pairs */
-__GLOBAL__ void updateNeighborList_LC_SB_Packed_Device(const uint*     cellNeighborsList,
-                                                       const uint64_t* sortedKeys,
-                                                       const uint*     cellStartIDs,
-                                                       const uint*     numNeighborsPrefixSums,
-                                                       const uint      numObstacles,
-                                                       const uint      numParticles,
-                                                       const uint      numCells,
-                                                       uint2*          pairList);
+    @param pairCount pointer to device memory for storing the total pair count */
+__GLOBAL__ void generateObstacleParticlePairs_Device(const uint2*    obstacleIDs,
+                                                     const uint*     obstacleCellIDs,
+                                                     const uint64_t* cellParticleIDs,
+                                                     const uint*     cellPrefixSums,
+                                                     const uint      maxCellsPerObstacle,
+                                                     const uint      numObstacles,
+                                                     const uint      numParticles,
+                                                     const uint      numCells,
+                                                     uint2*          pairList,
+                                                     uint*           pairCount);
 
 /** @brief Count neighbors per particle using linked cells with packed keys.
     @param cellNeighborsList array of neighboring cells for each cell
-    @param sortedKeys packed uint64 array (upper 32 bits = cellID, lower 32 bits = particleID)
-    @param cellStartIDs array of start IDs for each cell
+    @param cellParticleIDs packed uint64 array (upper 32 bits = cellID, lower 32 bits = particleID)
+    @param cellPrefixSums array of start IDs for each cell
     @param numParticles number of particles
     @param numCells number of cells
     @param neighborCounts output array of neighbor counts per particle */
-__GLOBAL__ void countNeighbors_Packed_Device(const uint*     cellNeighborsList,
-                                             const uint64_t* sortedKeys,
-                                             const uint*     cellStartIDs,
+__GLOBAL__ void countNeighbors_Device(const uint*     cellNeighborsList,
+                                      const uint64_t* cellParticleIDs,
+                                      const uint*     cellPrefixSums,
+                                      const uint      numParticles,
+                                      const uint      numCells,
+                                      uint*           neighborCounts);
+
+/** @brief Updates the neighbor list on device keys.
+    @param cellNeighborsList array of neighboring cells for each cell
+    @param cellParticleIDs packed uint64 array (upper 32 bits = cellID, lower 32 bits = particleID)
+    @param cellPrefixSums array of start IDs for each cell
+    @param numNeighborsPrefixSums array of prefix sums of neighbors
+    @param numObstacles number of obstacles
+    @param numParticles number of particles
+    @param numCells number of cells
+    @param pairList array of pairs */
+__GLOBAL__ void updateNeighborList_LC_Device(const uint*     cellNeighborsList,
+                                             const uint64_t* cellParticleIDs,
+                                             const uint*     cellPrefixSums,
+                                             const uint*     numNeighborsPrefixSums,
+                                             const uint      numObstacles,
                                              const uint      numParticles,
                                              const uint      numCells,
-                                             uint*           neighborCounts);
+                                             uint2*          pairList);
+
+/** @brief Count neighbors per particle for AtomicFixed (direct count lookup).
+    @param cellNeighborsList array of neighboring cells for each cell
+    @param cellParticleIDs packed uint64 array (upper 32 bits = cellID, lower 32 bits = particleID)
+    @param numParticlesPerCell array of particle counts per cell
+    @param maxParticlesPerCell maximum particles per cell
+    @param numParticles number of particles
+    @param numCells number of cells
+    @param neighborCounts output array of neighbor counts per particle */
+__GLOBAL__ void countNeighbors_AtomicFixed_Device(const uint*     cellNeighborsList,
+                                                  const uint64_t* cellParticleIDs,
+                                                  const uint*     numParticlesPerCell,
+                                                  const uint      maxParticlesPerCell,
+                                                  const uint      numParticles,
+                                                  const uint      numCells,
+                                                  uint*           neighborCounts);
+
+/** @brief Updates the neighbor list for AtomicFixed (direct count lookup).
+    @param cellNeighborsList array of neighboring cells for each cell
+    @param cellParticleIDs packed uint64 array (upper 32 bits = cellID, lower 32 bits = particleID)
+    @param numParticlesPerCell array of particle counts per cell
+    @param numNeighborsPrefixSums array of prefix sums of neighbors
+    @param maxParticlesPerCell maximum particles per cell
+    @param numObstacles number of obstacles
+    @param numParticles number of particles
+    @param numCells number of cells
+    @param pairList array of pairs */
+__GLOBAL__ void updateNeighborList_LC_AtomicFixed_Device(const uint*     cellNeighborsList,
+                                                         const uint64_t* cellParticleIDs,
+                                                         const uint*     numParticlesPerCell,
+                                                         const uint*     numNeighborsPrefixSums,
+                                                         const uint      maxParticlesPerCell,
+                                                         const uint      numObstacles,
+                                                         const uint      numParticles,
+                                                         const uint      numCells,
+                                                         uint2*          pairList);
 //@}
 
 #endif

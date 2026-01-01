@@ -263,8 +263,9 @@ public:
     //@{
     // ---------------------------------------------------------------------------------------------
     /** @brief Reserves memory for the buffer.
-        @param new_capacity new capacity of the buffer */
-    void reserve(size_t new_capacity)
+        @param new_capacity new capacity of the buffer
+        @param stream CUDA stream for asynchronous operations (default: 0) */
+    void reserve(size_t new_capacity, cudaStream_t stream = 0)
     {
         GAssert(new_capacity > 0, "Capacity must be positive in reserve()");
 
@@ -284,11 +285,12 @@ public:
             }
             else if constexpr(M == MemType::DEVICE || M == MemType::MANAGED)
             {
-                // Device-to-device copy for device/managed memory
-                cudaErrCheck(cudaMemcpy(new_buf.getData(),
-                                        m_ptr,
-                                        m_size * sizeof(T),
-                                        cudaMemcpyDeviceToDevice));
+                // Device-to-device copy for device/managed memory using stream
+                cudaErrCheck(cudaMemcpyAsync(new_buf.getData(),
+                                             m_ptr,
+                                             m_size * sizeof(T),
+                                             cudaMemcpyDeviceToDevice,
+                                             stream));
             }
         }
 
@@ -300,10 +302,10 @@ public:
     }
 
     // ---------------------------------------------------------------------------------------------
-    /** @brief Initialize/reinitialize buffer with specific size and capacity
+    /** @brief Initialize/reinitialize buffer with specific size and capacity.
+        This is useful for buffer initialization or complete reallocation with new size/capacity.
         @param new_size desired logical size
-        @param new_capacity desired capacity (if 0, uses new_size)
-    This is useful for buffer initialization or complete reallocation */
+        @param new_capacity desired capacity (if 0, uses new_size) */
     void initialize(size_t new_size, size_t new_capacity = 0)
     {
         if(new_capacity == 0)
@@ -416,8 +418,9 @@ public:
     }
 
     // ---------------------------------------------------------------------------------------------
-    /** @brief Shrinks the buffer to fit the current size */
-    void shrink_to_fit()
+    /** @brief Shrinks the buffer to fit the current size
+        @param stream CUDA stream for asynchronous operations (default: 0) */
+    void shrink_to_fit(cudaStream_t stream = 0)
     {
         if(m_size == m_capacity)
             return;
@@ -430,7 +433,8 @@ public:
         else if constexpr(M == MemType::DEVICE || M == MemType::MANAGED)
         {
             cudaMemcpyKind kind = cudaMemcpyDeviceToDevice;
-            cudaErrCheck(cudaMemcpy(new_buf.getData(), m_ptr, m_size * sizeof(T), kind));
+            cudaErrCheck(
+                cudaMemcpyAsync(new_buf.getData(), m_ptr, m_size * sizeof(T), kind, stream));
         }
         else
         {
@@ -442,8 +446,7 @@ public:
     }
 
     // ---------------------------------------------------------------------------------------------
-    /** @brief Returns the kind of memory transfer for the given source and destination memory
-        types. */
+    /** @brief Returns the kind of memory transfer for the given src and dst memory types. */
     template <MemType Src, MemType Dst>
     constexpr cudaMemcpyKind getMemcpyKind()
     {
@@ -481,9 +484,10 @@ public:
 
     // ---------------------------------------------------------------------------------------------
     /** @brief Copy to another buffer (host/device aware).
-        @param dest destination buffer */
+        @param dest destination buffer
+        @param stream CUDA stream for asynchronous operations (default: 0) */
     template <MemType destM>
-    void copyTo(GrainsMemBuffer<T, destM>& dest)
+    void copyTo(GrainsMemBuffer<T, destM>& dest, cudaStream_t stream = 0)
     {
         if(m_size == 0 || !m_ptr)
             return;
@@ -497,15 +501,16 @@ public:
             cudaMemcpyKind kind    = getMemcpyKind<M, destM>();
             const T*       src_ptr = m_ptr;
             T*             dst_ptr = dest.getData();
-            cudaErrCheck(cudaMemcpy(dst_ptr, src_ptr, getBytes(), kind));
+            cudaErrCheck(cudaMemcpyAsync(dst_ptr, src_ptr, getBytes(), kind, stream));
         }
     }
 
     // ---------------------------------------------------------------------------------------------
     /** @brief Copy from another buffer (host/device aware).
-        @param src source buffer */
+        @param src source buffer
+        @param stream CUDA stream for asynchronous operations (default: 0) */
     template <MemType srcM>
-    void copyFrom(const GrainsMemBuffer<T, srcM>& src)
+    void copyFrom(const GrainsMemBuffer<T, srcM>& src, cudaStream_t stream = 0)
     {
         if constexpr(M == srcM)
         {
@@ -527,7 +532,7 @@ public:
             cudaMemcpyKind kind    = getMemcpyKind<srcM, M>();
             const T*       src_ptr = src.getData();
             T*             dst_ptr = m_ptr;
-            cudaErrCheck(cudaMemcpy(dst_ptr, src_ptr, src.getBytes(), kind));
+            cudaErrCheck(cudaMemcpyAsync(dst_ptr, src_ptr, src.getBytes(), kind, stream));
         }
     }
 
@@ -577,8 +582,9 @@ public:
     }
 
     // ---------------------------------------------------------------------------------------------
-    /** @brief Fills the buffer with default values */
-    void fill()
+    /** @brief Fills the buffer with default values
+        @param stream CUDA stream for asynchronous operations (default: 0) */
+    void fill(cudaStream_t stream = 0)
     {
         if constexpr(M == MemType::HOST || M == MemType::PINNED)
         {
@@ -589,16 +595,16 @@ public:
         }
         else if constexpr(M == MemType::DEVICE || M == MemType::MANAGED)
         {
-            fill_Kernel<<<(m_size + 255) / 256, 256>>>(m_ptr, m_size);
-            cudaDeviceSynchronize();
+            // Use optimized cudaMemsetAsync for zero initialization
+            cudaMemsetAsync(m_ptr, 0, m_size * sizeof(T), stream);
         }
     }
 
     // ---------------------------------------------------------------------------------------------
     /** @brief Fills the buffer with a user-provided value.
-        @param count number of elements
-        @param value value to initialize with */
-    void fill(const T& value)
+        @param value value to initialize with
+        @param stream CUDA stream for asynchronous operations (default: 0) */
+    void fill(const T& value, cudaStream_t stream = 0)
     {
         if constexpr(M == MemType::HOST || M == MemType::PINNED)
         {
@@ -609,15 +615,35 @@ public:
         {
             static_assert(std::is_fundamental<T>::value,
                           "T must be a primitive type for device init");
-            fill_Kernel<<<(m_size + 255) / 256, 256>>>(m_ptr, m_size, value);
-            cudaDeviceSynchronize();
+
+            // Use cudaMemset for common patterns: 0 and UINT_MAX
+            if(value == T(0))
+            {
+                cudaMemsetAsync(m_ptr, 0, m_size * sizeof(T), stream);
+            }
+            else if constexpr(std::is_unsigned<T>::value)
+            {
+                if(value == static_cast<T>(~T(0)))  // UINT_MAX for this type
+                {
+                    cudaMemsetAsync(m_ptr, 0xFF, m_size * sizeof(T), stream);
+                }
+                else
+                {
+                    fill_Kernel<<<(m_size + 255) / 256, 256, 0, stream>>>(m_ptr, m_size, value);
+                }
+            }
+            else
+            {
+                fill_Kernel<<<(m_size + 255) / 256, 256, 0, stream>>>(m_ptr, m_size, value);
+            }
         }
     }
 
     // ---------------------------------------------------------------------------------------------
     /** @brief Fills the buffer incrementally with values starting from a given value.
-        @param start the starting value (default is 0) */
-    void sequence(const T& start = T(0))
+        @param start the starting value (default is 0)
+        @param stream CUDA stream for asynchronous operations (default: 0) */
+    void sequence(const T& start = T(0), cudaStream_t stream = 0)
     {
         if constexpr(M == MemType::HOST || M == MemType::PINNED)
         {
@@ -628,14 +654,15 @@ public:
         {
             static_assert(std::is_fundamental<T>::value,
                           "T must be a primitive type for device init");
-            sequence_Kernel<<<(m_size + 255) / 256, 256>>>(m_ptr, m_size, start);
-            cudaDeviceSynchronize();
+            sequence_Kernel<<<(m_size + 255) / 256, 256, 0, stream>>>(m_ptr, m_size, start);
         }
     }
 
     // ---------------------------------------------------------------------------------------------
-    /** @brief Prints the buffer contents (host/pinned/device/managed) */
-    void print(const std::string& label = "") const
+    /** @brief Prints the buffer contents (host/pinned/device/managed)
+        @param label optional label to print before the buffer contents
+        @param stream CUDA stream for asynchronous operations (default: 0) */
+    void print(const std::string& label = "", cudaStream_t stream = 0) const
     {
         if constexpr(M == MemType::HOST || M == MemType::PINNED)
         {
@@ -649,7 +676,9 @@ public:
         {
             // Copy to host and print
             std::vector<T> hostBuf(m_size);
-            cudaErrCheck(cudaMemcpy(hostBuf.data(), m_ptr, getBytes(), cudaMemcpyDeviceToHost));
+            cudaErrCheck(
+                cudaMemcpyAsync(hostBuf.data(), m_ptr, getBytes(), cudaMemcpyDeviceToHost, stream));
+            cudaStreamSynchronize(stream);  // Must synchronize before printing
             if(!label.empty())
                 std::cout << label << ": " << "\n";
             for(size_t i = 0; i < m_size; ++i)

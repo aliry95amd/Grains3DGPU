@@ -1,9 +1,9 @@
 #ifndef _RAWDATAPOSTPROCESSINGWRITER_HH_
 #define _RAWDATAPOSTPROCESSINGWRITER_HH_
 
-#include "PostProcessingWriter.hh"
 #include <fstream>
-#include <iostream>
+
+#include "PostProcessingWriter.hh"
 
 // =================================================================================================
 /** @brief The class RawPostProcessingWriter.

@@ -31,13 +31,13 @@
         {
             "group": "GPU-BruteForce",
             "sim_type": "GPU",
-            "precision": "Float",
+            "precision": "Single",
             "neighbor_list_type": "BruteForce"
         },
         {
             "group": "GPU-LinkedCell",
             "sim_type": "GPU",
-            "precision": "Float",
+            "precision": "Double",
             "neighbor_list_type": "LinkedCell",
             "linked_cell_type": ["Device_SortBased", "Device_Atomic"],
             "update_frequency": [0, 5],

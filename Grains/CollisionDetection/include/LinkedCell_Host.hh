@@ -32,6 +32,7 @@ class LinkedCell_Host : public LinkedCell<T, MemType::HOST>
     using LC::m_numCells;
     using LC::m_numObstacles;
     using LC::m_numParticles;
+    using LC::m_positions;
     using LC::m_useAdaptiveSkin;
 
 private:
@@ -127,14 +128,6 @@ public:
     /** @name Methods */
     //@{
     // ---------------------------------------------------------------------------------------------
-    /** @brief Sets the particle ID (already initialized in constructor) */
-    void setParticleID() override {}
-
-    // ---------------------------------------------------------------------------------------------
-    /** @brief Sets the cell ID (already initialized in constructor) */
-    void setCellID() override {}
-
-    // ---------------------------------------------------------------------------------------------
     /** @brief Populates initial cell assignments for all components */
     void populateInitialCells()
     {
@@ -204,12 +197,15 @@ public:
         m_oldCellID.copyFrom(m_cellID);
 
         // Re-link obstacles if they moved
+        bool hasChanges = false;
         if(SS.obstaclesMoved)
+        {
             this->linkObstacles();
+            hasChanges = true;
+        }
 
         // Update particle cell IDs and move particles that changed cells
-        bool              hasChanges = false;
-        const Vector3<T>* p          = m_positions->getData() + m_numObstacles;
+        const Vector3<T>* p = m_positions->getData() + m_numObstacles;
         for(uint i = 0; i < m_numParticles; ++i)
         {
             uint particleID = m_particleID[i];

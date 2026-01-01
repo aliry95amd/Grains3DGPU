@@ -2,7 +2,6 @@
 #define _POSTPROCESSINGWRITER_HH_
 
 #include <filesystem>
-#include <iostream>
 #include <regex>
 
 #include "Basic.hh"

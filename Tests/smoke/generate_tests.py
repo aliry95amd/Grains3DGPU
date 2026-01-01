@@ -180,7 +180,7 @@ def generate_tests(config: Dict[str, Any]) -> None:
     test_list = OUTPUT_DIR / "test_list.txt"
     test_list.write_text("\n".join(
         f.stem for f in sorted(OUTPUT_DIR.glob("*.xml"))
-    ))
+    ) + "\n")
     print(f"Test list written to: {test_list}")
 
 

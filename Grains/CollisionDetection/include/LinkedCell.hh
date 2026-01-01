@@ -1,18 +1,20 @@
 #ifndef _LINKEDCELL_HH_
 #define _LINKEDCELL_HH_
 
-#include "thrust/device_ptr.h"
-#include "thrust/execution_policy.h"
-#include "thrust/extrema.h"
-#include "thrust/find.h"
-#include "thrust/functional.h"
-#include "thrust/iterator/counting_iterator.h"
-#include "thrust/iterator/transform_iterator.h"
-#include "thrust/iterator/zip_iterator.h"
-#include "thrust/remove.h"
-#include "thrust/transform_reduce.h"
-#include "thrust/tuple.h"
+// Thrust library includes
+#include <thrust/device_ptr.h>
+#include <thrust/execution_policy.h>
+#include <thrust/extrema.h>
+#include <thrust/find.h>
+#include <thrust/functional.h>
+#include <thrust/iterator/counting_iterator.h>
+#include <thrust/iterator/transform_iterator.h>
+#include <thrust/iterator/zip_iterator.h>
+#include <thrust/remove.h>
+#include <thrust/transform_reduce.h>
+#include <thrust/tuple.h>
 
+// Project includes
 #include "Cells.hh"
 #include "CellsFactory.hh"
 #include "GrainsMemBuffer.hh"
@@ -162,8 +164,6 @@ public:
 
         // Setup obstacle
         linkObstacles();
-        setParticleID();
-        setCellID();
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -206,6 +206,62 @@ public:
     }
 
     // ---------------------------------------------------------------------------------------------
+    /** @brief Gets obstacle IDs */
+    const uint2* getObstacleIDs() const
+    {
+        return m_obstacleID.getData();
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    /** @brief Gets obstacle cell IDs */
+    const uint* getObstacleCellIDs() const
+    {
+        return m_obstacleCellID.getData();
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    /** @brief Gets cell size without skin thickness. */
+    T getCellSizeWithoutSkin() const
+    {
+        return m_cellSizeWithoutSkin;
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    /** @brief Gets skin thickness. */
+    T getSkinThickness() const
+    {
+        return m_skinThickness;
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    /** @brief Gets maximum displacement. */
+    T getMaxDisplacement() const
+    {
+        return sqrt(m_maxDisplacementSquared);
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    /** @brief Gets number of iterations since last update. */
+    uint getNumIterationsSinceLastUpdate() const
+    {
+        return m_numIterationsSinceLastUpdate;
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    /** @brief Gets maximum number of cells an obstacle can occupy. */
+    uint getMaxCellsPerObstacle() const
+    {
+        return m_maxCellsPerObstacle;
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    /** @brief Gets number of cells. */
+    uint getNumCells() const
+    {
+        return m_numCells;
+    }
+
+    // ---------------------------------------------------------------------------------------------
     /** @brief Gets particle IDs (implementation-specific) */
     virtual const uint* getParticleIDs() const
     {
@@ -230,110 +286,30 @@ public:
     }
 
     // ---------------------------------------------------------------------------------------------
-    /** @brief Gets sorted keys (packed uint64 cellID+particleID, implementation-specific) */
-    virtual const uint64_t* getPackedCellParticleIDs() const
+    /** @brief Gets packed cell-particle IDs (implementation-specific) */
+    virtual const uint64_t* getCellParticleIDs() const
     {
-        GAbort("LinkedCell::getPackedCellParticleIDs is not supported in this variant");
+        GAbort("LinkedCell::getCellParticleIDs is not supported in this variant");
         return nullptr;
     }
 
     // ---------------------------------------------------------------------------------------------
-    /** @brief Gets obstacle IDs */
-    const uint2* getObstacleIDs() const
+    /** @brief Gets cell prefix sums (start indices for each cell in particle arrays) */
+    virtual const uint* getCellPrefixSums() const
     {
-        return m_obstacleID.getData();
-    }
-
-    // ---------------------------------------------------------------------------------------------
-    /** @brief Gets obstacle cell IDs */
-    const uint* getObstacleCellIDs() const
-    {
-        return m_obstacleCellID.getData();
-    }
-
-    // ---------------------------------------------------------------------------------------------
-    /** @brief Gets cell start IDs (implementation-specific) */
-    virtual const uint* getCellStartIDs() const
-    {
-        GAbort("LinkedCell::getCellStartIDs is not supported in this variant");
+        GAbort("LinkedCell::getCellPrefixSums is not supported in this variant");
         return nullptr;
-    }
-
-    // ---------------------------------------------------------------------------------------------
-    /** @brief Gets particle IDs array (implementation-specific) */
-    virtual const uint* getParticleIDArray() const
-    {
-        GAbort("LinkedCell::getParticleIDArray is not supported in this variant");
-        return nullptr;
-    }
-
-    // ---------------------------------------------------------------------------------------------
-    /** @brief Gets number of particles prefix sums (implementation-specific) */
-    virtual const uint* getNumParticlesPrefixSums() const
-    {
-        GAbort("LinkedCell::getNumParticlesPrefixSums is not supported in this variant");
-        return nullptr;
-    }
-
-    // ---------------------------------------------------------------------------------------------
-    /** @brief Gets cell size without skin thickness */
-    T getCellSizeWithoutSkin() const
-    {
-        return m_cellSizeWithoutSkin;
-    }
-
-    // ---------------------------------------------------------------------------------------------
-    /** @brief Gets skin thickness */
-    T getSkinThickness() const
-    {
-        return m_skinThickness;
-    }
-
-    // ---------------------------------------------------------------------------------------------
-    /** @brief Gets maximum displacement */
-    T getMaxDisplacement() const
-    {
-        return sqrt(m_maxDisplacementSquared);
-    }
-
-    // ---------------------------------------------------------------------------------------------
-    /** @brief Gets number of iterations since last update */
-    uint getNumIterationsSinceLastUpdate() const
-    {
-        return m_numIterationsSinceLastUpdate;
-    }
-
-    // ---------------------------------------------------------------------------------------------
-    /** @brief Gets maximum number of cells an obstacle can occupy */
-    uint getMaxCellsPerObstacle() const
-    {
-        return m_maxCellsPerObstacle;
-    }
-
-    // ---------------------------------------------------------------------------------------------
-    /** @brief Gets number of cells */
-    uint getNumCells() const
-    {
-        return m_numCells;
     }
     //@}
 
     /** @name Set methods */
     //@{
-    // ---------------------------------------------------------------------------------------------
-    /** @brief Sets the particle ID (implementation-specific) */
-    virtual void setParticleID() {}
-
-    // ---------------------------------------------------------------------------------------------
-    /** @brief Sets the cell ID (implementation-specific) */
-    virtual void setCellID() {}
     //@}
 
     /** @name Methods */
     //@{
     // ---------------------------------------------------------------------------------------------
-    /** @brief Checks if linked cell update is needed based on adaptive skin and displacement
-        @return true if full update is needed, false otherwise */
+    /** @brief Checks if linked cell update is needed based on adaptive skin and displacement. */
     bool needsUpdate()
     {
         auto& SS = GrainsParameters<T>::m_simulationState;
@@ -353,7 +329,7 @@ public:
     }
 
     // ---------------------------------------------------------------------------------------------
-    /** @brief Generates neighbor cells */
+    /** @brief Generates neighbor cells. */
     void generateNeighborCells()
     {
         if constexpr(M == MemType::HOST)
@@ -376,7 +352,7 @@ public:
     }
 
     // ---------------------------------------------------------------------------------------------
-    /** @brief Links obstacles to cells */
+    /** @brief Links obstacles to cells. */
     void linkObstacles()
     {
         // If there is no obstacle
@@ -462,7 +438,7 @@ public:
     }
 
     // ---------------------------------------------------------------------------------------------
-    /** @brief Computes the maximum displacement */
+    /** @brief Computes the maximum displacement. */
     T computeMaxDisplacement() const
     {
         T maxDisplacementSquared = 0;
@@ -501,7 +477,7 @@ public:
     }
 
     // ---------------------------------------------------------------------------------------------
-    /** @brief Computes the skin thickness based on the maximum displacement */
+    /** @brief Computes the skin thickness based on the maximum displacement. */
     T computeSkinThickness() const
     {
         // Smoothing factor
@@ -516,100 +492,6 @@ public:
             skinThickness = maxSkinThickness * m_cellSizeWithoutSkin;
 
         return skinThickness;
-    }
-
-    // ---------------------------------------------------------------------------------------------
-    /** @brief Resets particle count per cell (implementation-specific) */
-    virtual void resetParticleCount() {}
-
-    // ---------------------------------------------------------------------------------------------
-    /** @brief Updates the cells particles belong to (virtual for specialization) */
-    virtual void updateCellIDs() = 0;
-
-    // ---------------------------------------------------------------------------------------------
-    /** @brief Determines if an update is required and updates cells if so (virtual for
-     * specialization) */
-    virtual bool updateCell()
-    {
-        auto& SS = GrainsParameters<T>::m_simulationState;
-
-        if(m_useAdaptiveSkin)
-        {
-            // Increment the number of iterations since last update
-            ++m_numIterationsSinceLastUpdate;
-
-            // Compute the maximum displacement
-            m_maxDisplacementSquared = computeMaxDisplacement();
-
-            // Condition to check if an update is needed:
-            // d_max > skinThickness / 2
-            // But we are using d_max^2, so we need to square the skin thickness
-            bool needUpdate = (T(4) * m_maxDisplacementSquared > m_skinThickness * m_skinThickness);
-
-            // If no update is needed, check if obstacles relinking is required.
-            if(!SS.particlesSorted && !needUpdate)
-            {
-                if(SS.obstaclesMoved)
-                {
-                    linkObstacles();
-                    return true;
-                }
-                else
-                    return false;
-            }
-
-            // If we reach here, an update is needed -- Adjust skin thickness
-            m_skinThickness = computeSkinThickness();
-            T cellSize      = m_cellSizeWithoutSkin + m_skinThickness;
-
-            // Update old positions
-            m_oldPosition.copyFrom(*m_positions);
-
-            // Resize the cells
-            if constexpr(M == MemType::HOST)
-            {
-                m_cells[0]->resize(cellSize);
-                m_numCells = m_cells[0]->getNumCells();
-            }
-            else if constexpr(M == MemType::DEVICE)
-            {
-                uint* d_numCells;
-                cudaMalloc(&d_numCells, sizeof(uint));
-                resizeCells_Device<<<1, 1>>>(m_cells.getData(), cellSize, d_numCells);
-                cudaMemcpy(&m_numCells, d_numCells, sizeof(uint), cudaMemcpyDeviceToHost);
-                cudaFree(d_numCells);
-            }
-
-            // Since Cell size may have changed, we need to recompute the neighbor cells
-            // Note: reserve does not change the size if the capacity is enough
-            m_neighborCells.reserve(m_numCells * 27);  // 26 neighbors + self
-            m_neighborCells.fill(UINT_MAX);
-            generateNeighborCells();
-
-            // Reset number of particles per cell (if needed by derived class)
-            resetParticleCount();
-
-            // Update obstacles, particleIDs, and cellIDs
-            linkObstacles();
-            setParticleID();
-            setCellID();
-
-            // Reset parameters
-            m_maxDisplacementSquared       = T(0);
-            m_numIterationsSinceLastUpdate = 0;
-        }
-        else
-        {
-            if(SS.obstaclesMoved)
-                linkObstacles();
-            setParticleID();
-            setCellID();
-        }
-
-        // Finally, update the cell IDs of the particles
-        updateCellIDs();
-
-        return true;
     }
 
     // ---------------------------------------------------------------------------------------------

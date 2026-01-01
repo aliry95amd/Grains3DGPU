@@ -296,7 +296,7 @@ __HOST__ void Insertion<T>::insert(const GrainsMemBuffer<RigidBody<T>*>* rigidBo
         const uint maxAttempts = 1000;
 
         // Build a temporary linked-cell structure for strict insertion checks
-        const auto&        LCParameters = GP::m_collisionDetection.linkedCellParameters;
+        const auto         LCParameters = GP::m_collisionDetection.linkedCellParameters;
         LinkedCell_Host<T> LC(rigidBody,
                               position,
                               orientation,

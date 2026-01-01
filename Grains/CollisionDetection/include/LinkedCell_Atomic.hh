@@ -35,14 +35,16 @@ class LinkedCell_Atomic : public LinkedCell<T, MemType::DEVICE>
 protected:
     /** @name Parameters */
     //@{
-    /** \brief Packed uint64 buffer: upper 32 bits = cellID, lower 32 bits = particleID */
-    GrainsMemBuffer<uint64_t, MemType::DEVICE> m_packedCellParticleIDs;
+    /** \brief Temporary buffer for atomic packing: upper 32 bits = cellID, lower 32 bits =
+     * particleID */
+    GrainsMemBuffer<uint64_t, MemType::DEVICE> m_atomicPackBuffer;
     /** \brief Buffer of number of particles per cell */
     GrainsMemBuffer<uint, MemType::DEVICE> m_numParticlesPerCell;
-    /** \brief Buffer to store particle IDs for each cell */
-    GrainsMemBuffer<uint, MemType::DEVICE> m_particleInCells;
+    /** \brief Final cell-organized packed buffer: upper 32 bits = cellID, lower 32 bits =
+     * particleID */
+    GrainsMemBuffer<uint64_t, MemType::DEVICE> m_cellParticleIDs;
     /** \brief Buffer to store the prefix sums of the number of particles per cell */
-    GrainsMemBuffer<uint, MemType::DEVICE> m_numParticlesPrefixSums;
+    GrainsMemBuffer<uint, MemType::DEVICE> m_cellPrefixSums;
     /** \brief Buffer for atomic counters during particle writing */
     GrainsMemBuffer<uint, MemType::DEVICE> m_cellCounters;
     /** \brief CUDA streams for concurrent kernel execution */
@@ -75,13 +77,13 @@ public:
                       const uint                                             nParticles)
         : LinkedCell<T, MemType::DEVICE>(
               rb, positions, quaternions, linkedCellParameters, nObstacles, nParticles)
-        , m_packedCellParticleIDs(nParticles)
+        , m_atomicPackBuffer(nParticles)
         , m_numParticlesPerCell(m_numCells)
-        , m_particleInCells(nParticles)
-        , m_numParticlesPrefixSums(m_numCells)
+        , m_cellParticleIDs(nParticles)
+        , m_cellPrefixSums(m_numCells)
         , m_cellCounters(m_numCells)
     {
-        m_numParticlesPerCell.fill(0);
+        m_numParticlesPerCell.fill();
         cudaEventCreate(&m_resizeComplete);
         cudaStreamCreate(&m_stream0);
         cudaStreamCreate(&m_stream1);
@@ -109,17 +111,18 @@ public:
     }
 
     // ---------------------------------------------------------------------------------------------
-    /** @brief Gets particle IDs array */
-    const uint* getParticleIDArray() const override
+    /** @brief Gets packed cell-particle IDs array (upper 32 bits = cellID, lower 32 bits =
+     * particleID) */
+    const uint64_t* getCellParticleIDs() const
     {
-        return m_particleInCells.getData();
+        return m_cellParticleIDs.getData();
     }
 
     // ---------------------------------------------------------------------------------------------
-    /** @brief Gets number of particles prefix sums */
-    const uint* getNumParticlesPrefixSums() const override
+    /** @brief Gets cell prefix sums (start indices for each cell) */
+    const uint* getCellPrefixSums() const override
     {
-        return m_numParticlesPrefixSums.getData();
+        return m_cellPrefixSums.getData();
     }
     //@}
 
@@ -145,7 +148,7 @@ public:
         └─────────────────────────────────────────────────────────────────────────┘
 
         ┌─────────────────────────────────────────────────────────────────────────┐
-        │ Stream 2: memset(particleCounts) → packCellParticleIDs_Atomic           │
+        │ Stream 2: memset(particleCounts) → computeCellParticleIDs               │
         └─────────────────────────────────────────────────────────────────────────┘
 
         Dependencies:
@@ -179,11 +182,11 @@ public:
             cudaFree(d_numCells);
             cudaEventRecord(m_resizeComplete, 0);
 
-            // Resize buffers
-            m_neighborCells.reserve(m_numCells * 27);
-            m_numParticlesPerCell.reserve(m_numCells);
-            m_numParticlesPrefixSums.reserve(m_numCells);
-            m_cellCounters.reserve(m_numCells);
+            // Resize buffers with appropriate streams
+            m_neighborCells.reserve(m_numCells * 27, m_stream1);
+            m_numParticlesPerCell.reserve(m_numCells, m_stream2);
+            m_cellPrefixSums.reserve(m_numCells, m_stream2);
+            m_cellCounters.reserve(m_numCells, m_stream2);
 
             // Copy old positions on stream0 (independent)
             cudaMemcpyAsync(m_oldPosition.getData() + m_numObstacles,
@@ -204,26 +207,21 @@ public:
                                        GrainsParameters<T>::m_GPU,
                                        numBlocksCells,
                                        numThreadsCells);
-        cudaMemsetAsync(m_neighborCells.getData(),
-                        0xFF,
-                        m_neighborCells.getSize() * sizeof(uint),
-                        m_stream1);
+        m_neighborCells.fill(UINT_MAX, m_stream1);
         generateNeighborCells_Device<<<numBlocksCells, numThreadsCells, 0, m_stream1>>>(
             m_cells.getData(),
             m_numCells,
             m_neighborCells.getData());
 
-        // Stream 2: Reset particle counts + pack IDs (sequential within stream)
-        cudaMemsetAsync(m_numParticlesPerCell.getData(),
-                        0,
-                        m_numParticlesPerCell.getSize() * sizeof(uint),
-                        m_stream2);
-        packCellParticleIDs_Atomic_Device<<<numBlocks, numThreads, 0, m_stream2>>>(
+        // Stream 2: Reset particle counts + cell counters, then pack IDs (sequential within stream)
+        m_numParticlesPerCell.fill(0u, m_stream2);
+        m_cellCounters.fill(0u, m_stream2);
+        computeCellParticleIDs_Device<<<numBlocks, numThreads, 0, m_stream2>>>(
             m_cells.getData(),
             m_positions->getData() + m_numObstacles,
             m_numParticles,
             m_numObstacles,
-            m_packedCellParticleIDs.getData(),
+            m_atomicPackBuffer.getData(),
             m_numParticlesPerCell.getData());
 
         // Synchronize all streams before returning
@@ -250,12 +248,12 @@ public:
             // Only relink obstacles if they moved
             if(SS.obstaclesMoved)
                 this->linkObstacles();
-            return false;
+            return true;
         }
 
         // Prefix sum to find the start index of each cell in the particleIDArray
         thrust::device_ptr<uint> numParticles_ptr(m_numParticlesPerCell.getData());
-        thrust::device_ptr<uint> prefixSums_ptr(m_numParticlesPrefixSums.getData());
+        thrust::device_ptr<uint> prefixSums_ptr(m_cellPrefixSums.getData());
         thrust::exclusive_scan(numParticles_ptr, numParticles_ptr + m_numCells, prefixSums_ptr);
 
         // Write the particle IDs into the particleInCells using packed uint64 data
@@ -264,12 +262,14 @@ public:
                                        GrainsParameters<T>::m_GPU,
                                        numBlocks,
                                        numThreads);
-        writeParticleIDs_Kernel<<<numBlocks, numThreads>>>(m_packedCellParticleIDs.getData(),
-                                                           m_numParticlesPrefixSums.getData(),
-                                                           m_numParticles,
-                                                           m_particleInCells.getData(),
-                                                           m_cellCounters.getData());
-
+        writeCellParticleIDs_Kernel<<<numBlocks, numThreads>>>(m_atomicPackBuffer.getData(),
+                                                               m_cellPrefixSums.getData(),
+                                                               m_numParticles,
+                                                               m_cellParticleIDs.getData(),
+                                                               m_cellCounters.getData());
+        m_atomicPackBuffer.print("atomicPackBuffer");
+        m_cellParticleIDs.print("cellParticleIDs");
+        m_cellPrefixSums.print("cellPrefixSums");
         return true;
     }
     //@}

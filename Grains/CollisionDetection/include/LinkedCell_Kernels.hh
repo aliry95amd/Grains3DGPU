@@ -53,154 +53,19 @@ __GLOBAL__ void generateNeighborCells_Device(const Cells<T>* const* cells,
 }
 
 // -------------------------------------------------------------------------------------------------
-/** @brief Computes the cell hash for a given point
-    @param cells pointer to the Cells object
-    @param positions buffer of positions
-    @param numParticles number of particles
-    @param cellIDs particle hash
-    @param numParticlesPerCell number of particles per cell */
-template <typename T>
-__GLOBAL__ void computeHash_Device(const Cells<T>* const* cells,
-                                   const Vector3<T>*      positions,
-                                   uint                   numParticles,
-                                   uint*                  cellIDs,
-                                   uint*                  numParticlesPerCell)
-{
-    // TODO: Load cells to shared memory if needed
-    uint tID = blockIdx.x * blockDim.x + threadIdx.x;
-    if(tID >= numParticles)
-        return;
-
-    uint c       = cells[0]->computeCellHash(positions[tID]);
-    cellIDs[tID] = c;
-    atomicAdd(&numParticlesPerCell[c], 1);
-}
-
-// -------------------------------------------------------------------------------------------------
-/** @brief Packs cellID and particleID into uint64 for SortBased (no particle counting)
-    @param cells pointer to the Cells object
-    @param positions buffer of positions
-    @param numObstacles offset for particle IDs
-    @param numParticles number of particles
-    @param packedCellParticleIDs output buffer of uint64 packed IDs */
-template <typename T>
-__GLOBAL__ void packCellParticleIDs_Device(const Cells<T>* const* cells,
-                                           const Vector3<T>*      positions,
-                                           const uint             numObstacles,
-                                           const uint             numParticles,
-                                           uint64_t*              packedCellParticleIDs)
+/** @brief Initialize synthetic cell prefix sums for AtomicFixed layout
+    @param numCells number of cells
+    @param maxParticlesPerCell maximum particles per cell
+    @param cellPrefixSums output array of prefix sums (cellID * maxParticlesPerCell) */
+static __GLOBAL__ void initFixedCellPrefixSums_Device(const uint numCells,
+                                                      const uint maxParticlesPerCell,
+                                                      uint*      cellPrefixSums)
 {
     uint tID = blockIdx.x * blockDim.x + threadIdx.x;
-    if(tID >= numParticles)
+    if(tID >= numCells)
         return;
 
-    uint cellID     = cells[0]->computeCellHash(positions[tID]);
-    uint particleID = tID + numObstacles;
-
-    // Pack: upper 32 bits = cellID, lower 32 bits = particleID
-    packedCellParticleIDs[tID] = (static_cast<uint64_t>(cellID) << 32) | particleID;
-}
-
-// -------------------------------------------------------------------------------------------------
-/** @brief Packs cellID and particleID into uint64 for Atomic AND counts particles per cell
-    @param cells pointer to the Cells object
-    @param positions buffer of positions
-    @param numParticles number of particles
-    @param particleOffset offset for particle IDs (usually numObstacles)
-    @param packedData output buffer of uint64 packed data (upper 32=cellID, lower 32=particleID)
-    @param numParticlesPerCell atomic counter for particles per cell */
-template <typename T>
-__GLOBAL__ void packCellParticleIDs_Atomic_Device(const Cells<T>* const* cells,
-                                                  const Vector3<T>*      positions,
-                                                  uint                   numParticles,
-                                                  uint                   particleOffset,
-                                                  uint64_t*              packedData,
-                                                  uint*                  numParticlesPerCell)
-{
-    uint tID = blockIdx.x * blockDim.x + threadIdx.x;
-    if(tID >= numParticles)
-        return;
-
-    uint cellID     = cells[0]->computeCellHash(positions[tID]);
-    uint particleID = tID + particleOffset;
-
-    // Pack data
-    packedData[tID] = (static_cast<uint64_t>(cellID) << 32) | particleID;
-
-    // Atomic count
-    atomicAdd(&numParticlesPerCell[cellID], 1);
-}
-
-// -------------------------------------------------------------------------------------------------
-/** @brief Writes particle IDs using packed uint64 data (for Atomic approach)
-    @param packedData buffer of uint64 packed data (upper 32=cellID, lower 32=particleID)
-    @param prefixSums prefix sums for each cell (starting positions)
-    @param numParticles total number of particles
-    @param particleInCells output array where particles are written by cell
-    @param cellCounters temporary counter array for atomic operations */
-__GLOBAL__ void writeParticleIDs_Kernel(const uint64_t* packedData,
-                                        const uint*     prefixSums,
-                                        const uint      numParticles,
-                                        uint*           particleInCells,
-                                        uint*           cellCounters)
-{
-    uint tID = blockIdx.x * blockDim.x + threadIdx.x;
-
-    if(tID >= numParticles)
-        return;
-
-    // Single read gets both cellID and particleID
-    uint64_t packed     = packedData[tID];
-    uint     cellID     = static_cast<uint>(packed >> 32);
-    uint     particleID = static_cast<uint>(packed & 0xFFFFFFFF);
-
-    // Skip invalid cells
-    if(cellID == UINT_MAX)
-        return;
-
-    // Get the starting position for this cell from prefix sums
-    uint cellStart = prefixSums[cellID];
-
-    // Use atomic to get unique position within the cell
-    uint localOffset = atomicAdd(&cellCounters[cellID], 1);
-
-    // Write particle ID to the computed position
-    uint finalPosition             = cellStart + localOffset;
-    particleInCells[finalPosition] = particleID;
-}
-
-// -------------------------------------------------------------------------------------------------
-/** @brief Direct atomic insertion for LinkedCell_AtomicFixed (no prefix sums needed)
-    @param cells pointer to the Cells object
-    @param positions buffer of positions
-    @param numParticles number of particles
-    @param particleOffset offset for particle IDs (usually numObstacles)
-    @param cellParticles 2D array [numCells][maxPerCell] for direct particle storage
-    @param numParticlesPerCell atomic counter for particles per cell
-    @param maxPerCell maximum particles allowed per cell */
-template <typename T>
-__GLOBAL__ void directInsert_Device(const Cells<T>* const* cells,
-                                    const Vector3<T>*      positions,
-                                    uint                   numParticles,
-                                    uint                   particleOffset,
-                                    uint*                  cellParticles,
-                                    uint*                  numParticlesPerCell,
-                                    uint                   maxPerCell)
-{
-    uint tID = blockIdx.x * blockDim.x + threadIdx.x;
-    if(tID >= numParticles)
-        return;
-
-    uint particleID = tID + particleOffset;
-    uint cellID     = cells[0]->computeCellHash(positions[tID]);
-
-    // Single atomic: get slot AND increment count
-    uint slot = atomicAdd(&numParticlesPerCell[cellID], 1);
-
-    // Write directly to 2D array if within bounds
-    if(slot < maxPerCell)
-        cellParticles[cellID * maxPerCell + slot] = particleID;
-    // Note: Overflow silently ignored (could add error counter if needed)
+    cellPrefixSums[tID] = tID * maxParticlesPerCell;
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -286,51 +151,127 @@ static __GLOBAL__ void linkObstacles_Device(const RigidBody<T>* const* rb,
 }
 
 // -------------------------------------------------------------------------------------------------
-/** @brief Finds the start of each cell. The cellStart array will contain the start index for each
-    cell hash.
-    @param particleHash Array of particle hashes
-    @param numParticles Number of particles
-    @param cellStart Output array to store start indices for each cell hash */
-static __GLOBAL__ void
-    computeCellStart_Kernel(const uint* particleHash, uint numParticles, uint* cellStart)
+/** @brief Computes the cell hash for a given point
+    @param cells pointer to the Cells object
+    @param positions buffer of positions
+    @param numParticles number of particles
+    @param cellIDs particle hash
+    @param numParticlesPerCell number of particles per cell */
+template <typename T>
+__GLOBAL__ void computeCellID_Device(const Cells<T>* const* cells,
+                                     const Vector3<T>*      positions,
+                                     uint                   numParticles,
+                                     uint*                  cellIDs,
+                                     uint*                  numParticlesPerCell)
 {
-    using namespace cooperative_groups;
-    // Handle to thread block group
-    thread_block           cta = this_thread_block();
-    extern __shared__ uint sharedHash[];  // blockSize + 1 elements
-    uint                   tid = blockIdx.x * blockDim.x + threadIdx.x;
+    // TODO: Load cells to shared memory if needed
+    uint tID = blockIdx.x * blockDim.x + threadIdx.x;
+    if(tID >= numParticles)
+        return;
 
-    uint hash;
-    if(tid < numParticles)
-    {
-        hash = particleHash[tid];
-        // Load hash data into shared memory so that we can look at neighboring particle's hash
-        // value without loading two hash values per thread
-        sharedHash[threadIdx.x + 1] = hash;
-        // first thread in block must load neighboring particle hash as well
-        if(tid > 0 && threadIdx.x == 0)
-            sharedHash[0] = particleHash[tid - 1];
-    }
-    sync(cta);
+    uint c       = cells[0]->computeCellHash(positions[tID]);
+    cellIDs[tID] = c;
+    atomicAdd(&numParticlesPerCell[c], 1);
+}
 
-    if(tid < numParticles)
+// -------------------------------------------------------------------------------------------------
+/** @brief Computes packed cellID and particleID for SortBased (no particle counting)
+    @param cells pointer to the Cells object
+    @param positions buffer of positions
+    @param numParticles number of particles
+    @param particleOffset offset for particle IDs (usually numObstacles)
+    @param cellParticleIDs output buffer of uint64 packed IDs */
+template <typename T>
+__GLOBAL__ void computeCellParticleIDs_Device(const Cells<T>* const* cells,
+                                              const Vector3<T>*      positions,
+                                              const uint             numParticles,
+                                              const uint             particleOffset,
+                                              uint64_t*              cellParticleIDs)
+{
+    uint tID = blockIdx.x * blockDim.x + threadIdx.x;
+    if(tID >= numParticles)
+        return;
+
+    uint cellID     = cells[0]->computeCellHash(positions[tID]);
+    uint particleID = tID + particleOffset;
+
+    // Pack: upper 32 bits = cellID, lower 32 bits = particleID
+    cellParticleIDs[tID] = (static_cast<uint64_t>(cellID) << 32) | particleID;
+}
+
+// -------------------------------------------------------------------------------------------------
+/** @brief Computes packed cellID and particleID for Atomic (particle counting included)
+    @param cells pointer to the Cells object
+    @param positions buffer of positions
+    @param numParticles number of particles
+    @param particleOffset offset for particle IDs (usually numObstacles)
+    @param cellParticleIDs output buffer of uint64 packed IDs
+    @param numParticlesPerCell atomic counter for particles per cell */
+template <typename T>
+__GLOBAL__ void computeCellParticleIDs_Device(const Cells<T>* const* cells,
+                                              const Vector3<T>*      positions,
+                                              uint                   numParticles,
+                                              uint                   particleOffset,
+                                              uint64_t*              cellParticleIDs,
+                                              uint*                  numParticlesPerCell)
+{
+    uint tID = blockIdx.x * blockDim.x + threadIdx.x;
+    if(tID >= numParticles)
+        return;
+
+    uint cellID     = cells[0]->computeCellHash(positions[tID]);
+    uint particleID = tID + particleOffset;
+
+    // Pack data
+    cellParticleIDs[tID] = (static_cast<uint64_t>(cellID) << 32) | particleID;
+
+    // Atomic count
+    atomicAdd(&numParticlesPerCell[cellID], 1);
+}
+
+// -------------------------------------------------------------------------------------------------
+/** @brief Computes packed cellID and particleID for AtomicFixed (no particle counting)
+    @param cells pointer to the Cells object
+    @param positions buffer of positions
+    @param numParticles number of particles
+    @param particleOffset offset for particle IDs (usually numObstacles)
+    @param maxPerCell maximum particles allowed per cell
+    @param cellParticleIDs storing packed uint64 (upper 32 = cellID, lower 32 = particleID)
+    @param numParticlesPerCell atomic counter for particles per cell */
+template <typename T>
+__GLOBAL__ void computeCellParticleIDs_Device(const Cells<T>* const* cells,
+                                              const Vector3<T>*      positions,
+                                              uint                   numParticles,
+                                              uint                   particleOffset,
+                                              uint                   maxPerCell,
+                                              uint64_t*              cellParticleIDs,
+                                              uint*                  numParticlesPerCell)
+{
+    uint tID = blockIdx.x * blockDim.x + threadIdx.x;
+    if(tID >= numParticles)
+        return;
+
+    uint particleID = tID + particleOffset;
+    uint cellID     = cells[0]->computeCellHash(positions[tID]);
+
+    // Single atomic: get slot AND increment count
+    uint slot = atomicAdd(&numParticlesPerCell[cellID], 1);
+
+    // Write packed cellID-particleID directly to 2D array if within bounds
+    if(slot < maxPerCell)
     {
-        // If this particle has a different cell hash value to the previous particle then it must
-        // be the first particle in the cell. As it isn't the first particle, it must also be the
-        // end of the previous particle's cell.
-        if(tid == 0 || hash != sharedHash[threadIdx.x])
-        {
-            cellStart[hash] = tid;
-        }
+        uint64_t packed = (static_cast<uint64_t>(cellID) << 32) | static_cast<uint64_t>(particleID);
+        cellParticleIDs[cellID * maxPerCell + slot] = packed;
     }
+    // Note: Overflow silently ignored (could add error counter if needed)
 }
 
 // -------------------------------------------------------------------------------------------------
 /** @brief Compute cell start indices from packed uint64 keys (upper 32 bits = cellID).
-    @param packedCellParticleIDs Array of packed uint64 IDs
+    @param cellParticleIDs Array of packed uint64 IDs
     @param numParticles Number of particles
     @param cellStart Output array to store start indices for each cell hash */
-static __GLOBAL__ void computeCellStart_Kernel(const uint64_t* packedCellParticleIDs,
+static __GLOBAL__ void computeCellStart_Kernel(const uint64_t* cellParticleIDs,
                                                const uint      numParticles,
                                                uint*           cellStart)
 {
@@ -343,16 +284,53 @@ static __GLOBAL__ void computeCellStart_Kernel(const uint64_t* packedCellParticl
     if(tid < numParticles)
     {
         // Extract cellID from upper 32 bits
-        hash                        = (uint)(packedCellParticleIDs[tid] >> 32);
+        hash                        = (uint)(cellParticleIDs[tid] >> 32);
         sharedHash[threadIdx.x + 1] = hash;
         if(tid > 0 && threadIdx.x == 0)
-            sharedHash[0] = (uint)(packedCellParticleIDs[tid - 1] >> 32);
+            sharedHash[0] = (uint)(cellParticleIDs[tid - 1] >> 32);
     }
     sync(cta);
 
     if(tid < numParticles)
         if(tid == 0 || hash != sharedHash[threadIdx.x])
             cellStart[hash] = tid;
+}
+
+// -------------------------------------------------------------------------------------------------
+/** @brief Writes particle IDs using packed uint64 data (for Atomic approach)
+    @param atomicCellParticleIDs buffer of uint64 packed data (upper 32=cellID, lower 32=particleID)
+    @param prefixSums prefix sums for each cell (starting positions)
+    @param numParticles total number of particles
+    @param cellParticleIDs output array where particles are written by cell
+    @param cellCounters temporary counter array for atomic operations */
+static __GLOBAL__ void writeCellParticleIDs_Kernel(const uint64_t* atomicCellParticleIDs,
+                                                   const uint*     prefixSums,
+                                                   const uint      numParticles,
+                                                   uint64_t*       cellParticleIDs,
+                                                   uint*           cellCounters)
+{
+    uint tID = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if(tID >= numParticles)
+        return;
+
+    // Single read gets both cellID and particleID
+    uint64_t packed = atomicCellParticleIDs[tID];
+    uint     cellID = static_cast<uint>(packed >> 32);
+
+    // Skip invalid cells
+    if(cellID == UINT_MAX)
+        return;
+
+    // Get the starting position for this cell from prefix sums
+    uint cellStart = prefixSums[cellID];
+
+    // Use atomic to get unique position within the cell
+    uint localOffset = atomicAdd(&cellCounters[cellID], 1);
+
+    // Write packed cellID-particleID to the computed position
+    uint finalPosition             = cellStart + localOffset;
+    cellParticleIDs[finalPosition] = packed;
 }
 //@}
 

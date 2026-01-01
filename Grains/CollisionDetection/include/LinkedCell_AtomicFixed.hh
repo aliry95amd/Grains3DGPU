@@ -43,8 +43,11 @@ protected:
     //@{
     /** \brief Buffer of number of particles per cell */
     GrainsMemBuffer<uint, MemType::DEVICE> m_numParticlesPerCell;
-    /** \brief Buffer storing particles: [numCells x maxParticlesPerCell] */
-    GrainsMemBuffer<uint, MemType::DEVICE> m_cellParticles;
+    /** \brief Buffer storing packed cellID-particleID pairs: [numCells x maxParticlesPerCell]
+     * (uint64: upper 32 = cellID, lower 32 = particleID) */
+    GrainsMemBuffer<uint64_t, MemType::DEVICE> m_cellParticleIDs;
+    /** \brief Synthetic prefix sums for uniform interface (cellID * maxParticlesPerCell) */
+    GrainsMemBuffer<uint, MemType::DEVICE> m_cellPrefixSums;
     /** \brief Maximum number of particles that can fit in a single cell */
     uint m_maxParticlesPerCell;
     /** \brief CUDA streams for concurrent kernel execution */
@@ -80,11 +83,25 @@ public:
         : LinkedCell<T, MemType::DEVICE>(
               rb, positions, quaternions, linkedCellParameters, nObstacles, nParticles)
         , m_numParticlesPerCell(m_numCells)
-        , m_cellParticles(m_numCells * maxParticlesPerCell)
+        , m_cellParticleIDs(m_numCells * maxParticlesPerCell)
+        , m_cellPrefixSums(m_numCells)
         , m_maxParticlesPerCell(maxParticlesPerCell)
     {
-        m_numParticlesPerCell.fill(0);
-        m_cellParticles.fill(UINT_MAX);
+        m_numParticlesPerCell.fill();
+        m_cellParticleIDs.fill(UINT64_MAX);
+
+        // Initialize synthetic prefix sums once for maximum cells (deterministic formula)
+        // Since we start with smallest cell size = maximum number of cells, this covers all cases
+        uint numBlocks, numThreads;
+        computeOptimalThreadsAndBlocks(m_numCells,
+                                       GrainsParameters<T>::m_GPU,
+                                       numBlocks,
+                                       numThreads);
+        initFixedCellPrefixSums_Device<<<numBlocks, numThreads>>>(m_numCells,
+                                                                  m_maxParticlesPerCell,
+                                                                  m_cellPrefixSums.getData());
+        cudaDeviceSynchronize();
+
         cudaEventCreate(&m_resizeComplete);
         cudaStreamCreate(&m_stream0);
         cudaStreamCreate(&m_stream1);
@@ -105,10 +122,11 @@ public:
     /** @name Get methods */
     //@{
     // ---------------------------------------------------------------------------------------------
-    /** @brief Gets particle IDs array */
-    const uint* getParticleIDArray() const override
+    /** @brief Gets packed cell-particle IDs array (upper 32 bits = cellID, lower 32 bits =
+     * particleID) */
+    const uint64_t* getCellParticleIDs() const
     {
-        return m_cellParticles.getData();
+        return m_cellParticleIDs.getData();
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -123,6 +141,13 @@ public:
     uint getMaxParticlesPerCell() const
     {
         return m_maxParticlesPerCell;
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    /** @brief Gets synthetic cell prefix sums (cellID * maxParticlesPerCell for fixed layout) */
+    const uint* getCellPrefixSums() const override
+    {
+        return m_cellPrefixSums.getData();
     }
     //@}
 
@@ -183,10 +208,10 @@ public:
             cudaFree(d_numCells);
             cudaEventRecord(m_resizeComplete, 0);
 
-            // Resize buffers
-            m_neighborCells.reserve(m_numCells * 27);
-            m_numParticlesPerCell.reserve(m_numCells);
-            m_cellParticles.reserve(m_numCells * m_maxParticlesPerCell);
+            // Resize buffers with appropriate streams
+            m_neighborCells.reserve(m_numCells * 27, m_stream1);
+            m_numParticlesPerCell.reserve(m_numCells, m_stream2);
+            m_cellParticleIDs.reserve(m_numCells * m_maxParticlesPerCell, m_stream2);
 
             // Copy old positions on stream0 (independent)
             cudaMemcpyAsync(m_oldPosition.getData() + m_numObstacles,
@@ -207,32 +232,23 @@ public:
                                        GrainsParameters<T>::m_GPU,
                                        numBlocksCells,
                                        numThreadsCells);
-        cudaMemsetAsync(m_neighborCells.getData(),
-                        0xFF,
-                        m_neighborCells.getSize() * sizeof(uint),
-                        m_stream1);
+        m_neighborCells.fill(UINT_MAX, m_stream1);
         generateNeighborCells_Device<<<numBlocksCells, numThreadsCells, 0, m_stream1>>>(
             m_cells.getData(),
             m_numCells,
             m_neighborCells.getData());
 
         // Stream 2: Reset counts + clear array + insert particles (sequential within stream)
-        cudaMemsetAsync(m_numParticlesPerCell.getData(),
-                        0,
-                        m_numParticlesPerCell.getSize() * sizeof(uint),
-                        m_stream2);
-        cudaMemsetAsync(m_cellParticles.getData(),
-                        0xFF,
-                        m_cellParticles.getSize() * sizeof(uint),
-                        m_stream2);
-        directInsert_Device<<<numBlocks, numThreads, 0, m_stream2>>>(
+        m_numParticlesPerCell.fill(0u, m_stream2);
+        m_cellParticleIDs.fill(UINT64_MAX, m_stream2);
+        computeCellParticleIDs_Device<<<numBlocks, numThreads, 0, m_stream2>>>(
             m_cells.getData(),
             m_positions->getData() + m_numObstacles,
             m_numParticles,
             m_numObstacles,
-            m_cellParticles.getData(),
-            m_numParticlesPerCell.getData(),
-            m_maxParticlesPerCell);
+            m_maxParticlesPerCell,
+            m_cellParticleIDs.getData(),
+            m_numParticlesPerCell.getData());
 
         // Synchronize all streams before returning
         cudaStreamSynchronize(m_stream0);  // Old position copy
@@ -258,7 +274,7 @@ public:
             // Only relink obstacles if they moved
             if(SS.obstaclesMoved)
                 this->linkObstacles();
-            return false;
+            return true;
         }
 
         return true;
