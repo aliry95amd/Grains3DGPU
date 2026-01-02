@@ -424,9 +424,9 @@ __HOSTDEVICE__ static INLINE bool operator!=(const Matrix3<T>& m1, const Matrix3
     for(int i = 0; i < 9; ++i)
     {
         if(fabs(b1[i] - b2[i]) > EPS<T>)
-            return false;
+            return true;
     }
-    return true;
+    return false;
 }
 
 // -------------------------------------------------------------------------------------------------

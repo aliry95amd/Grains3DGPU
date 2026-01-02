@@ -179,6 +179,10 @@ public:
                         m_pairList.getData(),
                         m_obstacleParticlePairCount);
                 }
+                else
+                {
+                    *m_obstacleParticlePairCount = 0;
+                }
 
                 // Stream 1: Two-phase atomic-free particle-particle neighbor generation
                 uint numBlocks, numThreads;
@@ -242,12 +246,12 @@ public:
                 if(nObstacles > 0)
                     totalPairs += *m_obstacleParticlePairCount;
 
-                // Increase pair list size if needed
-                if(totalPairs > m_pairList.getSize())
-                {
-                    m_pairList.free();
-                    m_pairList.initialize(totalPairs);
-                }
+                // Update the pair count
+                *m_pairCount = totalPairs;
+
+                // Resize pair list to exact size (preserves existing obstacle-particle data)
+                if(totalPairs != m_pairList.getSize())
+                    m_pairList.resize(totalPairs);
 
                 // Phase 3: Write neighbor pairs using prefix sums (on stream 1)
                 if(LC.type == LinkedCellType::ATOMICFIXED)
@@ -262,6 +266,7 @@ public:
                         LC_atomicFixed->getNumParticlesPerCell(),
                         m_numNeighborsPrefixSums.getData(),
                         LC_atomicFixed->getMaxParticlesPerCell(),
+                        *m_obstacleParticlePairCount,
                         nObstacles,
                         nParticles,
                         numCells,
@@ -274,6 +279,7 @@ public:
                         cellParticleIDs,
                         cellPrefixSums,
                         m_numNeighborsPrefixSums.getData(),
+                        *m_obstacleParticlePairCount,
                         nObstacles,
                         nParticles,
                         numCells,
@@ -282,6 +288,7 @@ public:
                 // Final synchronization of stream 1 (stream 0 already synchronized)
                 cudaStreamSynchronize(m_stream1);
             }
+
             return true;
         }
         else

@@ -65,9 +65,11 @@ cd Tests
 mkdir build && cd build
 source ../../Env/grainsGPU.env.sh
 cmake ..
-make -j
+make -j$(nproc)  # Parallel build using all available cores
 ./grains_tests
 ```
+
+**Note**: The CMake configuration automatically detects the number of CPU cores and enables parallel compilation. You can also specify the number of jobs manually with `make -j<N>`.
 
 **Performance Note**: The optimized build system uses existing object files from `Grains/objGNU-*` and include files from `Grains/include`, which significantly reduces build time compared to compiling everything from scratch.
 

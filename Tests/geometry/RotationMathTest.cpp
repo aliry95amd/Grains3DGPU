@@ -160,9 +160,6 @@ TEST_F(RotationMathTest, RotationComposition)
     Matrix3<double> mat_from_q2 = q2.toMatrix();
     Matrix3<double> mat_from_q3 = q3.toMatrix();
 
-    std::cout << "Matrix1: " << m1 - mat_from_q1 << std::endl;
-    std::cout << "Matrix2: " << m2 - mat_from_q2 << std::endl;
-    std::cout << "Matrix3: " << m3 - mat_from_q3 << std::endl;
     // Verify Matrix3 and Quaternion give the same result
     EXPECT_TRUE(m1 == mat_from_q1);
     EXPECT_TRUE(m2 == mat_from_q2);
@@ -176,11 +173,8 @@ TEST_F(RotationMathTest, RotationComposition)
     Quaternion<double> quat_from_m3;
     quat_from_m3.setQuaternion(m3);
 
-    std::cout << "Quat1: " << q1 - quat_from_m1 << std::endl;
-    std::cout << "Quat2: " << q2 - quat_from_m2 << std::endl;
-    std::cout << "Quat3: " << q3 - quat_from_m3 << std::endl;
     // Verify Matrix3 and Quaternion give the same result
-    EXPECT_TRUE(quat1 == quat_from_m1);
-    EXPECT_TRUE(quat2 == quat_from_m2);
-    EXPECT_TRUE(quat3 == quat_from_m3);
+    EXPECT_TRUE(q1 == quat_from_m1);
+    EXPECT_TRUE(q2 == quat_from_m2);
+    EXPECT_TRUE(q3 == quat_from_m3);
 }

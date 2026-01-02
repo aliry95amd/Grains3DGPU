@@ -155,8 +155,7 @@ public:
                                          size,
                                          d_numCells);
             cudaMemcpy(&h_numCells, d_numCells, sizeof(uint), cudaMemcpyDeviceToHost);
-            cudaDeviceSynchronize();
-            GoutWI(9, "LinkedCell with", h_numCells, "cells is created on device.");
+            // GoutWI(9, "LinkedCell with", h_numCells, "cells is created on device.");
         }
         cudaDeviceSynchronize();
         cudaFree(d_numCells);

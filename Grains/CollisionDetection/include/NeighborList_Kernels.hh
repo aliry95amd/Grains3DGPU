@@ -91,6 +91,7 @@ __GLOBAL__ void countNeighbors_Device(const uint*     cellNeighborsList,
     @param cellParticleIDs packed uint64 array (upper 32 bits = cellID, lower 32 bits = particleID)
     @param cellPrefixSums array of start IDs for each cell
     @param numNeighborsPrefixSums array of prefix sums of neighbors
+    @param pairListOffset offset in pairList where particle-particle pairs should start
     @param numObstacles number of obstacles
     @param numParticles number of particles
     @param numCells number of cells
@@ -99,6 +100,7 @@ __GLOBAL__ void updateNeighborList_LC_Device(const uint*     cellNeighborsList,
                                              const uint64_t* cellParticleIDs,
                                              const uint*     cellPrefixSums,
                                              const uint*     numNeighborsPrefixSums,
+                                             const uint      pairListOffset,
                                              const uint      numObstacles,
                                              const uint      numParticles,
                                              const uint      numCells,
@@ -126,6 +128,7 @@ __GLOBAL__ void countNeighbors_AtomicFixed_Device(const uint*     cellNeighborsL
     @param numParticlesPerCell array of particle counts per cell
     @param numNeighborsPrefixSums array of prefix sums of neighbors
     @param maxParticlesPerCell maximum particles per cell
+    @param pairListOffset offset in pairList where particle-particle pairs should start
     @param numObstacles number of obstacles
     @param numParticles number of particles
     @param numCells number of cells
@@ -135,6 +138,7 @@ __GLOBAL__ void updateNeighborList_LC_AtomicFixed_Device(const uint*     cellNei
                                                          const uint*     numParticlesPerCell,
                                                          const uint*     numNeighborsPrefixSums,
                                                          const uint      maxParticlesPerCell,
+                                                         const uint      pairListOffset,
                                                          const uint      numObstacles,
                                                          const uint      numParticles,
                                                          const uint      numCells,

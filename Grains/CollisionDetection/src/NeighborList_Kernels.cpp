@@ -211,7 +211,7 @@ __GLOBAL__ void countNeighbors_Device(const uint*     cellNeighborsList,
     {
         uint c = neighborCells[cID];
 
-        if(c == UINT_MAX)
+        if(c == UINT_MAX || c < cell)
             continue;
 
         // Calculate number of particles in cell from cellPrefixSums
@@ -231,7 +231,15 @@ __GLOBAL__ void countNeighbors_Device(const uint*     cellNeighborsList,
         if(k == numCells)
             cellEnd = numParticles;
 
-        totalNeighbors += (cellEnd - cellStart);
+        // Count particles in this neighbor cell
+        for(uint p = cellStart; p < cellEnd; ++p)
+        {
+            const uint j = (uint)(cellParticleIDs[p] & 0xFFFFFFFF);
+
+            // Only count if j > i (matching the write condition)
+            if(j > i)
+                totalNeighbors++;
+        }
     }
 
     neighborCounts[i] = totalNeighbors;
@@ -243,6 +251,7 @@ __GLOBAL__ void updateNeighborList_LC_Device(const uint*     cellNeighborsList,
                                              const uint64_t* cellParticleIDs,
                                              const uint*     cellPrefixSums,
                                              const uint*     numNeighborsPrefixSums,
+                                             const uint      pairListOffset,
                                              const uint      numObstacles,
                                              const uint      numParticles,
                                              const uint      numCells,
@@ -263,7 +272,7 @@ __GLOBAL__ void updateNeighborList_LC_Device(const uint*     cellNeighborsList,
         return;
 
     const uint* neighborCells = &cellNeighborsList[NUM_NEIGHBOR_CELLS * cell];
-    uint        insertIndex   = numNeighborsPrefixSums[i];
+    uint        insertIndex   = pairListOffset + numNeighborsPrefixSums[i];
 
     // Loop over all neighboring cells
     for(uint cID = 0; cID < NUM_NEIGHBOR_CELLS; ++cID)
@@ -364,6 +373,7 @@ __GLOBAL__ void updateNeighborList_LC_AtomicFixed_Device(const uint*     cellNei
                                                          const uint*     numParticlesPerCell,
                                                          const uint*     numNeighborsPrefixSums,
                                                          const uint      maxParticlesPerCell,
+                                                         const uint      pairListOffset,
                                                          const uint      numObstacles,
                                                          const uint      numParticles,
                                                          const uint      numCells,
@@ -384,7 +394,7 @@ __GLOBAL__ void updateNeighborList_LC_AtomicFixed_Device(const uint*     cellNei
         return;
 
     const uint* neighborCells = &cellNeighborsList[NUM_NEIGHBOR_CELLS * cell];
-    uint        insertIndex   = numNeighborsPrefixSums[i];
+    uint        insertIndex   = pairListOffset + numNeighborsPrefixSums[i];
 
     // Loop over all neighboring cells
     for(uint cID = 0; cID < NUM_NEIGHBOR_CELLS; ++cID)

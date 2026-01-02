@@ -10,8 +10,13 @@ project(GrainsGPU_Tests VERSION 1.0.0 LANGUAGES CXX CUDA)
 include(ProcessorCount)
 ProcessorCount(N)
 if(NOT N EQUAL 0)
+    set(CMAKE_BUILD_PARALLEL_LEVEL ${N} CACHE STRING "Number of parallel build jobs")
     set_property(GLOBAL PROPERTY JOB_POOLS "compilation=${N}")
     set(CMAKE_JOB_POOL_COMPILE compilation)
+    message(STATUS "Parallel compilation enabled with ${N} jobs")
+else()
+    set(CMAKE_BUILD_PARALLEL_LEVEL 4 CACHE STRING "Number of parallel build jobs")
+    message(STATUS "Parallel compilation enabled with 4 jobs (default)")
 endif()
 
 # Standards and build type
@@ -43,11 +48,36 @@ set(CMAKE_CUDA_ARCHITECTURES $ENV{CMAKE_CUDA_ARCHITECTURES})
 # Compiler flags
 string(REPLACE " " ";" GRAINS_CUDA_FLAGS_LIST "$ENV{GRAINS_GPU_COMPILER_FLAGS}")
 set(SAFE_CUDA_FLAGS)
+set(HAS_DEVICE_DEBUG FALSE)
+set(HAS_OPTIMIZE FALSE)
+
+# First pass: check if device-debug flag is present
 foreach(flag ${GRAINS_CUDA_FLAGS_LIST})
-    if(flag MATCHES "^(-O[0-3]|--use_fast_math|--extra-device-vectorization|--restrict|--extended-lambda|--expt-relaxed-constexpr|-g|--generate-line-info|-lineinfo)$" OR flag MATCHES "^-Xcompiler")
+    if(flag MATCHES "^(-g|-G|--device-debug)$")
+        set(HAS_DEVICE_DEBUG TRUE)
+    endif()
+    if(flag MATCHES "^-O[0-3]$")
+        set(HAS_OPTIMIZE TRUE)
+    endif()
+endforeach()
+
+# Second pass: add flags, skip --generate-line-info if device-debug is present
+foreach(flag ${GRAINS_CUDA_FLAGS_LIST})
+    if(flag MATCHES "^(-O[0-3]|--use_fast_math|--extra-device-vectorization|--restrict|--extended-lambda|--expt-relaxed-constexpr|-g|-G|--device-debug)$" OR flag MATCHES "^-Xcompiler")
+        list(APPEND SAFE_CUDA_FLAGS ${flag})
+    elseif(flag MATCHES "^(--generate-line-info|-lineinfo)$" AND NOT HAS_DEVICE_DEBUG)
+        # Only add line-info flags if device-debug is not present
         list(APPEND SAFE_CUDA_FLAGS ${flag})
     endif()
 endforeach()
+
+# Override CMake's default optimization flags to prevent conflicts
+if(HAS_OPTIMIZE)
+    set(CMAKE_CUDA_FLAGS_DEBUG "")
+    set(CMAKE_CUDA_FLAGS_RELEASE "")
+    set(CMAKE_CUDA_FLAGS_RELWITHDEBINFO "")
+    set(CMAKE_CUDA_FLAGS_MINSIZEREL "")
+endif()
 
 # Include directories
 include_directories(${GRAINS_INCLUDE_DIR})
@@ -91,6 +121,7 @@ set(POTENTIAL_TEST_FILES
     collision/test_gjk.cpp
     collision/test_obb.cpp
     collision/test_collision_detection.cpp
+    collision/test_neighborlist.cpp
     component/test_rigid_body.cpp
     component/test_convex.cpp
 )

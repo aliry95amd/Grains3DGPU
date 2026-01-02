@@ -71,14 +71,14 @@ export GRAINS_GPU_LINKER="${GRAINS_GPU_COMPILER_BINDIR}/${GRAINS_GPU_COMPILER}"
 # Release mode flags (optimized for performance)
 export GRAINS_GPU_COMPILER_FLAGS_RELEASE="-t=8 -x cu -m64 \
     -O3 -dlto -dc \
-    -std=c++20 -arch=sm_75 -lineinfo \
+    -std=c++20 -arch=sm_75 \
     -cudart static -cudadevrt static \
     -use_fast_math -extra-device-vectorization -restrict \
     --extended-lambda --expt-relaxed-constexpr \
-    -Xcompiler "-rdynamic,-fPIC,-fopenmp" \
+    -Xcompiler \"-rdynamic,-fPIC,-fopenmp\" \
     -g"
 export GRAINS_GPU_LINKER_FLAGS_RELEASE="-O3 -dlto \
-    -arch=sm_75 -lineinfo -lcudart \
+    -arch=sm_75 -lcudart \
     -use_fast_math -extra-device-vectorization -restrict \
     -lcudart -lcudadevrt \
     -lgomp \

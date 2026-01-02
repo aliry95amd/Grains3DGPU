@@ -291,6 +291,8 @@ public:
                                              m_size * sizeof(T),
                                              cudaMemcpyDeviceToDevice,
                                              stream));
+                // Synchronize before freeing old buffer to ensure copy completes
+                cudaStreamSynchronize(stream);
             }
         }
 

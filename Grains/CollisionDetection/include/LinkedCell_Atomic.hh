@@ -267,9 +267,7 @@ public:
                                                                m_numParticles,
                                                                m_cellParticleIDs.getData(),
                                                                m_cellCounters.getData());
-        m_atomicPackBuffer.print("atomicPackBuffer");
-        m_cellParticleIDs.print("cellParticleIDs");
-        m_cellPrefixSums.print("cellPrefixSums");
+
         return true;
     }
     //@}
