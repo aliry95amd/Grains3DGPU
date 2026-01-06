@@ -82,6 +82,7 @@ public:
     void computeRelativeTransformations() final;
 
     /** @brief Detects collisions between components */
+    // template <GJKType GJKVARIANT = GJKType::JOHNSON, bool GJKACC = false>
     void detectCollisionsComponents() final;
 
     /** @brief Transforms contact info to world frame and flags active pairs */

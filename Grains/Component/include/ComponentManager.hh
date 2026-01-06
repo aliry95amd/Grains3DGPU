@@ -238,6 +238,13 @@ public:
     }
 
     // ---------------------------------------------------------------------------------------------
+    /** @brief Gets neighbor list */
+    const NeighborList<T, M>* getNeighborList() const
+    {
+        return m_neighborList;
+    }
+
+    // ---------------------------------------------------------------------------------------------
     /** @brief Gets the number of particles in manager */
     uint getNumberOfParticles() const
     {
@@ -309,6 +316,26 @@ public:
     }
 
     // ---------------------------------------------------------------------------------------------
+    /** @brief Sets the neighbor list
+        @param neighborList pointer to the neighbor list object */
+    void setNeighborList(NeighborList<T, M>* neighborList)
+    {
+        if(m_neighborList)
+            delete m_neighborList;
+        m_neighborList = neighborList;
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    /** @brief Sets the particle sorter
+        @param particleSorter pointer to the particle sorter object */
+    void setParticleSorter(ParticleSorter<T, M>* particleSorter)
+    {
+        if(m_particleSorter)
+            delete m_particleSorter;
+        m_particleSorter = particleSorter;
+    }
+
+    // ---------------------------------------------------------------------------------------------
     /** @brief Sets the relative position
         @param relPosition host buffer containing the relative positions */
     template <MemType srcM>
@@ -345,6 +372,7 @@ public:
         NeighborListFactory<T, M>::create(m_rigidBody,
                                           m_position,
                                           m_quaternion,
+                                          GrainsParameters<T>::m_collisionDetection,
                                           m_numObstacles,
                                           m_numParticles,
                                           m_neighborList);
@@ -470,6 +498,7 @@ public:
                                 m_position,
                                 m_quaternion,
                                 m_velocity,
+                                GrainsParameters<T>::m_collisionDetection.linkedCellParameters,
                                 m_numObstacles,
                                 m_numParticles);
     }
@@ -511,6 +540,7 @@ public:
 
     // ---------------------------------------------------------------------------------------------
     /** @brief Detects collisions between components */
+    // template <GJKType GJKVARIANT = GJKType::JOHNSON, bool GJKACC = false>
     virtual void detectCollisionsComponents() = 0;
 
     // ---------------------------------------------------------------------------------------------

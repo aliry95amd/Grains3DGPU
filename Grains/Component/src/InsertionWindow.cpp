@@ -77,6 +77,22 @@ __HOST__ InsertionWindow<T>::InsertionWindow(DOMNode* dn, RandomGeneratorSeed se
 }
 
 // -------------------------------------------------------------------------------------------------
+// Constructor for box window with min and max points
+template <typename T>
+__HOST__ InsertionWindow<T>::InsertionWindow(const Vector3<T>& minPoint,
+                                             const Vector3<T>& maxPoint,
+                                             unsigned          seed)
+    : m_v1(minPoint)
+    , m_v2(maxPoint)
+    , m_iRad(T(0))
+    , m_oRad(T(0))
+    , m_dist(T(0), T(1))
+    , m_type(BOXWINDOW)
+{
+    m_randGenerator.seed(seed);
+}
+
+// -------------------------------------------------------------------------------------------------
 // Destructor
 template <typename T>
 __HOST__ InsertionWindow<T>::~InsertionWindow()

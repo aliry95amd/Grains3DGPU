@@ -34,11 +34,10 @@ enum InsertionMode
     OVERTIME
 };
 
-/** @brief info required for comping up with an insertion position. It can be
-either a value (T) that is used as the seed for random generator algorithm, a
-string (std::string) that is used as the pathToFile, a 3d vector (vector3<T>)
-for constant values, and a value (0) in case the default insertion option is
-desired. */
+/** @brief info required for comping up with an insertion position. It can be either a value (T)
+    that is used as the seed for random generator algorithm, a string (std::string) that is used as
+    the pathToFile, a 3d vector (vector3<T>) for constant values, and a value (0) in case the
+    default insertion option is desired. */
 template <typename T>
 using InsertionInfo = std::variant<std::vector<InsertionWindow<T>>, std::ifstream, Vector3<T>>;
 //@}
@@ -98,6 +97,34 @@ public:
     // TODO: INSERTION MODE AND TYPE?
     //@}
 
+    /** @name Set methods */
+    //@{
+    /** @brief Set position insertion info (type determined by variant content)
+        @param info Insertion info variant (windows, ifstream, or Vector3) */
+    __HOST__
+    void setPositionInsertionInfo(InsertionInfo<T>&& info);
+
+    /** @brief Set orientation insertion info (type determined by variant content)
+        @param info Insertion info variant (windows, ifstream, or Vector3) */
+    __HOST__
+    void setOrientationInsertionInfo(InsertionInfo<T>&& info);
+
+    /** @brief Set translational velocity insertion info (type determined by variant content)
+        @param info Insertion info variant (windows, ifstream, or Vector3) */
+    __HOST__
+    void setTranslationalVelInsertionInfo(InsertionInfo<T>&& info);
+
+    /** @brief Set angular velocity insertion info (type determined by variant content)
+        @param info Insertion info variant (windows, ifstream, or Vector3) */
+    __HOST__
+    void setAngularVelInsertionInfo(InsertionInfo<T>&& info);
+
+    /** @brief Set force insertion flag
+        @param forceInsertion If true, skip overlap checking during insertion */
+    __HOST__
+    void setForceInsertion(bool forceInsertion);
+    //@}
+
     /** @name Methods */
     //@{
     /** @brief Reads an XML node to set the insertion type and related info
@@ -117,6 +144,7 @@ public:
         @param position position buffer
         @param quaternion quaternion buffer
         @param velocity velocity buffer
+        @param LCParameters linked cell parameters
         @param numObstacles number of obstacles
         @param numParticles number of particles */
     __HOST__
@@ -124,6 +152,7 @@ public:
                 GrainsMemBuffer<Vector3<T>>&          position,
                 GrainsMemBuffer<Quaternion<T>>&       quaternion,
                 GrainsMemBuffer<Kinematics<T>>&       velocity,
+                const LinkedCellParameters<T>&        LCParameters,
                 const uint                            numObstacles,
                 const uint                            numParticles);
     //@}

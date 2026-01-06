@@ -61,17 +61,18 @@ void ComponentManagerCPU<T>::computeRelativeTransformations()
 // -------------------------------------------------------------------------------------------------
 // Detects collisions
 template <typename T>
+// template <GJKType GJKVARIANT, bool GJKACC>
 void ComponentManagerCPU<T>::detectCollisionsComponents()
 {
     uint nPairs = m_neighborList->getSize();
     for(uint i = 0; i < nPairs; ++i)
     {
-        detectCollisionsComponents_common(m_neighborList->getData(),
-                                          m_rigidBody->getData(),
-                                          m_relPosition.getData(),
-                                          m_relQuaternion.getData(),
-                                          m_contactInfo.getData(),
-                                          i);
+        detectCollisionsComponents_common<T>(m_neighborList->getData(),
+                                             m_rigidBody->getData(),
+                                             m_relPosition.getData(),
+                                             m_relQuaternion.getData(),
+                                             m_contactInfo.getData(),
+                                             i);
     }
 }
 

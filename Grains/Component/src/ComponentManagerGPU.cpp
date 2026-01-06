@@ -82,6 +82,7 @@ void ComponentManagerGPU<T>::computeRelativeTransformations()
 // -------------------------------------------------------------------------------------------------
 // Detects collisions between components
 template <typename T>
+// template <GJKType GJKVARIANT, bool GJKACC>
 void ComponentManagerGPU<T>::detectCollisionsComponents()
 {
     uint nPairs = m_neighborList->getSize();

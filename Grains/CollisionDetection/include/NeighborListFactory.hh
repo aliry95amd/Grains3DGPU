@@ -40,25 +40,24 @@ public:
         @param rb Rigid body buffer
         @param positions Positions buffer
         @param quaternions Quaternions buffer
+        @param CD Collision detection parameters
         @param nObstacles number of obstacles
         @param nParticles number of particles
         @param NL Memory buffer for storing the neighbor list object */
     static void create(const GrainsMemBuffer<RigidBody<T>*, M>* rb,
                        const GrainsMemBuffer<Vector3<T>, M>&    positions,
                        const GrainsMemBuffer<Quaternion<T>, M>& quaternions,
+                       const CollisionDetectionParameters<T>&   CD,
                        const uint                               nObstacles,
                        const uint                               nParticles,
                        NeighborList<T, M>*&                     NL)
     {
-        using GP = GrainsParameters<T>;
-
         // Assertions
         GAssert(rb->getSize() == nObstacles + nParticles, "Rigid body size mismatch");
         GAssert(positions.getSize() == nObstacles + nParticles, "Positions size mismatch");
         GAssert(quaternions.getSize() == nObstacles + nParticles, "Quaternions size mismatch");
 
         // Global parameters
-        const auto&      CD   = GP::m_collisionDetection;
         NeighborListType type = CD.neighborListType;
 
         if(type == NeighborListType::NSQ)

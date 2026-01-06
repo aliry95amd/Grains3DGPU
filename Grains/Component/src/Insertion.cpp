@@ -226,6 +226,83 @@ __HOST__ Insertion<T>::~Insertion()
 }
 
 // -------------------------------------------------------------------------------------------------
+// Set position insertion info (type determined by variant content)
+template <typename T>
+__HOST__ void Insertion<T>::setPositionInsertionInfo(InsertionInfo<T>&& info)
+{
+    // Determine type from variant content BEFORE moving
+    if(std::holds_alternative<std::vector<InsertionWindow<T>>>(info))
+        m_positionType = RANDOMINSERTION;
+    else if(std::holds_alternative<std::ifstream>(info))
+        m_positionType = FILEINSERTION;
+    else if(std::holds_alternative<Vector3<T>>(info))
+        m_positionType = CONSTANTINSERTION;
+    else
+        m_positionType = DEFAULTINSERTION;
+
+    m_positionInsertionInfo = std::move(info);
+}
+
+// -------------------------------------------------------------------------------------------------
+// Set orientation insertion info (type determined by variant content)
+template <typename T>
+__HOST__ void Insertion<T>::setOrientationInsertionInfo(InsertionInfo<T>&& info)
+{
+    if(std::holds_alternative<std::vector<InsertionWindow<T>>>(info))
+        m_orientationType = RANDOMINSERTION;
+    else if(std::holds_alternative<std::ifstream>(info))
+        m_orientationType = FILEINSERTION;
+    else if(std::holds_alternative<Vector3<T>>(info))
+        m_orientationType = CONSTANTINSERTION;
+    else
+        m_orientationType = DEFAULTINSERTION;
+
+    m_orientationInsertionInfo = std::move(info);
+}
+
+// -------------------------------------------------------------------------------------------------
+// Set translational velocity insertion info (type determined by variant content)
+template <typename T>
+__HOST__ void Insertion<T>::setTranslationalVelInsertionInfo(InsertionInfo<T>&& info)
+{
+    if(std::holds_alternative<std::vector<InsertionWindow<T>>>(info))
+        m_translationalVelType = RANDOMINSERTION;
+    else if(std::holds_alternative<std::ifstream>(info))
+        m_translationalVelType = FILEINSERTION;
+    else if(std::holds_alternative<Vector3<T>>(info))
+        m_translationalVelType = CONSTANTINSERTION;
+    else
+        m_translationalVelType = DEFAULTINSERTION;
+
+    m_translationalVelInsertionInfo = std::move(info);
+}
+
+// -------------------------------------------------------------------------------------------------
+// Set angular velocity insertion info (type determined by variant content)
+template <typename T>
+__HOST__ void Insertion<T>::setAngularVelInsertionInfo(InsertionInfo<T>&& info)
+{
+    if(std::holds_alternative<std::vector<InsertionWindow<T>>>(info))
+        m_angularVelType = RANDOMINSERTION;
+    else if(std::holds_alternative<std::ifstream>(info))
+        m_angularVelType = FILEINSERTION;
+    else if(std::holds_alternative<Vector3<T>>(info))
+        m_angularVelType = CONSTANTINSERTION;
+    else
+        m_angularVelType = DEFAULTINSERTION;
+
+    m_angularVelInsertionInfo = std::move(info);
+}
+
+// -------------------------------------------------------------------------------------------------
+// Set force insertion flag
+template <typename T>
+__HOST__ void Insertion<T>::setForceInsertion(bool forceInsertion)
+{
+    m_forceInsertion = forceInsertion;
+}
+
+// -------------------------------------------------------------------------------------------------
 // Returns a vector of Vector3 accroding to type and data
 template <typename T>
 __HOST__ Vector3<T> Insertion<T>::fetchInsertionData(InsertionType const type,
@@ -265,10 +342,10 @@ __HOST__ void Insertion<T>::insert(const GrainsMemBuffer<RigidBody<T>*>* rigidBo
                                    GrainsMemBuffer<Vector3<T>>&          position,
                                    GrainsMemBuffer<Quaternion<T>>&       orientation,
                                    GrainsMemBuffer<Kinematics<T>>&       kinematics,
+                                   const LinkedCellParameters<T>&        LCParameters,
                                    const uint                            numObstacles,
                                    const uint                            numParticles)
 {
-    using GP = GrainsParameters<T>;
     GoutWI(3, "Inserting", numParticles, "particles ...");
 
     if(m_forceInsertion)
@@ -296,7 +373,6 @@ __HOST__ void Insertion<T>::insert(const GrainsMemBuffer<RigidBody<T>*>* rigidBo
         const uint maxAttempts = 1000;
 
         // Build a temporary linked-cell structure for strict insertion checks
-        const auto         LCParameters = GP::m_collisionDetection.linkedCellParameters;
         LinkedCell_Host<T> LC(rigidBody,
                               position,
                               orientation,
@@ -351,12 +427,12 @@ __HOST__ void Insertion<T>::insert(const GrainsMemBuffer<RigidBody<T>*>* rigidBo
                 const Quaternion<T>& qCand = quat * orientation[insertID];
                 // Check if candidate position is within domain bounds
                 // clang-format off
-                bool withinBounds = (pCand[0] >= GP::m_origin[0] && 
-                                     pCand[0] <= GP::m_maxCoordinate[0] && 
-                                     pCand[1] >= GP::m_origin[1] && 
-                                     pCand[1] <= GP::m_maxCoordinate[1] &&
-                                     pCand[2] >= GP::m_origin[2] &&
-                                     pCand[2] <= GP::m_maxCoordinate[2]);
+                bool withinBounds = (pCand[0] >= LCParameters.minCorner[0] && 
+                                     pCand[0] <= LCParameters.maxCorner[0] && 
+                                     pCand[1] >= LCParameters.minCorner[1] && 
+                                     pCand[1] <= LCParameters.maxCorner[1] &&
+                                     pCand[2] >= LCParameters.minCorner[2] &&
+                                     pCand[2] <= LCParameters.maxCorner[2]);
                 // clang-format on
                 if(withinBounds && canInsert(insertID, pCand, qCand))
                 {

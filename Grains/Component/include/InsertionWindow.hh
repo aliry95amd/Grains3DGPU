@@ -70,6 +70,13 @@ public:
     __HOST__
     InsertionWindow();
 
+    /** @brief Constructor for box window with min and max points
+        @param minPoint Minimum corner of the box
+        @param maxPoint Maximum corner of the box
+        @param seed Random seed value (default: 0 for deterministic) */
+    __HOST__
+    InsertionWindow(const Vector3<T>& minPoint, const Vector3<T>& maxPoint, unsigned seed = 0);
+
     /** @brief Constructor with XML node and the type of the seed
         @param dn XML node
         @param seed random generator seed */

@@ -57,7 +57,7 @@ __HOSTDEVICE__ static INLINE void
     @param relQuaternion relative quaternion of the components
     @param contactInfo contact information
     @param pairID ID of the pair */
-template <typename T>
+template <typename T, GJKType GJKVARIANT = GJKType::JOHNSON, bool GJKACC = false>
 __HOSTDEVICE__ static INLINE void
     detectCollisionsComponents_common(const uint2*               pairList,
                                       const RigidBody<T>* const* rigidBody,
@@ -73,7 +73,7 @@ __HOSTDEVICE__ static INLINE void
     const RigidBody<T>&  rbB   = *(rigidBody[idB]);
     const Vector3<T>&    v_b2a = relPosition[pairID];
     const Quaternion<T>& q_b2a = relQuaternion[pairID];
-    closestPointsRigidBodies(rbA, rbB, v_b2a, q_b2a, contactInfo[pairID]);
+    closestPointsRigidBodies<T, GJKVARIANT, GJKACC>(rbA, rbB, v_b2a, q_b2a, contactInfo[pairID]);
 }
 
 // -------------------------------------------------------------------------------------------------
