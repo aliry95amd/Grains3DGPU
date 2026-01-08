@@ -62,6 +62,7 @@ struct BenchmarkConfig
     // Test parameters
     uint numTrials;
     uint randomSeed;
+    bool validateContacts;
 
     BenchmarkConfig()
         : platform(PLATFORM::BOTH)
@@ -80,6 +81,7 @@ struct BenchmarkConfig
         , testRelative(true)
         , numTrials(5)
         , randomSeed(42)
+        , validateContacts(false)
     {
     }
 };

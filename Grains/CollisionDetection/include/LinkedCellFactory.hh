@@ -45,68 +45,61 @@ public:
         @param linkedCellParameters Linked cell parameters
         @param nObstacles number of obstacles
         @param nParticles number of particles
-        @param LC Memory buffer for storing the linked cell object */
-    static void create(const GrainsMemBuffer<RigidBody<T>*, M>* rb,
-                       const GrainsMemBuffer<Vector3<T>, M>&    positions,
-                       const GrainsMemBuffer<Quaternion<T>, M>& quaternions,
-                       const LinkedCellParameters<T>&           linkedCellParameters,
-                       const uint                               nObstacles,
-                       const uint                               nParticles,
-                       LinkedCell<T, M>*&                       LC)
+        @return unique_ptr to the created LinkedCell object */
+    static std::unique_ptr<LinkedCell<T, M>>
+        create(const GrainsMemBuffer<RigidBody<T>*, M>* rb,
+               const GrainsMemBuffer<Vector3<T>, M>&    positions,
+               const GrainsMemBuffer<Quaternion<T>, M>& quaternions,
+               const LinkedCellParameters<T>&           linkedCellParameters,
+               const uint                               nObstacles,
+               const uint                               nParticles)
     {
         auto type = linkedCellParameters.type;
         // Create the linked cell object
         if constexpr(M == MemType::HOST)
         {
-            LC = new LinkedCell_Host<T>(rb,
-                                        positions,
-                                        quaternions,
-                                        linkedCellParameters,
-                                        nObstacles,
-                                        nParticles);
+            return std::make_unique<LinkedCell_Host<T>>(rb,
+                                                        positions,
+                                                        quaternions,
+                                                        linkedCellParameters,
+                                                        nObstacles,
+                                                        nParticles);
         }
         else if constexpr(M == MemType::DEVICE)
         {
             if(type == LinkedCellType::SORTBASED)
             {
-                LC = new LinkedCell_SortBased<T>(rb,
-                                                 positions,
-                                                 quaternions,
-                                                 linkedCellParameters,
-                                                 nObstacles,
-                                                 nParticles);
+                return std::make_unique<LinkedCell_SortBased<T>>(rb,
+                                                                 positions,
+                                                                 quaternions,
+                                                                 linkedCellParameters,
+                                                                 nObstacles,
+                                                                 nParticles);
             }
             else if(type == LinkedCellType::ATOMIC)
             {
-                LC = new LinkedCell_Atomic<T>(rb,
-                                              positions,
-                                              quaternions,
-                                              linkedCellParameters,
-                                              nObstacles,
-                                              nParticles);
+                return std::make_unique<LinkedCell_Atomic<T>>(rb,
+                                                              positions,
+                                                              quaternions,
+                                                              linkedCellParameters,
+                                                              nObstacles,
+                                                              nParticles);
             }
             else if(type == LinkedCellType::ATOMICFIXED)
             {
-                // Use maxNumCellsPerObstacle as maxParticlesPerCell proxy for now
-                // TODO: Add separate parameter in LinkedCellParameters if needed
-                uint maxPerCell = linkedCellParameters.maxNumCellsPerObstacle > 0
-                                      ? linkedCellParameters.maxNumCellsPerObstacle
-                                      : 64;  // Default fallback
-                LC              = new LinkedCell_AtomicFixed<T>(rb,
-                                                   positions,
-                                                   quaternions,
-                                                   linkedCellParameters,
-                                                   nObstacles,
-                                                   nParticles,
-                                                   maxPerCell);
+                return std::make_unique<LinkedCell_AtomicFixed<T>>(rb,
+                                                                   positions,
+                                                                   quaternions,
+                                                                   linkedCellParameters,
+                                                                   nObstacles,
+                                                                   nParticles);
             }
             else
                 GAbort("LinkedCell type not supported on device. Aborting "
                        "Grains!");
         }
 
-        // Sanity check to ensure LinkedCell was created
-        GAssert(LC != nullptr, "LinkedCell creation failed.");
+        return nullptr;  // Should never reach here
     }
     //@}
 };

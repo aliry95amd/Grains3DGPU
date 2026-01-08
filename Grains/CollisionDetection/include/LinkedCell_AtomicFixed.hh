@@ -71,21 +71,19 @@ public:
         @param quaternions Quaternions buffer
         @param linkedCellParameters Linked cell parameters
         @param nObstacles number of obstacles
-        @param nParticles number of particles
-        @param maxParticlesPerCell maximum particles per cell (fixed allocation) */
+        @param nParticles number of particles */
     LinkedCell_AtomicFixed(const GrainsMemBuffer<RigidBody<T>*, MemType::DEVICE>* rb,
                            const GrainsMemBuffer<Vector3<T>, MemType::DEVICE>&    positions,
                            const GrainsMemBuffer<Quaternion<T>, MemType::DEVICE>& quaternions,
                            const LinkedCellParameters<T>& linkedCellParameters,
                            const uint                     nObstacles,
-                           const uint                     nParticles,
-                           const uint                     maxParticlesPerCell = 64)
+                           const uint                     nParticles)
         : LinkedCell<T, MemType::DEVICE>(
               rb, positions, quaternions, linkedCellParameters, nObstacles, nParticles)
         , m_numParticlesPerCell(m_numCells)
-        , m_cellParticleIDs(m_numCells * maxParticlesPerCell)
+        , m_cellParticleIDs(m_numCells * linkedCellParameters.maxParticlesPerCell)
         , m_cellPrefixSums(m_numCells)
-        , m_maxParticlesPerCell(maxParticlesPerCell)
+        , m_maxParticlesPerCell(linkedCellParameters.maxParticlesPerCell)
     {
         m_numParticlesPerCell.fill();
         m_cellParticleIDs.fill(UINT64_MAX);

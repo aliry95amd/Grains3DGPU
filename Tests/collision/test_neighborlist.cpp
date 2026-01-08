@@ -177,25 +177,23 @@ TEST_F(NeighborListTest, BruteForce_CPU_vs_GPU)
     GP::m_collisionDetection.neighborListType = NeighborListType::NSQ;
 
     // Test CPU
-    NeighborList<double, MemType::HOST>* NL_cpu = nullptr;
-    NeighborListFactory<double, MemType::HOST>::create(&rb_cpu,
-                                                       positions_cpu,
-                                                       quaternions_cpu,
-                                                       nObstacles,
-                                                       nParticles,
-                                                       NL_cpu);
-    auto cpu_pairs = getNeighborPairs(NL_cpu);
+    auto NL_cpu    = NeighborListFactory<double, MemType::HOST>::create(&rb_cpu,
+                                                                     positions_cpu,
+                                                                     quaternions_cpu,
+                                                                     GP::m_collisionDetection,
+                                                                     nObstacles,
+                                                                     nParticles);
+    auto cpu_pairs = getNeighborPairs(NL_cpu.get());
 
     // Test GPU
     GP::m_simulationState.neighborListUpdateCount = 0;  // Reset for GPU test
-    NeighborList<double, MemType::DEVICE>* NL_gpu = nullptr;
-    NeighborListFactory<double, MemType::DEVICE>::create(&rb_gpu,
-                                                         positions_gpu,
-                                                         quaternions_gpu,
-                                                         nObstacles,
-                                                         nParticles,
-                                                         NL_gpu);
-    auto gpu_pairs = getNeighborPairsGPU(NL_gpu);
+    auto NL_gpu    = NeighborListFactory<double, MemType::DEVICE>::create(&rb_gpu,
+                                                                       positions_gpu,
+                                                                       quaternions_gpu,
+                                                                       GP::m_collisionDetection,
+                                                                       nObstacles,
+                                                                       nParticles);
+    auto gpu_pairs = getNeighborPairsGPU(NL_gpu.get());
 
     // Verify same results
     EXPECT_GT(cpu_pairs.size(), 0) << "Should find some neighbors";
@@ -217,14 +215,13 @@ TEST_F(NeighborListTest, LinkedCell_CPU_vs_GPU_Variants)
     GP::m_collisionDetection.linkedCellParameters = linkedCellParams;
     GP::m_simulationState.neighborListUpdateCount = 0;
 
-    NeighborList<double, MemType::HOST>* NL_cpu = nullptr;
-    NeighborListFactory<double, MemType::HOST>::create(&rb_cpu,
-                                                       positions_cpu,
-                                                       quaternions_cpu,
-                                                       nObstacles,
-                                                       nParticles,
-                                                       NL_cpu);
-    auto cpu_pairs = getNeighborPairs(NL_cpu);
+    auto NL_cpu    = NeighborListFactory<double, MemType::HOST>::create(&rb_cpu,
+                                                                     positions_cpu,
+                                                                     quaternions_cpu,
+                                                                     GP::m_collisionDetection,
+                                                                     nObstacles,
+                                                                     nParticles);
+    auto cpu_pairs = getNeighborPairs(NL_cpu.get());
     all_pairs.push_back(cpu_pairs);
     names.push_back("CPU_Host");
 
@@ -239,14 +236,13 @@ TEST_F(NeighborListTest, LinkedCell_CPU_vs_GPU_Variants)
         GP::m_collisionDetection.linkedCellParameters = linkedCellParams;
         GP::m_simulationState.neighborListUpdateCount = 0;
 
-        NeighborList<double, MemType::DEVICE>* NL_gpu = nullptr;
-        NeighborListFactory<double, MemType::DEVICE>::create(&rb_gpu,
-                                                             positions_gpu,
-                                                             quaternions_gpu,
-                                                             nObstacles,
-                                                             nParticles,
-                                                             NL_gpu);
-        auto gpu_pairs = getNeighborPairsGPU(NL_gpu);
+        auto NL_gpu    = NeighborListFactory<double, MemType::DEVICE>::create(&rb_gpu,
+                                                                           positions_gpu,
+                                                                           quaternions_gpu,
+                                                                           GP::m_collisionDetection,
+                                                                           nObstacles,
+                                                                           nParticles);
+        auto gpu_pairs = getNeighborPairsGPU(NL_gpu.get());
         all_pairs.push_back(gpu_pairs);
         names.push_back(gpu_names[i]);
     }

@@ -48,7 +48,7 @@ protected:
     GrainsMemBuffer<uint, M> m_componentId;
 
     /** \brief Neighbor list object */
-    NeighborList<T, M>* m_neighborList;
+    std::unique_ptr<NeighborList<T, M>> m_neighborList;
     /** \brief Particle sorter for Morton code-based reordering */
     ParticleSorter<T, M> m_particleSorter;
     /** \brief Relative position */
@@ -88,7 +88,6 @@ public:
         , m_velocity(nParticles + nObstacles)
         , m_torce(nParticles + nObstacles)
         , m_componentId(nParticles + nObstacles)
-        , m_neighborList(nullptr)
         , m_particleSorter(nObstacles, nParticles)
         , m_numObstacles(nObstacles)
         , m_numParticles(nParticles)
@@ -99,11 +98,7 @@ public:
 
     // ---------------------------------------------------------------------------------------------
     /** @brief Destructor */
-    virtual ~ComponentManager()
-    {
-        if(m_neighborList)
-            delete m_neighborList;
-    }
+    virtual ~ComponentManager() = default;
     //@}
 
     /** @name Get methods */
@@ -241,7 +236,7 @@ public:
     /** @brief Gets neighbor list */
     const NeighborList<T, M>* getNeighborList() const
     {
-        return m_neighborList;
+        return m_neighborList.get();
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -317,12 +312,10 @@ public:
 
     // ---------------------------------------------------------------------------------------------
     /** @brief Sets the neighbor list
-        @param neighborList pointer to the neighbor list object */
-    void setNeighborList(NeighborList<T, M>* neighborList)
+        @param neighborList unique pointer to the neighbor list object */
+    void setNeighborList(std::unique_ptr<NeighborList<T, M>> neighborList)
     {
-        if(m_neighborList)
-            delete m_neighborList;
-        m_neighborList = neighborList;
+        m_neighborList = std::move(neighborList);
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -369,13 +362,13 @@ public:
     /** @brief Initializes buffers for pair-dependent data */
     void initialize()
     {
-        NeighborListFactory<T, M>::create(m_rigidBody,
-                                          m_position,
-                                          m_quaternion,
-                                          GrainsParameters<T>::m_collisionDetection,
-                                          m_numObstacles,
-                                          m_numParticles,
-                                          m_neighborList);
+        m_neighborList
+            = NeighborListFactory<T, M>::create(m_rigidBody,
+                                                m_position,
+                                                m_quaternion,
+                                                GrainsParameters<T>::m_collisionDetection,
+                                                m_numObstacles,
+                                                m_numParticles);
 
         // Get the amount of memory available
         size_t freeMem;

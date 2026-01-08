@@ -88,6 +88,8 @@ struct LinkedCellParameters
     T cellSizeFactor = 1;
     /** \brief Maximum number of cells that one obstacle can occupy. */
     uint maxNumCellsPerObstacle = 0;
+    /** \brief Maximum number of particles per cell (used for ATOMICFIXED LinkedCell type). */
+    uint maxParticlesPerCell = 64;
     /** \brief If using adaptive skin, this is the desired number of iterations that the skin should
         be valid for. If it is set to 0, then we don't use adaptive skin. If set to 1, the skin is
         updated every iteration and trivially it gives worse performance. */

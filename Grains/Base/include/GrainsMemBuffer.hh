@@ -450,7 +450,7 @@ public:
     // ---------------------------------------------------------------------------------------------
     /** @brief Returns the kind of memory transfer for the given src and dst memory types. */
     template <MemType Src, MemType Dst>
-    constexpr cudaMemcpyKind getMemcpyKind()
+    constexpr cudaMemcpyKind getMemcpyKind() const
     {
         if constexpr(Src == MemType::HOST && Dst == MemType::HOST)
             return cudaMemcpyHostToHost;
@@ -489,7 +489,7 @@ public:
         @param dest destination buffer
         @param stream CUDA stream for asynchronous operations (default: 0) */
     template <MemType destM>
-    void copyTo(GrainsMemBuffer<T, destM>& dest, cudaStream_t stream = 0)
+    void copyTo(GrainsMemBuffer<T, destM>& dest, cudaStream_t stream = 0) const
     {
         if(m_size == 0 || !m_ptr)
             return;

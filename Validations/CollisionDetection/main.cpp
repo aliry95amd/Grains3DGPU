@@ -13,10 +13,10 @@ int main()
     BenchmarkConfig<float> config;
 
     // Platform parameters
-    config.platform = PLATFORM::GPU;
+    config.platform = PLATFORM::BOTH;
 
     // Particle parameters
-    config.numParticles = 256;
+    config.numParticles = 32;
     config.shapeType    = ParticleShapeType::SPHERE;
     config.particleSize = 0.05;
 
@@ -36,8 +36,9 @@ int main()
     config.testRelative      = true;
 
     // Test parameters
-    config.numTrials  = 5;   // Number of trials per configuration
-    config.randomSeed = 42;  // Base random seed
+    config.numTrials        = 5;     // Number of trials per configuration
+    config.randomSeed       = 42;    // Base random seed
+    config.validateContacts = true;  // Write contact info to file for validation
 
     // =========================================================================================
     // Run benchmark with current configuration

@@ -1,5 +1,6 @@
 #include "ContactInfo.hh"
 #include "GrainsUtils.hh"
+#include "VectorMath.hh"
 
 // -------------------------------------------------------------------------------------------------
 // Default constructor
@@ -74,6 +75,23 @@ template <typename T>
 __HOSTDEVICE__ void ContactInfo<T>::setOverlapDistance(T d)
 {
     m_overlapDistance = d;
+}
+
+// -------------------------------------------------------------------------------------------------
+// Equality operator
+template <typename T>
+__HOSTDEVICE__ bool ContactInfo<T>::operator==(const ContactInfo<T>& other) const
+{
+    return (m_contactPoint == other.m_contactPoint) && (m_contactVector == other.m_contactVector)
+           && (m_overlapDistance == other.m_overlapDistance);
+}
+
+// -------------------------------------------------------------------------------------------------
+// Inequality operator
+template <typename T>
+__HOSTDEVICE__ bool ContactInfo<T>::operator!=(const ContactInfo<T>& other) const
+{
+    return !(*this == other);
 }
 
 // -------------------------------------------------------------------------------------------------

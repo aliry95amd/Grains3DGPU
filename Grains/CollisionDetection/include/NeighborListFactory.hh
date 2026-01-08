@@ -36,21 +36,21 @@ public:
     /**@name Methods */
     //@{
     // ---------------------------------------------------------------------------------------------
-    /** @brief Creates and returns a buffer of NeighborList objects
+    /** @brief Creates and returns a unique_ptr to a NeighborList object
         @param rb Rigid body buffer
         @param positions Positions buffer
         @param quaternions Quaternions buffer
         @param CD Collision detection parameters
         @param nObstacles number of obstacles
         @param nParticles number of particles
-        @param NL Memory buffer for storing the neighbor list object */
-    static void create(const GrainsMemBuffer<RigidBody<T>*, M>* rb,
-                       const GrainsMemBuffer<Vector3<T>, M>&    positions,
-                       const GrainsMemBuffer<Quaternion<T>, M>& quaternions,
-                       const CollisionDetectionParameters<T>&   CD,
-                       const uint                               nObstacles,
-                       const uint                               nParticles,
-                       NeighborList<T, M>*&                     NL)
+        @return unique_ptr to the created neighbor list */
+    static std::unique_ptr<NeighborList<T, M>>
+        create(const GrainsMemBuffer<RigidBody<T>*, M>* rb,
+               const GrainsMemBuffer<Vector3<T>, M>&    positions,
+               const GrainsMemBuffer<Quaternion<T>, M>& quaternions,
+               const CollisionDetectionParameters<T>&   CD,
+               const uint                               nObstacles,
+               const uint                               nParticles)
     {
         // Assertions
         GAssert(rb->getSize() == nObstacles + nParticles, "Rigid body size mismatch");
@@ -60,22 +60,24 @@ public:
         // Global parameters
         NeighborListType type = CD.neighborListType;
 
+        std::unique_ptr<NeighborList<T, M>> NL;
         if(type == NeighborListType::NSQ)
         {
-            NL = new NeighborList_Nsq<T, M>(nObstacles, nParticles);
+            NL = std::make_unique<NeighborList_Nsq<T, M>>(nObstacles, nParticles);
         }
         else if(type == NeighborListType::LINKEDCELL)
         {
-            NL = new NeighborList_LinkedCell<T, M>(rb,
-                                                   positions,
-                                                   quaternions,
-                                                   CD.linkedCellParameters,
-                                                   nObstacles,
-                                                   nParticles);
+            NL = std::make_unique<NeighborList_LinkedCell<T, M>>(rb,
+                                                                 positions,
+                                                                 quaternions,
+                                                                 CD.linkedCellParameters,
+                                                                 nObstacles,
+                                                                 nParticles);
         }
 
         // Sanity check to ensure neighbor list was created
         GAssert(NL != nullptr, "Neighbor list creation failed.");
+        return NL;
     }
     //@}
 };

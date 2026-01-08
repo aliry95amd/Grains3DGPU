@@ -74,6 +74,21 @@ public:
     __HOSTDEVICE__
     void setOverlapDistance(T d);
     //@}
+
+    /** @name Operators */
+    //@{
+    /** @brief Equality operator
+        @param other the ContactInfo to compare with
+        @return true if all members are equal */
+    __HOSTDEVICE__
+    bool operator==(const ContactInfo<T>& other) const;
+
+    /** @brief Inequality operator
+        @param other the ContactInfo to compare with
+        @return true if any member is different */
+    __HOSTDEVICE__
+    bool operator!=(const ContactInfo<T>& other) const;
+    //@}
 };
 
 /** @name External Methods - I/O methods */

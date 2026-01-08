@@ -33,7 +33,7 @@ protected:
     /** @name Parameters */
     //@{
     /** \brief LinkedCell */
-    LinkedCell<T, M>* m_LinkedCell;
+    std::unique_ptr<LinkedCell<T, M>> m_LinkedCell;
     /** \brief Buffer of number of neighbors for each particle */
     GrainsMemBuffer<uint, M> m_numNeighbors;
     /** \brief Buffer of prefix sums for neighbor counts */
@@ -69,13 +69,12 @@ public:
                             const uint                               nParticles)
     {
         // Create the LinkedCell buffer
-        LinkedCellFactory<T, M>::create(rb,
-                                        positions,
-                                        quaternions,
-                                        linkedCellParameters,
-                                        nObstacles,
-                                        nParticles,
-                                        m_LinkedCell);
+        m_LinkedCell = LinkedCellFactory<T, M>::create(rb,
+                                                       positions,
+                                                       quaternions,
+                                                       linkedCellParameters,
+                                                       nObstacles,
+                                                       nParticles);
 
         // TODO: Reduce init size
         m_pairList.initialize(nObstacles * nParticles + nParticles * (nParticles - 1) / 2);
@@ -135,7 +134,7 @@ public:
             if constexpr(M == MemType::HOST)
             {
                 m_pairList.clear();
-                auto* LC_host = static_cast<LinkedCell_Host<T>*>(m_LinkedCell);
+                auto* LC_host = static_cast<LinkedCell_Host<T>*>(m_LinkedCell.get());
                 updateNeighborList_LC_Host(LC_host->getCellNeighborsList(),
                                            LC_host->getObstacleIDs(),
                                            LC_host->getObstacleCellIDs(),
@@ -194,7 +193,8 @@ public:
                 // Phase 1: Count neighbors per particle (on stream 1)
                 if(LC.type == LinkedCellType::ATOMICFIXED)
                 {
-                    auto* LC_atomicFixed = static_cast<LinkedCell_AtomicFixed<T>*>(m_LinkedCell);
+                    auto* LC_atomicFixed
+                        = static_cast<LinkedCell_AtomicFixed<T>*>(m_LinkedCell.get());
                     countNeighbors_AtomicFixed_Device<<<numBlocks, numThreads, 0, m_stream1>>>(
                         neighborCellsList,
                         cellParticleIDs,
@@ -256,7 +256,8 @@ public:
                 // Phase 3: Write neighbor pairs using prefix sums (on stream 1)
                 if(LC.type == LinkedCellType::ATOMICFIXED)
                 {
-                    auto* LC_atomicFixed = static_cast<LinkedCell_AtomicFixed<T>*>(m_LinkedCell);
+                    auto* LC_atomicFixed
+                        = static_cast<LinkedCell_AtomicFixed<T>*>(m_LinkedCell.get());
                     updateNeighborList_LC_AtomicFixed_Device<<<numBlocks,
                                                                numThreads,
                                                                0,
