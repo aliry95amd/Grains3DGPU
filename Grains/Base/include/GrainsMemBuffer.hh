@@ -53,6 +53,24 @@ __GLOBAL__ void sequence_Kernel(T* buffer, const size_t size, const T& start = T
 
     buffer[idx] = static_cast<T>(start + idx);
 }
+
+// -------------------------------------------------------------------------------------------------
+/** @brief Kernel to free device pointers stored in a pointer array.
+    @param ptrArray array of device pointers
+    @param size number of pointers in the array */
+template <typename T>
+__GLOBAL__ void freePointedObjects_Kernel(T** ptrArray, const size_t size)
+{
+    size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if(idx >= size)
+        return;
+
+    if(ptrArray[idx] != nullptr)
+    {
+        cudaFree(ptrArray[idx]);
+        ptrArray[idx] = nullptr;
+    }
+}
 //@}
 
 // =================================================================================================
@@ -581,6 +599,51 @@ public:
         m_d_ptr    = nullptr;
         m_size     = 0;
         m_capacity = 0;
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    /** @brief Frees objects pointed to by pointers in this buffer.
+        This is only valid for buffers that store pointers (e.g., GrainsMemBuffer<T*, M>).
+        For HOST memory, calls delete on each pointer.
+        For DEVICE memory, copies pointers to host and calls cudaFree on each.
+        @param stream CUDA stream for asynchronous operations (default: 0) */
+    void freePointedObjects(cudaStream_t stream = 0)
+    {
+        // Only allow this for pointer types
+        static_assert(std::is_pointer_v<T>, "freePointedObjects only valid for pointer types");
+        static_assert(M != MemType::MANAGED, "freePointedObjects not supported for MANAGED memory");
+
+        if(m_size == 0 || !m_ptr)
+            return;
+
+        if constexpr(M == MemType::HOST || M == MemType::PINNED)
+        {
+            // Host memory: directly iterate and delete
+            for(size_t i = 0; i < m_size; ++i)
+            {
+                if(m_ptr[i] != nullptr)
+                {
+                    delete m_ptr[i];
+                    m_ptr[i] = nullptr;
+                }
+            }
+        }
+        else if constexpr(M == MemType::DEVICE)
+        {
+            // Device memory: copy pointers to host first, then free each
+            std::vector<T> hostPtrs(m_size);
+            cudaErrCheck(
+                cudaMemcpy(hostPtrs.data(), m_ptr, m_size * sizeof(T), cudaMemcpyDeviceToHost));
+            std::cout << "Freeing " << m_size << " pointed objects from device memory...\n";
+            for(size_t i = 0; i < m_size; ++i)
+            {
+                if(hostPtrs[i] != nullptr)
+                    cudaErrCheck(cudaFree(hostPtrs[i]));
+            }
+            std::cout << "Freed " << m_size << " pointed objects from device memory.\n";
+            fill();
+            cudaErrCheck(cudaDeviceSynchronize());
+        }
     }
 
     // ---------------------------------------------------------------------------------------------

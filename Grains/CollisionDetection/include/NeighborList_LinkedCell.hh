@@ -39,7 +39,7 @@ protected:
     /** \brief Buffer of prefix sums for neighbor counts */
     GrainsMemBuffer<uint, M> m_numNeighborsPrefixSums;
     /** \brief Number of obstacle-particle pairs */
-    uint* m_obstacleParticlePairCount;
+    uint* m_obstacleParticlePairCount = nullptr;
     /** \brief CUDA stream for obstacle-particle pair generation */
     cudaStream_t m_stream0;
     /** \brief CUDA stream for particle-particle neighbor generation */
@@ -99,8 +99,6 @@ public:
             cudaErrCheck(cudaStreamCreate(&m_stream0));
             cudaErrCheck(cudaStreamCreate(&m_stream1));
         }
-        else
-            m_pairCount = new uint;
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -109,8 +107,13 @@ public:
     {
         if constexpr(M == MemType::DEVICE)
         {
-            cudaStreamDestroy(m_stream0);
-            cudaStreamDestroy(m_stream1);
+            if(m_obstacleParticlePairCount != nullptr)
+            {
+                cudaErrCheck(cudaFree(m_obstacleParticlePairCount));
+                m_obstacleParticlePairCount = nullptr;
+            }
+            cudaErrCheck(cudaStreamDestroy(m_stream0));
+            cudaErrCheck(cudaStreamDestroy(m_stream1));
         }
     }
     //@}

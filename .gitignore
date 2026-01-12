@@ -61,6 +61,8 @@ Tests/smoke/*/
 Tools/PrePost/*/bin*
 Tools/PrePost/*/obj*
 Tools/XMLGenerators/*/**.xml
+Validations/*/build/
+Validations/*/data/
 
 # IDEs and editors
 *.vscode

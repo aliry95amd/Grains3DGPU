@@ -44,6 +44,8 @@ protected:
     GrainsMemBuffer<uint64_t, MemType::DEVICE> m_cellParticleIDs;
     /** \brief Buffer to store cell prefix sums (start indices for each cell) */
     GrainsMemBuffer<uint, MemType::DEVICE> m_cellPrefixSums;
+    /** \brief Device pointer for number of cells (used in resize operations) */
+    uint* m_d_numCells = nullptr;
     /** \brief CUDA streams for concurrent kernel execution */
     cudaEvent_t  m_resizeComplete;  // Event to track cell resize completion
     cudaStream_t m_stream0;         // Neighbor cell generation
@@ -77,20 +79,23 @@ public:
         , m_cellParticleIDs(nParticles)
         , m_cellPrefixSums(m_numCells)
     {
-        cudaEventCreate(&m_resizeComplete);
-        cudaStreamCreate(&m_stream0);
-        cudaStreamCreate(&m_stream1);
-        cudaStreamCreate(&m_stream2);
+        cudaErrCheck(cudaMalloc(&m_d_numCells, sizeof(uint)));
+        cudaErrCheck(cudaEventCreate(&m_resizeComplete));
+        cudaErrCheck(cudaStreamCreate(&m_stream0));
+        cudaErrCheck(cudaStreamCreate(&m_stream1));
+        cudaErrCheck(cudaStreamCreate(&m_stream2));
     }
 
     // ---------------------------------------------------------------------------------------------
     /** @brief Destructor */
     virtual ~LinkedCell_SortBased()
     {
-        cudaEventDestroy(m_resizeComplete);
-        cudaStreamDestroy(m_stream0);
-        cudaStreamDestroy(m_stream1);
-        cudaStreamDestroy(m_stream2);
+        if(m_d_numCells != nullptr)
+            cudaErrCheck(cudaFree(m_d_numCells));
+        cudaErrCheck(cudaEventDestroy(m_resizeComplete));
+        cudaErrCheck(cudaStreamDestroy(m_stream0));
+        cudaErrCheck(cudaStreamDestroy(m_stream1));
+        cudaErrCheck(cudaStreamDestroy(m_stream2));
     }
     //@}
 
@@ -158,12 +163,9 @@ public:
             m_numIterationsSinceLastUpdate = 0;
 
             // Resize cells on default stream (blocking but minimal impact)
-            uint* d_numCells;
-            cudaMalloc(&d_numCells, sizeof(uint));
-            resizeCells_Device<<<1, 1>>>(m_cells.getData(), cellSize, d_numCells);
-            cudaMemcpyAsync(&m_numCells, d_numCells, sizeof(uint), cudaMemcpyDeviceToHost, 0);
+            resizeCells_Device<<<1, 1>>>(m_cells.getData(), cellSize, m_d_numCells);
+            cudaMemcpyAsync(&m_numCells, m_d_numCells, sizeof(uint), cudaMemcpyDeviceToHost, 0);
             cudaStreamSynchronize(0);
-            cudaFree(d_numCells);
             cudaEventRecord(m_resizeComplete, 0);
 
             // Resize buffers with appropriate streams

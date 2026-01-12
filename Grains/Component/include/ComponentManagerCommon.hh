@@ -77,6 +77,111 @@ __HOSTDEVICE__ static INLINE void
 }
 
 // -------------------------------------------------------------------------------------------------
+/** @brief Detects collisions between components using global coordinates
+    @param pairList list of contact pairs
+    @param rigidBody rigid body
+    @param position global position of the components
+    @param quaternion global quaternion of the components
+    @param contactInfo contact information
+    @param pairID ID of the pair */
+template <typename T, GJKType GJKVARIANT = GJKType::JOHNSON, bool GJKACC = false>
+__HOSTDEVICE__ static INLINE void
+    detectCollisionsComponentsGlobal_common(const uint2*               pairList,
+                                            const RigidBody<T>* const* rigidBody,
+                                            const Vector3<T>*          position,
+                                            const Quaternion<T>*       quaternion,
+                                            ContactInfo<T>*            contactInfo,
+                                            const uint                 pairID)
+{
+    const uint2          pair  = pairList[pairID];
+    const uint           idA   = pair.x;
+    const uint           idB   = pair.y;
+    const RigidBody<T>&  rbA   = *(rigidBody[idA]);
+    const RigidBody<T>&  rbB   = *(rigidBody[idB]);
+    const Vector3<T>&    v_a2w = position[idA];
+    const Vector3<T>&    v_b2w = position[idB];
+    const Quaternion<T>& q_a2w = quaternion[idA];
+    const Quaternion<T>& q_b2w = quaternion[idB];
+    closestPointsRigidBodies<T, GJKVARIANT, GJKACC>(rbA,
+                                                    rbB,
+                                                    v_a2w,
+                                                    v_b2w,
+                                                    q_a2w,
+                                                    q_b2w,
+                                                    contactInfo[pairID]);
+}
+
+// -------------------------------------------------------------------------------------------------
+/** @brief Computes relative transformations per pair using Transform3
+    @param pairList list of rigid bodies pairs
+    @param transform transforms of the components
+    @param relativeTransform output relative transforms of the components
+    @param pairID ID of the pair */
+template <typename T>
+__HOSTDEVICE__ static INLINE void
+    computeRelativeTransformations_common(const uint2*         pairList,
+                                          const Transform3<T>* transform,
+                                          Transform3<T>*       relativeTransform,
+                                          const uint           pairID)
+{
+    const uint2   pair = pairList[pairID];
+    const uint    idA  = pair.x;
+    const uint    idB  = pair.y;
+    Transform3<T> invA;
+    invA.setToInverseTransform(transform[idA]);
+    relativeTransform[pairID].setToTransformsComposition(invA, transform[idB]);
+}
+
+// -------------------------------------------------------------------------------------------------
+/** @brief Detects collisions between components using Transform3 (relative)
+    @param pairList list of contact pairs
+    @param rigidBody rigid body
+    @param relTransform relative transforms of the components
+    @param contactInfo contact information
+    @param pairID ID of the pair */
+template <typename T, GJKType GJKVARIANT = GJKType::JOHNSON, bool GJKACC = false>
+__HOSTDEVICE__ static INLINE void
+    detectCollisionsComponents_common(const uint2*               pairList,
+                                      const RigidBody<T>* const* rigidBody,
+                                      const Transform3<T>*       relTransform,
+                                      ContactInfo<T>*            contactInfo,
+                                      const uint                 pairID)
+{
+    const uint2          pair = pairList[pairID];
+    const uint           idA  = pair.x;
+    const uint           idB  = pair.y;
+    const RigidBody<T>&  rbA  = *(rigidBody[idA]);
+    const RigidBody<T>&  rbB  = *(rigidBody[idB]);
+    const Transform3<T>& b2a  = relTransform[pairID];
+    closestPointsRigidBodies<T, GJKVARIANT, GJKACC>(rbA, rbB, b2a, contactInfo[pairID]);
+}
+
+// -------------------------------------------------------------------------------------------------
+/** @brief Detects collisions between components using Transform3 (global coordinates)
+    @param pairList list of contact pairs
+    @param rigidBody rigid body
+    @param transform global transforms of the components
+    @param contactInfo contact information
+    @param pairID ID of the pair */
+template <typename T, GJKType GJKVARIANT = GJKType::JOHNSON, bool GJKACC = false>
+__HOSTDEVICE__ static INLINE void
+    detectCollisionsComponentsGlobal_common(const uint2*               pairList,
+                                            const RigidBody<T>* const* rigidBody,
+                                            const Transform3<T>*       transform,
+                                            ContactInfo<T>*            contactInfo,
+                                            const uint                 pairID)
+{
+    const uint2          pair = pairList[pairID];
+    const uint           idA  = pair.x;
+    const uint           idB  = pair.y;
+    const RigidBody<T>&  rbA  = *(rigidBody[idA]);
+    const RigidBody<T>&  rbB  = *(rigidBody[idB]);
+    const Transform3<T>& a2w  = transform[idA];
+    const Transform3<T>& b2w  = transform[idB];
+    closestPointsRigidBodies<T, GJKVARIANT, GJKACC>(rbA, rbB, a2w, b2w, contactInfo[pairID]);
+}
+
+// -------------------------------------------------------------------------------------------------
 /** @brief Flags active contacts and transforms CI from A-local to world.
     @param pairList list of contact pairs
     @param position world positions of components

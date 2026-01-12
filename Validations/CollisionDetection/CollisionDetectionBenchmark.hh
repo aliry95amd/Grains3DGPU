@@ -11,9 +11,8 @@
 #include "BenchmarkConfig.hh"
 #include "Box.hh"
 #include "CSVWriter.hh"
-#include "ComponentManager.hh"
-#include "ComponentManagerCPU.hh"
-#include "ComponentManagerGPU.hh"
+#include "ComponentManagerCommon.hh"
+#include "ComponentManagerGPU_Kernels.hh"
 #include "GJK.hh"
 #include "GrainsMemBuffer.hh"
 #include "GrainsParameters.hh"
@@ -26,6 +25,7 @@
 #include "NeighborList.hh"
 #include "NeighborListFactory.hh"
 #include "Quaternion.hh"
+#include "QuaternionMath.hh"
 #include "RigidBody.hh"
 #include "RigidBodyFactory.hh"
 #include "Sphere.hh"
@@ -35,10 +35,10 @@
 #include "Vector3.hh"
 
 // =================================================================================================
-/** @brief Comprehensive Collision Detection Benchmark
+/** @brief GJK Collision Detection Benchmark
 
-    This class provides full pipeline performance analysis including particle insertion,
-    broad-phase (NeighborList/LinkedCell), and narrow-phase (GJK) collision detection.
+    This class benchmarks GJK collision detection with neighbor list generation.
+    Directly uses detectCollisionsComponents_common without ComponentManager objects.
     Results are exported to CSV for post-processing.
 
     @author A.Yazdani - 2026 - Collision Detection Performance Validation */
@@ -47,93 +47,68 @@ template <typename T>
 class CollisionDetectionBenchmark
 {
 private:
-    BenchmarkConfig<T>         m_config;
+    BenchmarkConfig            m_config;
     std::unique_ptr<CSVWriter> m_csvWriter;
 
     // Storage for particles
-    std::unique_ptr<Convex<T>>                    m_shapeTemplate;
-    GrainsMemBuffer<RigidBody<T>*, MemType::HOST> m_rigidBodies;
-    GrainsMemBuffer<Vector3<T>, MemType::HOST>    m_positions;
-    GrainsMemBuffer<Quaternion<T>, MemType::HOST> m_quaternions;
-    GrainsMemBuffer<Kinematics<T>, MemType::HOST> m_kinematics;
+    std::unique_ptr<Convex<T>> m_shapeTemplate;
+
+    // Host-side storage
+    GrainsMemBuffer<RigidBody<T>*, MemType::HOST>  m_rigidBodies;
+    GrainsMemBuffer<Vector3<T>, MemType::HOST>     m_positions;
+    GrainsMemBuffer<Quaternion<T>, MemType::HOST>  m_quaternions;
+    GrainsMemBuffer<Transform3<T>, MemType::HOST>  m_transforms;
+    GrainsMemBuffer<Kinematics<T>, MemType::HOST>  m_kinematics;
+    GrainsMemBuffer<Vector3<T>, MemType::HOST>     m_relativePositions;
+    GrainsMemBuffer<Quaternion<T>, MemType::HOST>  m_relativeQuaternions;
+    GrainsMemBuffer<Transform3<T>, MemType::HOST>  m_relativeTransforms;
+    GrainsMemBuffer<ContactInfo<T>, MemType::HOST> m_contactInfo;
 
     // GPU-side storage
-    GrainsMemBuffer<RigidBody<T>*, MemType::DEVICE> m_d_rigidBodies;
-    GrainsMemBuffer<Vector3<T>, MemType::DEVICE>    m_d_positions;
-    GrainsMemBuffer<Quaternion<T>, MemType::DEVICE> m_d_quaternions;
+    GrainsMemBuffer<RigidBody<T>*, MemType::DEVICE>  m_d_rigidBodies;
+    GrainsMemBuffer<Vector3<T>, MemType::DEVICE>     m_d_positions;
+    GrainsMemBuffer<Quaternion<T>, MemType::DEVICE>  m_d_quaternions;
+    GrainsMemBuffer<Transform3<T>, MemType::DEVICE>  m_d_transforms;
+    GrainsMemBuffer<Vector3<T>, MemType::DEVICE>     m_d_relativePositions;
+    GrainsMemBuffer<Quaternion<T>, MemType::DEVICE>  m_d_relativeQuaternions;
+    GrainsMemBuffer<Transform3<T>, MemType::DEVICE>  m_d_relativeTransforms;
+    GrainsMemBuffer<ContactInfo<T>, MemType::DEVICE> m_d_contactInfo;
 
 public:
     // ---------------------------------------------------------------------------------------------
     /** @brief Constructor with configuration */
-    CollisionDetectionBenchmark(const BenchmarkConfig<T>& config, const std::string& csvFilename)
+    CollisionDetectionBenchmark(const BenchmarkConfig& config,
+                                const std::string&     csvFilename,
+                                bool                   appendToCSV = false)
         : m_config(config)
     {
-        m_csvWriter = std::make_unique<CSVWriter>(csvFilename);
-        initializeCSVHeader();
+        m_csvWriter = std::make_unique<CSVWriter>(csvFilename, appendToCSV);
+
+        // Initialize CSV header only if not appending
+        if(!appendToCSV)
+        {
+            std::vector<std::string> columns = {"TrialID",
+                                                "Platform",
+                                                "Precision",
+                                                "ParticleCount",
+                                                "ShapeType",
+                                                "ParticleSize",
+                                                "AspectRatio",
+                                                "GJKAlgo",
+                                                "GJKRepresentation",
+                                                "UseRelativeTransform",
+                                                "NeighborListTime_ms",
+                                                "RelativeTransformTime_ms",
+                                                "GJKTime_ms",
+                                                "TotalTime_ms",
+                                                "PairCount"};
+            m_csvWriter->writeHeader(columns);
+        }
     }
 
     // ---------------------------------------------------------------------------------------------
     /** @brief Destructor */
     ~CollisionDetectionBenchmark()
-    {
-        cleanup();
-    }
-
-    // ---------------------------------------------------------------------------------------------
-    /** @brief Run benchmark with current configuration */
-    void runBenchmark()
-    {
-        // Create CollisionDetectionParameters from config
-        CollisionDetectionParameters<T> cdParams;
-        cdParams.neighborListType                     = m_config.neighborListType;
-        cdParams.linkedCellParameters.type            = m_config.linkedCellType;
-        cdParams.linkedCellParameters.minCorner       = m_config.domainMin;
-        cdParams.linkedCellParameters.maxCorner       = m_config.domainMax;
-        cdParams.linkedCellParameters.minCellSize     = m_config.particleSize * 2;
-        cdParams.linkedCellParameters.cellSizeFactor  = 1.0;
-        cdParams.linkedCellParameters.updateFrequency = m_config.adaptiveSkin ? 10 : 0;
-        cdParams.linkedCellParameters.sortFrequency   = m_config.sort ? 10 : 0;
-
-        // Insert particles
-        insertParticles(cdParams.linkedCellParameters, m_config.randomSeed);
-
-        auto compMgrCPU = std::make_unique<ComponentManagerCPU<T>>(&m_rigidBodies,
-                                                                   0,  // numObstacles
-                                                                   m_config.numParticles);
-        compMgrCPU->setPosition(m_positions);
-        compMgrCPU->setQuaternion(m_quaternions);
-
-        // GPU - copy all data to device
-        RigidBodyFactory<T>::copyHostToDevice(m_rigidBodies, m_d_rigidBodies);
-        m_d_positions.copyFrom(m_positions);
-        m_d_quaternions.copyFrom(m_quaternions);
-
-        auto compMgrGPU = std::make_unique<ComponentManagerGPU<T>>(&m_d_rigidBodies,
-                                                                   0,  // numObstacles
-                                                                   m_config.numParticles);
-        compMgrCPU->template copyTo<MemType::DEVICE>(
-            reinterpret_cast<std::unique_ptr<ComponentManager<T, MemType::DEVICE>>&>(compMgrGPU));
-        // Create ComponentManager based on platform
-        for(uint trial = 0; trial < m_config.numTrials; ++trial)
-        {
-            if(m_config.platform == PLATFORM::CPU || m_config.platform == PLATFORM::BOTH)
-            {
-                runBenchmark(cdParams, compMgrCPU.get(), trial);
-            }
-            if(m_config.platform == PLATFORM::GPU || m_config.platform == PLATFORM::BOTH)
-            {
-                // GPU
-                runBenchmark(cdParams, compMgrGPU.get(), trial);
-            }
-        }
-
-        Gout("\nAll " + std::to_string(m_config.numTrials) + " trials complete!");
-    }
-
-private:
-    // ---------------------------------------------------------------------------------------------
-    /** @brief Cleanup allocated memory */
-    void cleanup()
     {
         // Delete all rigid bodies
         for(uint i = 0; i < m_config.numParticles; ++i)
@@ -144,57 +119,27 @@ private:
                 m_rigidBodies[i] = nullptr;
             }
         }
-
-        // Clear all containers
-        m_rigidBodies.clear();
-        m_positions.clear();
-        m_quaternions.clear();
-        m_kinematics.clear();
-    }
-
-private:
-    // ---------------------------------------------------------------------------------------------
-    /** @brief Initialize CSV header */
-    void initializeCSVHeader()
-    {
-        std::vector<std::string> columns = {"TrialID",
-                                            "Platform",
-                                            "ParticleCount",
-                                            "ShapeType",
-                                            "ParticleSize",
-                                            "AspectRatio",
-                                            "NeighborListType",
-                                            "LCVariant",
-                                            "Sort",
-                                            "AdaptiveSkin",
-                                            "GJKAlgo",
-                                            "GJKRepresentation",
-                                            "TestRelative",
-                                            "SortingTime_ms",
-                                            "NeighborUpdateTime_ms",
-                                            "RelativeTransformTime_ms",
-                                            "GJKTime_ms",
-                                            "TotalTime_ms",
-                                            "PairCount"};
-        m_csvWriter->writeHeader(columns);
     }
 
     // ---------------------------------------------------------------------------------------------
-    /** @brief Insert particles using Insertion class */
-    void insertParticles(const LinkedCellParameters<T>& linkedCellParams, uint seed)
+    /** @brief Run benchmark with current configuration */
+    void runBenchmark()
     {
         // Create shape template
-        T r = m_config.particleSize;
+        auto size = Vector3<T>(static_cast<T>(m_config.particleSize[X]),
+                               static_cast<T>(m_config.particleSize[Y]),
+                               static_cast<T>(m_config.particleSize[Z]));
         switch(m_config.shapeType)
         {
         case ParticleShapeType::BOX:
-            m_shapeTemplate = std::make_unique<Box<T>>(2 * r, 2 * r, 2 * r);
+            m_shapeTemplate = std::make_unique<Box<T>>(size[X], size[Y], size[Z]);
             break;
         case ParticleShapeType::SPHERE:
-            m_shapeTemplate = std::make_unique<Sphere<T>>(r);
+            m_shapeTemplate = std::make_unique<Sphere<T>>(size[X]);
             break;
         case ParticleShapeType::SUPERQUADRIC:
-            m_shapeTemplate = std::make_unique<Superquadric<T>>(r, r, r, T(3.0), T(3.0));
+            m_shapeTemplate
+                = std::make_unique<Superquadric<T>>(size[X], size[Y], size[Z], T(2.0), T(2.0));
             break;
         default:
             GAbort("Invalid shape type!");
@@ -213,20 +158,104 @@ private:
             m_d_quaternions.initialize(nTotal);
         }
 
-        // Create rigid bodies (all particles, no obstacles)
+        // Create rigid bodies
         for(uint i = 0; i < nTotal; ++i)
         {
             Convex<T>* cvx   = m_shapeTemplate->clone();
             m_rigidBodies[i] = new RigidBody<T>(cvx, T(0), 0, 1);
             m_positions[i]   = Vector3<T>(T(0), T(0), T(0));
             m_quaternions[i] = Quaternion<T>(T(1), T(0), T(0), T(0));
-            m_kinematics[i]  = Kinematics<T>();
         }
 
+        // Create CollisionDetectionParameters from config
+        CollisionDetectionParameters<T> cdParams;
+        cdParams.neighborListType               = NeighborListType::LINKEDCELL;
+        cdParams.linkedCellParameters.type      = LinkedCellType::SORTBASED;
+        cdParams.linkedCellParameters.minCorner = Vector3<T>(static_cast<T>(m_config.domainMin[X]),
+                                                             static_cast<T>(m_config.domainMin[Y]),
+                                                             static_cast<T>(m_config.domainMin[Z]));
+        cdParams.linkedCellParameters.maxCorner = Vector3<T>(static_cast<T>(m_config.domainMax[X]),
+                                                             static_cast<T>(m_config.domainMax[Y]),
+                                                             static_cast<T>(m_config.domainMax[Z]));
+        cdParams.linkedCellParameters.minCellSize
+            = 2. * m_shapeTemplate->computeCircumscribedRadius();
+        cdParams.linkedCellParameters.cellSizeFactor  = 1.0;
+        cdParams.linkedCellParameters.updateFrequency = 0;
+        cdParams.linkedCellParameters.sortFrequency   = 0;
+
+        // Insert particles
+        insertParticles(cdParams.linkedCellParameters, m_config.randomSeed);
+
+        // Estimate maximum number of pairs for buffer allocation
+        uint maxPairs = m_config.numParticles * m_config.numParticles;  // Conservative estimate
+
+        // Allocate collision detection buffers for CPU
+        m_relativePositions.initialize(maxPairs);
+        m_relativeQuaternions.initialize(maxPairs);
+        m_relativeTransforms.initialize(maxPairs);
+        m_contactInfo.initialize(maxPairs);
+
+        // Initialize transforms from positions and quaternions if using Transform3 representation
+        if(m_config.gjkRepresentation == GJKRepresentationType::TRANSFORM)
+        {
+            m_transforms.initialize(nTotal);
+            for(uint i = 0; i < nTotal; ++i)
+            {
+                m_transforms[i] = Transform3<T>(m_quaternions[i], m_positions[i]);
+            }
+        }
+
+        // Allocate collision detection buffers for GPU if needed
+        if(m_config.platform == PLATFORM::GPU || m_config.platform == PLATFORM::BOTH)
+        {
+            // Copy all data to device
+            RigidBodyFactory<T>::copyHostToDevice(m_rigidBodies, m_d_rigidBodies);
+            m_d_positions.copyFrom(m_positions);
+            m_d_quaternions.copyFrom(m_quaternions);
+
+            if(m_config.gjkRepresentation == GJKRepresentationType::TRANSFORM)
+            {
+                m_d_transforms.initialize(nTotal);
+                m_d_transforms.copyFrom(m_transforms);
+            }
+
+            m_d_relativePositions.initialize(maxPairs);
+            m_d_relativeQuaternions.initialize(maxPairs);
+            m_d_relativeTransforms.initialize(maxPairs);
+            m_d_contactInfo.initialize(maxPairs);
+        }
+
+        // Run trials
+        for(uint trial = 0; trial < m_config.numTrials; ++trial)
+        {
+            if(m_config.platform == PLATFORM::CPU || m_config.platform == PLATFORM::BOTH)
+            {
+                runBenchmark<MemType::HOST>(cdParams, trial);
+            }
+            if(m_config.platform == PLATFORM::GPU || m_config.platform == PLATFORM::BOTH)
+            {
+                runBenchmark<MemType::DEVICE>(cdParams, trial);
+            }
+        }
+
+        Gout("\nAll " + std::to_string(m_config.numTrials) + " trials complete!");
+    }
+
+private:
+    // ---------------------------------------------------------------------------------------------
+    /** @brief Insert particles using Insertion class */
+    void insertParticles(const LinkedCellParameters<T>& linkedCellParams, uint seed)
+    {
         // Use Insertion class for particle placement
         // Create insertion window covering the domain for positions
         std::vector<InsertionWindow<T>> positionWindows;
-        positionWindows.emplace_back(m_config.domainMin, m_config.domainMax, seed);
+        Vector3<T>                      domainMin(static_cast<T>(m_config.domainMin[X]),
+                             static_cast<T>(m_config.domainMin[Y]),
+                             static_cast<T>(m_config.domainMin[Z]));
+        Vector3<T>                      domainMax(static_cast<T>(m_config.domainMax[X]),
+                             static_cast<T>(m_config.domainMax[Y]),
+                             static_cast<T>(m_config.domainMax[Z]));
+        positionWindows.emplace_back(domainMin, domainMax, seed);
 
         // Create insertion windows for random orientations (Euler angles: 0 to 2π)
         std::vector<InsertionWindow<T>> orientationWindows;
@@ -246,155 +275,431 @@ private:
                           m_kinematics,
                           linkedCellParams,
                           0,
-                          nTotal);
+                          m_config.numParticles);
     }
 
     // ---------------------------------------------------------------------------------------------
-    /** @brief Run ComponentManager pipeline with timing (templated for CPU/GPU) */
+    /** @brief Run GJK benchmark with timing (templated for CPU/GPU) */
     template <MemType M>
-    void runBenchmark(const CollisionDetectionParameters<T>& cdParams,
-                      ComponentManager<T, M>*                compMgr,
-                      uint                                   trialID)
+    void runBenchmark(const CollisionDetectionParameters<T>& cdParams, uint trialID)
     {
         GrainsParameters<T>::m_simulationState.neighborListUpdateCount = 0;
 
         // Select appropriate buffers based on memory type
-        const GrainsMemBuffer<RigidBody<T>*, M>* rbBuffer;
-        const GrainsMemBuffer<Vector3<T>, M>*    posBuffer;
-        const GrainsMemBuffer<Quaternion<T>, M>* quatBuffer;
+        GrainsMemBuffer<RigidBody<T>*, M>*  rbBuffer;
+        GrainsMemBuffer<Vector3<T>, M>*     posBuffer;
+        GrainsMemBuffer<Quaternion<T>, M>*  quatBuffer;
+        GrainsMemBuffer<Transform3<T>, M>*  transformBuffer;
+        GrainsMemBuffer<Vector3<T>, M>*     relPosBuffer;
+        GrainsMemBuffer<Quaternion<T>, M>*  relQuatBuffer;
+        GrainsMemBuffer<Transform3<T>, M>*  relTransformBuffer;
+        GrainsMemBuffer<ContactInfo<T>, M>* contactBuffer;
 
         if constexpr(M == MemType::HOST)
         {
-            rbBuffer   = &m_rigidBodies;
-            posBuffer  = &m_positions;
-            quatBuffer = &m_quaternions;
+            rbBuffer           = &m_rigidBodies;
+            posBuffer          = &m_positions;
+            quatBuffer         = &m_quaternions;
+            transformBuffer    = &m_transforms;
+            relPosBuffer       = &m_relativePositions;
+            relQuatBuffer      = &m_relativeQuaternions;
+            relTransformBuffer = &m_relativeTransforms;
+            contactBuffer      = &m_contactInfo;
         }
         else
         {
-            rbBuffer   = &m_d_rigidBodies;
-            posBuffer  = &m_d_positions;
-            quatBuffer = &m_d_quaternions;
+            rbBuffer           = &m_d_rigidBodies;
+            posBuffer          = &m_d_positions;
+            quatBuffer         = &m_d_quaternions;
+            transformBuffer    = &m_d_transforms;
+            relPosBuffer       = &m_d_relativePositions;
+            relQuatBuffer      = &m_d_relativeQuaternions;
+            relTransformBuffer = &m_d_relativeTransforms;
+            contactBuffer      = &m_d_contactInfo;
         }
 
-        auto neighborList = NeighborListFactory<T, M>::create(rbBuffer,
+        // Step 1: Create and update neighbor list
+        auto      neighborList = NeighborListFactory<T, M>::create(rbBuffer,
                                                               *posBuffer,
                                                               *quatBuffer,
                                                               cdParams,
                                                               0,
                                                               m_config.numParticles);
-        compMgr->setNeighborList(std::move(neighborList));
-
-        // Step 4: Time sorting (if enabled)
-        StepTimer sortTimer;
-        double    sortingTime = 0.0;
-
-        if(m_config.sort)
-        {
-            sortTimer.start();
-            compMgr->sortParticles();
-            sortTimer.stop();
-            sortingTime = sortTimer.getElapsedMilliseconds();
-        }
-
-        // Step 5: Time neighbor list update (includes LC construction)
         StepTimer nlTimer;
         nlTimer.start();
-        compMgr->updateNeighborList();
+        neighborList->updateNeighborList(*posBuffer, 0, m_config.numParticles);
         nlTimer.stop();
         double nlUpdateTime = nlTimer.getElapsedMilliseconds();
 
-        // Get pair count for reporting
-        const NeighborList<T, M>* NL        = compMgr->getNeighborList();
-        uint                      pairCount = NL->getSize();
+        // Get pair count
+        uint         pairCount = neighborList->getSize();
+        const uint2* pairList  = neighborList->getData();
+        if(pairCount == 0)
+        {
+            Gout("Warning: No pairs found. Skipping collision detection for this trial.");
+        }
 
-        // Step 6: Time relative transformation computation (if enabled)
+        // Resize contact buffer if needed
+        contactBuffer->resize(pairCount);
+        relPosBuffer->resize(pairCount);
+        relQuatBuffer->resize(pairCount);
+        relTransformBuffer->resize(pairCount);
+
+        // Step 2: Compute relative transformations (if using relative mode)
         StepTimer relTransformTimer;
         double    relTransformTime = 0.0;
-        if(m_config.testRelative && pairCount > 0)
+
+        if(m_config.useRelativeTransform && pairCount > 0)
         {
             relTransformTimer.start();
-            compMgr->computeRelativeTransformations();
+
+            if(m_config.gjkRepresentation == GJKRepresentationType::TRANSFORM)
+            {
+                // Use Transform3 representation
+                if constexpr(M == MemType::HOST)
+                {
+                    // CPU version
+                    for(uint pairID = 0; pairID < pairCount; ++pairID)
+                    {
+                        computeRelativeTransformations_common<T>(pairList,
+                                                                 transformBuffer->getData(),
+                                                                 relTransformBuffer->getData(),
+                                                                 pairID);
+                    }
+                }
+                else
+                {
+                    // GPU version - launch kernel
+                    uint numThreads, numBlocks;
+                    computeOptimalThreadsAndBlocks(pairCount,
+                                                   GrainsParameters<T>::m_GPU,
+                                                   numBlocks,
+                                                   numThreads);
+                    computeRelativeTransformations_Kernel<<<numBlocks, numThreads>>>(
+                        pairList,
+                        transformBuffer->getData(),
+                        relTransformBuffer->getData(),
+                        pairCount);
+                    cudaDeviceSynchronize();
+                }
+            }
+            else  // Quaternion representation
+            {
+                // Use Quaternion representation
+                if constexpr(M == MemType::HOST)
+                {
+                    // CPU version
+                    for(uint pairID = 0; pairID < pairCount; ++pairID)
+                    {
+                        computeRelativeTransformations_common<T>(pairList,
+                                                                 posBuffer->getData(),
+                                                                 quatBuffer->getData(),
+                                                                 relPosBuffer->getData(),
+                                                                 relQuatBuffer->getData(),
+                                                                 pairID);
+                    }
+                }
+                else
+                {
+                    // GPU version - launch kernel
+                    uint numThreads, numBlocks;
+                    computeOptimalThreadsAndBlocks(pairCount,
+                                                   GrainsParameters<T>::m_GPU,
+                                                   numBlocks,
+                                                   numThreads);
+                    computeRelativeTransformations_Kernel<<<numBlocks, numThreads>>>(
+                        pairList,
+                        posBuffer->getData(),
+                        quatBuffer->getData(),
+                        relPosBuffer->getData(),
+                        relQuatBuffer->getData(),
+                        pairCount);
+                    cudaDeviceSynchronize();
+                }
+            }
             relTransformTimer.stop();
             relTransformTime = relTransformTimer.getElapsedMilliseconds();
         }
 
-        // Step 7: Time GJK collision detection
+        // Step 3: Run GJK collision detection
         StepTimer gjkTimer;
-        double    gjkTime = 0.0;
-        if(pairCount > 0)
+        gjkTimer.start();
+
+        if(pairCount > 0 && m_config.useRelativeTransform)
         {
-            gjkTimer.start();
-            // Call detectCollisionsComponents - currently only JOHNSON variant supported
-            // TODO: Add runtime dispatch for different GJK variants
-            compMgr->detectCollisionsComponents();
-            gjkTimer.stop();
-            gjkTime = gjkTimer.getElapsedMilliseconds();
+            // Use relative transformations
+            if(m_config.gjkRepresentation == GJKRepresentationType::TRANSFORM)
+            {
+                // Transform3 representation
+                if constexpr(M == MemType::HOST)
+                {
+                    // CPU version
+                    if(m_config.gjkVariant == GJKVariantType::JOHNSON)
+                    {
+                        for(uint pairID = 0; pairID < pairCount; ++pairID)
+                        {
+                            detectCollisionsComponents_common<T, GJKType::JOHNSON, false>(
+                                pairList,
+                                rbBuffer->getData(),
+                                relTransformBuffer->getData(),
+                                contactBuffer->getData(),
+                                pairID);
+                        }
+                    }
+                    else  // SIGNEDVOLUME
+                    {
+                        for(uint pairID = 0; pairID < pairCount; ++pairID)
+                        {
+                            detectCollisionsComponents_common<T, GJKType::SIGNEDVOLUME, false>(
+                                pairList,
+                                rbBuffer->getData(),
+                                relTransformBuffer->getData(),
+                                contactBuffer->getData(),
+                                pairID);
+                        }
+                    }
+                }
+                else
+                {
+                    // GPU version - launch kernel
+                    uint numThreads, numBlocks;
+                    computeOptimalThreadsAndBlocks(pairCount,
+                                                   GrainsParameters<T>::m_GPU,
+                                                   numBlocks,
+                                                   numThreads);
+                    detectCollisionsComponents_Kernel<<<numBlocks, numThreads>>>(
+                        pairList,
+                        rbBuffer->getData(),
+                        relTransformBuffer->getData(),
+                        contactBuffer->getData(),
+                        pairCount);
+                    cudaDeviceSynchronize();
+                }
+            }
+            else  // Quaternion representation
+            {
+                // Quaternion representation
+                if constexpr(M == MemType::HOST)
+                {
+                    // CPU version
+                    if(m_config.gjkVariant == GJKVariantType::JOHNSON)
+                    {
+                        for(uint pairID = 0; pairID < pairCount; ++pairID)
+                        {
+                            detectCollisionsComponents_common<T, GJKType::JOHNSON, false>(
+                                pairList,
+                                rbBuffer->getData(),
+                                relPosBuffer->getData(),
+                                relQuatBuffer->getData(),
+                                contactBuffer->getData(),
+                                pairID);
+                        }
+                    }
+                    else  // SIGNEDVOLUME
+                    {
+                        for(uint pairID = 0; pairID < pairCount; ++pairID)
+                        {
+                            detectCollisionsComponents_common<T, GJKType::SIGNEDVOLUME, false>(
+                                pairList,
+                                rbBuffer->getData(),
+                                relPosBuffer->getData(),
+                                relQuatBuffer->getData(),
+                                contactBuffer->getData(),
+                                pairID);
+                        }
+                    }
+                }
+                else
+                {
+                    // GPU version - launch kernel
+                    uint numThreads, numBlocks;
+                    computeOptimalThreadsAndBlocks(pairCount,
+                                                   GrainsParameters<T>::m_GPU,
+                                                   numBlocks,
+                                                   numThreads);
+                    detectCollisionsComponents_Kernel<<<numBlocks, numThreads>>>(
+                        pairList,
+                        rbBuffer->getData(),
+                        relPosBuffer->getData(),
+                        relQuatBuffer->getData(),
+                        contactBuffer->getData(),
+                        pairCount);
+                    cudaDeviceSynchronize();
+                }
+            }
         }
+        else if(pairCount > 0)
+        {
+            // Use global coordinates directly
+            if(m_config.gjkRepresentation == GJKRepresentationType::TRANSFORM)
+            {
+                // Transform3 representation
+                if constexpr(M == MemType::HOST)
+                {
+                    // CPU version
+                    if(m_config.gjkVariant == GJKVariantType::JOHNSON)
+                    {
+                        for(uint pairID = 0; pairID < pairCount; ++pairID)
+                        {
+                            detectCollisionsComponentsGlobal_common<T, GJKType::JOHNSON, false>(
+                                pairList,
+                                rbBuffer->getData(),
+                                transformBuffer->getData(),
+                                contactBuffer->getData(),
+                                pairID);
+                        }
+                    }
+                    else  // SIGNEDVOLUME
+                    {
+                        for(uint pairID = 0; pairID < pairCount; ++pairID)
+                        {
+                            detectCollisionsComponentsGlobal_common<T,
+                                                                    GJKType::SIGNEDVOLUME,
+                                                                    false>(
+                                pairList,
+                                rbBuffer->getData(),
+                                transformBuffer->getData(),
+                                contactBuffer->getData(),
+                                pairID);
+                        }
+                    }
+                }
+                else
+                {
+                    // GPU version - launch kernel
+                    uint numThreads, numBlocks;
+                    computeOptimalThreadsAndBlocks(pairCount,
+                                                   GrainsParameters<T>::m_GPU,
+                                                   numBlocks,
+                                                   numThreads);
+                    detectCollisionsComponentsGlobal_Kernel<<<numBlocks, numThreads>>>(
+                        pairList,
+                        rbBuffer->getData(),
+                        transformBuffer->getData(),
+                        contactBuffer->getData(),
+                        pairCount);
+                    cudaDeviceSynchronize();
+                }
+            }
+            else  // Quaternion representation
+            {
+                // Quaternion representation
+                if constexpr(M == MemType::HOST)
+                {
+                    // CPU version
+                    if(m_config.gjkVariant == GJKVariantType::JOHNSON)
+                    {
+                        for(uint pairID = 0; pairID < pairCount; ++pairID)
+                        {
+                            detectCollisionsComponentsGlobal_common<T, GJKType::JOHNSON, false>(
+                                pairList,
+                                rbBuffer->getData(),
+                                posBuffer->getData(),
+                                quatBuffer->getData(),
+                                contactBuffer->getData(),
+                                pairID);
+                        }
+                    }
+                    else  // SIGNEDVOLUME
+                    {
+                        for(uint pairID = 0; pairID < pairCount; ++pairID)
+                        {
+                            detectCollisionsComponentsGlobal_common<T,
+                                                                    GJKType::SIGNEDVOLUME,
+                                                                    false>(pairList,
+                                                                           rbBuffer->getData(),
+                                                                           posBuffer->getData(),
+                                                                           quatBuffer->getData(),
+                                                                           contactBuffer->getData(),
+                                                                           pairID);
+                        }
+                    }
+                }
+                else
+                {
+                    // GPU version - launch kernel
+                    uint numThreads, numBlocks;
+                    computeOptimalThreadsAndBlocks(pairCount,
+                                                   GrainsParameters<T>::m_GPU,
+                                                   numBlocks,
+                                                   numThreads);
+                    detectCollisionsComponentsGlobal_Kernel<<<numBlocks, numThreads>>>(
+                        pairList,
+                        rbBuffer->getData(),
+                        posBuffer->getData(),
+                        quatBuffer->getData(),
+                        contactBuffer->getData(),
+                        pairCount);
+                    cudaDeviceSynchronize();
+                }
+            }
+        }
+
+        gjkTimer.stop();
+        double gjkTime = gjkTimer.getElapsedMilliseconds();
 
         if(m_config.validateContacts && trialID == 0)
         {
-            writeContactsToFile(compMgr, trialID);
+            writeContactsToFile<M>(neighborList.get(), contactBuffer, trialID);
         }
 
-        // Step 8: Calculate total time
-        double totalTime = sortingTime + nlUpdateTime + relTransformTime + gjkTime;
-        Gout("Trial " + std::to_string(trialID)
-             + ": Total pipeline time: " + std::to_string(totalTime) + " ms");
+        // Step 4: Calculate total time
+        double totalTime = nlUpdateTime + relTransformTime + gjkTime;
+        Gout("Trial " + std::to_string(trialID) + ": Total time: " + std::to_string(totalTime)
+             + " ms");
 
-        // Step 9: Write results to CSV
-        writeResultRow(trialID,
-                       m_config.platform == PLATFORM::CPU   ? "CPU"
-                       : m_config.platform == PLATFORM::GPU ? "GPU"
-                                                            : "BOTH",
-                       m_config.numParticles,
-                       m_config.shapeType == ParticleShapeType::BOX            ? "Box"
-                       : m_config.shapeType == ParticleShapeType::SPHERE       ? "Sphere"
-                       : m_config.shapeType == ParticleShapeType::SUPERQUADRIC ? "Superquadric"
-                                                                               : "Unknown",
-                       m_config.particleSize,
-                       m_config.aspectRatio,
-                       m_config.neighborListType == NeighborListType::NSQ ? "NSQ" : "LINKEDCELL",
-                       m_config.linkedCellType == LinkedCellType::HOST        ? "Host"
-                       : m_config.linkedCellType == LinkedCellType::SORTBASED ? "SortBased"
-                       : m_config.linkedCellType == LinkedCellType::ATOMIC    ? "Atomic"
-                                                                              : "AtomicFixed",
-                       m_config.sort,
-                       m_config.adaptiveSkin,
-                       m_config.gjkVariant == GJKVariantType::JOHNSON ? "Johnson" : "SignedVolume",
-                       m_config.gjkRepresentation == GJKRepresentationType::TRANSFORM
-                           ? "Transform"
-                           : "Quaternion",
-                       m_config.testRelative,
-                       sortingTime,
-                       nlUpdateTime,
-                       relTransformTime,
-                       gjkTime,
-                       totalTime,
-                       pairCount);
+        // Step 5: Write results to CSV
+        m_csvWriter->writeRow(
+            trialID,
+            M == MemType::HOST ? "CPU" : "GPU",
+            sizeof(T) == sizeof(float) ? "Single" : "Double",
+            m_config.numParticles,
+            m_config.shapeType == ParticleShapeType::BOX            ? "Box"
+            : m_config.shapeType == ParticleShapeType::SPHERE       ? "Sphere"
+            : m_config.shapeType == ParticleShapeType::SUPERQUADRIC ? "Superquadric"
+                                                                    : "Unknown",
+            m_config.particleSize,
+            m_config.aspectRatio,
+            m_config.gjkVariant == GJKVariantType::JOHNSON ? "Johnson" : "SignedVolume",
+            m_config.gjkRepresentation == GJKRepresentationType::TRANSFORM ? "Transform"
+                                                                           : "Quaternion",
+            m_config.useRelativeTransform ? 1 : 0,
+            nlUpdateTime,
+            relTransformTime,
+            gjkTime,
+            totalTime,
+            pairCount);
     }
 
     // ---------------------------------------------------------------------------------------------
     /** @brief Write contact information to file
-        @param compMgr Component manager containing contact info
+        @param neighborList Neighbor list containing pair info
+        @param contactBuffer Contact info buffer
         @param trialID Trial identifier */
     template <MemType M>
-    void writeContactsToFile(ComponentManager<T, M>* compMgr, uint trialID)
+    void writeContactsToFile(const NeighborList<T, M>*                 neighborList,
+                             const GrainsMemBuffer<ContactInfo<T>, M>* contactBuffer,
+                             uint                                      trialID)
     {
+        if(neighborList->getSize() == 0)
+        {
+            Gout("No contacts to write for trial " + std::to_string(trialID));
+            return;
+        }
         auto platform = (M == MemType::HOST) ? "CPU" : "GPU";
 
         // Get pair list
-        const NeighborList<T, M>*             NL = compMgr->getNeighborList();
-        GrainsMemBuffer<uint2, MemType::HOST> pairList(NL->getSize());
-        NL->getBuffer().copyTo(pairList);
+        uint                                  numContacts = neighborList->getSize();
+        GrainsMemBuffer<uint2, MemType::HOST> pairList(numContacts);
+        neighborList->getBuffer().copyTo(pairList);
 
         // Get contact info
-        GrainsMemBuffer<ContactInfo<T>, MemType::HOST> contactInfo(NL->getSize());
-        compMgr->getContactInfo(contactInfo);
-
-        uint numContacts = NL->getSize();
+        GrainsMemBuffer<ContactInfo<T>, MemType::HOST> contactInfo(numContacts);
+        contactBuffer->copyTo(contactInfo);
 
         // Create filename
-        std::string filename = "contacts_trial" + std::to_string(trialID) + "_" + platform + ".txt";
+        std::string filename
+            = "data/contacts_trial" + std::to_string(trialID) + "_" + platform + ".txt";
         std::ofstream outFile(filename);
 
         if(!outFile.is_open())
@@ -439,50 +744,6 @@ private:
 
         outFile.close();
         Gout("Wrote " + std::to_string(numContacts) + " contacts to " + filename);
-    }
-
-    // ---------------------------------------------------------------------------------------------
-    /** @brief Write result row to CSV */
-    void writeResultRow(uint               trialID,
-                        const std::string& platform,
-                        uint               particleCount,
-                        const std::string& shapeType,
-                        double             particleSize,
-                        double             aspectRatio,
-                        const std::string& nlType,
-                        const std::string& lcVariant,
-                        bool               sort,
-                        bool               adaptiveSkin,
-                        const std::string& gjkAlgo,
-                        const std::string& gjkRep,
-                        bool               testRelative,
-                        double             sortingTime,
-                        double             updateTime,
-                        double             relTransformTime,
-                        double             gjkTime,
-                        double             totalTime,
-                        uint               pairCount)
-    {
-        // Write row data
-        m_csvWriter->writeRow(trialID,
-                              platform,
-                              particleCount,
-                              shapeType,
-                              particleSize,
-                              aspectRatio,
-                              nlType,
-                              lcVariant,
-                              sort ? 1 : 0,
-                              adaptiveSkin ? 1 : 0,
-                              gjkAlgo,
-                              gjkRep,
-                              testRelative,
-                              sortingTime,
-                              updateTime,
-                              relTransformTime,
-                              gjkTime,
-                              totalTime,
-                              pairCount);
     }
 };
 

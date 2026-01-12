@@ -16,11 +16,14 @@ private:
     bool          m_headerWritten;
 
 public:
-    CSVWriter(const std::string& filename)
+    CSVWriter(const std::string& filename, bool append = false)
         : m_filename(filename)
         , m_headerWritten(false)
     {
-        m_file.open(m_filename, std::ios::out);
+        if(append)
+            m_file.open(m_filename, std::ios::out | std::ios::app);
+        else
+            m_file.open(m_filename, std::ios::out);
         if(!m_file.is_open())
         {
             std::cerr << "Error: Could not open CSV file: " << m_filename << std::endl;

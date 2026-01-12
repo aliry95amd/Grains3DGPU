@@ -98,6 +98,70 @@ __GLOBAL__ void computeRelativeTransformations_Kernel(const uint2*         pairL
 }
 
 // -------------------------------------------------------------------------------------------------
+/** @brief Computes the relative transformations between pairs of components using Transform3
+    @param pairList list of pairs of components
+    @param transform array of transforms for components
+    @param relTransform array of relative transforms for particles
+    @param nPairs number of pairs */
+template <typename T>
+__GLOBAL__ void computeRelativeTransformations_Kernel(const uint2*         pairList,
+                                                      const Transform3<T>* transform,
+                                                      Transform3<T>*       relTransform,
+                                                      const uint           nPairs)
+{
+    uint tID = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if(tID >= nPairs)
+        return;
+
+    computeRelativeTransformations_common(pairList, transform, relTransform, tID);
+}
+
+// -------------------------------------------------------------------------------------------------
+/** @brief Detects collisions between components using Transform3 (relative)
+    @param pairList list of pairs of components
+    @param rigidBody array of rigid bodies for components
+    @param relTransform array of relative transforms for components
+    @param contactInfo array to store contact information
+    @param nPairs number of pairs */
+template <typename T>
+__GLOBAL__ void detectCollisionsComponents_Kernel(const uint2*               pairList,
+                                                  const RigidBody<T>* const* rigidBody,
+                                                  const Transform3<T>*       relTransform,
+                                                  ContactInfo<T>*            contactInfo,
+                                                  const uint                 nPairs)
+{
+    uint tID = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if(tID >= nPairs)
+        return;
+
+    detectCollisionsComponents_common(pairList, rigidBody, relTransform, contactInfo, tID);
+}
+
+// -------------------------------------------------------------------------------------------------
+/** @brief Detects collisions between components using Transform3 (global coordinates)
+    @param pairList list of pairs of components
+    @param rigidBody array of rigid bodies for components
+    @param transform array of global transforms for components
+    @param contactInfo array to store contact information
+    @param nPairs number of pairs */
+template <typename T>
+__GLOBAL__ void detectCollisionsComponentsGlobal_Kernel(const uint2*               pairList,
+                                                        const RigidBody<T>* const* rigidBody,
+                                                        const Transform3<T>*       transform,
+                                                        ContactInfo<T>*            contactInfo,
+                                                        const uint                 nPairs)
+{
+    uint tID = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if(tID >= nPairs)
+        return;
+
+    detectCollisionsComponentsGlobal_common(pairList, rigidBody, transform, contactInfo, tID);
+}
+
+// -------------------------------------------------------------------------------------------------
 /** @brief Detects collisions between components
     @param pairList list of pairs of components
     @param rigidBody array of rigid bodies for components
@@ -124,6 +188,35 @@ __GLOBAL__ void detectCollisionsComponents_Kernel(const uint2*               pai
                                       relQuaternion,
                                       contactInfo,
                                       tID);
+}
+
+// -------------------------------------------------------------------------------------------------
+/** @brief Detects collisions between components using global coordinates
+    @param pairList list of pairs of components
+    @param rigidBody array of rigid bodies for components
+    @param position array of global positions for components
+    @param quaternion array of global quaternions for components
+    @param contactInfo array to store contact information
+    @param nPairs number of pairs */
+template <typename T>
+__GLOBAL__ void detectCollisionsComponentsGlobal_Kernel(const uint2*               pairList,
+                                                        const RigidBody<T>* const* rigidBody,
+                                                        const Vector3<T>*          position,
+                                                        const Quaternion<T>*       quaternion,
+                                                        ContactInfo<T>*            contactInfo,
+                                                        const uint                 nPairs)
+{
+    uint tID = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if(tID >= nPairs)
+        return;
+
+    detectCollisionsComponentsGlobal_common(pairList,
+                                            rigidBody,
+                                            position,
+                                            quaternion,
+                                            contactInfo,
+                                            tID);
 }
 
 // -------------------------------------------------------------------------------------------------

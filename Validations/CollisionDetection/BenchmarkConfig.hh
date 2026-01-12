@@ -4,6 +4,12 @@
 #include "LinkedCell.hh"
 #include "Vector3.hh"
 
+enum class PrecisionType
+{
+    SINGLE = 0,  // float
+    DOUBLE = 1   // double
+};
+
 enum class ParticleShapeType
 {
     SPHERE       = 0,
@@ -32,32 +38,28 @@ enum class PLATFORM
 
 // =================================================================================================
 /** @brief Configuration for collision detection benchmarks */
-template <typename T>
 struct BenchmarkConfig
 {
+    // Precision
+    PrecisionType precision;
+
     // Platform parameters
     PLATFORM platform;
 
     // Particle parameters
     uint              numParticles;
     ParticleShapeType shapeType;
-    T                 particleSize;
-    T                 aspectRatio;
+    Vector3<double>   particleSize;
+    double            aspectRatio;
 
     // Domain parameters
-    Vector3<T> domainMin;
-    Vector3<T> domainMax;
-
-    // Neighbor list parameters
-    NeighborListType neighborListType;
-    LinkedCellType   linkedCellType;
-    bool             sort;
-    bool             adaptiveSkin;
+    Vector3<double> domainMin;
+    Vector3<double> domainMax;
 
     // GJK parameters
     GJKRepresentationType gjkRepresentation;
     GJKVariantType        gjkVariant;
-    bool                  testRelative;
+    bool                  useRelativeTransform;
 
     // Test parameters
     uint numTrials;
@@ -65,25 +67,20 @@ struct BenchmarkConfig
     bool validateContacts;
 
     BenchmarkConfig()
-        : platform(PLATFORM::BOTH)
+        : precision(PrecisionType::SINGLE)
+        , platform(PLATFORM::BOTH)
         , numParticles(1000)
         , shapeType(ParticleShapeType::BOX)
         , particleSize(0.05)
         , aspectRatio(1.0)
-        , domainMin(Vector3<T>(-1, -1, -1))
-        , domainMax(Vector3<T>(1, 1, 1))
-        , neighborListType(NeighborListType::NSQ)
-        , linkedCellType(LinkedCellType::SORTBASED)
-        , sort(false)
-        , adaptiveSkin(false)
+        , domainMin(Vector3<double>(-1, -1, -1))
+        , domainMax(Vector3<double>(1, 1, 1))
         , gjkRepresentation(GJKRepresentationType::TRANSFORM)
         , gjkVariant(GJKVariantType::JOHNSON)
-        , testRelative(true)
+        , useRelativeTransform(true)
         , numTrials(5)
         , randomSeed(42)
-        , validateContacts(false)
-    {
-    }
+        , validateContacts(false){};
 };
 
 #endif

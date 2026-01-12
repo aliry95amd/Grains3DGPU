@@ -170,17 +170,8 @@ public:
     /** @brief Destructor */
     virtual ~LinkedCell()
     {
-        // Clean up the Cells object
-        if constexpr(M == MemType::HOST)
-        {
-            if(m_cells.getSize() > 0 && m_cells[0] != nullptr)
-                delete m_cells[0];
-        }
-        else if constexpr(M == MemType::DEVICE)
-        {
-            if(m_cells.getSize() > 0 && m_cells.getData()[0] != nullptr)
-                cudaFree(m_cells.getData()[0]);
-        }
+        // Clean up the Cells objects using GrainsMemBuffer helper method
+        // m_cells.freePointedObjects();
 
         // Set non-owning pointers to nullptr
         m_rb          = nullptr;

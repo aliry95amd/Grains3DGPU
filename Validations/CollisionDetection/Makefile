@@ -1,4 +1,8 @@
 
+# Directories
+BUILD_DIR = build
+DATA_DIR = data
+
 # Paths
 INCLUDE_DIRS = $(GRAINS_INCDIR) $(GRAINS_XERCES_INCDIR)
 INCFLAGS  := $(INCLUDE_DIRS:%=-I%)
@@ -10,14 +14,21 @@ LINKFLAGS := $(GRAINS_GPU_LINKER_FLAGS) $(GRAINS_XERCES_FLAGS)
 
 # Source files
 SOURCES = main.cpp
-OBJECTS = $(SOURCES:.cpp=.o)
-TARGET = GJKPerformanceTest
+OBJECTS = $(SOURCES:%.cpp=$(BUILD_DIR)/%.o)
+TARGET = $(BUILD_DIR)/GJKPerformanceTest
 
 # Default target
 all: $(TARGET)
 
+# Create directories
+$(BUILD_DIR):
+	@mkdir -p $(BUILD_DIR)
+
+$(DATA_DIR):
+	@mkdir -p $(DATA_DIR)
+
 # Build target
-$(TARGET): $(OBJECTS)
+$(TARGET): $(BUILD_DIR) $(DATA_DIR) $(OBJECTS)
 	@if [ ! -d "$(GRAINS_OBJDIR)" ]; then \
 		echo "Error: Grains object files not found at $(GRAINS_OBJDIR)"; \
 		exit 1; \
@@ -31,7 +42,7 @@ $(TARGET): $(OBJECTS)
 	@echo "$(TARGET) build successful!"
 
 # Compile source files
-%.o: %.cpp
+$(BUILD_DIR)/%.o: %.cpp | $(BUILD_DIR)
 	@echo "Compiling $<..."
 	@$(GRAINS_GPU_COMPILER) $(COMPFLAGS) -MMD -MP -D_XML -c $< -o $@
 
@@ -46,7 +57,14 @@ test: $(TARGET)
 
 # Clean
 clean:
-	@rm -f $(OBJECTS) $(TARGET) *.d
-	@echo "${TARGET} cleaned!"
+	@rm -rf $(BUILD_DIR)
+	@echo "Build directory cleaned!"
 
-.PHONY: all test clean
+clean-data:
+	@rm -rf $(DATA_DIR)
+	@echo "Data directory cleaned!"
+
+clean-all: clean clean-data
+	@echo "All directories cleaned!"
+
+.PHONY: all test clean clean-data clean-all
