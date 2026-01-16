@@ -1,8 +1,7 @@
 #ifndef _LINKEDCELL_SORTBASED_HH_
 #define _LINKEDCELL_SORTBASED_HH_
 
-#include <thrust/device_ptr.h>
-#include <thrust/sort.h>
+#include <cub/cub.cuh>
 
 #include "GrainsMemBuffer.hh"
 #include "LinkedCell.hh"
@@ -44,6 +43,10 @@ protected:
     GrainsMemBuffer<uint64_t, MemType::DEVICE> m_cellParticleIDs;
     /** \brief Buffer to store cell prefix sums (start indices for each cell) */
     GrainsMemBuffer<uint, MemType::DEVICE> m_cellPrefixSums;
+    /** \brief Pre-allocated workspace for CUB sort operations */
+    void* m_cubSortTempStorage = nullptr;
+    /** \brief Size of CUB sort temporary storage */
+    size_t m_cubSortTempStorageBytes = 0;
     /** \brief Device pointer for number of cells (used in resize operations) */
     uint* m_d_numCells = nullptr;
     /** \brief CUDA streams for concurrent kernel execution */
@@ -79,6 +82,14 @@ public:
         , m_cellParticleIDs(nParticles)
         , m_cellPrefixSums(m_numCells)
     {
+        // Pre-allocate CUB sort workspace
+        cudaErrCheck(cub::DeviceRadixSort::SortKeys(m_cubSortTempStorage,
+                                                    m_cubSortTempStorageBytes,
+                                                    m_cellParticleIDs.getData(),
+                                                    m_cellParticleIDs.getData(),
+                                                    m_numParticles));
+        cudaErrCheck(cudaMalloc(&m_cubSortTempStorage, m_cubSortTempStorageBytes));
+
         cudaErrCheck(cudaMalloc(&m_d_numCells, sizeof(uint)));
         cudaErrCheck(cudaEventCreate(&m_resizeComplete));
         cudaErrCheck(cudaStreamCreate(&m_stream0));
@@ -90,6 +101,8 @@ public:
     /** @brief Destructor */
     virtual ~LinkedCell_SortBased()
     {
+        if(m_cubSortTempStorage != nullptr)
+            cudaErrCheck(cudaFree(m_cubSortTempStorage));
         if(m_d_numCells != nullptr)
             cudaErrCheck(cudaFree(m_d_numCells));
         cudaErrCheck(cudaEventDestroy(m_resizeComplete));
@@ -159,7 +172,7 @@ public:
         {
             m_skinThickness                = this->computeSkinThickness();
             T cellSize                     = m_cellSizeWithoutSkin + m_skinThickness;
-            m_maxDisplacementSquared       = T(0);
+            m_maxDisplacementSquared[0]    = T(0);
             m_numIterationsSinceLastUpdate = 0;
 
             // Resize cells on default stream (blocking but minimal impact)
@@ -173,9 +186,9 @@ public:
             m_cellPrefixSums.reserve(m_numCells, m_stream2);
 
             // Copy old positions on stream1 (independent)
-            cudaMemcpyAsync(m_oldPosition.getData() + m_numObstacles,
-                            m_positions->getData() + m_numObstacles,
-                            m_numParticles * sizeof(Vector3<T>),
+            cudaMemcpyAsync(m_oldPosition.getData(),
+                            m_positions->getData(),
+                            (m_numObstacles + m_numParticles) * sizeof(Vector3<T>),
                             cudaMemcpyDeviceToDevice,
                             m_stream1);
         }
@@ -231,10 +244,12 @@ public:
             return true;
         }
 
-        // Sort packed uint64 keys (faster than sort_by_key)
-        thrust::sort(thrust::device_ptr<uint64_t>(m_cellParticleIDs.getData()),
-                     thrust::device_ptr<uint64_t>(m_cellParticleIDs.getData() + m_numParticles));
-
+        // Sort packed uint64 keys using CUB with pre-allocated workspace
+        cudaErrCheck(cub::DeviceRadixSort::SortKeys(m_cubSortTempStorage,
+                                                    m_cubSortTempStorageBytes,
+                                                    m_cellParticleIDs.getData(),
+                                                    m_cellParticleIDs.getData(),
+                                                    m_numParticles));
         // Compute cell start indices from sorted packed keys
         uint numBlocks, numThreads;
         computeOptimalThreadsAndBlocks(m_numParticles,

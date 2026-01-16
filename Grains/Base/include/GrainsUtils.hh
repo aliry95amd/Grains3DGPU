@@ -200,6 +200,10 @@ __DEVICE__ INLINE void print_device_arg(double arg)
 {
     printf("%f ", arg);
 }
+__DEVICE__ INLINE void print_device_arg(const std::string& arg)
+{
+    printf("%s ", arg.c_str());
+}
 
 template <typename... Args>
 __HOSTDEVICE__ INLINE void GAbort(const Args&... args)

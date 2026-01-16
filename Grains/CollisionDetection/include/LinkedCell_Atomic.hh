@@ -1,6 +1,8 @@
 #ifndef _LINKEDCELL_ATOMIC_HH_
 #define _LINKEDCELL_ATOMIC_HH_
 
+#include <cub/cub.cuh>
+
 #include "GrainsMemBuffer.hh"
 #include "LinkedCell.hh"
 #include "LinkedCell_Kernels.hh"
@@ -47,6 +49,10 @@ protected:
     GrainsMemBuffer<uint, MemType::DEVICE> m_cellPrefixSums;
     /** \brief Buffer for atomic counters during particle writing */
     GrainsMemBuffer<uint, MemType::DEVICE> m_cellCounters;
+    /** \brief Pre-allocated workspace for CUB scan operations */
+    void* m_cubScanTempStorage = nullptr;
+    /** \brief Size of CUB scan temporary storage */
+    size_t m_cubScanTempStorageBytes = 0;
     /** \brief Device pointer for number of cells (used in resize operations) */
     uint* m_d_numCells = nullptr;
     /** \brief CUDA streams for concurrent kernel execution */
@@ -86,6 +92,16 @@ public:
         , m_cellCounters(m_numCells)
     {
         m_numParticlesPerCell.fill();
+
+        // Pre-allocate CUB scan workspace
+        // Check for errors after each batch
+        cudaErrCheck(cub::DeviceScan::ExclusiveSum(nullptr,
+                                                   m_cubScanTempStorageBytes,
+                                                   m_numParticlesPerCell.getData(),
+                                                   m_cellPrefixSums.getData(),
+                                                   m_numCells));
+        cudaErrCheck(cudaMalloc(&m_cubScanTempStorage, m_cubScanTempStorageBytes));
+
         cudaErrCheck(cudaMalloc(&m_d_numCells, sizeof(uint)));
         cudaErrCheck(cudaEventCreate(&m_resizeComplete));
         cudaErrCheck(cudaStreamCreate(&m_stream0));
@@ -97,6 +113,8 @@ public:
     /** @brief Destructor */
     virtual ~LinkedCell_Atomic()
     {
+        if(m_cubScanTempStorage != nullptr)
+            cudaErrCheck(cudaFree(m_cubScanTempStorage));
         if(m_d_numCells != nullptr)
             cudaErrCheck(cudaFree(m_d_numCells));
         cudaErrCheck(cudaEventDestroy(m_resizeComplete));
@@ -175,7 +193,7 @@ public:
         {
             m_skinThickness                = this->computeSkinThickness();
             T cellSize                     = m_cellSizeWithoutSkin + m_skinThickness;
-            m_maxDisplacementSquared       = T(0);
+            m_maxDisplacementSquared[0]    = T(0);
             m_numIterationsSinceLastUpdate = 0;
 
             // Resize cells on default stream (blocking but minimal impact)
@@ -191,9 +209,9 @@ public:
             m_cellCounters.reserve(m_numCells, m_stream2);
 
             // Copy old positions on stream0 (independent)
-            cudaMemcpyAsync(m_oldPosition.getData() + m_numObstacles,
-                            m_positions->getData() + m_numObstacles,
-                            m_numParticles * sizeof(Vector3<T>),
+            cudaMemcpyAsync(m_oldPosition.getData(),
+                            m_positions->getData(),
+                            (m_numObstacles + m_numParticles) * sizeof(Vector3<T>),
                             cudaMemcpyDeviceToDevice,
                             m_stream0);
         }
@@ -254,9 +272,11 @@ public:
         }
 
         // Prefix sum to find the start index of each cell in the particleIDArray
-        thrust::device_ptr<uint> numParticles_ptr(m_numParticlesPerCell.getData());
-        thrust::device_ptr<uint> prefixSums_ptr(m_cellPrefixSums.getData());
-        thrust::exclusive_scan(numParticles_ptr, numParticles_ptr + m_numCells, prefixSums_ptr);
+        cudaErrCheck(cub::DeviceScan::ExclusiveSum(m_cubScanTempStorage,
+                                                   m_cubScanTempStorageBytes,
+                                                   m_numParticlesPerCell.getData(),
+                                                   m_cellPrefixSums.getData(),
+                                                   m_numCells));
 
         // Write the particle IDs into the particleInCells using packed uint64 data
         uint numBlocks, numThreads;

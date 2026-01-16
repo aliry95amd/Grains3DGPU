@@ -151,11 +151,13 @@ public:
         m_positions.initialize(nTotal);
         m_quaternions.initialize(nTotal);
         m_kinematics.initialize(nTotal);
+        m_transforms.initialize(nTotal);
         if(m_config.platform == PLATFORM::GPU || m_config.platform == PLATFORM::BOTH)
         {
             m_d_rigidBodies.initialize(nTotal);
             m_d_positions.initialize(nTotal);
             m_d_quaternions.initialize(nTotal);
+            m_d_transforms.initialize(nTotal);
         }
 
         // Create rigid bodies
@@ -170,7 +172,7 @@ public:
         // Create CollisionDetectionParameters from config
         CollisionDetectionParameters<T> cdParams;
         cdParams.neighborListType               = NeighborListType::LINKEDCELL;
-        cdParams.linkedCellParameters.type      = LinkedCellType::SORTBASED;
+        cdParams.linkedCellParameters.type      = LinkedCellType::ATOMIC;
         cdParams.linkedCellParameters.minCorner = Vector3<T>(static_cast<T>(m_config.domainMin[X]),
                                                              static_cast<T>(m_config.domainMin[Y]),
                                                              static_cast<T>(m_config.domainMin[Z]));
@@ -187,7 +189,7 @@ public:
         insertParticles(cdParams.linkedCellParameters, m_config.randomSeed);
 
         // Estimate maximum number of pairs for buffer allocation
-        uint maxPairs = m_config.numParticles * m_config.numParticles;  // Conservative estimate
+        uint maxPairs = 20 * m_config.numParticles;  // Conservative estimate
 
         // Allocate collision detection buffers for CPU
         m_relativePositions.initialize(maxPairs);
@@ -195,14 +197,9 @@ public:
         m_relativeTransforms.initialize(maxPairs);
         m_contactInfo.initialize(maxPairs);
 
-        // Initialize transforms from positions and quaternions if using Transform3 representation
-        if(m_config.gjkRepresentation == GJKRepresentationType::TRANSFORM)
+        for(uint i = 0; i < nTotal; ++i)
         {
-            m_transforms.initialize(nTotal);
-            for(uint i = 0; i < nTotal; ++i)
-            {
-                m_transforms[i] = Transform3<T>(m_quaternions[i], m_positions[i]);
-            }
+            m_transforms[i] = Transform3<T>(m_quaternions[i], m_positions[i]);
         }
 
         // Allocate collision detection buffers for GPU if needed
@@ -212,12 +209,7 @@ public:
             RigidBodyFactory<T>::copyHostToDevice(m_rigidBodies, m_d_rigidBodies);
             m_d_positions.copyFrom(m_positions);
             m_d_quaternions.copyFrom(m_quaternions);
-
-            if(m_config.gjkRepresentation == GJKRepresentationType::TRANSFORM)
-            {
-                m_d_transforms.initialize(nTotal);
-                m_d_transforms.copyFrom(m_transforms);
-            }
+            m_d_transforms.copyFrom(m_transforms);
 
             m_d_relativePositions.initialize(maxPairs);
             m_d_relativeQuaternions.initialize(maxPairs);
@@ -225,20 +217,21 @@ public:
             m_d_contactInfo.initialize(maxPairs);
         }
 
-        // Run trials
-        for(uint trial = 0; trial < m_config.numTrials; ++trial)
+        // Run trials - CPU first, then GPU
+        if(m_config.platform == PLATFORM::CPU || m_config.platform == PLATFORM::BOTH)
         {
-            if(m_config.platform == PLATFORM::CPU || m_config.platform == PLATFORM::BOTH)
+            for(uint trial = 0; trial < m_config.numTrials; ++trial)
             {
                 runBenchmark<MemType::HOST>(cdParams, trial);
             }
-            if(m_config.platform == PLATFORM::GPU || m_config.platform == PLATFORM::BOTH)
+        }
+        if(m_config.platform == PLATFORM::GPU || m_config.platform == PLATFORM::BOTH)
+        {
+            for(uint trial = 0; trial < m_config.numTrials; ++trial)
             {
                 runBenchmark<MemType::DEVICE>(cdParams, trial);
             }
         }
-
-        Gout("\nAll " + std::to_string(m_config.numTrials) + " trials complete!");
     }
 
 private:
@@ -282,6 +275,38 @@ private:
     /** @brief Run GJK benchmark with timing (templated for CPU/GPU) */
     template <MemType M>
     void runBenchmark(const CollisionDetectionParameters<T>& cdParams, uint trialID)
+    {
+        // Test all combinations of representation, variant, and transform mode
+        std::vector<GJKRepresentationType> representations
+            = {GJKRepresentationType::QUATERNION, GJKRepresentationType::TRANSFORM};
+        std::vector<GJKVariantType> gjkVariants
+            = {GJKVariantType::JOHNSON, GJKVariantType::SIGNEDVOLUME};
+        std::vector<bool> transformModes = {true, false};  // relative vs global
+
+        for(auto representation : representations)
+        {
+            for(auto gjkVariant : gjkVariants)
+            {
+                for(bool useRelativeTransform : transformModes)
+                {
+                    runSingleConfiguration<M>(cdParams,
+                                              trialID,
+                                              representation,
+                                              gjkVariant,
+                                              useRelativeTransform);
+                }
+            }
+        }
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    /** @brief Run a single GJK configuration with timing */
+    template <MemType M>
+    void runSingleConfiguration(const CollisionDetectionParameters<T>& cdParams,
+                                uint                                   trialID,
+                                GJKRepresentationType                  representation,
+                                GJKVariantType                         gjkVariant,
+                                bool                                   useRelativeTransform)
     {
         GrainsParameters<T>::m_simulationState.neighborListUpdateCount = 0;
 
@@ -349,11 +374,11 @@ private:
         StepTimer relTransformTimer;
         double    relTransformTime = 0.0;
 
-        if(m_config.useRelativeTransform && pairCount > 0)
+        if(useRelativeTransform && pairCount > 0)
         {
             relTransformTimer.start();
 
-            if(m_config.gjkRepresentation == GJKRepresentationType::TRANSFORM)
+            if(representation == GJKRepresentationType::TRANSFORM)
             {
                 // Use Transform3 representation
                 if constexpr(M == MemType::HOST)
@@ -425,16 +450,16 @@ private:
         StepTimer gjkTimer;
         gjkTimer.start();
 
-        if(pairCount > 0 && m_config.useRelativeTransform)
+        if(pairCount > 0 && useRelativeTransform)
         {
             // Use relative transformations
-            if(m_config.gjkRepresentation == GJKRepresentationType::TRANSFORM)
+            if(representation == GJKRepresentationType::TRANSFORM)
             {
                 // Transform3 representation
                 if constexpr(M == MemType::HOST)
                 {
                     // CPU version
-                    if(m_config.gjkVariant == GJKVariantType::JOHNSON)
+                    if(gjkVariant == GJKVariantType::JOHNSON)
                     {
                         for(uint pairID = 0; pairID < pairCount; ++pairID)
                         {
@@ -482,7 +507,7 @@ private:
                 if constexpr(M == MemType::HOST)
                 {
                     // CPU version
-                    if(m_config.gjkVariant == GJKVariantType::JOHNSON)
+                    if(gjkVariant == GJKVariantType::JOHNSON)
                     {
                         for(uint pairID = 0; pairID < pairCount; ++pairID)
                         {
@@ -531,13 +556,13 @@ private:
         else if(pairCount > 0)
         {
             // Use global coordinates directly
-            if(m_config.gjkRepresentation == GJKRepresentationType::TRANSFORM)
+            if(representation == GJKRepresentationType::TRANSFORM)
             {
                 // Transform3 representation
                 if constexpr(M == MemType::HOST)
                 {
                     // CPU version
-                    if(m_config.gjkVariant == GJKVariantType::JOHNSON)
+                    if(gjkVariant == GJKVariantType::JOHNSON)
                     {
                         for(uint pairID = 0; pairID < pairCount; ++pairID)
                         {
@@ -587,7 +612,7 @@ private:
                 if constexpr(M == MemType::HOST)
                 {
                     // CPU version
-                    if(m_config.gjkVariant == GJKVariantType::JOHNSON)
+                    if(gjkVariant == GJKVariantType::JOHNSON)
                     {
                         for(uint pairID = 0; pairID < pairCount; ++pairID)
                         {
@@ -645,8 +670,6 @@ private:
 
         // Step 4: Calculate total time
         double totalTime = nlUpdateTime + relTransformTime + gjkTime;
-        Gout("Trial " + std::to_string(trialID) + ": Total time: " + std::to_string(totalTime)
-             + " ms");
 
         // Step 5: Write results to CSV
         m_csvWriter->writeRow(
@@ -658,12 +681,11 @@ private:
             : m_config.shapeType == ParticleShapeType::SPHERE       ? "Sphere"
             : m_config.shapeType == ParticleShapeType::SUPERQUADRIC ? "Superquadric"
                                                                     : "Unknown",
-            m_config.particleSize,
+            m_config.particleSize[X],
             m_config.aspectRatio,
-            m_config.gjkVariant == GJKVariantType::JOHNSON ? "Johnson" : "SignedVolume",
-            m_config.gjkRepresentation == GJKRepresentationType::TRANSFORM ? "Transform"
-                                                                           : "Quaternion",
-            m_config.useRelativeTransform ? 1 : 0,
+            gjkVariant == GJKVariantType::JOHNSON ? "Johnson" : "SignedVolume",
+            representation == GJKRepresentationType::TRANSFORM ? "Transform" : "Quaternion",
+            useRelativeTransform ? 1 : 0,
             nlUpdateTime,
             relTransformTime,
             gjkTime,
@@ -698,8 +720,8 @@ private:
         contactBuffer->copyTo(contactInfo);
 
         // Create filename
-        std::string filename
-            = "data/contacts_trial" + std::to_string(trialID) + "_" + platform + ".txt";
+        std::string filename = "data/contacts_trial" + std::to_string(trialID) + "_" + platform
+                               + std::to_string(std::rand()) + ".txt";
         std::ofstream outFile(filename);
 
         if(!outFile.is_open())

@@ -780,7 +780,7 @@ __HOSTDEVICE__ T computeClosestPoints_GJK_Johnson(const Convex<T>&     a,
     T momentum = T(0);  // Only used if Acceleration is true
 
     // Initializing vectors
-    Vector3<T> v(-b2a.getOrigin());
+    Vector3<T> v(b2a.getOrigin());
     Vector3<T> w;
     T          dist = norm(v);
 
@@ -862,7 +862,7 @@ __HOSTDEVICE__ T computeClosestPoints_GJK_SignedVolume(const Convex<T>&     a,
     T momentum = T(0);  // Only used if Acceleration is true
 
     // Initializing vectors
-    Vector3<T> v(-b2a.getOrigin());
+    Vector3<T> v(b2a.getOrigin());
     Vector3<T> w;
     T          dist = norm(v);
 

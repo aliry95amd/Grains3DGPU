@@ -1,8 +1,7 @@
 #ifndef _PARTICLESORTER_HH_
 #define _PARTICLESORTER_HH_
 
-#include <algorithm>
-#include <cuda_runtime.h>
+#include <cub/cub.cuh>
 
 #include "Basic.hh"
 #include "Cells.hh"
@@ -17,10 +16,9 @@
 // =================================================================================================
 /** @brief The class ParticleSorter.
 
-    This class sorts particles based on their Morton codes (Z-order curve)
-    to improve memory access patterns and cache efficiency during collision
-    detection. It maintains a separate Cells object with Morton ordering and
-    provides methods to reorder particle data arrays accordingly.
+    This class sorts particles based on their Morton codes (Z-order curve) to improve memory access
+    patterns and cache efficiency during collision detection. It maintains a separate Cells object
+    with Morton ordering and provides methods to reorder particle data arrays accordingly.
 
     @author A.Yazdani - 2025 - Construction */
 // =================================================================================================
@@ -43,6 +41,10 @@ protected:
     GrainsMemBuffer<Torce<T>, M>      m_tempTorce;
     GrainsMemBuffer<uint, M>          m_tempRigidBodyId;
     GrainsMemBuffer<uint, M>          m_tempComponentId;
+    /** \brief CUB sort temporary storage */
+    void* m_cubSortTempStorage = nullptr;
+    /** \brief CUB sort temporary storage bytes */
+    size_t m_cubSortTempStorageBytes = 0;
     /** \brief CUDA streams for parallel gather operations (device only) */
     cudaStream_t m_streams[6];
     //@}
@@ -81,6 +83,18 @@ public:
 
         if constexpr(M == MemType::DEVICE)
         {
+            // Initialize CUB sort workspace
+            uint64_t* dummyKeys   = nullptr;
+            uint*     dummyValues = nullptr;
+            cudaErrCheck(cub::DeviceRadixSort::SortPairs(nullptr,
+                                                         m_cubSortTempStorageBytes,
+                                                         dummyKeys,
+                                                         dummyKeys,
+                                                         dummyValues,
+                                                         dummyValues,
+                                                         numParticles));
+            cudaMalloc(&m_cubSortTempStorage, m_cubSortTempStorageBytes);
+
             // Create CUDA streams for parallel gather operations
             for(int i = 0; i < 6; ++i)
                 cudaStreamCreate(&m_streams[i]);
@@ -99,7 +113,14 @@ public:
         }
         else if constexpr(M == MemType::DEVICE)
         {
-            // Destroy CUDA streams first
+            // Free CUB workspace
+            if(m_cubSortTempStorage != nullptr)
+            {
+                cudaFree(m_cubSortTempStorage);
+                m_cubSortTempStorage = nullptr;
+            }
+
+            // Destroy CUDA streams
             for(int i = 0; i < 6; ++i)
                 cudaStreamDestroy(m_streams[i]);
 
@@ -222,12 +243,18 @@ public:
             cudaDeviceSynchronize();
 
             // Step 2: Initialize indices [0, 1, 2, ..., numParticles-1]
-            thrust::device_ptr<uint> indicesPtr(m_sortedIndices.getData());
-            thrust::sequence(indicesPtr, indicesPtr + numParticles);
+            m_sortedIndices.sequence();
+            cudaDeviceSynchronize();
 
-            // Step 3: Sort indices based on Morton codes using thrust
-            thrust::device_ptr<uint64_t> mortonPtr(m_mortonCodes.getData());
-            thrust::sort_by_key(mortonPtr, mortonPtr + numParticles, indicesPtr);
+            // Step 3: Sort indices based on Morton codes using CUB
+            cudaErrCheck(cub::DeviceRadixSort::SortPairs(m_cubSortTempStorage,
+                                                         m_cubSortTempStorageBytes,
+                                                         m_mortonCodes.getData(),
+                                                         m_mortonCodes.getData(),
+                                                         m_sortedIndices.getData(),
+                                                         m_sortedIndices.getData(),
+                                                         numParticles));
+            cudaDeviceSynchronize();
 
             // Step 4: Gather particle arrays according to sorted indices using
             // multiple streams (skip obstacles)

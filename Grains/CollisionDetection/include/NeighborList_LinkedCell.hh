@@ -1,8 +1,7 @@
 #ifndef _NEIGHBORLIST_LINKEDCELL_HH_
 #define _NEIGHBORLIST_LINKEDCELL_HH_
 
-#include <thrust/device_ptr.h>
-#include <thrust/scan.h>
+#include <cub/cub.cuh>
 
 #include "GrainsMemBuffer.hh"
 #include "GrainsParameters.hh"
@@ -38,6 +37,10 @@ protected:
     GrainsMemBuffer<uint, M> m_numNeighbors;
     /** \brief Buffer of prefix sums for neighbor counts */
     GrainsMemBuffer<uint, M> m_numNeighborsPrefixSums;
+    /** \brief Pre-allocated workspace for CUB scan operations */
+    void* m_cubScanTempStorage = nullptr;
+    /** \brief Size of CUB scan temporary storage */
+    size_t m_cubScanTempStorageBytes = 0;
     /** \brief Number of obstacle-particle pairs */
     uint* m_obstacleParticlePairCount = nullptr;
     /** \brief CUDA stream for obstacle-particle pair generation */
@@ -77,7 +80,9 @@ public:
                                                        nParticles);
 
         // TODO: Reduce init size
-        m_pairList.initialize(nObstacles * nParticles + nParticles * (nParticles - 1) / 2);
+        auto initNumPairs = GrainsParameters<T>::m_collisionDetection.linkedCellParameters
+                                .initialNumberOfPairsPerParticle;
+        m_pairList.initialize(initNumPairs * nParticles);
         m_pairList.fill();
 
         if constexpr(M == MemType::DEVICE)
@@ -93,6 +98,21 @@ public:
         // Allocate obstacle-particle pair count
         if constexpr(M == MemType::DEVICE)
         {
+            // Pre-allocate CUB scan workspace
+            // First, query required workspace size (pass nullptr for temp storage)
+            m_cubScanTempStorage = nullptr;
+            cudaErrCheck(cub::DeviceScan::ExclusiveSum(m_cubScanTempStorage,
+                                                       m_cubScanTempStorageBytes,
+                                                       m_numNeighbors.getData(),
+                                                       m_numNeighborsPrefixSums.getData(),
+                                                       nParticles));
+            // Allocate the workspace
+            if(m_cubScanTempStorageBytes > 0)
+            {
+                cudaErrCheck(cudaMalloc(&m_cubScanTempStorage, m_cubScanTempStorageBytes));
+            }
+
+            // Allocate obstacle-particle pair count
             cudaErrCheck(cudaMallocManaged(&m_obstacleParticlePairCount, sizeof(uint)));
 
             // Create CUDA streams for concurrent execution
@@ -107,6 +127,11 @@ public:
     {
         if constexpr(M == MemType::DEVICE)
         {
+            if(m_cubScanTempStorage != nullptr)
+            {
+                cudaErrCheck(cudaFree(m_cubScanTempStorage));
+                m_cubScanTempStorage = nullptr;
+            }
             if(m_obstacleParticlePairCount != nullptr)
             {
                 cudaErrCheck(cudaFree(m_obstacleParticlePairCount));
@@ -136,7 +161,6 @@ public:
         {
             if constexpr(M == MemType::HOST)
             {
-                m_pairList.clear();
                 auto* LC_host = static_cast<LinkedCell_Host<T>*>(m_LinkedCell.get());
                 updateNeighborList_LC_Host(LC_host->getCellNeighborsList(),
                                            LC_host->getObstacleIDs(),
@@ -147,8 +171,8 @@ public:
                                            LC_host->getMaxCellsPerObstacle(),
                                            nObstacles,
                                            nParticles,
-                                           m_pairList.getData(),
-                                           m_pairCount);
+                                           m_pairList);
+                *m_pairCount = m_pairList.getSize();
             }
             else if constexpr(M == MemType::DEVICE)
             {
@@ -218,13 +242,13 @@ public:
                         m_numNeighbors.getData());
                 }
 
-                // Phase 2: Compute prefix sum (using Thrust with stream 1)
-                thrust::device_ptr<uint> numNeighbors_ptr(m_numNeighbors.getData());
-                thrust::device_ptr<uint> prefixSums_ptr(m_numNeighborsPrefixSums.getData());
-                thrust::exclusive_scan(thrust::cuda::par.on(m_stream1),
-                                       numNeighbors_ptr,
-                                       numNeighbors_ptr + nParticles,
-                                       prefixSums_ptr);
+                // Phase 2: Compute prefix sum using CUB with pre-allocated workspace
+                cudaErrCheck(cub::DeviceScan::ExclusiveSum(m_cubScanTempStorage,
+                                                           m_cubScanTempStorageBytes,
+                                                           m_numNeighbors.getData(),
+                                                           m_numNeighborsPrefixSums.getData(),
+                                                           nParticles,
+                                                           m_stream1));
 
                 // Get total pair count using async copy from exclusive scan result (on stream 1)
                 // Async copy last elements: prefix_sum[n-1] + neighbor_count[n-1] = total

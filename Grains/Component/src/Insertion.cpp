@@ -451,9 +451,11 @@ __HOST__ void Insertion<T>::insert(const GrainsMemBuffer<RigidBody<T>*>* rigidBo
                 }
             }
 
-            GAssert(placed,
-                    "Failed to place a particle without overlap after too many "
-                    "attempts.");
+            GAssert(
+                placed,
+                std::string("Failed to place a particle without overlap after too many attempts.")
+                    + "Only inserted " + std::to_string(i) + " out of "
+                    + std::to_string(numParticles) + " particles. ");
         }
     }
     GoutWI(3, "Inserted", std::to_string(numParticles), "particles.");

@@ -56,11 +56,6 @@ struct BenchmarkConfig
     Vector3<double> domainMin;
     Vector3<double> domainMax;
 
-    // GJK parameters
-    GJKRepresentationType gjkRepresentation;
-    GJKVariantType        gjkVariant;
-    bool                  useRelativeTransform;
-
     // Test parameters
     uint numTrials;
     uint randomSeed;
@@ -75,9 +70,6 @@ struct BenchmarkConfig
         , aspectRatio(1.0)
         , domainMin(Vector3<double>(-1, -1, -1))
         , domainMax(Vector3<double>(1, 1, 1))
-        , gjkRepresentation(GJKRepresentationType::TRANSFORM)
-        , gjkVariant(GJKVariantType::JOHNSON)
-        , useRelativeTransform(true)
         , numTrials(5)
         , randomSeed(42)
         , validateContacts(false){};

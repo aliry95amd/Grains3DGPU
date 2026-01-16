@@ -342,12 +342,15 @@ __HOSTDEVICE__ inline void closestPointsRigidBodies(const RigidBody<T>&  rbA,
     T distance = computeDistance();
 
     // If bodies are too close
-    while(fabs(distance) < HIGHEPS<T>)
+    constexpr uint maxCrustIterations = 4;
+    uint           crustIteration     = 0;
+    while(fabs(distance) < HIGHEPS<T> && crustIteration < maxCrustIterations)
     {
         Gout("Warning: GJK too close bodies, increasing crust thicknesses ...");
         crustA *= 10;
         crustB *= 10;
         distance = computeDistance();
+        crustIteration++;
     }
 
     // Computation of the actual overlap
@@ -416,12 +419,15 @@ __HOSTDEVICE__ inline void closestPointsRigidBodies(const RigidBody<T>&  rbA,
     T distance = computeDistance();
 
     // If bodies are too close
-    while(fabs(distance) < HIGHEPS<T>)
+    constexpr uint maxCrustIterations = 4;
+    uint           crustIteration     = 0;
+    while(fabs(distance) < HIGHEPS<T> && crustIteration < maxCrustIterations)
     {
         Gout("Warning: GJK too close bodies, increasing crust thicknesses ...");
         crustA *= 10;
         crustB *= 10;
         distance = computeDistance();
+        crustIteration++;
     }
 
     // Computation of the actual overlap
@@ -489,12 +495,15 @@ __HOSTDEVICE__ inline void closestPointsRigidBodies(const RigidBody<T>&  rbA,
     T distance = computeDistance();
 
     // If bodies are too close
-    while(fabs(distance) < HIGHEPS<T>)
+    constexpr uint maxCrustIterations = 4;
+    uint           crustIteration     = 0;
+    while(fabs(distance) < HIGHEPS<T> && crustIteration < maxCrustIterations)
     {
         Gout("Warning: GJK too close bodies, increasing crust thicknesses ...");
         crustA *= 10;
         crustB *= 10;
         distance = computeDistance();
+        crustIteration++;
     }
 
     // Computation of the actual overlap
@@ -569,12 +578,15 @@ __HOSTDEVICE__ inline void closestPointsRigidBodies(const RigidBody<T>&  rbA,
     T distance = computeDistance();
 
     // If bodies are too close
-    while(fabs(distance) < HIGHEPS<T>)
+    constexpr uint maxCrustIterations = 4;
+    uint           crustIteration     = 0;
+    while(fabs(distance) < HIGHEPS<T> && crustIteration < maxCrustIterations)
     {
         Gout("Warning: GJK too close bodies, increasing crust thicknesses ...");
         crustA *= 10;
         crustB *= 10;
         distance = computeDistance();
+        crustIteration++;
     }
 
     // Computation of the actual overlap

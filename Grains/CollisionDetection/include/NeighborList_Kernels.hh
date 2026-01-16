@@ -1,6 +1,8 @@
 #ifndef _NEIGHBORLIST_KERNELS_HH_
 #define _NEIGHBORLIST_KERNELS_HH_
 
+#include "GrainsMemBuffer.hh"
+
 // =================================================================================================
 /** @brief The class NeighborList_Kernels.
 
@@ -36,19 +38,17 @@ __GLOBAL__ void
     @param maxCellsPerObstacle maximum number of cells per obstacle
     @param numObstacles number of obstacles
     @param numParticles number of particles
-    @param pairList array of pairs
-    @param pairCount pointer to host memory for storing the total pair count */
-__HOST__ void updateNeighborList_LC_Host(const uint*                         cellNeighborsList,
-                                         const uint2*                        obstacleIDs,
-                                         const uint*                         obstacleCellIDs,
-                                         const uint*                         particleIDs,
-                                         const uint*                         cellIDs,
-                                         const std::vector<std::list<uint>>& cellParticles,
-                                         const uint                          maxCellsPerObstacle,
-                                         const uint                          numObstacles,
-                                         const uint                          numParticles,
-                                         uint2*                              pairList,
-                                         uint*                               pairCount);
+    @param pairList reference to GrainsMemBuffer that will be resized if needed */
+__HOST__ void updateNeighborList_LC_Host(const uint*                            cellNeighborsList,
+                                         const uint2*                           obstacleIDs,
+                                         const uint*                            obstacleCellIDs,
+                                         const uint*                            particleIDs,
+                                         const uint*                            cellIDs,
+                                         const std::vector<std::list<uint>>&    cellParticles,
+                                         const uint                             maxCellsPerObstacle,
+                                         const uint                             numObstacles,
+                                         const uint                             numParticles,
+                                         GrainsMemBuffer<uint2, MemType::HOST>& pairList);
 
 /** @brief Generate obstacle-particle pairs on device.
     @param obstacleIDs array of obstacle IDs and cell counts

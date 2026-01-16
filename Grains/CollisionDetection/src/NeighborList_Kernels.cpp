@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <set>
 
+#include "NeighborList_Kernels.hh"
 #include "Transform3.hh"
 
 // -------------------------------------------------------------------------------------------------
@@ -47,20 +48,21 @@ __GLOBAL__ void
 
 // -------------------------------------------------------------------------------------------------
 // Updates the neighbor list on host using a linked cell approach
-__HOST__ void updateNeighborList_LC_Host(const uint*                         cellNeighborsList,
-                                         const uint2*                        obstacleIDs,
-                                         const uint*                         obstacleCellIDs,
-                                         const uint*                         particleIDs,
-                                         const uint*                         cellIDs,
-                                         const std::vector<std::list<uint>>& cellParticles,
-                                         const uint                          maxCellsPerObstacle,
-                                         const uint                          numObstacles,
-                                         const uint                          numParticles,
-                                         uint2*                              pairList,
-                                         uint*                               pairCount)
+__HOST__ void updateNeighborList_LC_Host(const uint*                            cellNeighborsList,
+                                         const uint2*                           obstacleIDs,
+                                         const uint*                            obstacleCellIDs,
+                                         const uint*                            particleIDs,
+                                         const uint*                            cellIDs,
+                                         const std::vector<std::list<uint>>&    cellParticles,
+                                         const uint                             maxCellsPerObstacle,
+                                         const uint                             numObstacles,
+                                         const uint                             numParticles,
+                                         GrainsMemBuffer<uint2, MemType::HOST>& pairList)
 {
     constexpr uint NUM_NEIGHBOR_CELLS = 27;  // Number of neighboring cells
-    uint           counter            = 0;
+
+    // Set pairList size to zero
+    pairList.setSize(0);
 
     // FIRST PASS: Loop over all obstacles
     for(uint i = 0; i < numObstacles; ++i)
@@ -77,9 +79,7 @@ __HOST__ void updateNeighborList_LC_Host(const uint*                         cel
 
             // Check against all particles in the target cell
             for(uint particleID : targetCellParticles)
-            {
-                pairList[counter++] = make_uint2(obstacleIndex, particleID);
-            }
+                pairList.push_back(make_uint2(obstacleIndex, particleID));
         }
     }
 
@@ -109,16 +109,12 @@ __HOST__ void updateNeighborList_LC_Host(const uint*                         cel
                 for(uint otherParticle : neighborCellParticles)
                 {
                     // ordering to avoid duplicates
-                    if(primaryParticle >= otherParticle)
-                        continue;
-
-                    pairList[counter++] = make_uint2(primaryParticle, otherParticle);
+                    if(primaryParticle < otherParticle)
+                        pairList.push_back(make_uint2(primaryParticle, otherParticle));
                 }
             }
         }
     }
-
-    *pairCount = counter;
 }
 
 // -------------------------------------------------------------------------------------------------

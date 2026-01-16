@@ -128,8 +128,10 @@ __HOSTDEVICE__ static INLINE void
     const uint    idA  = pair.x;
     const uint    idB  = pair.y;
     Transform3<T> invA;
+    // We want B expressed in A-local coordinates: b2a = inv(A2W) ∘ B2W.
+    // setToTransformsComposition(t1, t2) computes: this = t2 ∘ t1.
     invA.setToInverseTransform(transform[idA]);
-    relativeTransform[pairID].setToTransformsComposition(invA, transform[idB]);
+    relativeTransform[pairID].setToTransformsComposition(transform[idB], invA);
 }
 
 // -------------------------------------------------------------------------------------------------

@@ -1,4 +1,5 @@
 #include "CollisionDetectionBenchmark.hh"
+#include <cstring>
 #include <iostream>
 #include <vector>
 
@@ -11,242 +12,205 @@ void runBenchmarkWithPrecision(const BenchmarkConfig& config,
     benchmark.runBenchmark();
 }
 
-int main()
+void printUsage(const char* progName)
 {
-    Gout(std::string(80, '='));
-    Gout("Collision Detection Performance Benchmark");
-    Gout(std::string(80, '='));
+    std::cout
+        << "Usage: " << progName << " [options]\n"
+        << "Options:\n"
+        << "  --particles <N>           Number of particles (required)\n"
+        << "  --domain <size>           Domain size (cube side length, required)\n"
+        << "  --shape <type>            Shape type: sphere, box, superquadric (required)\n"
+        << "  --size <x> <y> <z>        Particle size (3 values, required)\n"
+        << "  --aspect <ratio>          Aspect ratio (default: 1.0)\n"
+        << "  --precision <type>        Precision: single, double, both (default: both)\n"
+        << "  --platform <type>         Platform: cpu, gpu, both (default: both)\n"
+        << "  --trials <N>              Number of trials (default: 3)\n"
+        << "  --seed <N>                Random seed (default: 42)\n"
+        << "  --csv <filename>          CSV output file (default: data/collision_benchmark.csv)\n"
+        << "  --append                  Append to CSV instead of overwriting\n"
+        << "  --validate                Write contact info for validation\n"
+        << "  --help                    Show this help message\n";
+}
 
-    // =============================================================================================
-    // Configure particle parameters
-    // =============================================================================================
-    struct ParticleConfig
+int main(int argc, char* argv[])
+{
+    // Parse command-line arguments
+    uint              numParticles     = 0;
+    double            domainSize       = 0.0;
+    ParticleShapeType shapeType        = ParticleShapeType::SPHERE;
+    Vector3<double>   particleSize     = Vector3<double>(0.0, 0.0, 0.0);
+    double            aspectRatio      = 1.0;
+    std::string       precisionStr     = "both";
+    std::string       platformStr      = "both";
+    uint              numTrials        = 3;
+    uint              randomSeed       = 42;
+    std::string       csvFilename      = "data/collision_benchmark.csv";
+    bool              appendToCSV      = false;
+    bool              validateContacts = false;
+
+    bool hasParticles = false;
+    bool hasDomain    = false;
+    bool hasShape     = false;
+    bool hasSize      = false;
+
+    for(int i = 1; i < argc; ++i)
     {
-        uint              numParticles;
-        Vector3<double>   domainMin;
-        Vector3<double>   domainMax;
-        ParticleShapeType shapeType;
-        Vector3<double>   particleSize;
-        double            aspectRatio;
-    };
+        std::string arg = argv[i];
 
-    double r = 0.05;                                // Base particle size
-    double A = cos(1.0 / 3.0 * acos(-1.0 / 64.0));  // Approximately 0.8634
-
-    std::vector<ParticleConfig> particleConfigs = {
-        // Spheres - S1
-        {128,
-         Vector3<double>(0.0, 0.0, 0.0),
-         Vector3<double>(24 * r, 24 * r, 24 * r),
-         ParticleShapeType::SPHERE,
-         Vector3<double>(r, r, r),
-         1.0},
-        {4096,
-         Vector3<double>(0.0, 0.0, 0.0),
-         Vector3<double>(48 * r, 48 * r, 48 * r),
-         ParticleShapeType::SPHERE,
-         Vector3<double>(r, r, r),
-         1.0},
-        {32768,
-         Vector3<double>(0.0, 0.0, 0.0),
-         Vector3<double>(96 * r, 96 * r, 96 * r),
-         ParticleShapeType::SPHERE,
-         Vector3<double>(r, r, r),
-         1.0},
-        {524288,
-         Vector3<double>(0.0, 0.0, 0.0),
-         Vector3<double>(192 * r, 192 * r, 192 * r),
-         ParticleShapeType::SPHERE,
-         Vector3<double>(r, r, r),
-         1.0},
-        // Boxes - B1
-        {1024,
-         Vector3<double>(0.0, 0.0, 0.0),
-         Vector3<double>(24 * r, 24 * r, 24 * r),
-         ParticleShapeType::BOX,
-         Vector3<double>(2. / sqrt(3.) * r, 2. / sqrt(3.) * r, 2. / sqrt(3.) * r),
-         1.0},
-        {4096,
-         Vector3<double>(0.0, 0.0, 0.0),
-         Vector3<double>(48 * r, 48 * r, 48 * r),
-         ParticleShapeType::BOX,
-         Vector3<double>(2. / sqrt(3.) * r, 2. / sqrt(3.) * r, 2. / sqrt(3.) * r),
-         1.0},
-        {16384,
-         Vector3<double>(0.0, 0.0, 0.0),
-         Vector3<double>(96 * r, 96 * r, 96 * r),
-         ParticleShapeType::BOX,
-         Vector3<double>(2. / sqrt(3.) * r, 2. / sqrt(3.) * r, 2. / sqrt(3.) * r),
-         1.0},
-        {65536,
-         Vector3<double>(0.0, 0.0, 0.0),
-         Vector3<double>(192 * r, 192 * r, 192 * r),
-         ParticleShapeType::BOX,
-         Vector3<double>(2. / sqrt(3.) * r, 2. / sqrt(3.) * r, 2. / sqrt(3.) * r),
-         1.0},
-        // Superquadrics - S4
-        {1024,
-         Vector3<double>(0.0, 0.0, 0.0),
-         Vector3<double>(24 * r, 24 * r, 24 * r),
-         ParticleShapeType::SUPERQUADRIC,
-         Vector3<double>(r / 2., r / 2., 4. * r),
-         4.0},
-        {4096,
-         Vector3<double>(0.0, 0.0, 0.0),
-         Vector3<double>(48 * r, 48 * r, 48 * r),
-         ParticleShapeType::SUPERQUADRIC,
-         Vector3<double>(r / 2., r / 2., 4. * r),
-         4.0},
-        {16384,
-         Vector3<double>(0.0, 0.0, 0.0),
-         Vector3<double>(96 * r, 96 * r, 96 * r),
-         ParticleShapeType::SUPERQUADRIC,
-         Vector3<double>(r / 2., r / 2., 4. * r),
-         4.0},
-        {65536,
-         Vector3<double>(0.0, 0.0, 0.0),
-         Vector3<double>(192 * r, 192 * r, 192 * r),
-         ParticleShapeType::SUPERQUADRIC,
-         Vector3<double>(r / 2., r / 2., 4. * r),
-         4.0},
-        // Boxes - B4
-        {1024,
-         Vector3<double>(0.0, 0.0, 0.0),
-         Vector3<double>(24 * r, 24 * r, 24 * r),
-         ParticleShapeType::BOX,
-         Vector3<double>(1. / sqrt(6. * A) * r, 1. / sqrt(6. * A) * r, 16. / sqrt(3.) * A * r),
-         4.0},
-        {4096,
-         Vector3<double>(0.0, 0.0, 0.0),
-         Vector3<double>(48 * r, 48 * r, 48 * r),
-         ParticleShapeType::BOX,
-         Vector3<double>(1. / sqrt(6. * A) * r, 1. / sqrt(6. * A) * r, 16. / sqrt(3.) * A * r),
-         4.0},
-        {16384,
-         Vector3<double>(0.0, 0.0, 0.0),
-         Vector3<double>(96 * r, 96 * r, 96 * r),
-         ParticleShapeType::BOX,
-         Vector3<double>(1. / sqrt(6. * A) * r, 1. / sqrt(6. * A) * r, 16. / sqrt(3.) * A * r),
-         4.0},
-        {65536,
-         Vector3<double>(0.0, 0.0, 0.0),
-         Vector3<double>(192 * r, 192 * r, 192 * r),
-         ParticleShapeType::BOX,
-         Vector3<double>(1. / sqrt(6. * A) * r, 1. / sqrt(6. * A) * r, 16. / sqrt(3.) * A * r),
-         4.0},
-    };
-
-    // Test parameters
-    uint numTrials        = 3;      // Number of trials per configuration
-    uint randomSeed       = 42;     // Base random seed
-    bool validateContacts = false;  // Write contact info to file for validation
-
-    // =============================================================================================
-    // Generate all test configurations
-    // =============================================================================================
-    std::vector<PrecisionType>         precisions = {PrecisionType::SINGLE, PrecisionType::DOUBLE};
-    std::vector<PLATFORM>              platforms  = {PLATFORM::CPU, PLATFORM::GPU};
-    std::vector<GJKRepresentationType> representations
-        = {GJKRepresentationType::QUATERNION, GJKRepresentationType::TRANSFORM};
-    std::vector<GJKVariantType> gjkVariants
-        = {GJKVariantType::JOHNSON, GJKVariantType::SIGNEDVOLUME};
-    std::vector<bool> transformModes = {true, false};  // relative vs global
-
-    std::string csvFilename = "data/collision_benchmark_comprehensive.csv";
-
-    int totalConfigs = precisions.size() * platforms.size() * representations.size()
-                       * gjkVariants.size() * transformModes.size() * particleConfigs.size();
-    int configCount = 0;
-
-    Gout("\nRunning comprehensive benchmark with " + std::to_string(totalConfigs)
-         + " different configurations...\n");
-
-    // =========================================================================================
-    // Iterate through all combinations
-    // =========================================================================================
-    for(const auto& particleConfig : particleConfigs)
-    {
-        for(auto precision : precisions)
+        if(arg == "--help" || arg == "-h")
         {
-            for(auto platform : platforms)
+            printUsage(argv[0]);
+            return 0;
+        }
+        else if(arg == "--particles" && i + 1 < argc)
+        {
+            numParticles = std::stoul(argv[++i]);
+            hasParticles = true;
+        }
+        else if(arg == "--domain" && i + 1 < argc)
+        {
+            domainSize = std::stod(argv[++i]);
+            hasDomain  = true;
+        }
+        else if(arg == "--shape" && i + 1 < argc)
+        {
+            std::string shape = argv[++i];
+            if(shape == "sphere")
+                shapeType = ParticleShapeType::SPHERE;
+            else if(shape == "box")
+                shapeType = ParticleShapeType::BOX;
+            else if(shape == "superquadric")
+                shapeType = ParticleShapeType::SUPERQUADRIC;
+            else
             {
-                for(auto representation : representations)
-                {
-                    for(auto gjkVariant : gjkVariants)
-                    {
-                        for(bool useRelativeTransform : transformModes)
-                        {
-                            configCount++;
-
-                            // Create configuration
-                            BenchmarkConfig config;
-                            config.precision            = precision;
-                            config.platform             = platform;
-                            config.numParticles         = particleConfig.numParticles;
-                            config.shapeType            = particleConfig.shapeType;
-                            config.particleSize         = particleConfig.particleSize;
-                            config.aspectRatio          = particleConfig.aspectRatio;
-                            config.domainMin            = particleConfig.domainMin;
-                            config.domainMax            = particleConfig.domainMax;
-                            config.gjkRepresentation    = representation;
-                            config.gjkVariant           = gjkVariant;
-                            config.useRelativeTransform = useRelativeTransform;
-                            config.numTrials            = numTrials;
-                            config.randomSeed           = randomSeed;
-                            config.validateContacts     = validateContacts && (configCount == 1);
-
-                            // Print configuration info
-                            Gout("\n" + std::string(80, '-'));
-                            Gout("Configuration " + std::to_string(configCount) + "/"
-                                 + std::to_string(totalConfigs));
-                            Gout("  Particles: " + std::to_string(particleConfig.numParticles));
-                            Gout("  Domain: [" + std::to_string(particleConfig.domainMin[0])
-                                 + " to " + std::to_string(particleConfig.domainMax[0]) + "]");
-                            Gout("  Shape: "
-                                 + std::string(particleConfig.shapeType == ParticleShapeType::SPHERE
-                                                   ? "Sphere"
-                                               : particleConfig.shapeType == ParticleShapeType::BOX
-                                                   ? "Box"
-                                                   : "Superquadric"));
-                            Gout("  Aspect: " + std::to_string(particleConfig.aspectRatio));
-                            Gout("  Precision: "
-                                 + std::string(precision == PrecisionType::SINGLE ? "Single"
-                                                                                  : "Double"));
-                            Gout("  Platform: "
-                                 + std::string(platform == PLATFORM::CPU ? "CPU" : "GPU"));
-                            Gout("  Representation: "
-                                 + std::string(representation == GJKRepresentationType::QUATERNION
-                                                   ? "Quaternion"
-                                                   : "Transform3"));
-                            Gout("  GJK Variant: "
-                                 + std::string(gjkVariant == GJKVariantType::JOHNSON
-                                                   ? "Johnson"
-                                                   : "SignedVolume"));
-                            Gout("  Transform Mode: "
-                                 + std::string(useRelativeTransform ? "Relative" : "Global"));
-                            Gout(std::string(80, '-'));
-
-                            // Run benchmark with the configured precision
-                            bool appendToCSV = (configCount > 1);
-                            if(config.precision == PrecisionType::SINGLE)
-                            {
-                                runBenchmarkWithPrecision<float>(config, csvFilename, appendToCSV);
-                            }
-                            else
-                            {
-                                runBenchmarkWithPrecision<double>(config, csvFilename, appendToCSV);
-                            }
-                        }
-                    }
-                }
+                std::cerr << "Error: Invalid shape type: " << shape << "\n";
+                return 1;
             }
+            hasShape = true;
+        }
+        else if(arg == "--size" && i + 3 < argc)
+        {
+            particleSize[0] = std::stod(argv[++i]);
+            particleSize[1] = std::stod(argv[++i]);
+            particleSize[2] = std::stod(argv[++i]);
+            hasSize         = true;
+        }
+        else if(arg == "--aspect" && i + 1 < argc)
+        {
+            aspectRatio = std::stod(argv[++i]);
+        }
+        else if(arg == "--precision" && i + 1 < argc)
+        {
+            precisionStr = argv[++i];
+        }
+        else if(arg == "--platform" && i + 1 < argc)
+        {
+            platformStr = argv[++i];
+        }
+        else if(arg == "--trials" && i + 1 < argc)
+        {
+            numTrials = std::stoul(argv[++i]);
+        }
+        else if(arg == "--seed" && i + 1 < argc)
+        {
+            randomSeed = std::stoul(argv[++i]);
+        }
+        else if(arg == "--csv" && i + 1 < argc)
+        {
+            csvFilename = argv[++i];
+        }
+        else if(arg == "--append")
+        {
+            appendToCSV = true;
+        }
+        else if(arg == "--validate")
+        {
+            validateContacts = true;
+        }
+        else
+        {
+            std::cerr << "Error: Unknown argument or missing value: " << arg << "\n";
+            printUsage(argv[0]);
+            return 1;
         }
     }
 
-    Gout("\n" + std::string(80, '='));
-    Gout("All " + std::to_string(totalConfigs) + " configurations completed!");
-    Gout("Results written to: " + csvFilename);
-    Gout(std::string(80, '='));
+    // Validate required arguments
+    if(!hasParticles || !hasDomain || !hasShape || !hasSize)
+    {
+        std::cerr << "Error: Missing required arguments\n";
+        printUsage(argv[0]);
+        return 1;
+    }
+
+    // Configure domain
+    Vector3<double> domainMin(0.0, 0.0, 0.0);
+    Vector3<double> domainMax(domainSize, domainSize, domainSize);
+
+    // Parse precision
+    std::vector<PrecisionType> precisions;
+    if(precisionStr == "single")
+        precisions = {PrecisionType::SINGLE};
+    else if(precisionStr == "double")
+        precisions = {PrecisionType::DOUBLE};
+    else if(precisionStr == "both")
+        precisions = {PrecisionType::SINGLE, PrecisionType::DOUBLE};
+    else
+    {
+        std::cerr << "Error: Invalid precision type: " << precisionStr << "\n";
+        return 1;
+    }
+
+    // Parse platform
+    PLATFORM platform;
+    if(platformStr == "cpu")
+        platform = PLATFORM::CPU;
+    else if(platformStr == "gpu")
+        platform = PLATFORM::GPU;
+    else if(platformStr == "both")
+        platform = PLATFORM::BOTH;
+    else
+    {
+        std::cerr << "Error: Invalid platform type: " << platformStr << "\n";
+        return 1;
+    }
+
+    // Run benchmarks for each precision
+    int configCount = 0;
+
+    // =========================================================================================
+    // Iterate through precisions
+    // =========================================================================================
+    for(auto precision : precisions)
+    {
+        configCount++;
+
+        // Create configuration
+        BenchmarkConfig config;
+        config.precision        = precision;
+        config.platform         = platform;
+        config.numParticles     = numParticles;
+        config.shapeType        = shapeType;
+        config.particleSize     = particleSize;
+        config.aspectRatio      = aspectRatio;
+        config.domainMin        = domainMin;
+        config.domainMax        = domainMax;
+        config.numTrials        = numTrials;
+        config.randomSeed       = randomSeed;
+        config.validateContacts = validateContacts;
+
+        // Run benchmark
+        if(config.precision == PrecisionType::SINGLE)
+        {
+            runBenchmarkWithPrecision<float>(config, csvFilename, appendToCSV);
+        }
+        else
+        {
+            runBenchmarkWithPrecision<double>(config, csvFilename, appendToCSV);
+        }
+
+        appendToCSV = true;  // After first run, always append
+    }
 
     return 0;
 }

@@ -271,7 +271,6 @@ public:
         @param new_size new size of the buffer (must be <= capacity) */
     void setSize(size_t new_size)
     {
-        GAssert(new_size > 0, "Size must be positive in setSize()");
         GAssert(new_size <= m_capacity, "Size must be <= capacity in setSize()");
         m_size = new_size;
     }
@@ -561,8 +560,8 @@ public:
         @param index index of the element to access */
     const T& at(size_t index) const
     {
-        static_assert(M == MemType::HOST || M == MemType::PINNED,
-                      "at() only available for HOST or PINNED memory");
+        static_assert(M == MemType::HOST || M == MemType::PINNED || M == MemType::MANAGED,
+                      "at() only available for HOST, PINNED, or MANAGED memory");
         GAssert(index < m_size, "Index", index, "out of bounds for size", m_size);
         return m_ptr[index];
     }
@@ -764,8 +763,8 @@ public:
     @param i index of the element */
     T& operator[](size_t i)
     {
-        static_assert(M == MemType::HOST || M == MemType::PINNED,
-                      "operator[] only available for HOST or PINNED memory");
+        static_assert(M == MemType::HOST || M == MemType::PINNED || M == MemType::MANAGED,
+                      "operator[] only available for HOST, PINNED, or MANAGED memory");
         GAssert(i < m_size, "Index", i, "out of bounds for size", m_size);
         return m_ptr[i];
     }
@@ -775,8 +774,8 @@ public:
         @param i index of the element */
     const T& operator[](size_t i) const
     {
-        static_assert(M == MemType::HOST || M == MemType::PINNED,
-                      "operator[] only available for HOST or PINNED memory");
+        static_assert(M == MemType::HOST || M == MemType::PINNED || M == MemType::MANAGED,
+                      "operator[] only available for HOST, PINNED, or MANAGED memory");
         GAssert(i < m_size, "Index", i, "out of bounds for size", m_size);
         return m_ptr[i];
     }

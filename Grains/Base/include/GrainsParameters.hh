@@ -90,6 +90,8 @@ struct LinkedCellParameters
     uint maxNumCellsPerObstacle = 0;
     /** \brief Maximum number of particles per cell (used for ATOMICFIXED LinkedCell type). */
     uint maxParticlesPerCell = 64;
+    /** \brief Initial number of pairs per particle. */
+    uint initialNumberOfPairsPerParticle = 16;
     /** \brief If using adaptive skin, this is the desired number of iterations that the skin should
         be valid for. If it is set to 0, then we don't use adaptive skin. If set to 1, the skin is
         updated every iteration and trivially it gives worse performance. */

@@ -197,7 +197,7 @@ public:
         if(m_useAdaptiveSkin)
         {
             m_skinThickness                = this->computeSkinThickness();
-            m_maxDisplacementSquared       = T(0);
+            m_maxDisplacementSquared[0]    = T(0);
             m_numIterationsSinceLastUpdate = 0;
 
             T cellSize = m_cellSizeWithoutSkin + m_skinThickness;
@@ -214,9 +214,9 @@ public:
             m_cellParticleIDs.reserve(m_numCells * m_maxParticlesPerCell, m_stream2);
 
             // Copy old positions on stream0 (independent)
-            cudaMemcpyAsync(m_oldPosition.getData() + m_numObstacles,
-                            m_positions->getData() + m_numObstacles,
-                            m_numParticles * sizeof(Vector3<T>),
+            cudaMemcpyAsync(m_oldPosition.getData(),
+                            m_positions->getData(),
+                            (m_numObstacles + m_numParticles) * sizeof(Vector3<T>),
                             cudaMemcpyDeviceToDevice,
                             m_stream0);
         }

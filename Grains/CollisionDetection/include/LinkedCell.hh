@@ -1,20 +1,9 @@
 #ifndef _LINKEDCELL_HH_
 #define _LINKEDCELL_HH_
 
-// Thrust library includes
-#include <thrust/device_ptr.h>
-#include <thrust/execution_policy.h>
-#include <thrust/extrema.h>
-#include <thrust/find.h>
-#include <thrust/functional.h>
-#include <thrust/iterator/counting_iterator.h>
-#include <thrust/iterator/transform_iterator.h>
+#include <cub/cub.cuh>
 #include <thrust/iterator/zip_iterator.h>
-#include <thrust/remove.h>
-#include <thrust/transform_reduce.h>
-#include <thrust/tuple.h>
 
-// Project includes
 #include "Cells.hh"
 #include "CellsFactory.hh"
 #include "GrainsMemBuffer.hh"
@@ -66,31 +55,49 @@ protected:
     /** \brief Buffer of the cell IDs that that have to be checked for a possible contact with an
         obstacle. */
     GrainsMemBuffer<uint, M> m_obstacleCellID;
+    /** \brief CUB reduce temporary storage */
+    void* m_cubReduceTempStorage = nullptr;
+    /** \brief CUB reduce temporary storage bytes */
+    size_t m_cubReduceTempStorageBytes = 0;
+    /** \brief Maximum displacement of particles since the last update. Note that we store the
+        squared value.  */
+    GrainsMemBuffer<T, MemType::MANAGED> m_maxDisplacementSquared;
     /** \brief Cell size. This is the minimum possible size for the cells. Skin thickness will be
         added to this value. */
-    T m_cellSizeWithoutSkin;
+    T m_cellSizeWithoutSkin = 0;
     /** \brief Skin thickness */
-    T m_skinThickness;
-    /** \brief Maximum displacement of particles since the last update. Note that we store the
-        squared value. */
-    T m_maxDisplacementSquared;
+    T m_skinThickness = 0;
     /** \brief Update frequency */
-    uint m_updateFrequency;
+    uint m_updateFrequency = 0;
     /** \brief Number of iterations since the last update */
-    uint m_numIterationsSinceLastUpdate;
+    uint m_numIterationsSinceLastUpdate = 0;
     /** \brief Number of obstacles */
-    uint m_numObstacles;
+    uint m_numObstacles = 0;
     /** \brief Maximum number of cells an obstacle can occupy + 1-ring */
-    uint m_maxCellsPerObstacle;
+    uint m_maxCellsPerObstacle = 0;
     /** \brief Number of particles */
-    uint m_numParticles;
+    uint m_numParticles = 0;
     /** \brief Number of cells in the grid */
-    uint m_numCells;
+    uint m_numCells = 0;
     /** \brief Flag to indicate if adaptive skin is used */
-    bool m_useAdaptiveSkin;
+    bool m_useAdaptiveSkin = false;
     //@}
 
 public:
+    /** @name Helper functors for CUB operations */
+    //@{
+    /** \brief Functor to compute squared displacement between two positions */
+    struct DiffNorm2
+    {
+        __HOSTDEVICE__ T operator()(const thrust::tuple<Vector3<T>, Vector3<T>>& t) const
+        {
+            const Vector3<T>& oldPos = thrust::get<0>(t);
+            const Vector3<T>& pos    = thrust::get<1>(t);
+            return norm2(pos - oldPos);
+        }
+    };
+    //@}
+
     /** @name Constructors */
     //@{
     // ---------------------------------------------------------------------------------------------
@@ -114,8 +121,7 @@ public:
                const uint                               nParticles)
         : m_oldPosition(nObstacles + nParticles)
         , m_obstacleID(nObstacles)
-        , m_maxDisplacementSquared(0)
-        , m_numIterationsSinceLastUpdate(0)
+        , m_maxDisplacementSquared(1)
         , m_numObstacles(nObstacles)
         , m_numParticles(nParticles)
     {
@@ -123,6 +129,26 @@ public:
         m_rb          = rb;
         m_positions   = &positions;
         m_quaternions = &quaternions;
+
+        // Initialize CUB reduce workspace for maximum displacement computation
+        if constexpr(M == MemType::DEVICE)
+        {
+            // Query workspace size for Reduce operation with dummy iterator
+            using ZipIt = thrust::zip_iterator<thrust::tuple<const Vector3<T>*, const Vector3<T>*>>;
+            using InputIt = cub::TransformInputIterator<T, DiffNorm2, ZipIt>;
+
+            ZipIt zip_it = thrust::make_zip_iterator(
+                thrust::make_tuple(m_oldPosition.getData(), m_positions->getData()));
+            InputIt input_it(zip_it, DiffNorm2{});
+            cudaErrCheck(cub::DeviceReduce::Reduce(m_cubReduceTempStorage,
+                                                   m_cubReduceTempStorageBytes,
+                                                   input_it,
+                                                   m_maxDisplacementSquared.getData(),
+                                                   nObstacles + nParticles,
+                                                   cub::Max(),
+                                                   T(0)));
+            cudaMalloc(&m_cubReduceTempStorage, m_cubReduceTempStorageBytes);
+        }
         GAssert(positions.getSize() == nObstacles + nParticles
                     && quaternions.getSize() == nObstacles + nParticles,
                 "LinkedCell: positions or quaternions size does not match the number of bodies!");
@@ -162,8 +188,13 @@ public:
         m_maxCellsPerObstacle = std::min(maxNumCellsPerObstacle, m_numCells);
         m_obstacleCellID.initialize(m_maxCellsPerObstacle * nObstacles);
 
+        // Initialize old positions with current positions for first displacement computation
+        m_oldPosition.copyFrom(positions);
+
         // Setup obstacle
         linkObstacles();
+
+        cudaErrCheck(cudaDeviceSynchronize());
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -172,6 +203,16 @@ public:
     {
         // Clean up the Cells objects using GrainsMemBuffer helper method
         // m_cells.freePointedObjects();
+
+        // Free CUB workspace
+        if constexpr(M == MemType::DEVICE)
+        {
+            if(m_cubReduceTempStorage != nullptr)
+            {
+                cudaFree(m_cubReduceTempStorage);
+                m_cubReduceTempStorage = nullptr;
+            }
+        }
 
         // Set non-owning pointers to nullptr
         m_rb          = nullptr;
@@ -313,16 +354,18 @@ public:
 
         // Adaptive skin: check if update is needed
         ++m_numIterationsSinceLastUpdate;
-        m_maxDisplacementSquared = computeMaxDisplacement();
+        T maxDispSq = computeMaxDisplacement();
 
         // Check if update is needed: d_max > skinThickness / 2
-        return (T(4) * m_maxDisplacementSquared > m_skinThickness * m_skinThickness);
+        return (T(4) * maxDispSq > m_skinThickness * m_skinThickness);
     }
 
     // ---------------------------------------------------------------------------------------------
     /** @brief Generates neighbor cells. */
     void generateNeighborCells()
     {
+        GAssert(m_numCells > 0, "LinkedCell::generateNeighborCells: number of cells is zero!");
+
         if constexpr(M == MemType::HOST)
         {
             m_cells[0]->generateNeighborCells(m_neighborCells.getData());
@@ -430,41 +473,40 @@ public:
 
     // ---------------------------------------------------------------------------------------------
     /** @brief Computes the maximum displacement. */
-    T computeMaxDisplacement() const
+    T computeMaxDisplacement()
     {
-        T maxDisplacementSquared = 0;
-
         if constexpr(M == MemType::HOST)
         {
+            T maxDisplacementSquared = 0;
             for(uint i = 0; i < m_oldPosition.getSize(); ++i)
             {
                 T dispSquared = norm2(m_positions->at(i) - m_oldPosition[i]);
                 if(dispSquared > maxDisplacementSquared)
                     maxDisplacementSquared = dispSquared;
             }
+            m_maxDisplacementSquared[0] = maxDisplacementSquared;
         }
         else if constexpr(M == MemType::DEVICE)
         {
-            // Convert raw pointers to thrust device pointers
-            thrust::device_ptr<const Vector3<T>> old_begin
-                = thrust::device_pointer_cast(m_oldPosition.getData());
-            thrust::device_ptr<const Vector3<T>> old_end = old_begin + m_oldPosition.getSize();
-            thrust::device_ptr<const Vector3<T>> pos_begin
-                = thrust::device_pointer_cast(m_positions->getData());
-            thrust::device_ptr<const Vector3<T>> pos_end = pos_begin + m_positions->getSize();
+            using ZipIt = thrust::zip_iterator<thrust::tuple<const Vector3<T>*, const Vector3<T>*>>;
+            using InputIt = cub::TransformInputIterator<T, DiffNorm2, ZipIt>;
 
-            maxDisplacementSquared = thrust::transform_reduce(
-                thrust::device,
-                thrust::make_zip_iterator(thrust::make_tuple(old_begin, pos_begin)),
-                thrust::make_zip_iterator(thrust::make_tuple(old_end, pos_end)),
-                [] __device__(thrust::tuple<const Vector3<T>, const Vector3<T>> tup) -> T {
-                    return norm2(thrust::get<1>(tup) - thrust::get<0>(tup));
-                },
-                T(0),
-                thrust::maximum<T>());
+            ZipIt zip_it = thrust::make_zip_iterator(
+                thrust::make_tuple(m_oldPosition.getData(), m_positions->getData()));
+            InputIt input_it = InputIt(zip_it, DiffNorm2{});
+
+            // Fused: compute displacement squared and find maximum in one CUB call
+            cudaErrCheck(cub::DeviceReduce::Reduce(m_cubReduceTempStorage,
+                                                   m_cubReduceTempStorageBytes,
+                                                   input_it,
+                                                   m_maxDisplacementSquared.getData(),
+                                                   m_positions->getSize(),
+                                                   cub::Max(),
+                                                   T(0)));
+            cudaDeviceSynchronize();
         }
 
-        return maxDisplacementSquared;
+        return m_maxDisplacementSquared[0];
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -476,7 +518,7 @@ public:
         // Max Cap the skin thickness at 20% of the cell size
         constexpr T maxSkinThickness = T(0.2);
 
-        const T newThickness = T(2) * sqrt(m_maxDisplacementSquared) * m_updateFrequency
+        const T newThickness = T(2) * sqrt(m_maxDisplacementSquared[0]) * m_updateFrequency
                                / m_numIterationsSinceLastUpdate;
         T skinThickness = mu * newThickness + (1 - mu) * m_skinThickness;
         if(skinThickness > maxSkinThickness * m_cellSizeWithoutSkin)

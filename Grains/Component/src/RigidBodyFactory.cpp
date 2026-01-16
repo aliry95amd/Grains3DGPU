@@ -11,26 +11,24 @@
 /* ============================================================================================== */
 /* Low-Level Methods                                                                              */
 /* ============================================================================================== */
-// GPU kernel to construct the rigidbody on device.
-// This is mandatory as we cannot access device memory addresses on the host
-// So, we pass a device memory address to a kernel.
-// Memory address is then populated within the kernel.
-// This kernel is not declared in any header file since we directly use it below
-// It helps to NOT explicitly instantiate it.
+// GPU kernel to construct rigid bodies on device in batches
+// Takes array of indices where each rigid body should be placed
 template <typename T, typename... Arguments>
-__GLOBAL__ void createRigidBodyKernel(RigidBody<T>** rb,
-                                      uint           index,
-                                      T              crustThickness,
-                                      uint           material,
-                                      T              density,
-                                      ConvexType     convexType,
-                                      Arguments... args)
+__GLOBAL__ void createRigidBodiesBatchKernel(RigidBody<T>** rb,
+                                             const uint*    indices,
+                                             T              crustThickness,
+                                             uint           material,
+                                             T              density,
+                                             ConvexType     convexType,
+                                             uint           count,
+                                             Arguments... args)
 {
-    uint tID = blockIdx.x * blockDim.x + threadIdx.x;
-    if(tID > 0)
+    uint idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if(idx >= count)
         return;
 
     Convex<T>* convex = nullptr;
+
     if constexpr(sizeof...(args) == 1)
     {
         if(convexType == SPHERE)
@@ -40,9 +38,9 @@ __GLOBAL__ void createRigidBodyKernel(RigidBody<T>** rb,
     {
         if(convexType == CYLINDER)
             convex = new Cylinder<T>(args...);
-        if(convexType == CONE)
+        else if(convexType == CONE)
             convex = new Cone<T>(args...);
-        if(convexType == RECTANGLE)
+        else if(convexType == RECTANGLE)
             convex = new Rectangle<T>(args...);
     }
     else if constexpr(sizeof...(args) == 3)
@@ -55,8 +53,12 @@ __GLOBAL__ void createRigidBodyKernel(RigidBody<T>** rb,
         if(convexType == SUPERQUADRIC)
             convex = new Superquadric<T>(args...);
     }
-    GAssert(convex, "Convex is not created! Aborting Grains!");
-    rb[index] = new RigidBody<T>(convex, crustThickness, density, material);
+
+    if(convex)
+    {
+        uint targetIdx = indices[idx];
+        rb[targetIdx]  = new RigidBody<T>(convex, crustThickness, density, material);
+    }
 }
 
 /* ============================================================================================== */
@@ -144,98 +146,263 @@ __HOST__ void
 }
 
 // -------------------------------------------------------------------------------------------------
-// Constructs a ContactForceModel object on device.
+// Constructs RigidBody objects on device by grouping similar bodies and launching one kernel per
+// group
 template <typename T>
 __HOST__ void
     RigidBodyFactory<T>::copyHostToDevice(GrainsMemBuffer<RigidBody<T>*, MemType::HOST>&   h_RB,
                                           GrainsMemBuffer<RigidBody<T>*, MemType::DEVICE>& d_RB)
 {
     d_RB.initialize(h_RB.getSize());
-    for(uint i = 0; i < h_RB.getSize(); ++i)
-    {
-        // Extracting info from the host side object
-        Convex<T>* convex   = h_RB[i]->getConvex();
-        ConvexType cvxType  = convex->getConvexType();
-        T          ct       = h_RB[i]->getCrustThickness();
-        uint       material = h_RB[i]->getMaterial();
-        // We also need the density to calculate the mass of the rigid body.
-        // However, it is not available here. So, we manually compute it:
-        T density = h_RB[i]->getMass() / h_RB[i]->getVolume();
 
-        if(cvxType == SPHERE)
+    uint numRB = h_RB.getSize();
+    if(numRB == 0)
+        return;
+
+    // Define a structure to identify unique rigid body types
+    struct RBProperties
+    {
+        ConvexType type;
+        T          crustThickness;
+        uint       material;
+        T          density;
+        // Parameters for convex shapes (max 5 for superquadric)
+        T    params[5];
+        uint numParams;
+
+        bool operator==(const RBProperties& other) const
         {
-            Sphere<T>* c = dynamic_cast<Sphere<T>*>(convex);
-            T          r = c->getRadius();
-            createRigidBodyKernel<<<1, 1>>>(d_RB.getData(), i, ct, material, density, SPHERE, r);
+            if(type != other.type || crustThickness != other.crustThickness
+               || material != other.material || std::abs(density - other.density) > T(1e-9)
+               || numParams != other.numParams)
+                return false;
+            for(uint i = 0; i < numParams; ++i)
+                if(std::abs(params[i] - other.params[i]) > T(1e-9))
+                    return false;
+            return true;
         }
-        else if(cvxType == BOX)
+    };
+
+    // Step 1: Analyze h_RB to find unique types and their indices
+    std::vector<RBProperties>      uniqueTypes;
+    std::vector<std::vector<uint>> indicesPerType;
+
+    for(uint i = 0; i < numRB; ++i)
+    {
+        RBProperties prop;
+        Convex<T>*   convex = h_RB[i]->getConvex();
+        prop.type           = convex->getConvexType();
+        prop.crustThickness = h_RB[i]->getCrustThickness();
+        prop.material       = h_RB[i]->getMaterial();
+        prop.density        = h_RB[i]->getMass() / h_RB[i]->getVolume();
+
+        // Extract parameters based on type
+        prop.numParams = 0;
+        if(prop.type == SPHERE)
         {
-            Box<T>*    c = dynamic_cast<Box<T>*>(convex);
-            Vector3<T> L = c->getExtent();
-            createRigidBodyKernel<<<1, 1>>>(d_RB.getData(),
-                                            i,
-                                            ct,
-                                            material,
-                                            density,
-                                            BOX,
-                                            L[X],
-                                            L[Y],
-                                            L[Z]);
+            Sphere<T>* s   = dynamic_cast<Sphere<T>*>(convex);
+            prop.params[0] = s->getRadius();
+            prop.numParams = 1;
         }
-        else if(cvxType == CYLINDER)
+        else if(prop.type == BOX)
+        {
+            Box<T>*    b   = dynamic_cast<Box<T>*>(convex);
+            Vector3<T> L   = b->getExtent();
+            prop.params[0] = L[X];
+            prop.params[1] = L[Y];
+            prop.params[2] = L[Z];
+            prop.numParams = 3;
+        }
+        else if(prop.type == CYLINDER)
         {
             Cylinder<T>* c = dynamic_cast<Cylinder<T>*>(convex);
-            T            r = c->getRadius();
-            T            h = c->getHeight();
-            createRigidBodyKernel<<<1, 1>>>(d_RB.getData(),
-                                            i,
-                                            ct,
-                                            material,
-                                            density,
-                                            CYLINDER,
-                                            r,
-                                            h);
+            prop.params[0] = c->getRadius();
+            prop.params[1] = c->getHeight();
+            prop.numParams = 2;
         }
-        else if(cvxType == CONE)
+        else if(prop.type == CONE)
         {
-            Cone<T>* c = dynamic_cast<Cone<T>*>(convex);
-            T        r = c->getRadius();
-            T        h = c->getHeight();
-            createRigidBodyKernel<<<1, 1>>>(d_RB.getData(), i, ct, material, density, CONE, r, h);
+            Cone<T>* c     = dynamic_cast<Cone<T>*>(convex);
+            prop.params[0] = c->getRadius();
+            prop.params[1] = c->getHeight();
+            prop.numParams = 2;
         }
-        else if(cvxType == SUPERQUADRIC)
+        else if(prop.type == RECTANGLE)
         {
-            Superquadric<T>* c = dynamic_cast<Superquadric<T>*>(convex);
-            Vector3<T>       L = c->getExtent();
-            Vector3<T>       N = c->getExponent();
-            createRigidBodyKernel<<<1, 1>>>(d_RB.getData(),
-                                            i,
-                                            ct,
-                                            material,
-                                            density,
-                                            SUPERQUADRIC,
-                                            L[X],
-                                            L[Y],
-                                            L[Z],
-                                            N[X],
-                                            N[Y]);
+            Rectangle<T>* r = dynamic_cast<Rectangle<T>*>(convex);
+            Vector3<T>    L = r->getExtent();
+            prop.params[0]  = L[X];
+            prop.params[1]  = L[Y];
+            prop.numParams  = 2;
         }
-        else if(cvxType == RECTANGLE)
+        else if(prop.type == SUPERQUADRIC)
         {
-            Rectangle<T>* c = dynamic_cast<Rectangle<T>*>(convex);
-            Vector3<T>    L = c->getExtent();
-            createRigidBodyKernel<<<1, 1>>>(d_RB.getData(),
-                                            i,
-                                            ct,
-                                            material,
-                                            density,
-                                            RECTANGLE,
-                                            L[X],
-                                            L[Y]);
+            Superquadric<T>* sq = dynamic_cast<Superquadric<T>*>(convex);
+            Vector3<T>       L  = sq->getExtent();
+            Vector3<T>       N  = sq->getExponent();
+            prop.params[0]      = L[X];
+            prop.params[1]      = L[Y];
+            prop.params[2]      = L[Z];
+            prop.params[3]      = N[X];
+            prop.params[4]      = N[Y];
+            prop.numParams      = 5;
+        }
+
+        // Find if this type already exists
+        int typeIdx = -1;
+        for(uint j = 0; j < uniqueTypes.size(); ++j)
+        {
+            if(uniqueTypes[j] == prop)
+            {
+                typeIdx = j;
+                break;
+            }
+        }
+
+        // Add to existing type or create new type
+        if(typeIdx >= 0)
+        {
+            indicesPerType[typeIdx].push_back(i);
         }
         else
-            GAbort("Convex type is not implemented for GPU! Aborting Grains!");
+        {
+            uniqueTypes.push_back(prop);
+            indicesPerType.push_back({i});
+        }
     }
+
+    // Set device heap size to accommodate all allocations
+    size_t requiredHeap = numRB * 1024;  // Conservative estimate: 1KB per object
+    size_t currentHeap;
+    cudaDeviceGetLimit(&currentHeap, cudaLimitMallocHeapSize);
+    if(requiredHeap > currentHeap)
+    {
+        cudaDeviceSetLimit(cudaLimitMallocHeapSize, requiredHeap);
+    }
+
+    // Step 2: Launch one kernel per unique type
+    for(uint typeIdx = 0; typeIdx < uniqueTypes.size(); ++typeIdx)
+    {
+        const RBProperties&      prop    = uniqueTypes[typeIdx];
+        const std::vector<uint>& indices = indicesPerType[typeIdx];
+        uint                     count   = indices.size();
+
+        // Allocate device memory for indices
+        uint* d_indices;
+        cudaErrCheck(cudaMalloc(&d_indices, count * sizeof(uint)));
+        cudaErrCheck(
+            cudaMemcpy(d_indices, indices.data(), count * sizeof(uint), cudaMemcpyHostToDevice));
+
+        // Process in batches to avoid overwhelming device heap
+        const uint maxBatchSize = 2048;  // Process 2K objects at a time
+        uint       numBatches   = (count + maxBatchSize - 1) / maxBatchSize;
+
+        for(uint batch = 0; batch < numBatches; ++batch)
+        {
+            uint batchStart = batch * maxBatchSize;
+            uint batchSize  = std::min(maxBatchSize, count - batchStart);
+
+            uint numThreads = 256;
+            uint numBlocks  = (batchSize + numThreads - 1) / numThreads;
+
+            // Launch kernel based on type
+            if(prop.type == SPHERE)
+            {
+                createRigidBodiesBatchKernel<<<numBlocks, numThreads>>>(d_RB.getData(),
+                                                                        d_indices + batchStart,
+                                                                        prop.crustThickness,
+                                                                        prop.material,
+                                                                        prop.density,
+                                                                        SPHERE,
+                                                                        batchSize,
+                                                                        prop.params[0]);
+            }
+            else if(prop.type == BOX)
+            {
+                createRigidBodiesBatchKernel<<<numBlocks, numThreads>>>(d_RB.getData(),
+                                                                        d_indices + batchStart,
+                                                                        prop.crustThickness,
+                                                                        prop.material,
+                                                                        prop.density,
+                                                                        BOX,
+                                                                        batchSize,
+                                                                        prop.params[0],
+                                                                        prop.params[1],
+                                                                        prop.params[2]);
+            }
+            else if(prop.type == CYLINDER)
+            {
+                createRigidBodiesBatchKernel<<<numBlocks, numThreads>>>(d_RB.getData(),
+                                                                        d_indices + batchStart,
+                                                                        prop.crustThickness,
+                                                                        prop.material,
+                                                                        prop.density,
+                                                                        CYLINDER,
+                                                                        batchSize,
+                                                                        prop.params[0],
+                                                                        prop.params[1]);
+            }
+            else if(prop.type == CONE)
+            {
+                createRigidBodiesBatchKernel<<<numBlocks, numThreads>>>(d_RB.getData(),
+                                                                        d_indices + batchStart,
+                                                                        prop.crustThickness,
+                                                                        prop.material,
+                                                                        prop.density,
+                                                                        CONE,
+                                                                        batchSize,
+                                                                        prop.params[0],
+                                                                        prop.params[1]);
+            }
+            else if(prop.type == RECTANGLE)
+            {
+                createRigidBodiesBatchKernel<<<numBlocks, numThreads>>>(d_RB.getData(),
+                                                                        d_indices + batchStart,
+                                                                        prop.crustThickness,
+                                                                        prop.material,
+                                                                        prop.density,
+                                                                        RECTANGLE,
+                                                                        batchSize,
+                                                                        prop.params[0],
+                                                                        prop.params[1]);
+            }
+            else if(prop.type == SUPERQUADRIC)
+            {
+                createRigidBodiesBatchKernel<<<numBlocks, numThreads>>>(d_RB.getData(),
+                                                                        d_indices + batchStart,
+                                                                        prop.crustThickness,
+                                                                        prop.material,
+                                                                        prop.density,
+                                                                        SUPERQUADRIC,
+                                                                        batchSize,
+                                                                        prop.params[0],
+                                                                        prop.params[1],
+                                                                        prop.params[2],
+                                                                        prop.params[3],
+                                                                        prop.params[4]);
+            }
+            else
+            {
+                cudaFree(d_indices);
+                GAbort("Convex type is not implemented for GPU! Aborting Grains!");
+            }
+
+            cudaDeviceSynchronize();
+
+            // Check for errors after each batch
+            cudaError_t err = cudaGetLastError();
+            if(err != cudaSuccess)
+            {
+                cudaFree(d_indices);
+                GAbort(("CUDA error in RigidBody batch creation: "
+                        + std::string(cudaGetErrorString(err)))
+                           .c_str());
+            }
+        }
+
+        cudaFree(d_indices);
+    }
+
     cudaDeviceSynchronize();
 }
 
