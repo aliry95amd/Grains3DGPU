@@ -403,7 +403,7 @@ __HOST__ void
         cudaFree(d_indices);
     }
 
-    cudaDeviceSynchronize();
+    cudaErrCheck(cudaDeviceSynchronize());
 }
 
 // -------------------------------------------------------------------------------------------------

@@ -2,7 +2,6 @@
 #define _LINKEDCELL_HH_
 
 #include <cub/cub.cuh>
-#include <thrust/iterator/zip_iterator.h>
 
 #include "Cells.hh"
 #include "CellsFactory.hh"
@@ -89,11 +88,12 @@ public:
     /** \brief Functor to compute squared displacement between two positions */
     struct DiffNorm2
     {
-        __HOSTDEVICE__ T operator()(const thrust::tuple<Vector3<T>, Vector3<T>>& t) const
+        const Vector3<T>* oldPos;
+        const Vector3<T>* pos;
+
+        __DEVICE__ T operator()(int i) const
         {
-            const Vector3<T>& oldPos = thrust::get<0>(t);
-            const Vector3<T>& pos    = thrust::get<1>(t);
-            return norm2(pos - oldPos);
+            return norm2(pos[i] - oldPos[i]);
         }
     };
     //@}
@@ -130,25 +130,7 @@ public:
         m_positions   = &positions;
         m_quaternions = &quaternions;
 
-        // Initialize CUB reduce workspace for maximum displacement computation
-        if constexpr(M == MemType::DEVICE)
-        {
-            // Query workspace size for Reduce operation with dummy iterator
-            using ZipIt = thrust::zip_iterator<thrust::tuple<const Vector3<T>*, const Vector3<T>*>>;
-            using InputIt = cub::TransformInputIterator<T, DiffNorm2, ZipIt>;
-
-            ZipIt zip_it = thrust::make_zip_iterator(
-                thrust::make_tuple(m_oldPosition.getData(), m_positions->getData()));
-            InputIt input_it(zip_it, DiffNorm2{});
-            cudaErrCheck(cub::DeviceReduce::Reduce(m_cubReduceTempStorage,
-                                                   m_cubReduceTempStorageBytes,
-                                                   input_it,
-                                                   m_maxDisplacementSquared.getData(),
-                                                   nObstacles + nParticles,
-                                                   cub::Max(),
-                                                   T(0)));
-            cudaMalloc(&m_cubReduceTempStorage, m_cubReduceTempStorageBytes);
-        }
+        // Sanity check
         GAssert(positions.getSize() == nObstacles + nParticles
                     && quaternions.getSize() == nObstacles + nParticles,
                 "LinkedCell: positions or quaternions size does not match the number of bodies!");
@@ -194,7 +176,26 @@ public:
         // Setup obstacle
         linkObstacles();
 
-        cudaErrCheck(cudaDeviceSynchronize());
+        // Initialize CUB reduce workspace for maximum displacement computation
+        if constexpr(M == MemType::DEVICE)
+        {
+            // Query workspace size for Reduce operation with dummy iterator
+            using CountingIt = cub::CountingInputIterator<int>;
+            using InputIt    = cub::TransformInputIterator<T, DiffNorm2, CountingIt>;
+
+            DiffNorm2  op{m_oldPosition.getData(), m_positions->getData()};
+            CountingIt count_it(0);
+            InputIt    input_it(count_it, op);
+            cudaErrCheck(cudaGetLastError());
+            cudaErrCheck(cub::DeviceReduce::Reduce(m_cubReduceTempStorage,
+                                                   m_cubReduceTempStorageBytes,
+                                                   input_it,
+                                                   m_maxDisplacementSquared.getData(),
+                                                   nObstacles + nParticles,
+                                                   cub::Max(),
+                                                   T(0)));
+            cudaErrCheck(cudaMalloc(&m_cubReduceTempStorage, m_cubReduceTempStorageBytes));
+        }
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -488,13 +489,12 @@ public:
         }
         else if constexpr(M == MemType::DEVICE)
         {
-            using ZipIt = thrust::zip_iterator<thrust::tuple<const Vector3<T>*, const Vector3<T>*>>;
-            using InputIt = cub::TransformInputIterator<T, DiffNorm2, ZipIt>;
+            using CountingIt = cub::CountingInputIterator<int>;
+            using InputIt    = cub::TransformInputIterator<T, DiffNorm2, CountingIt>;
 
-            ZipIt zip_it = thrust::make_zip_iterator(
-                thrust::make_tuple(m_oldPosition.getData(), m_positions->getData()));
-            InputIt input_it = InputIt(zip_it, DiffNorm2{});
-
+            DiffNorm2  op{m_oldPosition.getData(), m_positions->getData()};
+            CountingIt count_it(0);
+            InputIt    input_it(count_it, op);
             // Fused: compute displacement squared and find maximum in one CUB call
             cudaErrCheck(cub::DeviceReduce::Reduce(m_cubReduceTempStorage,
                                                    m_cubReduceTempStorageBytes,
@@ -503,7 +503,7 @@ public:
                                                    m_positions->getSize(),
                                                    cub::Max(),
                                                    T(0)));
-            cudaDeviceSynchronize();
+            cudaErrCheck(cudaDeviceSynchronize());
         }
 
         return m_maxDisplacementSquared[0];

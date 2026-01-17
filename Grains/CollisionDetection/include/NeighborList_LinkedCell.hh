@@ -79,7 +79,7 @@ public:
                                                        nObstacles,
                                                        nParticles);
 
-        // TODO: Reduce init size
+        // Initialize pair list
         auto initNumPairs = GrainsParameters<T>::m_collisionDetection.linkedCellParameters
                                 .initialNumberOfPairsPerParticle;
         m_pairList.initialize(initNumPairs * nParticles);

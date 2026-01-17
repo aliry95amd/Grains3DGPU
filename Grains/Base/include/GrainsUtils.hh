@@ -54,13 +54,13 @@ __HOST__ static INLINE size_t getAvailableDeviceMemory()
 /** @brief computes the optimal number of threads and blocks for a given number of elements and an
     architecture
     @param numElements the number of elements
-    @param numThreads the number of threads per block
-    @param numBlocks the minimum number of blocks
-    @param prop the device properties */
+    @param prop the device properties
+    @param numBlocks the number of blocks (output)
+    @param numThreads the number of threads per block (output) */
 __HOST__ static INLINE void computeOptimalThreadsAndBlocks(const uint            numElements,
                                                            const cudaDeviceProp& prop,
-                                                           uint&                 numThreads,
-                                                           uint&                 numBlocks)
+                                                           uint&                 numBlocks,
+                                                           uint&                 numThreads)
 {
     constexpr uint maxThreads = 256;  // Avoid 1024 unless necessary
     constexpr uint minThreads = 32;
