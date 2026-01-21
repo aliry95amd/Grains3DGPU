@@ -1,20 +1,24 @@
-#ifndef _HOOKECONTACTFORCEMODEL_HH_
-#define _HOOKECONTACTFORCEMODEL_HH_
+#ifndef _HOOKEMEMORYCONTACTFORCEMODEL_HH_
+#define _HOOKEMEMORYCONTACTFORCEMODEL_HH_
 
 #include "ContactForceModel.hh"
 #include "ReaderXML.hh"
 
 // =================================================================================================
-/** @brief The class HookeContactForceModel.
+/** @brief The class HookeMemoryContactForceModel.
 
-    Contact force model involving a normal Hookean spring, a normal Dashpot and
-    a tangential Coulomb friction (HO-D-C) to compute the force and torque
-    induced by the contact between two rigid components.
+    Contact force model involving a Hookean spring and a Dashpot in both the normal and tangential
+    directions with tangential history (memory), as well as rolling resistance with memory, and a
+    tangential Coulomb friction to compute the force and torque induced by the contact between two
+    rigid components.
 
-    @author A.Yazdani - 2024 - Construction */
+    This model includes tangential spring effects (kt) and rolling friction (mur) with full memory
+    tracking of cumulative displacements.
+
+    @author A.Yazdani - 2025 - Construction (Inspired by D.Huet and A.Wachs) */
 // =================================================================================================
 template <typename T>
-class HookeContactForceModel : public ContactForceModel<T>
+class HookeMemoryContactForceModel : public ContactForceModel<T>
 {
 private:
     /** @name Parameters */
@@ -27,10 +31,14 @@ private:
     T m_muen;
     /** \brief Tangential damping coefficient */
     T m_etat;
+    /** \brief Tangential stiffness coefficient */
+    T m_kt;
     /** \brief Tangential Coulomb friction coefficient */
     T m_muc;
     /** \brief Rolling resistance coefficient */
-    T m_kr;
+    T m_mur = T(0);
+    /** \brief Rolling friction prefactor */
+    T m_etarpf = T(0);
     //@}
 
 public:
@@ -38,25 +46,27 @@ public:
     //@{
     /** @brief Default constructor */
     __HOSTDEVICE__
-    HookeContactForceModel();
+    HookeMemoryContactForceModel();
 
     /** @brief Constructor with an XML node
         @param root XML node */
     __HOST__
-    HookeContactForceModel(DOMNode* root);
+    HookeMemoryContactForceModel(DOMNode* root);
 
-    /** @brief Constructor with five values as contact parameters
+    /** @brief Constructor with eight values as contact parameters
         @param kn normal stiffness coefficient
         @param en normal restitution coefficient
+        @param kt tangential stiffness coefficient
         @param etat tangential damping coefficient
         @param muc tangential Coulomb friction coefficient
-        @param kr rolling resistance coefficient */
+        @param mur rolling resistance coefficient
+        @param etarpf rolling friction prefactor */
     __HOSTDEVICE__
-    HookeContactForceModel(T kn, T en, T etat, T muc, T kr);
+    HookeMemoryContactForceModel(T kn, T en, T kt, T etat, T muc, T mur = T(0), T etarpf = T(0));
 
     /** @brief Destructor */
     __HOSTDEVICE__
-    ~HookeContactForceModel();
+    ~HookeMemoryContactForceModel();
     //@}
 
     /** @name Get methods */
@@ -65,19 +75,22 @@ public:
     __HOSTDEVICE__
     ContactForceModelType getContactForceModelType() const final;
 
-    /** @brief Gets the parameters of the Hooke contact force model
+    /** @brief Gets the parameters of the HookeMemory contact force model
         @param kn normal stiffness coefficient
         @param en normal restitution coefficient
+        @param kt tangential stiffness coefficient
         @param etat tangential damping coefficient
         @param muc tangential Coulomb friction coefficient
-        @param kr rolling resistance coefficient */
+        @param mur rolling resistance coefficient
+        @param etarpf rolling friction prefactor */
     __HOSTDEVICE__
-    void getContactForceModelParameters(T& kn, T& en, T& etat, T& muc, T& kr) const;
+    void getContactForceModelParameters(
+        T& kn, T& en, T& kt, T& etat, T& muc, T& mur, T& etarpf) const;
     //@}
 
     /**@name Methods */
     //@{
-    /** @brief Returns a torce based on the contact information
+    /** @brief Returns a force based on the contact information
         @param contactVector geometric contact vector
         @param relVelocityAtContact relative velocity at the contact point
         @param relAngVelocity relative angular velocity
@@ -96,7 +109,7 @@ public:
                                Vector3<T>&       delFT,
                                Vector3<T>&       delM) const;
 
-    /** @brief Returns a torce based on the contact information
+    /** @brief Returns a force based on the contact information
         @param contactInfos geometric contact features
         @param relVelocityAtContact relative velocity at the contact point
         @param relAngVelocity relative angular velocity

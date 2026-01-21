@@ -25,7 +25,6 @@ class ComponentManagerCPU : public ComponentManager<T, MemType::HOST>
     using CM::m_torce;
     using CM::m_velocity;
 
-    using CM::m_activePairs;
     using CM::m_contactInfo;
     using CM::m_contactInfoWorld;
     using CM::m_neighborList;

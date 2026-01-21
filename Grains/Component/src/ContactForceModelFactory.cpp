@@ -48,7 +48,7 @@ __HOST__ void
         std::string matB     = ReaderXML::getNodeAttr_String(material, "materialB");
         uint        matA_id  = GrainsParameters<T>::m_materialMap[matA];
         uint        matB_id  = GrainsParameters<T>::m_materialMap[matB];
-        uint        index    = computeHash(matA_id, matB_id);
+        uint        index    = triangularHash(matA_id, matB_id);
         // Contact Parameters
         DOMNode* parameters = ReaderXML::getNode(contact, "Parameters");
         if(contactType == "Hooke")
@@ -56,20 +56,6 @@ __HOST__ void
         else
             GAbort("Unknown contact force model! Aborting Grains!");
     }
-}
-
-// -------------------------------------------------------------------------------------------------
-// Hash function to map a pair of material IDs x and y to a single ID to access
-// the proper contact force model between them.
-// We DO NOT CHECK the inputs. We TRUST the user on this. However, inproper
-// inputs would persumably crash the code by accessing memory accesses that are
-// not valid.
-template <typename T>
-__HOSTDEVICE__ uint ContactForceModelFactory<T>::computeHash(uint x, uint y)
-{
-    uint s = min(x, y);  // smaller one
-    uint l = max(x, y);  // larger one
-    return (l * (l + 1) / 2 + s);
 }
 
 // -------------------------------------------------------------------------------------------------

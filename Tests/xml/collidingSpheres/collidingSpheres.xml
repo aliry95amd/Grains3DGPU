@@ -1,0 +1,66 @@
+<Grains3D Type="Standard" Precision="Double">
+
+<Construction>
+	<Origin X="-0.25" Y="-0.25" Z="0"/>
+	<MaxCoordinate X="0.5" Y="0.5" Z="1.0"/>
+	<Periodicity PX="0" PY="0" PZ="0"/>
+
+	<CollisionDetection>
+		<NeighborList Type="BruteForce" UpdateFrequency="1"/>
+		<BoundingVolume Type="OBB"/>
+		<NarrowPhase Type="GJK"/>
+	</CollisionDetection>
+
+
+	<ContactForceModels>
+		<ContactForceModel Type='Hooke'>
+			<Material materialA="matP" materialB="matP"/>
+			<Parameters kn="5.e4" en="0.8" etat="0" muc="0" kr="0"/>
+		</ContactForceModel>
+	</ContactForceModels>
+
+
+	<TemporalSetting>
+		<TimeInterval Start="0." End="0.025e-1" dt="1.e-8"/>
+		<TimeIntegration Type="FirstOrderExplicit"/>
+	</TemporalSetting>
+
+
+	<Particles>
+		<Particle Number="1" Density="1000" Material="matP">
+			<Convex CrustThickness="1.e-4">
+				<Sphere Radius="0.1"/>
+			</Convex>
+			<AngularPosition Type="Identity"/>
+		</Particle>
+		<Particle Number="1" Density="1000" Material="matP">
+			<Convex CrustThickness="1.e-4">
+				<Sphere Radius="0.1"/>				
+			</Convex>
+			<AngularPosition Type="Identity"/>
+		</Particle>
+	</Particles>
+</Construction>
+
+
+<Forces>
+	<Gravity GX="0.0" GY="0.0" GZ="0"/>
+</Forces>
+
+
+<Simulation>
+	<ParticleInsertion>
+		<InitialPosition Type="File" Name="./collidingSpheres/collidingSpheres_position.dat"/>
+		<InitialOrientation Type="Zero"/>
+		<InitialVelocity Type="File" Name="./collidingSpheres/collidingSpheres_velocity.dat"/>
+		<InitialAngularVelocity Type="Constant" X="0" Y="0" Z="0"/>
+	</ParticleInsertion>
+	<PostProcessing>
+		<TimeSave Start="0." End="0.05" dt="0.0001"/>
+		<Writers>
+			<RawData Directory ="./results/collidingSpheres" RootName="collidingSpheres"/>
+		</Writers>
+	</PostProcessing>
+</Simulation>
+
+</Grains3D>

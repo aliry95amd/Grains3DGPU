@@ -247,14 +247,6 @@ TEST_F(NeighborListTest, LinkedCell_CPU_vs_GPU_Variants)
         names.push_back(gpu_names[i]);
     }
 
-    // Print results
-    // std::cout << "\nLinkedCell Results:" << std::endl;
-    // for(size_t i = 0; i < names.size(); ++i)
-    // {
-    //     std::cout << "  " << names[i] << ": " << all_pairs[i].size() << " neighbor pairs"
-    //               << std::endl;
-    // }
-
     // Verify all give same results
     EXPECT_GT(all_pairs[0].size(), 0) << "Should find some neighbors";
 

@@ -1,6 +1,9 @@
 #ifndef _RIGIDBODY_HH_
 #define _RIGIDBODY_HH_
 
+#include <limits>
+
+#include "BitPacker.hh"
 #include "Convex.hh"
 #include "Kinematics.hh"
 #include "Quaternion.hh"
@@ -10,18 +13,32 @@
 // =================================================================================================
 /** @brief The class RigidBody.
 
-    Rigid bodies comprising their shapes and physical attributes. The precision is managed by two
-    typenames "T" and "U". "T" corresponds to the precision of the rigid body, and "U" represents
-    the precision of the bounding volume encapsulating the rigid body. We explicitly instantiate
-    three classes out of this template; (T, U) = (double, double), (double, float), (float, float).
+    Rigid bodies comprising their shapes and physical attributes.
 
     @author A.Yazdani - 2024 - Construction */
 // =================================================================================================
 template <typename T>
 class RigidBody
 {
+public:
+    /** @name BitPacker constants */
+    //@{
+    /** \brief Number of bits for each field in the packed properties */
+    static constexpr int B_MAT   = 4;
+    static constexpr int B_MASS  = 30;
+    static constexpr int B_CRUST = 30;
+    static_assert(B_MAT + B_MASS + B_CRUST == 64, "Property bits must sum to 64");
+
+    /** \brief Default minimum and maximum values for mass and crust thickness */
+    static constexpr T DEFAULT_CRUST_MIN = HIGHEPS<T>;
+    static constexpr T DEFAULT_CRUST_MAX = T(1);
+    static constexpr T DEFAULT_MASS_MIN  = EPS<T>;
+    // Finite sentinel to represent unspecified/obstacle masses without producing inf.
+    static constexpr T DEFAULT_MASS_MAX = T(1e3);
+    //@}
+
 protected:
-    /**@name Parameters */
+    /** @name Parameters */
     //@{
     /** \brief Convex shape */
     Convex<T>* m_convex;
@@ -29,20 +46,23 @@ protected:
     T m_inertia[6];
     /** \brief Inverse of the inertia tensor */
     T m_inertia_1[6];
-    /** \brief Crust thickness */
-    T m_crustThickness;
-    /** \brief Mass */
-    T m_mass;
-    /** \brief Material ID */
-    uint m_material;
+    /** \brief Packed properties:
+        BitPacker field order is LSB->MSB: material(4), mass(30), crust(30) */
+    BitPacker<uint64_t, B_MAT, B_MASS, B_CRUST> m_properties;
     //@}
 
 public:
-    /**@name Constructeurs */
+    /** @name Constructors */
     //@{
     /** @brief Default constructor */
     __HOSTDEVICE__
     RigidBody();
+
+    /** @brief Constructor that accepts pre-packed properties produced by BitPacker.
+        This is intended for fast device-side construction when the packed properties
+        are already available on the caller side. */
+    __HOSTDEVICE__
+    RigidBody(Convex<T>* convex, uint64_t propertiesRaw);
 
     /** @brief Constructor with a convex, crust thickness, material, and density.
         @param convex convex
@@ -82,7 +102,7 @@ public:
     ~RigidBody();
     //@}
 
-    /**@name Get methods */
+    /** @name Get methods */
     //@{
     /** @brief Gets the rigid body's convex */
     __HOSTDEVICE__
@@ -98,13 +118,17 @@ public:
     __HOSTDEVICE__
     void getInertia_1(T (&inertia_1)[6]) const;
 
+    /** @brief Gets the packed properties */
+    __HOSTDEVICE__
+    const BitPacker<uint64_t, B_MAT, B_MASS, B_CRUST>& getProperties() const;
+
+    /** @brief Gets the packed properties as raw uint64_t */
+    __HOSTDEVICE__
+    uint64_t getPropertiesRaw() const;
+
     /** @brief Gets the rigid body's crust thickness */
     __HOSTDEVICE__
     T getCrustThickness() const;
-
-    /** @brief Gets the rigid body's volume */
-    __HOSTDEVICE__
-    T getVolume() const;
 
     /** @brief Gets the rigid body's mass */
     __HOSTDEVICE__
@@ -114,6 +138,10 @@ public:
     __HOSTDEVICE__
     uint getMaterial() const;
 
+    /** @brief Gets the rigid body's volume */
+    __HOSTDEVICE__
+    T getVolume() const;
+
     /** @brief Gets the circumcribed radius of the rigid body */
     __HOSTDEVICE__
     T getCircumscribedRadius() const;
@@ -121,8 +149,19 @@ public:
 
     /**@name Set methods */
     //@{
+    /** @brief Sets the rigid body's inertia and its inverse */
     __HOSTDEVICE__
     void setInertia();
+
+    /** @brief Sets the packed properties directly
+        @param p packed properties */
+    __HOSTDEVICE__
+    void setProperties(BitPacker<uint64_t, B_MAT, B_MASS, B_CRUST> p);
+
+    /** @brief Sets the packed properties from raw uint64_t
+        @param p packed properties as uint64_t */
+    __HOSTDEVICE__
+    void setProperties(uint64_t p);
     //@}
 
     /**@name Methods */

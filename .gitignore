@@ -58,6 +58,11 @@ Main/obj*
 Main/bin*
 Tests/build*
 Tests/smoke/*/
+# Test-runner output directories
+/Tests/xml/logs/
+/Tests/xml/plots/
+/Tests/xml/results/
+/Tests/smoke/logs/
 Tools/PrePost/*/bin*
 Tools/PrePost/*/obj*
 Tools/XMLGenerators/*/**.xml

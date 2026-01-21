@@ -17,6 +17,7 @@ enum ConvexType
 
 // =================================================================================================
 /** @brief The class Convex. Convex bodies - The base class for various particle shapes.
+
     @author A.Yazdani - 2023 - Construction
     @author A.Yazdani - 2024 - Modificiation */
 // =================================================================================================

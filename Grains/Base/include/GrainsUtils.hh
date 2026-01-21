@@ -232,4 +232,20 @@ __HOSTDEVICE__ INLINE void GAssert(bool condition, const Args&... args)
         GAbort("GAssert failed:", args...);
 }
 
+// -------------------------------------------------------------------------------------------------
+/** @brief Computes a triangular hash for a pair of unsigned integers. Maps two IDs (x, y) to a
+    unique single ID using upper-triangular indexing:
+    hash = l * (l + 1) / 2 + s, where l = max(x,y) and s = min(x,y).
+    This produces a symmetric hash (order-independent) for pairs.
+    @param x first ID
+    @param y second ID
+    @return unique hash value */
+__HOSTDEVICE__ static INLINE uint triangularHash(uint x, uint y)
+{
+    uint s = min(x, y);  // smaller one
+    uint l = max(x, y);  // larger one
+    return (l * (l + 1) / 2 + s);
+}
+//@}
+
 #endif

@@ -227,7 +227,6 @@ __GLOBAL__ void transformContactInfo_Kernel(const uint2*         pairList,
                                             const Quaternion<T>* quaternion,
                                             ContactInfo<T>*      contactInfoLocal,
                                             ContactInfo<T>*      contactInfoWorld,
-                                            uint*                activePairs,
                                             const uint           nPairs)
 {
     uint tID = blockIdx.x * blockDim.x + threadIdx.x;
@@ -240,42 +239,6 @@ __GLOBAL__ void transformContactInfo_Kernel(const uint2*         pairList,
                                 quaternion,
                                 contactInfoLocal,
                                 contactInfoWorld,
-                                activePairs,
-                                tID);
-}
-
-// -------------------------------------------------------------------------------------------------
-/** @brief Computes the contact forces
-    @param CF contact force models
-    @param pairList list of rigid bodies pairs
-    @param contactInfo contact information
-    @param rigidBody rigid body of components
-    @param position position of the components
-    @param velocity kinematics of the components
-    @param torce torce acting on the components
-    @param nPairs number of pairs */
-template <typename T>
-__GLOBAL__ void computeContactForces_Kernel(const ContactForceModel<T>* const* CF,
-                                            const uint2*                       pairList,
-                                            const ContactInfo<T>*              contactInfo,
-                                            const RigidBody<T>* const*         rigidBody,
-                                            const Vector3<T>*                  position,
-                                            const Kinematics<T>*               velocity,
-                                            Torce<T>*                          torce,
-                                            const uint                         nPairs)
-{
-    uint tID = blockIdx.x * blockDim.x + threadIdx.x;
-
-    if(tID >= nPairs)
-        return;
-
-    computeContactForces_common(CF,
-                                pairList,
-                                contactInfo,
-                                rigidBody,
-                                position,
-                                velocity,
-                                torce,
                                 tID);
 }
 
@@ -291,23 +254,29 @@ __GLOBAL__ void computeContactForces_Kernel(const ContactForceModel<T>* const* C
     @param torce torce acting on the components
     @param nPairs number of pairs */
 template <typename T>
-__GLOBAL__ void computeContactForcesCompact_Kernel(const ContactForceModel<T>* const* CF,
-                                                   const uint2*                       pairList,
-                                                   const ContactInfo<T>*              contactInfo,
-                                                   const uint*                        activeIdx,
-                                                   const RigidBody<T>* const*         rigidBody,
-                                                   const Vector3<T>*                  position,
-                                                   const Kinematics<T>*               velocity,
-                                                   Torce<T>*                          torce,
-                                                   const uint                         nActive)
+__GLOBAL__ void computeContactForces_Kernel(const ContactForceModel<T>* const* CF,
+                                            const uint2*                       pairList,
+                                            const ContactInfo<T>*              contactInfo,
+                                            const uint*                        activeIdx,
+                                            const Vector3<T>*                  position,
+                                            const Kinematics<T>*               velocity,
+                                            Torce<T>*                          torce,
+                                            const uint                         nActive)
 {
     uint tID = blockIdx.x * blockDim.x + threadIdx.x;
 
     if(tID >= nActive)
         return;
 
-    const uint i = activeIdx[tID];
-    computeContactForces_common(CF, pairList, contactInfo, rigidBody, position, velocity, torce, i);
+    if(activeIdx == nullptr)
+    {
+        computeContactForces_common(CF, pairList, contactInfo, position, velocity, torce, tID);
+    }
+    else
+    {
+        const uint i = activeIdx[tID];
+        computeContactForces_common(CF, pairList, contactInfo, position, velocity, torce, i);
+    }
 }
 
 // -------------------------------------------------------------------------------------------------

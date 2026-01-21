@@ -8,7 +8,8 @@
 // ContactForceModel types
 enum ContactForceModelType
 {
-    HOOKE
+    HOOKE,
+    HOOKEMEMORY
 };
 
 // =================================================================================================
@@ -58,8 +59,7 @@ public:
         @param relAngVelocity relative angular velocity
         @param vA position of the first component
         @param vB position of the second component
-        @param mA mass of the first component
-        @param mB mass of the second component
+        @param averageMass average mass of the two components
         @param torceA computed force and torque for the first component
         @param torceB computed force and torque for the second component */
     __HOSTDEVICE__
@@ -68,8 +68,7 @@ public:
                                const Vector3<T>&     relAngVelocity,
                                const Vector3<T>&     vA,
                                const Vector3<T>&     vB,
-                               const T               mA,
-                               const T               mB,
+                               const T               averageMass,
                                Torce<T>&             torceA,
                                Torce<T>&             torceB) const
         = 0;

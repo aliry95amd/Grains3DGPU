@@ -59,8 +59,6 @@ protected:
     GrainsMemBuffer<ContactInfo<T>, M> m_contactInfo;
     /** \brief Contact information in world frame */
     GrainsMemBuffer<ContactInfo<T>, M> m_contactInfoWorld;
-    /** \brief Active contact pairs */
-    GrainsMemBuffer<uint, M> m_activePairs;
 
     /** \brief Number of particles in manager */
     uint m_numParticles;
@@ -378,25 +376,24 @@ public:
             freeMem = getAvailableDeviceMemory();
 
         // Initialize with maximum possible pairs for dynamic sizing
-        constexpr uint initialPairPerComponent = 20;
-        size_t         estimatedPairs = (m_numObstacles + m_numParticles) * initialPairPerComponent;
-        size_t         maxPairs
+        uint initialPairPerComponent = GrainsParameters<T>::m_collisionDetection
+                                           .linkedCellParameters.initialNumberOfPairsPerParticle;
+        size_t estimatedPairs = m_numParticles * initialPairPerComponent;
+        size_t maxPairs
             = m_numObstacles * m_numParticles + m_numParticles * (m_numParticles - 1) / 2;
         estimatedPairs = std::min(estimatedPairs, maxPairs);
         size_t sizePerPair
             = sizeof(m_relPosition.getData()[0]) + sizeof(m_relQuaternion.getData()[0])
-              + sizeof(m_contactInfo.getData()[0]) + sizeof(m_contactInfoWorld.getData()[0])
-              + sizeof(m_activePairs.getData()[0]);
+              + sizeof(m_contactInfo.getData()[0]) + sizeof(m_contactInfoWorld.getData()[0]);
         size_t sizeNeeded = estimatedPairs * sizePerPair;
-        // Maybe a safety factor here would be useful
-        sizeNeeded           = std::min(sizeNeeded, freeMem);
+        GAssert(sizeNeeded < freeMem,
+                "Not enough memory to allocate pair-dependent buffers in ComponentManager!");
         size_t maxPairsFinal = sizeNeeded / sizePerPair;
 
         m_relPosition.initialize(maxPairsFinal);
         m_relQuaternion.initialize(maxPairsFinal);
         m_contactInfo.initialize(maxPairsFinal);
         m_contactInfoWorld.initialize(maxPairsFinal);
-        m_activePairs.initialize(maxPairsFinal);
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -408,7 +405,6 @@ public:
         m_relQuaternion.resize(size);
         m_contactInfo.resize(size);
         m_contactInfoWorld.resize(size);
-        m_activePairs.resize(size);
     }
 
     // ---------------------------------------------------------------------------------------------

@@ -1,7 +1,9 @@
+#include <cmath>
 #include <limits>
 
 #include "ConvexFactory.hh"
 #include "GrainsParameters.hh"
+#include "GrainsUtils.hh"
 #include "QuaternionMath.hh"
 #include "RigidBody.hh"
 #include "VectorMath.hh"
@@ -15,15 +17,32 @@ __HOSTDEVICE__ RigidBody<T>::RigidBody()
 }
 
 // -------------------------------------------------------------------------------------------------
+// Constructor that accepts packed properties (raw uint64_t)
+template <typename T>
+__HOSTDEVICE__ RigidBody<T>::RigidBody(Convex<T>* convex, uint64_t propertiesRaw)
+    : m_convex(convex)
+{
+    m_properties.setValue(propertiesRaw);
+    setInertia();
+}
+
+// -------------------------------------------------------------------------------------------------
 // Constructor with input parameters
 template <typename T>
 __HOSTDEVICE__ RigidBody<T>::RigidBody(Convex<T>* convex, T ct, T density, uint material)
     : m_convex(convex)
-    , m_crustThickness(ct)
-    , m_material(material)
 {
-    // mass
-    m_mass = density * m_convex->computeVolume();
+    // Compute mass
+    T mass = density * m_convex->computeVolume();
+
+    // Pack properties directly using BitPacker
+    bool mass_sat = false, crust_sat = false;
+    m_properties.template set<0>(material & ((1u << B_MAT) - 1));
+    m_properties.template setFixed<1, T>(mass, DEFAULT_MASS_MIN, DEFAULT_MASS_MAX, mass_sat);
+    m_properties.template setFixed<2, T>(ct, DEFAULT_CRUST_MIN, DEFAULT_CRUST_MAX, crust_sat);
+
+    GAssert(!mass_sat && !crust_sat,
+            "RigidBody property overflow when packing crust/mass into 64 bits");
     setInertia();
 }
 
@@ -32,9 +51,7 @@ __HOSTDEVICE__ RigidBody<T>::RigidBody(Convex<T>* convex, T ct, T density, uint 
 template <typename T>
 __HOSTDEVICE__ RigidBody<T>::RigidBody(RigidBody<T> const& rb)
     : m_convex(NULL)
-    , m_crustThickness(rb.m_crustThickness)
-    , m_mass(rb.m_mass)
-    , m_material(rb.m_material)
+    , m_properties(rb.m_properties)
 {
     if(rb.m_convex)
         m_convex = rb.m_convex->clone();
@@ -56,10 +73,8 @@ __HOSTDEVICE__ RigidBody<T>& RigidBody<T>::operator=(const RigidBody<T>& other)
         delete m_convex;
 
         // copy
-        m_convex         = other.m_convex ? other.m_convex->clone() : nullptr;
-        m_crustThickness = other.m_crustThickness;
-        m_mass           = other.m_mass;
-        m_material       = other.m_material;
+        m_convex     = other.m_convex ? other.m_convex->clone() : nullptr;
+        m_properties = other.m_properties;
         for(int i = 0; i < 6; ++i)
         {
             m_inertia[i]   = other.m_inertia[i];
@@ -74,9 +89,7 @@ __HOSTDEVICE__ RigidBody<T>& RigidBody<T>::operator=(const RigidBody<T>& other)
 template <typename T>
 __HOSTDEVICE__ RigidBody<T>::RigidBody(RigidBody<T>&& other)
     : m_convex(other.m_convex)
-    , m_crustThickness(other.m_crustThickness)
-    , m_mass(other.m_mass)
-    , m_material(other.m_material)
+    , m_properties(other.m_properties)
 {
     // Copy arrays
     for(int i = 0; i < 6; ++i)
@@ -86,10 +99,8 @@ __HOSTDEVICE__ RigidBody<T>::RigidBody(RigidBody<T>&& other)
     }
 
     // Reset moved-from
-    other.m_convex         = nullptr;
-    other.m_crustThickness = T(0);
-    other.m_mass           = T(0);
-    other.m_material       = 0u;
+    other.m_convex = nullptr;
+    other.m_properties.setValue(0);
     for(int i = 0; i < 6; ++i)
     {
         other.m_inertia[i]   = T(0);
@@ -108,10 +119,8 @@ __HOSTDEVICE__ RigidBody<T>& RigidBody<T>::operator=(RigidBody<T>&& other)
         delete m_convex;
 
         // Move ownership and copy POD fields
-        m_convex         = other.m_convex;
-        m_crustThickness = other.m_crustThickness;
-        m_mass           = other.m_mass;
-        m_material       = other.m_material;
+        m_convex     = other.m_convex;
+        m_properties = other.m_properties;
         for(int i = 0; i < 6; ++i)
         {
             m_inertia[i]   = other.m_inertia[i];
@@ -119,10 +128,8 @@ __HOSTDEVICE__ RigidBody<T>& RigidBody<T>::operator=(RigidBody<T>&& other)
         }
 
         // Reset moved-from
-        other.m_convex         = nullptr;
-        other.m_crustThickness = T(0);
-        other.m_mass           = T(0);
-        other.m_material       = 0u;
+        other.m_convex = nullptr;
+        other.m_properties.setValue(0);
         for(int i = 0; i < 6; ++i)
         {
             other.m_inertia[i]   = T(0);
@@ -140,32 +147,38 @@ __HOST__ RigidBody<T>::RigidBody(DOMNode* root)
     // Convex
     DOMNode* shape = ReaderXML::getNode(root, "Convex");
     m_convex       = ConvexFactory<T>::create(shape);
-    // Crust thickenss
-    m_crustThickness = T(ReaderXML::getNodeAttr_Double(shape, "CrustThickness"));
+    // Crust thickness
+    T crust = T(ReaderXML::getNodeAttr_Double(shape, "CrustThickness"));
     // Volume and mass
     T volume  = m_convex->computeVolume();
     T density = T(0);
+    T mass    = T(0);
     if(ReaderXML::hasNodeAttr(root, "Density"))
     {
         density = T(ReaderXML::getNodeAttr_Double(root, "Density"));
-        m_mass  = density * volume;
+        mass    = density * volume;
     }
-    else
-        m_mass = T(0);
-    setInertia();
     // Material
     std::string material = ReaderXML::getNodeAttr_String(root, "Material");
-    // checking if the material name is already defined.
-    // If yes, we access the ID and store it for the rigid body.
-    // If it is not, we add the material to the map.
-    // Getting the ID of the last material added to the map.
-    // This is basically the same as the size of the map.
+    // checking if the material name is already defined. If yes, we access the ID and store it for
+    // the rigid body. If it is not, we add the material to the map. Getting the ID of the last
+    // material added to the map. This is basically the same as the size of the map.
     if(GrainsParameters<T>::m_materialMap.count(material) == 0)
     {
         uint id = GrainsParameters<T>::m_materialMap.size();
         GrainsParameters<T>::m_materialMap.emplace(material, id);
     }
-    m_material = GrainsParameters<T>::m_materialMap[material];
+    uint matID = GrainsParameters<T>::m_materialMap[material];
+
+    // Pack properties directly using BitPacker
+    bool mass_sat = false, crust_sat = false;
+    m_properties.set<0>(matID & ((1u << B_MAT) - 1));
+    m_properties.setFixed<1, T>(mass, DEFAULT_MASS_MIN, DEFAULT_MASS_MAX, mass_sat);
+    m_properties.setFixed<2, T>(crust, DEFAULT_CRUST_MIN, DEFAULT_CRUST_MAX, crust_sat);
+
+    GAssert(!mass_sat && !crust_sat,
+            "RigidBody property overflow when packing crust/mass into 64 bits");
+    setInertia();
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -203,11 +216,46 @@ __HOSTDEVICE__ void RigidBody<T>::getInertia_1(T (&inertia_1)[6]) const
 }
 
 // -------------------------------------------------------------------------------------------------
+// Gets the packed properties
+template <typename T>
+__HOSTDEVICE__ const
+    BitPacker<uint64_t, RigidBody<T>::B_MAT, RigidBody<T>::B_MASS, RigidBody<T>::B_CRUST>&
+    RigidBody<T>::getProperties() const
+{
+    return m_properties;
+}
+
+// -------------------------------------------------------------------------------------------------
+// Gets the packed properties as raw uint64_t
+template <typename T>
+__HOSTDEVICE__ uint64_t RigidBody<T>::getPropertiesRaw() const
+{
+    return m_properties.getValue();
+}
+
+// -------------------------------------------------------------------------------------------------
 // Gets the rigid body's crust thickness
 template <typename T>
 __HOSTDEVICE__ T RigidBody<T>::getCrustThickness() const
 {
-    return (m_crustThickness);
+    return m_properties.getFixed<2, T>(DEFAULT_CRUST_MIN, DEFAULT_CRUST_MAX);
+}
+
+// -------------------------------------------------------------------------------------------------
+// Gets the rigid body's mass
+template <typename T>
+__HOSTDEVICE__ T RigidBody<T>::getMass() const
+{
+    return m_properties.getFixed<1, T>(DEFAULT_MASS_MIN, DEFAULT_MASS_MAX);
+}
+
+// -------------------------------------------------------------------------------------------------
+// Gets the rigid body's material ID
+template <typename T>
+__HOSTDEVICE__ uint RigidBody<T>::getMaterial() const
+{
+    // material is stored at index 0 (LSB)
+    return uint(m_properties.get<0>());
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -216,22 +264,6 @@ template <typename T>
 __HOSTDEVICE__ T RigidBody<T>::getVolume() const
 {
     return (m_convex->computeVolume());
-}
-
-// -------------------------------------------------------------------------------------------------
-// Gets the rigid body's volume
-template <typename T>
-__HOSTDEVICE__ T RigidBody<T>::getMass() const
-{
-    return (m_mass);
-}
-
-// -------------------------------------------------------------------------------------------------
-// Gets the rigid body's material ID
-template <typename T>
-__HOSTDEVICE__ uint RigidBody<T>::getMaterial() const
-{
-    return (m_material);
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -247,7 +279,8 @@ __HOSTDEVICE__ T RigidBody<T>::getCircumscribedRadius() const
 template <typename T>
 __HOSTDEVICE__ void RigidBody<T>::setInertia()
 {
-    if(m_mass == T(0))
+    T mass = getMass();
+    if(mass == T(0))
     {
         for(int i = 0; i < 6; i++)
         {
@@ -259,13 +292,32 @@ __HOSTDEVICE__ void RigidBody<T>::setInertia()
     {
         // Storing inertia and inverse of it
         m_convex->computeInertia(m_inertia, m_inertia_1);
-        T density = m_mass / getVolume();
+        T volume = getVolume();
+        // Guard against zero volume to avoid division-by-zero producing inf/NaN.
+        T density = (volume == T(0)) ? T(0) : (mass / volume);
         for(int i = 0; i < 6; i++)
         {
             m_inertia[i] *= density;
-            m_inertia_1[i] /= density;
+            m_inertia_1[i] = (density == T(0)) ? T(0) : (m_inertia_1[i] / density);
         }
     }
+}
+
+// -------------------------------------------------------------------------------------------------
+// Sets the packed properties directly
+template <typename T>
+__HOSTDEVICE__ void RigidBody<T>::setProperties(
+    BitPacker<uint64_t, RigidBody<T>::B_MAT, RigidBody<T>::B_MASS, RigidBody<T>::B_CRUST> p)
+{
+    m_properties = p;
+}
+
+// -------------------------------------------------------------------------------------------------
+// Sets the packed properties from raw uint64_t
+template <typename T>
+__HOSTDEVICE__ void RigidBody<T>::setProperties(uint64_t p)
+{
+    m_properties.setValue(p);
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -277,7 +329,7 @@ __HOSTDEVICE__ Kinematics<T> RigidBody<T>::computeMomentum(const Vector3<T>& ome
                                                            const Torce<T>&   t) const
 {
     // Translational momentum
-    Vector3<T> transMomentum(t.getForce() / m_mass);
+    Vector3<T> transMomentum(t.getForce() / getMass());
 
     // Angular momentum
     // Torque
@@ -330,7 +382,7 @@ __HOSTDEVICE__ Kinematics<T> RigidBody<T>::computeMomentum(const Vector3<T>&    
     angMomentum = q >> angMomentumTemp;
 
     // Translational momentum
-    Vector3<T> transMomentum(t.getForce() / m_mass);
+    Vector3<T> transMomentum(t.getForce() / getMass());
 
     return (Kinematics<T>(transMomentum, angMomentum));
 }

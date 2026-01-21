@@ -184,13 +184,12 @@ __HOSTDEVICE__ static INLINE void
 }
 
 // -------------------------------------------------------------------------------------------------
-/** @brief Flags active contacts and transforms CI from A-local to world.
+/** @brief Transforms contact info from A-local to world.
     @param pairList list of contact pairs
     @param position world positions of components
     @param quaternion world orientations of components
     @param contactInfoLocal CI computed in A-local frame (input)
     @param contactInfoWorld CI written in world frame (output, only for actives)
-    @param active flag buffer (1 if active/contact, else 0)
     @param pairID ID of the pair */
 template <typename T>
 __HOSTDEVICE__ static INLINE void transformContactInfo_common(const uint2*         pairList,
@@ -198,22 +197,20 @@ __HOSTDEVICE__ static INLINE void transformContactInfo_common(const uint2*      
                                                               const Quaternion<T>* quaternion,
                                                               ContactInfo<T>*      contactInfoLocal,
                                                               ContactInfo<T>*      contactInfoWorld,
-                                                              uint*                active,
                                                               const uint           pairID)
 {
-    ContactInfo<T>& ciL = contactInfoLocal[pairID];
-    active[pairID]      = (ciL.getOverlapDistance() < T(0)) ? 1 : 0;
-
     // Transform point and vector from A-local to world using A's pose
-    const uint           idA = pairList[pairID].x;
+    const ContactInfo<T> ciL = contactInfoLocal[pairID];
     ContactInfo<T>&      ciW = contactInfoWorld[pairID];
+    uint                 idA = pairList[pairID].x;
     const Quaternion<T>& qA  = quaternion[idA];
     ciW.setContactPoint((qA >> ciL.getContactPoint()) + position[idA]);
     ciW.setContactVector((qA >> ciL.getContactVector()));
     ciW.setOverlapDistance(ciL.getOverlapDistance());
-
-    // reset the distance so we don't compute the torce twice
-    ciL.setOverlapDistance(T(0));
+    ciW.setContactInfo((qA >> ciL.getContactPoint()) + position[idA],
+                       (qA >> ciL.getContactVector()),
+                       ciL.getOverlapDistance(),
+                       ciL.getContactMetaDataRaw());
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -230,28 +227,31 @@ template <typename T>
 __HOSTDEVICE__ static INLINE void computeContactForces_common(const ContactForceModel<T>* const* CF,
                                                               const uint2*          pairList,
                                                               const ContactInfo<T>* contactInfo,
-                                                              const RigidBody<T>* const* rigidBody,
-                                                              const Vector3<T>*          position,
-                                                              const Kinematics<T>*       velocity,
-                                                              Torce<T>*                  torce,
-                                                              const uint                 pairID)
+                                                              const Vector3<T>*     position,
+                                                              const Kinematics<T>*  velocity,
+                                                              Torce<T>*             torce,
+                                                              const uint            pairID)
 {
-    ContactInfo<T>& ci = const_cast<ContactInfo<T>&>(contactInfo[pairID]);
+    using CMPacker = BitPacker<uint32_t,
+                               ContactInfo<T>::B_OVERLAP_SIGN,
+                               ContactInfo<T>::B_CONTACT_HASH,
+                               ContactInfo<T>::B_AVG_MASS>;
+    // Contact Details
+    ContactInfo<T> ci = contactInfo[pairID];
+    // one load of metadata
+    CMPacker metaData       = ci.getContactMetaData();
+    bool     isContact      = metaData.template get<0>();  // is in contact/negative distance
+    uint     contactForceID = metaData.template get<1>();  // material hash
+    T        avgMass        = metaData.template getFixed<2, T>(ContactInfo<T>::DEFAULT_AVG_MASS_MIN,
+                                                 ContactInfo<T>::DEFAULT_AVG_MASS_MAX);
     // Compute the forces
     // On device path, this is redundant.
-    if(ci.getOverlapDistance() < T(0))
+    if(isContact)
     {
-        const uint2         pair      = pairList[pairID];
-        const uint          idA       = pair.x;
-        const uint          idB       = pair.y;
-        const RigidBody<T>* rbA       = rigidBody[idA];
-        const uint          materialA = rbA->getMaterial();
-        const T             massA     = rbA->getMass();
-        const RigidBody<T>* rbB       = rigidBody[idB];
-        const uint          materialB = rbB->getMaterial();
-        const T             massB     = rbB->getMass();
-        // CF ID given materialIDs
-        uint contactForceID = ContactForceModelFactory<T>::computeHash(materialA, materialB);
+        const uint2 pair = pairList[pairID];
+        const uint  idA  = pair.x;
+        const uint  idB  = pair.y;
+
         // velocities of the components
         const Kinematics<T>& vA(velocity[idA]);
         const Kinematics<T>& vB(velocity[idB]);
@@ -267,8 +267,7 @@ __HOSTDEVICE__ static INLINE void computeContactForces_common(const ContactForce
                                           relAngVel,
                                           position[idA],
                                           position[idB],
-                                          massA,
-                                          massB,
+                                          avgMass,
                                           torce[idA],
                                           torce[idB]);
     }

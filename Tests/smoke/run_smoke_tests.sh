@@ -30,7 +30,6 @@ print_header() {
     echo "=========================================="
     echo "  GrainsGPU Smoke Tests"
     echo "=========================================="
-    echo "Binary: $BINARY"
     echo ""
 }
 

@@ -7,6 +7,10 @@
 #include "RigidBody.hh"
 #include "Sphere.hh"
 #include "Superquadric.hh"
+#include <cstdint>
+#include <cstdlib>
+#include <iomanip>
+#include <iostream>
 
 /* ============================================================================================== */
 /* Low-Level Methods                                                                              */
@@ -16,9 +20,7 @@
 template <typename T, typename... Arguments>
 __GLOBAL__ void createRigidBodiesBatchKernel(RigidBody<T>** rb,
                                              const uint*    indices,
-                                             T              crustThickness,
-                                             uint           material,
-                                             T              density,
+                                             uint64_t       packedProperties,
                                              ConvexType     convexType,
                                              uint           count,
                                              Arguments... args)
@@ -57,7 +59,7 @@ __GLOBAL__ void createRigidBodiesBatchKernel(RigidBody<T>** rb,
     if(convex)
     {
         uint targetIdx = indices[idx];
-        rb[targetIdx]  = new RigidBody<T>(convex, crustThickness, density, material);
+        rb[targetIdx]  = new RigidBody<T>(convex, packedProperties);
     }
 }
 
@@ -82,66 +84,76 @@ __HOST__ void
 {
     // Obstacles
     numObstacles              = 0;
-    DOMNodeList* allObstacles = ReaderXML::getNodes(obstacles);
+    DOMNodeList* allObstacles = nullptr;
+    if(obstacles)
+        allObstacles = ReaderXML::getNodes(obstacles);
     // Number of unique shapes (rigid bodies) in the simulation
-    uint numRefObstacles = allObstacles->getLength();
-    refObstacleRB.initialize(numRefObstacles);
-    refObstacleInitialPosition.initialize(numRefObstacles);
-    refObstacleInitialOrientation.initialize(numRefObstacles);
-    numEachRefObstacle.initialize(numRefObstacles);
-    for(uint i = 0; i < numRefObstacles; ++i)
+    uint numRefObstacles = allObstacles ? allObstacles->getLength() : 0;
+    if(numRefObstacles > 0)
     {
-        DOMNode* nObstacle       = allObstacles->item(i);
-        numEachRefObstacle[i]    = 1;
-        refObstacleRB[i]         = new RigidBody<T>(nObstacle);
-        DOMNode*      nTransform = ReaderXML::getNode(nObstacle, "Transformation");
-        Vector3<T>    centre(T(0), T(0), T(0));
-        Quaternion<T> rotation(T(0), T(0), T(0), T(1));
-        if(nTransform)
+        refObstacleRB.initialize(numRefObstacles);
+        refObstacleInitialPosition.initialize(numRefObstacles);
+        refObstacleInitialOrientation.initialize(numRefObstacles);
+        numEachRefObstacle.initialize(numRefObstacles);
+        for(uint i = 0; i < numRefObstacles; ++i)
         {
-            DOMNode* nCentre = ReaderXML::getNode(nTransform, "Centre");
-            if(nCentre)
-                centre = Vector3<T>(nCentre);
+            DOMNode* nObstacle       = allObstacles->item(i);
+            numEachRefObstacle[i]    = 1;
+            refObstacleRB[i]         = new RigidBody<T>(nObstacle);
+            DOMNode*      nTransform = ReaderXML::getNode(nObstacle, "Transformation");
+            Vector3<T>    centre(T(0), T(0), T(0));
+            Quaternion<T> rotation(T(0), T(0), T(0), T(1));
+            if(nTransform)
+            {
+                DOMNode* nCentre = ReaderXML::getNode(nTransform, "Centre");
+                if(nCentre)
+                    centre = Vector3<T>(nCentre);
 
-            DOMNode* nRotation = ReaderXML::getNode(nTransform, "AngularPosition");
-            if(nRotation)
-                rotation = Quaternion<T>(nRotation);
+                DOMNode* nRotation = ReaderXML::getNode(nTransform, "AngularPosition");
+                if(nRotation)
+                    rotation = Quaternion<T>(nRotation);
+            }
+            refObstacleInitialPosition[i]    = centre;
+            refObstacleInitialOrientation[i] = rotation;
+            numObstacles += numEachRefObstacle[i];
         }
-        refObstacleInitialPosition[i]    = centre;
-        refObstacleInitialOrientation[i] = rotation;
-        numObstacles += numEachRefObstacle[i];
     }
 
     // Particles
     numParticles              = 0;
-    DOMNodeList* allParticles = ReaderXML::getNodes(particles);
+    DOMNodeList* allParticles = nullptr;
+    if(particles)
+        allParticles = ReaderXML::getNodes(particles);
     // Number of unique shapes (rigid bodies) in the simulation
-    uint numRefParticles = allParticles->getLength();
-    refParticleRB.initialize(numRefParticles);
-    refParticleInitialPosition.initialize(numRefParticles);
-    refParticleInitialOrientation.initialize(numRefParticles);
-    numEachRefParticle.initialize(numRefParticles);
-    for(uint i = 0; i < numRefParticles; ++i)
+    uint numRefParticles = allParticles ? allParticles->getLength() : 0;
+    if(numRefParticles > 0)
     {
-        DOMNode* nParticle    = allParticles->item(i);
-        numEachRefParticle[i] = static_cast<uint>(ReaderXML::getNodeAttr_Int(nParticle, "Number"));
-        refParticleRB[i]      = new RigidBody<T>(nParticle);
-        DOMNode*      nTransform = ReaderXML::getNode(nParticle, "Transformation");
-        Vector3<T>    centre(T(0), T(0), T(0));
-        Quaternion<T> rotation(T(0), T(0), T(0), T(1));
-        if(nTransform)
+        refParticleRB.initialize(numRefParticles);
+        refParticleInitialPosition.initialize(numRefParticles);
+        refParticleInitialOrientation.initialize(numRefParticles);
+        numEachRefParticle.initialize(numRefParticles);
+        for(uint i = 0; i < numRefParticles; ++i)
         {
-            DOMNode* nCentre = ReaderXML::getNode(nTransform, "Centre");
-            if(nCentre)
-                centre = Vector3<T>(nCentre);
+            DOMNode* nParticle       = allParticles->item(i);
+            numEachRefParticle[i]    = ReaderXML::getNodeAttr_Int(nParticle, "Number");
+            refParticleRB[i]         = new RigidBody<T>(nParticle);
+            DOMNode*      nTransform = ReaderXML::getNode(nParticle, "Transformation");
+            Vector3<T>    centre(T(0), T(0), T(0));
+            Quaternion<T> rotation(T(0), T(0), T(0), T(1));
+            if(nTransform)
+            {
+                DOMNode* nCentre = ReaderXML::getNode(nTransform, "Centre");
+                if(nCentre)
+                    centre = Vector3<T>(nCentre);
 
-            DOMNode* nRotation = ReaderXML::getNode(nTransform, "AngularPosition");
-            if(nRotation)
-                rotation = Quaternion<T>(nRotation);
+                DOMNode* nRotation = ReaderXML::getNode(nTransform, "AngularPosition");
+                if(nRotation)
+                    rotation = Quaternion<T>(nRotation);
+            }
+            refParticleInitialPosition[i]    = centre;
+            refParticleInitialOrientation[i] = rotation;
+            numParticles += numEachRefParticle[i];
         }
-        refParticleInitialPosition[i]    = centre;
-        refParticleInitialOrientation[i] = rotation;
-        numParticles += numEachRefParticle[i];
     }
 }
 
@@ -163,18 +175,14 @@ __HOST__ void
     struct RBProperties
     {
         ConvexType type;
-        T          crustThickness;
-        uint       material;
-        T          density;
+        uint64_t   packedProperties;
         // Parameters for convex shapes (max 5 for superquadric)
         T    params[5];
         uint numParams;
 
         bool operator==(const RBProperties& other) const
         {
-            if(type != other.type || crustThickness != other.crustThickness
-               || material != other.material || std::abs(density - other.density) > T(1e-9)
-               || numParams != other.numParams)
+            if(type != other.type || numParams != other.numParams)
                 return false;
             for(uint i = 0; i < numParams; ++i)
                 if(std::abs(params[i] - other.params[i]) > T(1e-9))
@@ -192,9 +200,6 @@ __HOST__ void
         RBProperties prop;
         Convex<T>*   convex = h_RB[i]->getConvex();
         prop.type           = convex->getConvexType();
-        prop.crustThickness = h_RB[i]->getCrustThickness();
-        prop.material       = h_RB[i]->getMaterial();
-        prop.density        = h_RB[i]->getMass() / h_RB[i]->getVolume();
 
         // Extract parameters based on type
         prop.numParams = 0;
@@ -259,6 +264,9 @@ __HOST__ void
             }
         }
 
+        // Record packed properties for kernel launches
+        prop.packedProperties = h_RB[i]->getPropertiesRaw();
+
         // Add to existing type or create new type
         if(typeIdx >= 0)
         {
@@ -266,6 +274,21 @@ __HOST__ void
         }
         else
         {
+            // Debug print: show host-side mass/crust/material and packed properties for this
+            // rigid body when a new unique type is recorded. This helps inspect what values
+            // are being quantized and stored in the packedProperties.
+            {
+                const char* dbg = std::getenv("GRAINS_DEBUG");
+                if(dbg && dbg[0] == '1')
+                {
+                    std::cout << "[RigidBodyFactory] New unique type RB[" << i << "] "
+                              << "mass=" << h_RB[i]->getMass() << " "
+                              << "crust=" << h_RB[i]->getCrustThickness() << " "
+                              << "material=" << h_RB[i]->getMaterial() << " " << "packed=0x"
+                              << std::hex << prop.packedProperties << std::dec << std::endl;
+                }
+            }
+
             uniqueTypes.push_back(prop);
             indicesPerType.push_back({i});
         }
@@ -310,9 +333,7 @@ __HOST__ void
             {
                 createRigidBodiesBatchKernel<<<numBlocks, numThreads>>>(d_RB.getData(),
                                                                         d_indices + batchStart,
-                                                                        prop.crustThickness,
-                                                                        prop.material,
-                                                                        prop.density,
+                                                                        prop.packedProperties,
                                                                         SPHERE,
                                                                         batchSize,
                                                                         prop.params[0]);
@@ -321,9 +342,7 @@ __HOST__ void
             {
                 createRigidBodiesBatchKernel<<<numBlocks, numThreads>>>(d_RB.getData(),
                                                                         d_indices + batchStart,
-                                                                        prop.crustThickness,
-                                                                        prop.material,
-                                                                        prop.density,
+                                                                        prop.packedProperties,
                                                                         BOX,
                                                                         batchSize,
                                                                         prop.params[0],
@@ -334,9 +353,7 @@ __HOST__ void
             {
                 createRigidBodiesBatchKernel<<<numBlocks, numThreads>>>(d_RB.getData(),
                                                                         d_indices + batchStart,
-                                                                        prop.crustThickness,
-                                                                        prop.material,
-                                                                        prop.density,
+                                                                        prop.packedProperties,
                                                                         CYLINDER,
                                                                         batchSize,
                                                                         prop.params[0],
@@ -346,9 +363,7 @@ __HOST__ void
             {
                 createRigidBodiesBatchKernel<<<numBlocks, numThreads>>>(d_RB.getData(),
                                                                         d_indices + batchStart,
-                                                                        prop.crustThickness,
-                                                                        prop.material,
-                                                                        prop.density,
+                                                                        prop.packedProperties,
                                                                         CONE,
                                                                         batchSize,
                                                                         prop.params[0],
@@ -358,9 +373,7 @@ __HOST__ void
             {
                 createRigidBodiesBatchKernel<<<numBlocks, numThreads>>>(d_RB.getData(),
                                                                         d_indices + batchStart,
-                                                                        prop.crustThickness,
-                                                                        prop.material,
-                                                                        prop.density,
+                                                                        prop.packedProperties,
                                                                         RECTANGLE,
                                                                         batchSize,
                                                                         prop.params[0],
@@ -370,9 +383,7 @@ __HOST__ void
             {
                 createRigidBodiesBatchKernel<<<numBlocks, numThreads>>>(d_RB.getData(),
                                                                         d_indices + batchStart,
-                                                                        prop.crustThickness,
-                                                                        prop.material,
-                                                                        prop.density,
+                                                                        prop.packedProperties,
                                                                         SUPERQUADRIC,
                                                                         batchSize,
                                                                         prop.params[0],

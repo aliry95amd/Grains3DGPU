@@ -111,7 +111,6 @@ void ComponentManagerGPU<T>::transformContactInfoToWorld()
                                                            m_quaternion.getData(),
                                                            m_contactInfo.getData(),
                                                            m_contactInfoWorld.getData(),
-                                                           m_activePairs.getData(),
                                                            nPairs);
     cudaDeviceSynchronize();
 }
@@ -173,7 +172,7 @@ void ComponentManagerGPU<T>::computeContactForces(
     computeContactForces_Kernel<<<numBlocks, numThreads>>>(CF.getData(),
                                                            m_neighborList->getData(),
                                                            m_contactInfoWorld.getData(),
-                                                           m_rigidBody->getData(),
+                                                           nullptr,
                                                            m_position.getData(),
                                                            m_velocity.getData(),
                                                            m_torce.getData(),

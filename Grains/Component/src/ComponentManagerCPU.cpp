@@ -89,7 +89,6 @@ void ComponentManagerCPU<T>::transformContactInfoToWorld()
                                     m_quaternion.getData(),
                                     m_contactInfo.getData(),
                                     m_contactInfoWorld.getData(),
-                                    m_activePairs.getData(),
                                     i);
     }
 }
@@ -127,7 +126,6 @@ void ComponentManagerCPU<T>::computeContactForces(
         computeContactForces_common(CF.getData(),
                                     m_neighborList->getData(),
                                     m_contactInfoWorld.getData(),
-                                    m_rigidBody->getData(),
                                     m_position.getData(),
                                     m_velocity.getData(),
                                     m_torce.getData(),

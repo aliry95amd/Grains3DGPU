@@ -1,4 +1,4 @@
-<Grains3D Type="GPU" Precision="Double">
+<Grains3D Type="Standard" Precision="Double">
 
 <Construction>
 	<Origin X="0.0" Y="0.0" Z="0.0"/>
@@ -15,7 +15,7 @@
 	<ContactForceModels>
 		<ContactForceModel Type='Hooke'>
 			<Material materialA="matP" materialB="matP"/>
-			<Parameters kn="120000000.0" en="0.1" etat="100.0" muc="0.5" kr="0.0"/>
+			<Parameters kn="1.2e8" en="0.85" etat="1.e6" muc="0.5" kr="0.0"/>
 		</ContactForceModel>
 	</ContactForceModels>
 
@@ -25,9 +25,9 @@
 	</TemporalSetting>
 
 	<Particles>
-		<Particle Number="1024" Density="1000" Material="matP">
-			<Convex CrustThickness="0.0002">
-				<Superquadric a="0.01" b="0.01" c="0.08" n1="2.0" n2="2.0"/>
+		<Particle Number="1" Density="1163.66" Material="matP">
+			<Convex CrustThickness="1.e-4">
+				<Superquadric a="0.04" b="0.04" c="0.0265" n1="8" n2="2"/>
 			</Convex>
 		</Particle>
 	</Particles>

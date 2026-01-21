@@ -91,7 +91,7 @@ public:
         const Vector3<T>* oldPos;
         const Vector3<T>* pos;
 
-        __DEVICE__ T operator()(int i) const
+        INLINE __DEVICE__ T operator()(int i) const
         {
             return norm2(pos[i] - oldPos[i]);
         }

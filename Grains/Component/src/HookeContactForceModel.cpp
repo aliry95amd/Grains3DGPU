@@ -74,27 +74,25 @@ __HOSTDEVICE__ void HookeContactForceModel<T>::getContactForceModelParameters(
 // Performs forces & torques computation
 template <typename T>
 __HOSTDEVICE__ void
-    HookeContactForceModel<T>::performForcesCalculus(const ContactInfo<T>& contactInfos,
-                                                     const Vector3<T>&     relVelocityAtContact,
-                                                     const Vector3<T>&     relAngVelocity,
-                                                     const T               mA,
-                                                     const T               mB,
-                                                     Vector3<T>&           delFN,
-                                                     Vector3<T>&           delFT,
-                                                     Vector3<T>&           delM) const
+    HookeContactForceModel<T>::performForcesCalculus(const Vector3<T>& contactVector,
+                                                     const Vector3<T>& relVelocityAtContact,
+                                                     const Vector3<T>& relAngVelocity,
+                                                     const T           overlapDistance,
+                                                     const T           averageMass,
+                                                     Vector3<T>&       delFN,
+                                                     Vector3<T>&       delFT,
+                                                     Vector3<T>&       delM) const
 {
-    Vector3<T> geometricPointOfContact = contactInfos.getContactPoint();
-    Vector3<T> penetration             = contactInfos.getContactVector();
+    // Notes:
+    // - contactVector is a unit vector pointing from B to A
+    // - overlapDistance is negative when there is penetration
 
     // Normal linear elastic force
     // We do this here as we want to modify the penetration vector later
-    delFN = m_kn * penetration;
+    delFN = m_kn * overlapDistance * contactVector;
 
     // Unit normal vector at contact point
-    penetration /= norm(penetration);
-    round(penetration);
-
-    Vector3<T> v_n = (relVelocityAtContact * penetration) * penetration;
+    Vector3<T> v_n = (relVelocityAtContact * contactVector) * contactVector;
     Vector3<T> v_t = relVelocityAtContact - v_n;
 
     // Unit tangential vector along relative velocity at contact point
@@ -104,31 +102,24 @@ __HOSTDEVICE__ void
         tangent = v_t / normv_t;
 
     // Normal dissipative force
-    T avmass = mA * mB / (mA + mB);
-    T omega0 = sqrt(m_kn / avmass);
-    if(avmass == T(0))
-    {
-        avmass = mB == T(0) ? T(0.5) * mA : T(0.5) * mB;
-        omega0 = T(2) * sqrt(m_kn / avmass);
-    }
-    T muen = -omega0 * m_muen;
-    delFN += -T(2) * muen * avmass * v_n;
+    T gamman = -2. * m_muen * sqrt(averageMass * m_kn);
+    delFN -= gamman * v_n;
     T normFN = norm(delFN);
 
     // Tangential dissipative force
-    delFT = (-m_etat * T(2) * avmass) * v_t;
+    delFT    = (T(2) * m_etat * averageMass) * v_t;
+    T normFT = norm(delFT);
 
     // Tangential Coulomb saturation
     T fn = m_muc * normFN;
-    T ft = norm(delFT);
-    if(fn < ft)
+    if(fn < normFT)
         delFT = (-fn) * tangent;
 
     // Rolling resistance moment
     if(m_kr)
     {
         // Relative angular velocity at contact point
-        Vector3<T> wn     = (relAngVelocity * penetration) * penetration;
+        Vector3<T> wn     = (relAngVelocity * contactVector) * contactVector;
         Vector3<T> wt     = relAngVelocity - wn;
         T          normwt = norm(wt);
 
@@ -149,23 +140,26 @@ __HOSTDEVICE__ void HookeContactForceModel<T>::computeForces(const ContactInfo<T
                                                              const Vector3<T>& relAngVelocity,
                                                              const Vector3<T>& vA,
                                                              const Vector3<T>& vB,
-                                                             const T           mA,
-                                                             const T           mB,
+                                                             const T           averageMass,
                                                              Torce<T>&         torceA,
                                                              Torce<T>&         torceB) const
 {
+    // Extract contact vector
+    Vector3<T> geometricPointOfContact = contactInfos.getContactPoint();
+    Vector3<T> contactVector           = contactInfos.getContactVector();
+    T          overlapDistance         = contactInfos.getOverlapDistance();
+
     // Compute contact force and torque
     Vector3<T> delFN, delFT, delM;
-    performForcesCalculus(contactInfos,
+    performForcesCalculus(contactVector,
                           relVelocityAtContact,
                           relAngVelocity,
-                          mA,
-                          mB,
+                          overlapDistance,
+                          averageMass,
                           delFN,
                           delFT,
                           delM);
 
-    const Vector3<T>& geometricPointOfContact = contactInfos.getContactPoint();
     delFN += delFT;
     torceA.addForce(delFN, geometricPointOfContact - vA);
     torceB.addForce(-delFN, geometricPointOfContact - vB);
