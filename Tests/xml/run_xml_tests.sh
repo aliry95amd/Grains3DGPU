@@ -116,10 +116,10 @@ echo
 echo "=========================================="
 echo "  Test Summary"
 echo "=========================================="
-echo "Tests run:    $TESTS_RUN"
-echo -e "Tests passed: ${GREEN}$TESTS_PASSED${NC}"
+echo "Run:    $TESTS_RUN"
+echo -e "Passed: ${GREEN}$TESTS_PASSED${NC}"
 if [ $TESTS_FAILED -gt 0 ]; then
-    echo -e "Tests failed: ${RED}$TESTS_FAILED${NC}"
+    echo -e "Failed: ${RED}$TESTS_FAILED${NC}"
 else
-    echo "Tests failed: 0"
+    echo "Failed: 0"
 fi
