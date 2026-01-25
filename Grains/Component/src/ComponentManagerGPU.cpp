@@ -28,9 +28,9 @@ template <typename T>
 void ComponentManagerGPU<T>::initialize()
 {
     ComponentManager<T, MemType::DEVICE>::initialize();
-    uint maxPairs = m_numObstacles * m_numParticles + m_numParticles * (m_numParticles - 1) / 2;
-    m_prefixScan.initialize(maxPairs);
-    m_activeIndex.initialize(maxPairs);
+    uint numPairs = m_relPosition.getSize();
+    m_prefixScan.initialize(numPairs);
+    m_activeIndex.initialize(numPairs);
 }
 
 // -------------------------------------------------------------------------------------------------

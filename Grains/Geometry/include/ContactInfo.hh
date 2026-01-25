@@ -28,8 +28,8 @@ public:
                   "Bits must match storage type size");
 
     /** \brief Default minimum and maximum values for average mass */
-    static constexpr T DEFAULT_AVG_MASS_MIN = HIGHEPS<T>;
-    static constexpr T DEFAULT_AVG_MASS_MAX = T(1);
+    static constexpr T DEFAULT_AVG_MASS_MIN = 0;
+    static constexpr T DEFAULT_AVG_MASS_MAX = T(1e5);
 
     /** \brief Storage type for contact metadata (uint32_t for float/double) */
     using StorageType = uint32_t;

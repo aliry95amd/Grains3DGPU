@@ -65,17 +65,19 @@ __HOSTDEVICE__ static INLINE void buildContactMetaData(const RigidBody<T>&      
 
     // Compute symmetric material hash (order-independent)
     uint matHash = triangularHash(materialA, materialB);
-    // Compute average mass (with protection against infinity mass (obstacle))
+    // Compute inverse reduced mass (with protection against infinity mass (obstacle))
     massA = (massA == 0.f) ? 0.f : 1.f / massA;
     massB = (massB == 0.f) ? 0.f : 1.f / massB;
 
-    // Set average mass with quantization
+    // Set inverse reduced mass with quantization (store 1/avgMass for better range)
     bool saturated = false;
     contactMetaData.template set<1>(matHash);
-    contactMetaData.template setFixed<2, T>((1.f / (massA + massB)),
+    float invReducedMass = massA + massB;  // Store inverse to avoid small values
+    contactMetaData.template setFixed<2, T>(invReducedMass,
                                             ContactInfo<T>::DEFAULT_AVG_MASS_MIN,
                                             ContactInfo<T>::DEFAULT_AVG_MASS_MAX,
                                             saturated);
+    GAssert(!saturated, "Inverse reduced mass saturation in contact metadata");
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -199,38 +201,48 @@ __HOSTDEVICE__ inline void closestPointsRigidBodies(const RigidBody<T>&  rbA,
     ContactMetaDataPacker<T> contactMetaData;
     buildContactMetaData(rbA, rbB, crustA, crustB, contactMetaData);
 
+    Vector3<T> contactPoint, contactVector;
     T          distance = std::numeric_limits<T>::max();
-    Vector3<T> ptA, ptB;
 
     // Sphere-Sphere Case
     if(typeA == ConvexType::SPHERE && typeB == ConvexType::SPHERE)
     {
-        T                 rA    = rbA.getCircumscribedRadius();
-        T                 rB    = rbB.getCircumscribedRadius();
-        const Vector3<T>& vecBA = b2a.getOrigin();
-        distance                = norm(vecBA) - rA - rB;
-        ptA                     = (rA + T(.5) * distance) * vecBA;
-        ptB                     = ptA + distance * vecBA;
+        T rA          = rbA.getCircumscribedRadius();
+        T rB          = rbB.getCircumscribedRadius();
+        contactVector = b2a.getOrigin();
+        distance      = norm(contactVector) - rA - rB;
+        contactPoint  = (rA + T(.5) * distance) * contactVector;
+        contactVector.normalize();
     }
     // Rectangle-Particle Case
     else if(typeA == ConvexType::RECTANGLE)
     {
+        // ptA is the point on rectangle and ptB is the point on particle
+        Vector3<T>       ptA, ptB;
         const Vector3<T> r = b2a.getOrigin()[Z] > 0 ? Vector3<T>(0, 0, -1) : Vector3<T>(0, 0, 1);
-        ptA                = (b2a)(convexB.support(r * b2a.getBasis()));
-        if(ptA[Z] < T(0))
+        ptB                = (b2a)(convexB.support(r * b2a.getBasis()));
+        if(ptB[Z] < T(0))
         {
-            ptB = Vector3<T>(ptA[X], ptA[Y], T(0));
-            if(convexA.isInside(ptB))
+            ptA = Vector3<T>(ptB[X], ptB[Y], T(0));
+            if(convexA.isInside(ptA))
             {
-                distance = -norm(ptA - ptB);
+                contactPoint = T(0.5) * (ptA + ptB);
+                ptB -= ptA;
+                distance      = -norm(ptB);
+                contactVector = ptB / distance;
             }
         }
+    }
+    else if(typeB == ConvexType::RECTANGLE)
+    {
+        GAbort("General-Rectangle collision detection is not implemented yet.");
     }
     // General Case
     else
     {
-        uint nbIterGJK       = 0;
-        auto computeDistance = [&]() {
+        Vector3<T> ptA, ptB;
+        uint       nbIterGJK       = 0;
+        auto       computeDistance = [&]() {
             return computeClosestPoints_GJK<T, GJKVARIANT, GJKACC>(convexA,
                                                                    convexB,
                                                                    b2a,
@@ -258,15 +270,14 @@ __HOSTDEVICE__ inline void closestPointsRigidBodies(const RigidBody<T>&  rbA,
         // Actual overlap
         distance -= crustA + crustB;
         // ptA = (a2a)(ptA);
-        ptB = (b2a)(ptB);
+        ptB           = (b2a)(ptB);
+        contactPoint  = T(0.5) * (ptA + ptB);
+        contactVector = (ptA - ptB).normalized();
     }
 
     // Set contact information and metadata
     contactMetaData.template set<0>(distance < T(0) ? 1 : 0);
-    contactInfo.setContactInfo(T(0.5) * (ptA + ptB),
-                               (ptA - ptB).normalized(),
-                               distance,
-                               contactMetaData.getValue());
+    contactInfo.setContactInfo(contactPoint, contactVector, distance, contactMetaData.getValue());
     return;
 }
 
@@ -294,37 +305,46 @@ __HOSTDEVICE__ inline void closestPointsRigidBodies(const RigidBody<T>&  rbA,
     ContactMetaDataPacker<T> contactMetaData;
     buildContactMetaData(rbA, rbB, crustA, crustB, contactMetaData);
 
+    Vector3<T> contactPoint, contactVector, ptA, ptB;
     T          distance = std::numeric_limits<T>::max();
-    Vector3<T> ptA, ptB;
 
     // Sphere-Sphere Case
     if(typeA == ConvexType::SPHERE && typeB == ConvexType::SPHERE)
     {
-        T                 rA    = rbA.getCircumscribedRadius();
-        T                 rB    = rbB.getCircumscribedRadius();
-        const Vector3<T>& cenA  = a2w.getOrigin();
-        const Vector3<T>& vecBA = b2w.getOrigin() - cenA;
-        distance                = norm(vecBA) - rA - rB;
-        ptA                     = cenA + (rA + T(.5) * distance) * vecBA;
-        ptB                     = ptA + distance * vecBA;
+        T rA          = rbA.getCircumscribedRadius();
+        T rB          = rbB.getCircumscribedRadius();
+        ptA           = a2w.getOrigin();
+        ptB           = b2w.getOrigin() - ptA;
+        distance      = norm(ptB) - rA - rB;
+        contactPoint  = ptA + (rA + T(.5) * distance) * ptB;
+        contactVector = ptA + distance * ptB;
     }
     // Rectangle-Particle Case
     else if(typeA == ConvexType::RECTANGLE)
     {
+        // ptA is the point on rectangle and ptB is the point on particle
         const Vector3<T>& c = a2w.getOrigin();
         const Matrix3<T>& m = a2w.getBasis();
-        Vector3<T>        r(m(XZ), m(YZ), m(ZZ));
+        // rectangle normal is a2w.getBasis() * [0, 0, 1] which is the last column of the transform
+        Vector3<T> r(m(XZ), m(YZ), m(ZZ));
         r.normalized();
         r *= copysign(T(1), r * (b2w.getOrigin() - c));
-        ptA = (b2w)(convexB.support((-r) * b2w.getBasis()));
-        if(r * (ptA - c) < T(0))
+        ptB = (b2w)(convexB.support((-r) * b2w.getBasis()));
+        if(r * (ptB - c) < T(0))
         {
-            ptB = ((c - ptA) * r) * r + ptA;
-            if(convexA.isInside(inverse(m) * (ptB - c)))
+            ptA = ((c - ptB) * r) * r + ptB;
+            if(convexA.isInside(inverse(m) * (ptA - c)))
             {
-                distance = -norm(ptA - ptB);
+                contactPoint = T(0.5) * (ptA + ptB);
+                ptB -= ptA;
+                distance      = -norm(ptB);
+                contactVector = ptB / distance;
             }
         }
+    }
+    else if(typeB == ConvexType::RECTANGLE)
+    {
+        GAbort("General-Rectangle collision detection is not implemented yet.");
     }
     // General Case
     else
@@ -358,16 +378,15 @@ __HOSTDEVICE__ inline void closestPointsRigidBodies(const RigidBody<T>&  rbA,
 
         // Computation of the actual overlap
         distance -= crustA + crustB;
-        ptA = (a2w)(ptA);
-        ptB = (b2w)(ptB);
+        ptA           = (a2w)(ptA);
+        ptB           = (b2w)(ptB);
+        contactPoint  = T(0.5) * (ptA + ptB);
+        contactVector = (ptA - ptB).normalized();
     }
 
     // Set contact information and metadata
     contactMetaData.template set<0>(distance < T(0) ? 1 : 0);
-    contactInfo.setContactInfo(T(0.5) * (ptA + ptB),
-                               (ptA - ptB).normalized(),
-                               distance,
-                               contactMetaData.getValue());
+    contactInfo.setContactInfo(contactPoint, contactVector, distance, contactMetaData.getValue());
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -394,39 +413,49 @@ __HOSTDEVICE__ inline void closestPointsRigidBodies(const RigidBody<T>&  rbA,
     ContactMetaDataPacker<T> contactMetaData;
     buildContactMetaData(rbA, rbB, crustA, crustB, contactMetaData);
 
+    Vector3<T> contactPoint, contactVector;
     T          distance = std::numeric_limits<T>::max();
-    Vector3<T> ptA, ptB;
 
     // Sphere-Sphere Case
     if(typeA == ConvexType::SPHERE && typeB == ConvexType::SPHERE)
     {
-        T          rA    = rbA.getCircumscribedRadius();
-        T          rB    = rbB.getCircumscribedRadius();
-        Vector3<T> vecBA = v_b2a;
-        distance         = norm(vecBA) - rA - rB;
-        ptA              = (rA + T(.5) * distance) * vecBA;
-        ptB              = ptA + distance * vecBA;
+        T rA          = rbA.getCircumscribedRadius();
+        T rB          = rbB.getCircumscribedRadius();
+        contactVector = v_b2a;
+        distance      = norm(contactVector) - rA - rB;
+        contactPoint  = (rA + T(.5) * distance) * contactVector;
+        contactVector.normalize();
     }
     // Rectangle-Particle Case
     else if(typeA == ConvexType::RECTANGLE)
     {
+        // ptA is the point on rectangle and ptB is the point on particle
+        Vector3<T>       ptA, ptB;
         const Vector3<T> r = v_b2a[Z] > 0 ? Vector3<T>(0, 0, -1) : Vector3<T>(0, 0, 1);
-        ptA                = convexB.support(q_b2a << r);
-        transform(q_b2a, v_b2a, ptA);
-        if(ptA[Z] < T(0))
+        ptB                = convexB.support(q_b2a << r);
+        transform(q_b2a, v_b2a, ptB);
+        if(ptB[Z] < T(0))
         {
-            ptB = Vector3<T>(ptA[X], ptA[Y], T(0));
-            if(convexA.isInside(ptB))
+            ptA = Vector3<T>(ptB[X], ptB[Y], T(0));
+            if(convexA.isInside(ptA))
             {
-                distance = -norm(ptA - ptB);
+                contactPoint = T(0.5) * (ptA + ptB);
+                ptB -= ptA;
+                distance      = -norm(ptB);
+                contactVector = ptB / distance;
             }
         }
+    }
+    else if(typeB == ConvexType::RECTANGLE)
+    {
+        GAbort("General-Rectangle collision detection is not implemented yet.");
     }
     // General Case
     else
     {
-        uint nbIterGJK       = 0;
-        auto computeDistance = [&]() {
+        Vector3<T> ptA, ptB;
+        uint       nbIterGJK       = 0;
+        auto       computeDistance = [&]() {
             return computeClosestPoints_GJK<T, GJKVARIANT, GJKACC>(convexA,
                                                                    convexB,
                                                                    v_b2a,
@@ -456,14 +485,13 @@ __HOSTDEVICE__ inline void closestPointsRigidBodies(const RigidBody<T>&  rbA,
         distance -= crustA + crustB;
         // transform(q_a2a, v_a2a, ptA);
         transform(q_b2a, v_b2a, ptB);
+        contactPoint  = T(0.5) * (ptA + ptB);
+        contactVector = (ptA - ptB).normalized();
     }
 
     // Set contact information and metadata
     contactMetaData.template set<0>(distance < T(0) ? 1 : 0);
-    contactInfo.setContactInfo(T(0.5) * (ptA + ptB),
-                               (ptA - ptB).normalized(),
-                               distance,
-                               contactMetaData.getValue());
+    contactInfo.setContactInfo(contactPoint, contactVector, distance, contactMetaData.getValue());
     return;
 }
 
@@ -495,35 +523,43 @@ __HOSTDEVICE__ inline void closestPointsRigidBodies(const RigidBody<T>&  rbA,
     ContactMetaDataPacker<T> contactMetaData;
     buildContactMetaData(rbA, rbB, crustA, crustB, contactMetaData);
 
+    Vector3<T> contactPoint, contactVector, ptA, ptB;
     T          distance = std::numeric_limits<T>::max();
-    Vector3<T> ptA, ptB;
 
     // Sphere-Sphere Case
     if(typeA == ConvexType::SPHERE && typeB == ConvexType::SPHERE)
     {
-        T          rA    = rbA.getCircumscribedRadius();
-        T          rB    = rbB.getCircumscribedRadius();
-        Vector3<T> cenA  = v_a2w;
-        Vector3<T> vecBA = v_b2w - cenA;
-        distance         = norm(vecBA) - rA - rB;
-        ptA              = cenA + (rA + T(.5) * distance) * vecBA;
-        ptB              = ptA + distance * vecBA;
+        T rA          = rbA.getCircumscribedRadius();
+        T rB          = rbB.getCircumscribedRadius();
+        ptA           = v_a2w;
+        ptB           = v_b2w - ptA;
+        distance      = norm(ptB) - rA - rB;
+        contactPoint  = ptA + (rA + T(.5) * distance) * ptB;
+        contactVector = ptA + distance * ptB;
     }
     // Rectangle-Particle Case
     else if(typeA == ConvexType::RECTANGLE)
     {
+        // ptA is the point on rectangle and ptB is the point on particle
         Vector3<T> r = q_a2w >> Vector3<T>(0, 0, 1);
         r.normalized();
         r *= copysign(T(1), r * (v_b2w - v_a2w));
-        ptA = q_b2w >> convexB.support(q_b2w << r) + v_b2w;
-        if(r * (ptA - v_a2w) < T(0))
+        ptB = q_b2w >> convexB.support(q_b2w << r) + v_b2w;
+        if(r * (ptB - v_a2w) < T(0))
         {
-            ptB = ((v_a2w - ptA) * r) * r + ptA;
-            if(convexA.isInside(q_a2w << (ptB - v_a2w)))
+            ptA = ((v_a2w - ptB) * r) * r + ptB;
+            if(convexA.isInside(q_a2w << (ptA - v_a2w)))
             {
-                distance = -norm(ptA - ptB);
+                contactPoint = T(0.5) * (ptA + ptB);
+                ptB -= ptA;
+                distance      = -norm(ptB);
+                contactVector = ptB / distance;
             }
         }
+    }
+    else if(typeB == ConvexType::RECTANGLE)
+    {
+        GAbort("General-Rectangle collision detection is not implemented yet.");
     }
     // General Case
     else
@@ -561,14 +597,13 @@ __HOSTDEVICE__ inline void closestPointsRigidBodies(const RigidBody<T>&  rbA,
         distance -= crustA + crustB;
         transform(q_a2w, v_a2w, ptA);
         transform(q_b2w, v_b2w, ptB);
+        contactPoint  = T(0.5) * (ptA + ptB);
+        contactVector = (ptA - ptB).normalized();
     }
 
     // Set contact information and metadata
     contactMetaData.template set<0>(distance < T(0) ? 1 : 0);
-    contactInfo.setContactInfo(T(0.5) * (ptA + ptB),
-                               (ptA - ptB).normalized(),
-                               distance,
-                               contactMetaData.getValue());
+    contactInfo.setContactInfo(contactPoint, contactVector, distance, contactMetaData.getValue());
 }
 
 // -------------------------------------------------------------------------------------------------

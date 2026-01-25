@@ -11,7 +11,6 @@ RawDataPostProcessingWriter<T>::RawDataPostProcessingWriter()
 // -------------------------------------------------------------------------------------------------
 // Constructor with XML node
 template <typename T>
-
 RawDataPostProcessingWriter<T>::RawDataPostProcessingWriter(DOMNode* dn)
     : m_ndigits(6)
 {
@@ -108,35 +107,6 @@ void RawDataPostProcessingWriter<T>::PostProcessing(const GrainsMemBuffer<RigidB
     m_angular_velocity_y << stime;
     m_angular_velocity_z << stime;
 
-    // Writing particles data
-    for(size_t i = numObstacles; i < numParticles; i++)
-    {
-        // Center of mass position
-        centre = tr[i].getOrigin();
-        m_gc_coordinates_x << " " << realToString(ios::scientific, m_ndigits, centre[X]);
-        m_gc_coordinates_y << " " << realToString(ios::scientific, m_ndigits, centre[Y]);
-        m_gc_coordinates_z << " " << realToString(ios::scientific, m_ndigits, centre[Z]);
-
-        // Translational velocity
-        velT = kin[i].getTranslationalComponent();
-        m_translational_velocity_x << " " << realToString(ios::scientific, m_ndigits, velT[X]);
-        m_translational_velocity_y << " " << realToString(ios::scientific, m_ndigits, velT[Y]);
-        m_translational_velocity_z << " " << realToString(ios::scientific, m_ndigits, velT[Z]);
-
-        // Angular velocity
-        velR = kin[i].getAngularComponent();
-        m_angular_velocity_x << " " << realToString(ios::scientific, m_ndigits, velR[X]);
-        m_angular_velocity_y << " " << realToString(ios::scientific, m_ndigits, velR[Y]);
-        m_angular_velocity_z << " " << realToString(ios::scientific, m_ndigits, velR[Z]);
-
-        // // Number of contacts
-        // m_coordination_number << " " << pp->getCoordinationNumber();
-
-        // Particle type
-        // type = particleRB[rbParticle[i]]->getConvex()->getConvexType();
-        // m_particle_class << type << " " ;
-    }
-
     // Writing obstacles data
     for(size_t i = 0; i < numObstacles; i++)
     {
@@ -163,6 +133,35 @@ void RawDataPostProcessingWriter<T>::PostProcessing(const GrainsMemBuffer<RigidB
 
         // Particle type
         // type = obstacleRB[rbObstacle[i]]->getConvex()->getConvexType();
+        // m_particle_class << type << " " ;
+    }
+
+    // Writing particles data
+    for(size_t i = numObstacles; i < numComponents; i++)
+    {
+        // Center of mass position
+        centre = tr[i].getOrigin();
+        m_gc_coordinates_x << " " << realToString(ios::scientific, m_ndigits, centre[X]);
+        m_gc_coordinates_y << " " << realToString(ios::scientific, m_ndigits, centre[Y]);
+        m_gc_coordinates_z << " " << realToString(ios::scientific, m_ndigits, centre[Z]);
+
+        // Translational velocity
+        velT = kin[i].getTranslationalComponent();
+        m_translational_velocity_x << " " << realToString(ios::scientific, m_ndigits, velT[X]);
+        m_translational_velocity_y << " " << realToString(ios::scientific, m_ndigits, velT[Y]);
+        m_translational_velocity_z << " " << realToString(ios::scientific, m_ndigits, velT[Z]);
+
+        // Angular velocity
+        velR = kin[i].getAngularComponent();
+        m_angular_velocity_x << " " << realToString(ios::scientific, m_ndigits, velR[X]);
+        m_angular_velocity_y << " " << realToString(ios::scientific, m_ndigits, velR[Y]);
+        m_angular_velocity_z << " " << realToString(ios::scientific, m_ndigits, velR[Z]);
+
+        // // Number of contacts
+        // m_coordination_number << " " << pp->getCoordinationNumber();
+
+        // Particle type
+        // type = particleRB[rbParticle[i]]->getConvex()->getConvexType();
         // m_particle_class << type << " " ;
     }
 

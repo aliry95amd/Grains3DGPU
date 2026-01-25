@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 import os
+import sys
 import math
+import argparse
 import scipy.special as sc
 import numpy as np
 import matplotlib.pyplot as plt
@@ -19,11 +21,20 @@ def main():
     rho = 1000
     k = 50000
     en = 0.8
-    # Read RESULTS_DIR and PLOTS_DIR from environment (fall back to local ./results and ./plots)
-    results_root = os.environ.get('RESULTS_DIR', os.path.join('.', 'results'))
-    plots_root = os.environ.get('PLOTS_DIR', os.path.join('.', 'plots'))
-    # RESULTS_DIR is the per-test results directory (e.g. .../results/collidingSpheres)
-    data_path = os.path.join(results_root, 'collidingSpheres_position_y.dat')
+    parser = argparse.ArgumentParser(description='Generate plots for collidingSpheres from result files')
+    parser.add_argument('--result-dir', dest='results_root', type=str, required=True,
+                        help='Path to the per-test results directory (must contain collidingSpheres_position_y.dat)')
+    parser.add_argument('--plot-dir', dest='plots_root', type=str, required=True,
+                        help='Path where plots will be written')
+    args = parser.parse_args()
+    results_root = args.results_root
+    plots_root = args.plots_root
+    expected_name = 'collidingSpheres_position_y.dat'
+    data_path = os.path.join(results_root, expected_name)
+    if not os.path.exists(data_path):
+        msg = f"Missing results file '{expected_name}' in directory '{results_root}'"
+        print(msg, file=sys.stderr)
+        raise FileNotFoundError(msg)
     data = np.loadtxt(data_path, delimiter=' ')
     numSolution = 2 * r - (data[:, 2] - data[:, 1])
     M = rho * 4.0 / 3.0 * math.pi * r * r * r
@@ -48,7 +59,6 @@ def main():
     ax1.legend()
     ax1.grid(color='lightgrey', linestyle='--', linewidth=0.5)
 
-    # PLOTS_DIR is the per-test plots directory (e.g. .../plots/collidingSpheres)
     out_plot = os.path.join(plots_root, 'overlap.eps')
     os.makedirs(os.path.dirname(out_plot), exist_ok=True)
     plt.savefig(out_plot, format='eps', bbox_inches='tight')

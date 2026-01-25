@@ -127,7 +127,7 @@ __HOST__ Quaternion<T>::Quaternion(DOMNode* root) noexcept
         Matrix3<T> mat(root);
         setQuaternion(mat);
     }
-    else if(type == "Angle")
+    else if(type == "Angles")
     {
         // read in radiands
         T aX = RADS_PER_DEG<T> * T(ReaderXML::getNodeAttr_Double(root, "aX"));

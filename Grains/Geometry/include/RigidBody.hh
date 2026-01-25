@@ -30,11 +30,11 @@ public:
     static_assert(B_MAT + B_MASS + B_CRUST == 64, "Property bits must sum to 64");
 
     /** \brief Default minimum and maximum values for mass and crust thickness */
-    static constexpr T DEFAULT_CRUST_MIN = HIGHEPS<T>;
+    static constexpr T DEFAULT_CRUST_MIN = 0;
     static constexpr T DEFAULT_CRUST_MAX = T(1);
-    static constexpr T DEFAULT_MASS_MIN  = EPS<T>;
+    static constexpr T DEFAULT_MASS_MIN  = 0;
     // Finite sentinel to represent unspecified/obstacle masses without producing inf.
-    static constexpr T DEFAULT_MASS_MAX = T(1e3);
+    static constexpr T DEFAULT_MASS_MAX = T(1e5);
     //@}
 
 protected:

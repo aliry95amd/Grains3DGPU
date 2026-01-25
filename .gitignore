@@ -56,16 +56,20 @@ Grains/lib*
 Grains/DraftCodes/
 Main/obj*
 Main/bin*
+Debug/
+
 Tests/build*
 Tests/smoke/*/
-# Test-runner output directories
-/Tests/xml/logs/
-/Tests/xml/plots/
-/Tests/xml/results/
-/Tests/smoke/logs/
+Tests/smoke/logs/
+Tests/xml/logs/
+Tests/xml/plots/
+Tests/xml/results/
+Tests/xml/*/generated/
+
 Tools/PrePost/*/bin*
 Tools/PrePost/*/obj*
 Tools/XMLGenerators/*/**.xml
+
 Validations/*/build/
 Validations/*/data/
 

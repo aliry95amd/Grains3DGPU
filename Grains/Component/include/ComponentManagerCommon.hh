@@ -244,6 +244,8 @@ __HOSTDEVICE__ static INLINE void computeContactForces_common(const ContactForce
     uint     contactForceID = metaData.template get<1>();  // material hash
     T        avgMass        = metaData.template getFixed<2, T>(ContactInfo<T>::DEFAULT_AVG_MASS_MIN,
                                                  ContactInfo<T>::DEFAULT_AVG_MASS_MAX);
+    avgMass = 1 / avgMass;  // converting back to average mass from its reciprocal stored value
+
     // Compute the forces
     // On device path, this is redundant.
     if(isContact)

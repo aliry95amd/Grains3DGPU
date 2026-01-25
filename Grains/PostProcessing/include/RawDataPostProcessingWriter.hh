@@ -52,16 +52,13 @@ public:
     /** @name Constructors */
     //@{
     /** @brief Default constructor */
-
     RawDataPostProcessingWriter();
 
     /** @brief Constructor with XML node
         @param dn XML node */
-
     RawDataPostProcessingWriter(DOMNode* dn);
 
     /** @brief Destructor */
-
     ~RawDataPostProcessingWriter();
     //@}
 
@@ -74,28 +71,23 @@ public:
     /** @name Methods */
     //@{
     /** @brief Removes post-processing files already in the directory */
-
     void clearPostProcessingFiles() const;
 
     /** @brief Initializes the post-processing writer */
-
     void PostProcessing_start();
 
     /** @brief Writes post-processing data
         @param rb Arrays of rigid bodies
         @param cm Component manager
         @param currentTime Current simulation time */
-
     void PostProcessing(const GrainsMemBuffer<RigidBody<T>*>&       rb,
                         const std::unique_ptr<ComponentManager<T>>& cm,
                         const T                                     currentTime) final;
 
     /** @brief Finalizes writing data */
-
     void PostProcessing_end();
 
     /** @brief Creates output files and open streams */
-
     void prepareResultFiles(ios_base::openmode mode);
     //@}
 };
