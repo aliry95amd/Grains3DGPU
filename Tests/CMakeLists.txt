@@ -124,6 +124,8 @@ set(POTENTIAL_TEST_FILES
     collision/test_neighborlist.cpp
     component/test_rigid_body.cpp
     component/test_convex.cpp
+    contactForce/test_contact_table_host.cpp
+    contactForce/test_contact_table_device.cpp
 )
 
 foreach(test_file ${POTENTIAL_TEST_FILES})

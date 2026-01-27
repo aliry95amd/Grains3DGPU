@@ -238,13 +238,25 @@ __HOSTDEVICE__ INLINE void GAssert(bool condition, const Args&... args)
     hash = l * (l + 1) / 2 + s, where l = max(x,y) and s = min(x,y).
     This produces a symmetric hash (order-independent) for pairs.
     @param x first ID
-    @param y second ID
-    @return unique hash value */
+    @param y second ID */
 __HOSTDEVICE__ static INLINE uint triangularHash(uint x, uint y)
 {
     uint s = min(x, y);  // smaller one
     uint l = max(x, y);  // larger one
     return (l * (l + 1) / 2 + s);
+}
+
+// -------------------------------------------------------------------------------------------------
+/** @brief Computes a hash value for a pair of IDs using prime number multiplication. This provides
+    good distribution of hash values to minimize collisions.
+    @param k pair of IDs (i,j) where i < j */
+__HOSTDEVICE__ static INLINE uint primeHash(uint2 k)
+{
+    // Simple, fast hash using prime numbers for good distribution
+    if(k.x > k.y)
+        swap(k.x, k.y);
+    uint h = k.x * 73856093u ^ k.y * 19349663u;
+    return h;
 }
 //@}
 

@@ -111,7 +111,7 @@ def main():
     ax1 = fig.add_subplot(111)
     ax1.plot(
         thetaArray,
-        simResults.flatten() - 0.05,
+        simResults.flatten(),
         linewidth=0,
         c="tab:blue",
         marker="o",
