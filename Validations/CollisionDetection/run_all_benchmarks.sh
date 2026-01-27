@@ -43,7 +43,7 @@ echo "Random seed: $SEED"
 echo ""
 
 # Counter for progress
-total_configs=16
+total_configs=20
 current=0
 
 # Function to run benchmark
@@ -68,7 +68,7 @@ run_benchmark() {
     echo "================================================================================"
     
     # compute-sanitizer --tool memcheck 
-    # cuda-gdb --args 
+    # cuda-gdb --args \
     $EXECUTABLE \
         --particles "$particles" \
         --domain "$domain" \
@@ -90,49 +90,44 @@ run_benchmark() {
 # =================================================================================
 echo "Running Sphere benchmarks (S1)..."
 
-# run_benchmark 512 $(echo "32 * $r" | bc -l) sphere $r $r $r 1.0 ""
-# run_benchmark 2048 $(echo "48 * $r" | bc -l) sphere $r $r $r 1.0 "--append"
-# run_benchmark 4096 $(echo "64 * $r" | bc -l) sphere $r $r $r 1.0 "--append"
-# run_benchmark 8192 $(echo "80 * $r" | bc -l) sphere $r $r $r 1.0 "--append"
-# run_benchmark 16384 $(echo "100 * $r" | bc -l) sphere $r $r $r 1.0 "--append"
-# run_benchmark 32768 $(echo "112 * $r" | bc -l) sphere $r $r $r 1.0 "--append"
-# run_benchmark 65584 $(echo "144 * $r" | bc -l) sphere $r $r $r 1.0 "--append"
+run_benchmark 512 $(echo "32 * $r" | bc -l) sphere $r $r $r 1.0 ""
+run_benchmark 2048 $(echo "48 * $r" | bc -l) sphere $r $r $r 1.0 "--append"
+run_benchmark 8192 $(echo "80 * $r" | bc -l) sphere $r $r $r 1.0 "--append"
+run_benchmark 32768 $(echo "112 * $r" | bc -l) sphere $r $r $r 1.0 "--append"
+run_benchmark 131072 $(echo "176 * $r" | bc -l) sphere $r $r $r 1.0 "--append"
 
 # =================================================================================
 # Boxes - B1 (aspect ratio 1.0)
 # =================================================================================
 echo "Running Box benchmarks (B1)..."
 
-# run_benchmark 512 $(echo "32 * $r" | bc -l) box $BOX_SIZE $BOX_SIZE $BOX_SIZE 1.0 "--append"
-# run_benchmark 2048 $(echo "48 * $r" | bc -l) box $BOX_SIZE $BOX_SIZE $BOX_SIZE 1.0 "--append"
-# run_benchmark 4096 $(echo "64 * $r" | bc -l) box $BOX_SIZE $BOX_SIZE $BOX_SIZE 1.0 "--append"
-# run_benchmark 8192 $(echo "80 * $r" | bc -l) box $BOX_SIZE $BOX_SIZE $BOX_SIZE 1.0 "--append"
-# run_benchmark 16384 $(echo "100 * $r" | bc -l) box $BOX_SIZE $BOX_SIZE $BOX_SIZE 1.0 "--append"
-# run_benchmark 32768 $(echo "112 * $r" | bc -l) box $BOX_SIZE $BOX_SIZE $BOX_SIZE 1.0 "--append"
+run_benchmark 512 $(echo "32 * $r" | bc -l) box $BOX_SIZE $BOX_SIZE $BOX_SIZE 1.0 "--append"
+run_benchmark 2048 $(echo "48 * $r" | bc -l) box $BOX_SIZE $BOX_SIZE $BOX_SIZE 1.0 "--append"
+run_benchmark 8192 $(echo "80 * $r" | bc -l) box $BOX_SIZE $BOX_SIZE $BOX_SIZE 1.0 "--append"
+run_benchmark 32768 $(echo "112 * $r" | bc -l) box $BOX_SIZE $BOX_SIZE $BOX_SIZE 1.0 "--append"
+run_benchmark 131072 $(echo "176 * $r" | bc -l) box $BOX_SIZE $BOX_SIZE $BOX_SIZE 1.0 "--append"
 
 # =================================================================================
 # Superquadrics - S4 (aspect ratio 4.0)
 # =================================================================================
 echo "Running Superquadric benchmarks (S4)..."
 
-# run_benchmark 512 $(echo "32 * $r" | bc -l) superquadric $SQ4_X $SQ4_Y $SQ4_Z 4.0 "--append"
-# run_benchmark 2048 $(echo "48 * $r" | bc -l) superquadric $SQ4_X $SQ4_Y $SQ4_Z 4.0 "--append"
-# run_benchmark 4096 $(echo "64 * $r" | bc -l) superquadric $SQ4_X $SQ4_Y $SQ4_Z 4.0 "--append"
-# run_benchmark 8192 $(echo "80 * $r" | bc -l) superquadric $SQ4_X $SQ4_Y $SQ4_Z 4.0 "--append"
-# run_benchmark 16384 $(echo "100 * $r" | bc -l) superquadric $SQ4_X $SQ4_Y $SQ4_Z 4.0 "--append"
-# run_benchmark 32768 $(echo "112 * $r" | bc -l) superquadric $SQ4_X $SQ4_Y $SQ4_Z 4.0 "--append"
+run_benchmark 512 $(echo "31 * $r" | bc -l) superquadric $SQ4_X $SQ4_Y $SQ4_Z 4.0 "--append"
+run_benchmark 2048 $(echo "48 * $r" | bc -l) superquadric $SQ4_X $SQ4_Y $SQ4_Z 4.0 "--append"
+run_benchmark 8192 $(echo "80 * $r" | bc -l) superquadric $SQ4_X $SQ4_Y $SQ4_Z 4.0 "--append"
+run_benchmark 32768 $(echo "128 * $r" | bc -l) superquadric $SQ4_X $SQ4_Y $SQ4_Z 4.0 "--append"
+run_benchmark 131072 $(echo "200 * $r" | bc -l) superquadric $SQ4_X $SQ4_Y $SQ4_Z 4.0 "--append"
 
 # =================================================================================
 # Boxes - B4 (aspect ratio 4.0)
 # =================================================================================
 echo "Running Box benchmarks (B4)..."
 
-# run_benchmark 512 $(echo "32 * $r" | bc -l) box $BOX4_X $BOX4_Y $BOX4_Z 4.0 "--append"
-# run_benchmark 2048 $(echo "48 * $r" | bc -l) box $BOX4_X $BOX4_Y $BOX4_Z 4.0 "--append"
-# run_benchmark 4096 $(echo "64 * $r" | bc -l) box $BOX4_X $BOX4_Y $BOX4_Z 4.0 "--append"
+run_benchmark 512 $(echo "31 * $r" | bc -l) box $BOX4_X $BOX4_Y $BOX4_Z 4.0 "--append"
+run_benchmark 2048 $(echo "48 * $r" | bc -l) box $BOX4_X $BOX4_Y $BOX4_Z 4.0 "--append"
 run_benchmark 8192 $(echo "80 * $r" | bc -l) box $BOX4_X $BOX4_Y $BOX4_Z 4.0 "--append"
-# run_benchmark 16384 $(echo "100 * $r" | bc -l) box $BOX4_X $BOX4_Y $BOX4_Z 4.0 "--append"
-# run_benchmark 32768 $(echo "112 * $r" | bc -l) box $BOX4_X $BOX4_Y $BOX4_Z 4.0 "--append"
+run_benchmark 32768 $(echo "128 * $r" | bc -l) box $BOX4_X $BOX4_Y $BOX4_Z 4.0 "--append"
+run_benchmark 131072 $(echo "200 * $r" | bc -l) box $BOX4_X $BOX4_Y $BOX4_Z 4.0 "--append"
 
 echo "================================================================================"
 echo "All benchmarks completed!"
