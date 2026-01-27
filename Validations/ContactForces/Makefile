@@ -12,9 +12,10 @@ LIBFLAGS = -lxerces-c -lcudart
 COMPFLAGS := $(GRAINS_GPU_COMPILER_FLAGS) $(INCFLAGS)
 LINKFLAGS := $(GRAINS_GPU_LINKER_FLAGS) $(GRAINS_XERCES_FLAGS)
 
-SOURCES = bench_contact_table.cu
-OBJECTS = $(SOURCES:%.cu=$(BUILD_DIR)/%.o)
-TARGET = $(BUILD_DIR)/bench_contact_table
+
+SOURCES = main.cpp
+OBJECTS = $(SOURCES:%.cpp=$(BUILD_DIR)/%.o)
+TARGET = $(BUILD_DIR)/ContactTablePerformance
 
 all: $(TARGET)
 
@@ -24,16 +25,18 @@ $(BUILD_DIR):
 $(DATA_DIR):
 	@mkdir -p $(DATA_DIR)
 
+
 $(TARGET): $(BUILD_DIR) $(DATA_DIR) $(OBJECTS)
 	@if [ ! -d "$(GRAINS_OBJDIR)" ]; then \
 		echo "Error: Grains object files not found at $(GRAINS_OBJDIR)"; \
 		exit 1; \
 	fi
-	@echo "Linking benchmark against Grains object files..."
+	@echo "Linking ContactTablePerformance against Grains object files..."
 	@$(GRAINS_GPU_COMPILER) $(LINKFLAGS) $(OBJECTS) $(GRAINS_OBJECTS) $(LIB_DIRS) $(LIBFLAGS) -o $@
 	@echo "$(TARGET) build successful!"
 
-$(BUILD_DIR)/%.o: %.cu | $(BUILD_DIR)
+
+$(BUILD_DIR)/%.o: %.cpp | $(BUILD_DIR)
 	@echo "Compiling $<..."
 	@$(GRAINS_GPU_COMPILER) $(COMPFLAGS) -MMD -MP -c $< -o $@
 
