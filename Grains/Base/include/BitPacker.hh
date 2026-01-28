@@ -15,9 +15,6 @@
 
     @author A.Yazdani - 2026 - Construction */
 // =================================================================================================
-// Offset/width helpers are implemented inside `BitPacker` as nested templates
-// to keep the API encapsulated and avoid polluting the global namespace.
-
 template <typename T, size_t... Widths>
 class BitPacker
 {
