@@ -3,6 +3,7 @@
 
 #include "ComponentManagerCommon.hh"
 #include "ContactForceModel.hh"
+#include "ContactTable.hh"
 #include "GrainsMemBuffer.hh"
 #include "GrainsParameters.hh"
 #include "Insertion.hh"
@@ -59,6 +60,9 @@ protected:
     GrainsMemBuffer<ContactInfo<T>, M> m_contactInfo;
     /** \brief Contact information in world frame */
     GrainsMemBuffer<ContactInfo<T>, M> m_contactInfoWorld;
+
+    /** \brief Contact history table for memory-enabled force models */
+    ContactHashTable<T, M> m_contactTable;
 
     /** \brief Number of particles in manager */
     uint m_numParticles;
@@ -238,6 +242,27 @@ public:
     }
 
     // ---------------------------------------------------------------------------------------------
+    /** @brief Gets complete contact memory view (hash table + history data) */
+    ContactMemoryView<T> getContactMemoryView()
+    {
+        return m_contactTable.getView();
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    /** @brief Gets the contact table */
+    ContactHashTable<T, M>& getContactTable()
+    {
+        return m_contactTable;
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    /** @brief Gets the contact table (const) */
+    const ContactHashTable<T, M>& getContactTable() const
+    {
+        return m_contactTable;
+    }
+
+    // ---------------------------------------------------------------------------------------------
     /** @brief Gets the number of particles in manager */
     uint getNumberOfParticles() const
     {
@@ -394,6 +419,11 @@ public:
         m_relQuaternion.initialize(maxPairsFinal);
         m_contactInfo.initialize(maxPairsFinal);
         m_contactInfoWorld.initialize(maxPairsFinal);
+
+        // Initialize contact hash table with capacity based on expected contacts
+        // Use a load factor of 0.7 for good performance (capacity = expected_contacts / 0.7)
+        uint hashCapacity = static_cast<uint>(estimatedPairs / 0.7);
+        m_contactTable.allocate(hashCapacity, estimatedPairs);
     }
 
     // ---------------------------------------------------------------------------------------------

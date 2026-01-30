@@ -41,17 +41,56 @@ struct ContactEntry
 };
 
 // =================================================================================================
-/** @brief Lightweight view of ContactHashTable for passing to kernels.
+/** @brief Contact history data for memory-enabled force models.
 
-    This structure contains only raw pointers and primitive types, making it safe to pass to
-    kernels by value. Obtain this view from ContactHashTable::getView() and pass it to kernels.
+    Stores the cumulative tangential and rolling displacements for a contact pair.
+    This data is accessed via the index returned by the hash table.
 
     @author A.Yazdani - 2026 - Construction */
 // =================================================================================================
-struct ContactHashTableView
+template <typename T>
+struct ContactHistory
 {
     /** @name Parameters */
     //@{
+    /** \brief Cumulative tangential displacement (kt * delta) */
+    Vector3<T> m_tangentialDisplacement;
+    /** \brief Cumulative rolling friction spring-torque */
+    Vector3<T> m_rollingDisplacement;
+    /** \brief Previous contact normal (for plane rotation between timesteps) */
+    Vector3<T> m_previousNormal;
+    //@}
+
+    /** @name Constructors */
+    //@{
+    // ---------------------------------------------------------------------------------------------
+    /** @brief Default constructor */
+    __HOSTDEVICE__
+    ContactHistory()
+        : m_tangentialDisplacement(Vector3<T>(T(0), T(0), T(0)))
+        , m_rollingDisplacement(Vector3<T>(T(0), T(0), T(0)))
+        , m_previousNormal(Vector3<T>(T(0), T(0), T(0)))
+    {
+    }
+    //@}
+};
+
+// =================================================================================================
+/** @brief Complete contact memory view for passing to force models.
+
+    This unified structure contains everything needed for contact history tracking: hash table
+    pointers for looking up contact indices, and the flat array of contact history data. Contains
+    only raw pointers and primitive types, making it safe to pass to kernels by value.
+
+    @author A.Yazdani - 2026 - Construction */
+// =================================================================================================
+template <typename T>
+struct ContactMemoryView
+{
+    /** @name Parameters */
+    //@{
+    /** \brief Pointer to flat array of contact history data */
+    ContactHistory<T>* m_historyData;
     /** \brief Pointer to hash table entries */
     ContactEntry* m_table;
     /** \brief Total capacity of the hash table */
@@ -65,8 +104,9 @@ struct ContactHashTableView
     // ---------------------------------------------------------------------------------------------
     /** @brief Default constructor */
     __HOSTDEVICE__
-    ContactHashTableView()
-        : m_table(nullptr)
+    ContactMemoryView()
+        : m_historyData(nullptr)
+        , m_table(nullptr)
         , m_capacity(0)
         , m_nextIndex(nullptr)
     {
@@ -74,12 +114,17 @@ struct ContactHashTableView
 
     // ---------------------------------------------------------------------------------------------
     /** @brief Constructor with parameters
+        @param historyData pointer to contact history data array
         @param table pointer to hash table entries
         @param capacity total capacity of the hash table
         @param nextIndex pointer to the next index counter */
     __HOSTDEVICE__
-    ContactHashTableView(ContactEntry* table, uint capacity, uint* nextIndex)
-        : m_table(table)
+    ContactMemoryView(ContactHistory<T>* historyData,
+                      ContactEntry*      table,
+                      uint               capacity,
+                      uint*              nextIndex)
+        : m_historyData(historyData)
+        , m_table(table)
         , m_capacity(capacity)
         , m_nextIndex(nextIndex)
     {
@@ -93,7 +138,7 @@ struct ContactHashTableView
         @param key pair of component IDs (i,j) where i < j
         @param index output parameter for the contact state index
         @return true if found, false otherwise */
-    __DEVICE__
+    __HOSTDEVICE__
     bool find(uint2 key, uint& index) const
     {
         if(m_capacity == 0 || m_table == nullptr)
@@ -101,8 +146,7 @@ struct ContactHashTableView
 
         uint h = primeHash(key) % m_capacity;
 
-        // Linear probing with unrolling hint for better performance
-#pragma unroll 4
+        // Linear probing
         for(uint i = 0; i < m_capacity; ++i)
         {
             uint                idx = (h + i) % m_capacity;
@@ -112,10 +156,13 @@ struct ContactHashTableView
             if(e.m_valid == 0)
                 return false;
 
-            // Key found - ensure all writes are visible before reading
+            // Key found
             if(e.m_valid == 1 && e.m_key.x == key.x && e.m_key.y == key.y)
             {
+#ifdef __CUDA_ARCH__
+                // Ensure all writes are visible before reading (GPU only)
                 __threadfence();
+#endif
                 index = e.m_index;
                 return true;
             }
@@ -130,7 +177,7 @@ struct ContactHashTableView
         @param key pair of component IDs (i,j) where i < j
         @param index output parameter for the contact state index
         @return true if found or inserted, false if table is full */
-    __DEVICE__
+    __HOSTDEVICE__
     bool findOrInsert(uint2 key, uint& index)
     {
         if(m_capacity == 0 || m_table == nullptr || m_nextIndex == nullptr)
@@ -143,6 +190,8 @@ struct ContactHashTableView
             uint          idx = (h + i) % m_capacity;
             ContactEntry& e   = m_table[idx];
 
+#ifdef __CUDA_ARCH__
+            // GPU path
             // Empty slot - try to claim it atomically
             if(e.m_valid == 0)
             {
@@ -172,6 +221,24 @@ struct ContactHashTableView
                 index = e.m_index;
                 return true;
             }
+#else
+            // CPU path
+            // Empty slot - claim it
+            if(e.m_valid == 0)
+            {
+                e.m_valid = 1;
+                e.m_key   = key;
+                e.m_index = (*m_nextIndex)++;
+                index     = e.m_index;
+                return true;
+            }
+            // Slot already occupied - check if it's our key
+            else if(e.m_valid == 1 && e.m_key.x == key.x && e.m_key.y == key.y)
+            {
+                index = e.m_index;
+                return true;
+            }
+#endif
             // Different key, continue probing
         }
 
@@ -183,7 +250,7 @@ struct ContactHashTableView
     /** @brief Removes a contact from the hash table
         @param key pair of component IDs (i,j) where i < j
         @return true if removed, false if not found */
-    __DEVICE__
+    __HOSTDEVICE__
     bool remove(uint2 key)
     {
         if(m_capacity == 0 || m_table == nullptr)
@@ -203,8 +270,13 @@ struct ContactHashTableView
             // Key found - remove it
             if(e.m_key.x == key.x && e.m_key.y == key.y)
             {
+#ifdef __CUDA_ARCH__
                 // Mark as invalid atomically
                 atomicExch(&e.m_valid, 0u);
+#else
+                // Mark as invalid
+                e.m_valid = 0;
+#endif
                 return true;
             }
         }
@@ -218,23 +290,25 @@ struct ContactHashTableView
 // =================================================================================================
 /** @brief Hash table manager for contact history tracking.
 
-    This class manages memory allocation and provides a lightweight view for kernel use. The hash
-    table stores indices pointing to a flat array of ContactForce objects. This class should NOT be
-    passed to kernels. Instead, use getView() to obtain a ContactHashTableView that can be safely
-    passed to kernels by value.
+    This class manages both the hash table for fast lookups and the flat array of contact history
+    data. It ensures both structures are properly sized and synchronized.
 
     @author A.Yazdani - 2026 - Construction */
 // =================================================================================================
-template <MemType M = MemType::HOST>
+template <typename T, MemType M = MemType::HOST>
 class ContactHashTable
 {
 private:
     /** @name Parameters */
     //@{
+    /** \brief Flat array of contact history data */
+    GrainsMemBuffer<ContactHistory<T>, M> m_historyData;
     /** \brief Hash table entries buffer */
     GrainsMemBuffer<ContactEntry, M> m_table;
     /** \brief Total capacity of the hash table */
     uint m_capacity;
+    /** \brief Maximum number of contacts that can be stored */
+    uint m_maxContacts;
     /** \brief Pointer to the next index counter (in device/host memory) */
     uint* m_nextIndex;
     //@}
@@ -245,9 +319,10 @@ public:
     /** @brief Default constructor */
     ContactHashTable();
 
-    /** @brief Constructor with specified capacity
-        @param capacity number of entries in the hash table */
-    ContactHashTable(uint capacity);
+    /** @brief Constructor with specified capacities
+        @param hashCapacity number of entries in the hash table
+        @param maxContacts maximum number of contacts to store */
+    ContactHashTable(uint hashCapacity, uint maxContacts);
 
     /** @brief Destructor */
     ~ContactHashTable();
@@ -255,52 +330,52 @@ public:
 
     /** @name Get methods */
     //@{
-    /** @brief Gets a lightweight view for passing to kernels */
-    ContactHashTableView getView();
+    /** @brief Gets the pointer to the history data */
+    const ContactHistory<T>* getHistoryData() const;
+
+    /** @brief Gets the pointer to the history data (mutable) */
+    ContactHistory<T>* getHistoryData();
 
     /** @brief Gets the pointer to the table data */
     const ContactEntry* getTable() const;
+
     /** @brief Gets the pointer to the table data (mutable) */
     ContactEntry* getTable();
 
     /** @brief Gets the capacity of the hash table */
     uint getCapacity() const;
 
+    /** @brief Gets the maximum number of contacts */
+    uint getMaxContacts() const;
+
     /** @brief Gets the current next index value (host-side read only) */
     uint getNextIndex() const;
+
+    /** @brief Gets the pointer to the next index counter */
+    uint* getNextIndexPointer();
+
+    /** @brief Gets the pointer to the next index counter (const) */
+    const uint* getNextIndexPointer() const;
+
+    /** @brief Gets a complete view for passing to kernels */
+    ContactMemoryView<T> getView();
     //@}
 
     /** @name Memory management methods */
     //@{
-    /** @brief Allocates memory for the hash table
-        @param capacity number of entries to allocate */
-    void allocate(uint capacity);
+    /** @brief Allocates memory for both hash table and history data
+        @param hashCapacity number of hash table entries to allocate
+        @param maxContacts maximum number of contacts to store */
+    void allocate(uint hashCapacity, uint maxContacts);
 
-    /** @brief Frees memory used by the hash table */
+    /** @brief Frees memory used by hash table and history data */
     void deallocate();
 
-    /** @brief Clears all entries in the hash table */
+    /** @brief Clears all entries in the hash table and resets history data */
     void clear();
 
     /** @brief Resets the index counter */
     void resetIndexCounter();
-    //@}
-
-    /** @name Methods */
-    //@{
-    /** @brief Finds an existing contact index in the hash table (host-side)
-        @param key pair of component IDs (i,j) where i < j
-        @param index output parameter for the contact state index */
-    bool find(uint2 key, uint& index) const;
-
-    /** @brief Finds an existing contact or inserts a new one (host-side)
-        @param key pair of component IDs (i,j) where i < j
-        @param index output parameter for the contact state index */
-    bool findOrInsert(uint2 key, uint& index);
-
-    /** @brief Removes a contact from the hash table (host-side)
-        @param key pair of component IDs (i,j) where i < j */
-    bool remove(uint2 key);
     //@}
 };
 

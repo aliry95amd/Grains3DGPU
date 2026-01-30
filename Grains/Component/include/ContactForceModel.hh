@@ -2,6 +2,7 @@
 #define _CONTACTFORCEMODEL_HH_
 
 #include "ContactInfo.hh"
+#include "ContactTable.hh"
 #include "Torce.hh"
 #include "Vector3.hh"
 
@@ -60,6 +61,7 @@ public:
         @param vA position of the first component
         @param vB position of the second component
         @param averageMass average mass of the two components
+        @param contactHistory pointer to contact history
         @param torceA computed force and torque for the first component
         @param torceB computed force and torque for the second component */
     __HOSTDEVICE__
@@ -69,6 +71,7 @@ public:
                                const Vector3<T>&     vA,
                                const Vector3<T>&     vB,
                                const T               averageMass,
+                               ContactHistory<T>*    contactHistory,
                                Torce<T>&             torceA,
                                Torce<T>&             torceB) const
         = 0;

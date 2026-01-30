@@ -2,69 +2,116 @@
 
 // -------------------------------------------------------------------------------------------------
 // Default constructor
-template <MemType M>
-ContactHashTable<M>::ContactHashTable()
-    : m_table()
+template <typename T, MemType M>
+ContactHashTable<T, M>::ContactHashTable()
+    : m_historyData()
+    , m_table()
     , m_capacity(0)
+    , m_maxContacts(0)
     , m_nextIndex(nullptr)
 {
 }
 
 // -------------------------------------------------------------------------------------------------
-// Constructor with specified capacity
-template <MemType M>
-ContactHashTable<M>::ContactHashTable(uint capacity)
-    : m_table()
+// Constructor with specified capacities
+template <typename T, MemType M>
+ContactHashTable<T, M>::ContactHashTable(uint hashCapacity, uint maxContacts)
+    : m_historyData()
+    , m_table()
     , m_capacity(0)
+    , m_maxContacts(0)
     , m_nextIndex(nullptr)
 {
-    allocate(capacity);
+    allocate(hashCapacity, maxContacts);
 }
 
 // -------------------------------------------------------------------------------------------------
 // Destructor
-template <MemType M>
-ContactHashTable<M>::~ContactHashTable()
+template <typename T, MemType M>
+ContactHashTable<T, M>::~ContactHashTable()
 {
     deallocate();
 }
 
 // -------------------------------------------------------------------------------------------------
-// Gets a lightweight view for passing to kernels
-template <MemType M>
-ContactHashTableView ContactHashTable<M>::getView()
+// Gets the pointer to the history data
+template <typename T, MemType M>
+const ContactHistory<T>* ContactHashTable<T, M>::getHistoryData() const
 {
-    return ContactHashTableView(m_table.getData(), m_capacity, m_nextIndex);
+    return m_historyData.getData();
+}
+
+// -------------------------------------------------------------------------------------------------
+// Gets mutable pointer to the history data
+template <typename T, MemType M>
+ContactHistory<T>* ContactHashTable<T, M>::getHistoryData()
+{
+    return m_historyData.getData();
 }
 
 // -------------------------------------------------------------------------------------------------
 // Gets the pointer to the table data
-template <MemType M>
-const ContactEntry* ContactHashTable<M>::getTable() const
+template <typename T, MemType M>
+const ContactEntry* ContactHashTable<T, M>::getTable() const
 {
     return m_table.getData();
 }
 
 // -------------------------------------------------------------------------------------------------
 // Gets mutable pointer to the table data
-template <MemType M>
-ContactEntry* ContactHashTable<M>::getTable()
+template <typename T, MemType M>
+ContactEntry* ContactHashTable<T, M>::getTable()
 {
     return m_table.getData();
 }
 
 // -------------------------------------------------------------------------------------------------
 // Gets the capacity of the hash table
-template <MemType M>
-uint ContactHashTable<M>::getCapacity() const
+template <typename T, MemType M>
+uint ContactHashTable<T, M>::getCapacity() const
 {
     return m_capacity;
 }
 
 // -------------------------------------------------------------------------------------------------
+// Gets the maximum number of contacts
+template <typename T, MemType M>
+uint ContactHashTable<T, M>::getMaxContacts() const
+{
+    return m_maxContacts;
+}
+
+// -------------------------------------------------------------------------------------------------
+// Gets the pointer to the next index counter
+template <typename T, MemType M>
+uint* ContactHashTable<T, M>::getNextIndexPointer()
+{
+    return m_nextIndex;
+}
+
+// -------------------------------------------------------------------------------------------------
+// Gets the pointer to the next index counter (const)
+template <typename T, MemType M>
+const uint* ContactHashTable<T, M>::getNextIndexPointer() const
+{
+    return m_nextIndex;
+}
+
+// -------------------------------------------------------------------------------------------------
+// Gets a complete view for passing to kernels
+template <typename T, MemType M>
+ContactMemoryView<T> ContactHashTable<T, M>::getView()
+{
+    return ContactMemoryView<T>(m_table.getData(),
+                                m_capacity,
+                                m_nextIndex,
+                                m_historyData.getData());
+}
+
+// -------------------------------------------------------------------------------------------------
 // Gets the current next index value
-template <MemType M>
-uint ContactHashTable<M>::getNextIndex() const
+template <typename T, MemType M>
+uint ContactHashTable<T, M>::getNextIndex() const
 {
     if(m_nextIndex == nullptr)
         return 0;
@@ -85,20 +132,21 @@ uint ContactHashTable<M>::getNextIndex() const
 }
 
 // -------------------------------------------------------------------------------------------------
-// Allocates memory for the hash table
-template <MemType M>
-void ContactHashTable<M>::allocate(uint capacity)
+// Allocates memory for both hash table and history data
+template <typename T, MemType M>
+void ContactHashTable<T, M>::allocate(uint hashCapacity, uint maxContacts)
 {
     // Deallocate existing memory if any
-    if(m_table.getSize() > 0 || m_nextIndex != nullptr)
+    if(m_table.getSize() > 0 || m_historyData.getSize() > 0 || m_nextIndex != nullptr)
     {
         deallocate();
     }
 
-    m_capacity = capacity;
+    m_capacity    = hashCapacity;
+    m_maxContacts = maxContacts;
 
-    // Allocate and initialize the table
-    m_table.initialize(capacity);
+    // Allocate and initialize the hash table
+    m_table.initialize(hashCapacity);
     if constexpr(M == MemType::HOST)
     {
         m_table.fill(ContactEntry());
@@ -107,7 +155,19 @@ void ContactHashTable<M>::allocate(uint capacity)
     {
         // Initialize device memory to zero. ContactEntry is not a POD primitive,
         // so use cudaMemset to avoid instantiating device-side constructors.
-        cudaErrCheck(cudaMemset(m_table.getData(), 0, capacity * sizeof(ContactEntry)));
+        cudaErrCheck(cudaMemset(m_table.getData(), 0, hashCapacity * sizeof(ContactEntry)));
+    }
+
+    // Allocate and initialize the history data
+    m_historyData.initialize(maxContacts);
+    if constexpr(M == MemType::HOST)
+    {
+        m_historyData.fill(ContactHistory<T>());
+    }
+    else if constexpr(M == MemType::DEVICE)
+    {
+        cudaErrCheck(
+            cudaMemset(m_historyData.getData(), 0, maxContacts * sizeof(ContactHistory<T>)));
     }
 
     // Allocate the index counter
@@ -124,12 +184,14 @@ void ContactHashTable<M>::allocate(uint capacity)
 }
 
 // -------------------------------------------------------------------------------------------------
-// Frees memory used by the hash table
-template <MemType M>
-void ContactHashTable<M>::deallocate()
+// Frees memory used by hash table and history data
+template <typename T, MemType M>
+void ContactHashTable<T, M>::deallocate()
 {
     m_table.free();
-    m_capacity = 0;
+    m_historyData.free();
+    m_capacity    = 0;
+    m_maxContacts = 0;
 
     if(m_nextIndex != nullptr)
     {
@@ -146,9 +208,9 @@ void ContactHashTable<M>::deallocate()
 }
 
 // -------------------------------------------------------------------------------------------------
-// Clears all entries in the hash table
-template <MemType M>
-void ContactHashTable<M>::clear()
+// Clears all entries in the hash table and resets history data
+template <typename T, MemType M>
+void ContactHashTable<T, M>::clear()
 {
     if(m_table.getSize() > 0)
     {
@@ -159,6 +221,19 @@ void ContactHashTable<M>::clear()
         else if constexpr(M == MemType::DEVICE)
         {
             cudaErrCheck(cudaMemset(m_table.getData(), 0, m_capacity * sizeof(ContactEntry)));
+        }
+    }
+
+    if(m_historyData.getSize() > 0)
+    {
+        if constexpr(M == MemType::HOST)
+        {
+            m_historyData.fill(ContactHistory<T>());
+        }
+        else if constexpr(M == MemType::DEVICE)
+        {
+            cudaErrCheck(
+                cudaMemset(m_historyData.getData(), 0, m_maxContacts * sizeof(ContactHistory<T>)));
         }
     }
 
@@ -177,8 +252,8 @@ void ContactHashTable<M>::clear()
 
 // -------------------------------------------------------------------------------------------------
 // Resets the index counter
-template <MemType M>
-void ContactHashTable<M>::resetIndexCounter()
+template <typename T, MemType M>
+void ContactHashTable<T, M>::resetIndexCounter()
 {
     if(m_nextIndex != nullptr)
     {
@@ -194,112 +269,8 @@ void ContactHashTable<M>::resetIndexCounter()
 }
 
 // -------------------------------------------------------------------------------------------------
-// Finds an existing contact index in the hash table
-template <MemType M>
-bool ContactHashTable<M>::find(uint2 key, uint& index) const
-{
-    GAssert(M == MemType::HOST, "find() is only supported for HOST memory type.");
-    if(m_capacity == 0 || m_table.getData() == nullptr)
-        return false;
-
-    const ContactEntry* table = m_table.getData();
-    uint                h     = primeHash(key) % m_capacity;
-
-    for(uint i = 0; i < m_capacity; ++i)
-    {
-        uint                idx = (h + i) % m_capacity;
-        const ContactEntry& e   = table[idx];
-
-        // Empty slot found - key not in table
-        if(e.m_valid == 0)
-            return false;
-
-        // Key found
-        if(e.m_valid == 1 && e.m_key.x == key.x && e.m_key.y == key.y)
-        {
-            index = e.m_index;
-            return true;
-        }
-    }
-
-    // Table full, key not found
-    return false;
-}
-
-// -------------------------------------------------------------------------------------------------
-// Finds an existing contact or inserts a new one
-template <MemType M>
-bool ContactHashTable<M>::findOrInsert(uint2 key, uint& index)
-{
-    GAssert(M == MemType::HOST, "findOrInsert() is only supported for HOST memory type.");
-    if(m_capacity == 0 || m_table.getData() == nullptr || m_nextIndex == nullptr)
-        return false;
-
-    ContactEntry* table = m_table.getData();
-    uint          h     = primeHash(key) % m_capacity;
-
-    for(uint i = 0; i < m_capacity; ++i)
-    {
-        uint          idx = (h + i) % m_capacity;
-        ContactEntry& e   = table[idx];
-
-        // Empty slot - claim it
-        if(e.m_valid == 0)
-        {
-            e.m_valid = 1;
-            e.m_key   = key;
-            e.m_index = (*m_nextIndex)++;
-            index     = e.m_index;
-            return true;
-        }
-        // Slot already occupied - check if it's our key
-        else if(e.m_valid == 1 && e.m_key.x == key.x && e.m_key.y == key.y)
-        {
-            index = e.m_index;
-            return true;
-        }
-        // Different key, continue probing
-    }
-
-    // Hash table is full - cannot insert
-    return false;
-}
-
-// -------------------------------------------------------------------------------------------------
-// Removes a contact from the hash table
-template <MemType M>
-bool ContactHashTable<M>::remove(uint2 key)
-{
-    GAssert(M == MemType::HOST, "remove() is only supported for HOST memory type.");
-
-    if(m_capacity == 0 || m_table.getData() == nullptr)
-        return false;
-
-    ContactEntry* table = m_table.getData();
-    uint          h     = primeHash(key) % m_capacity;
-
-    for(uint i = 0; i < m_capacity; ++i)
-    {
-        uint          idx = (h + i) % m_capacity;
-        ContactEntry& e   = table[idx];
-
-        // Empty slot - key not found
-        if(e.m_valid == 0)
-            return false;
-
-        // Key found - remove it
-        if(e.m_key.x == key.x && e.m_key.y == key.y)
-        {
-            e.m_valid = 0;
-            return true;
-        }
-    }
-
-    // Key not found
-    return false;
-}
-
-// -------------------------------------------------------------------------------------------------
 // Explicit template instantiation
-template class ContactHashTable<MemType::HOST>;
-template class ContactHashTable<MemType::DEVICE>;
+template class ContactHashTable<float, MemType::HOST>;
+template class ContactHashTable<float, MemType::DEVICE>;
+template class ContactHashTable<double, MemType::HOST>;
+template class ContactHashTable<double, MemType::DEVICE>;

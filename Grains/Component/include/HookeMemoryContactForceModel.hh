@@ -2,6 +2,7 @@
 #define _HOOKEMEMORYCONTACTFORCEMODEL_HH_
 
 #include "ContactForceModel.hh"
+#include "ContactTable.hh"
 #include "ReaderXML.hh"
 
 // =================================================================================================
@@ -15,7 +16,10 @@
     This model includes tangential spring effects (kt) and rolling friction (mur) with full memory
     tracking of cumulative displacements.
 
-    @author A.Yazdani - 2025 - Construction (Inspired by D.Huet and A.Wachs) */
+    This model requires a ContactHashTableView to be passed to computeForces for tracking
+    contact history. The hash table is managed centrally by ComponentManager.
+
+    @author A.Yazdani - 2026 - Construction (Inspired by D.Huet and A.Wachs) */
 // =================================================================================================
 template <typename T>
 class HookeMemoryContactForceModel : public ContactForceModel<T>
@@ -90,32 +94,35 @@ public:
 
     /**@name Methods */
     //@{
-    /** @brief Returns a force based on the contact information
-        @param contactVector geometric contact vector
+    /** @brief Performs force and torque computation with optional memory tracking
+        @param contactVector geometric contact vector (unit normal from B to A)
         @param relVelocityAtContact relative velocity at the contact point
         @param relAngVelocity relative angular velocity
-        @param overlapDistance overlap distance
+        @param overlapDistance overlap distance (negative when penetrating)
         @param averageMass average mass of the two components
-        @param delFN normal force
-        @param delFT tangential force
-        @param delM torque */
+        @param contactHistory pointer to contact history (nullptr for no memory)
+        @param delFN output normal force
+        @param delFT output tangential force
+        @param delM output torque */
     __HOSTDEVICE__
-    void performForcesCalculus(const Vector3<T>& contactVector,
-                               const Vector3<T>& relVelocityAtContact,
-                               const Vector3<T>& relAngVelocity,
-                               const T           overlapDistance,
-                               const T           averageMass,
-                               Vector3<T>&       delFN,
-                               Vector3<T>&       delFT,
-                               Vector3<T>&       delM) const;
+    void performForcesCalculus(const Vector3<T>&  contactVector,
+                               const Vector3<T>&  relVelocityAtContact,
+                               const Vector3<T>&  relAngVelocity,
+                               const T            overlapDistance,
+                               const T            averageMass,
+                               ContactHistory<T>* contactHistory,
+                               Vector3<T>&        delFN,
+                               Vector3<T>&        delFT,
+                               Vector3<T>&        delM) const;
 
-    /** @brief Returns a force based on the contact information
+    /** @brief Returns a force based on the contact information with memory tracking
         @param contactInfos geometric contact features
         @param relVelocityAtContact relative velocity at the contact point
         @param relAngVelocity relative angular velocity
         @param vA position of the first component
         @param vB position of the second component
         @param averageMass average mass of the two components
+        @param contactHistory pointer to contact history
         @param torceA computed force and torque for the first component
         @param torceB computed force and torque for the second component */
     __HOSTDEVICE__
@@ -125,6 +132,7 @@ public:
                        const Vector3<T>&     vA,
                        const Vector3<T>&     vB,
                        const T               averageMass,
+                       ContactHistory<T>*    contactHistory,
                        Torce<T>&             torceA,
                        Torce<T>&             torceB) const final;
     //@}

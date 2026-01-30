@@ -121,6 +121,10 @@ void ComponentManagerCPU<T>::computeContactForces(
     const GrainsMemBuffer<ContactForceModel<T>*, MemType::HOST>& CF)
 {
     uint nPairs = m_neighborList->getSize();
+
+    // Get the contact memory view
+    ContactMemoryView<T> contactMemory = this->getContactMemoryView();
+
     for(uint i = 0; i < nPairs; ++i)
     {
         computeContactForces_common(CF.getData(),
@@ -129,6 +133,7 @@ void ComponentManagerCPU<T>::computeContactForces(
                                     m_position.getData(),
                                     m_velocity.getData(),
                                     m_torce.getData(),
+                                    contactMemory,
                                     i);
     }
 }

@@ -41,6 +41,8 @@ void ComponentManagerGPU<T>::resizePairBuffers(const uint size)
     ComponentManager<T, MemType::DEVICE>::resizePairBuffers(size);
     m_prefixScan.resize(size);
     m_activeIndex.resize(size);
+    m_intermediateTorceA.resize(size);
+    m_intermediateTorceB.resize(size);
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -169,14 +171,29 @@ void ComponentManagerGPU<T>::computeContactForces(
 
     uint numThreads, numBlocks;
     computeOptimalThreadsAndBlocks(nPairs, GrainsParameters<T>::m_GPU, numBlocks, numThreads);
+
+    // Get the contact memory view (hash table + history data)
+    ContactMemoryView<T> contactMemory = this->getContactMemoryView();
+
+    // Kernel 1: Compute forces and write to intermediate per-pair storage (no race conditions)
     computeContactForces_Kernel<<<numBlocks, numThreads>>>(CF.getData(),
                                                            m_neighborList->getData(),
                                                            m_contactInfoWorld.getData(),
                                                            nullptr,
                                                            m_position.getData(),
                                                            m_velocity.getData(),
-                                                           m_torce.getData(),
+                                                           m_intermediateTorceA.getData(),
+                                                           m_intermediateTorceB.getData(),
+                                                           contactMemory,
                                                            nPairs);
+
+    // Kernel 2: Reduce per-pair forces to per-particle torces using atomics
+    reduceTorces_Kernel<<<numBlocks, numThreads>>>(m_neighborList->getData(),
+                                                   nullptr,
+                                                   m_intermediateTorceA.getData(),
+                                                   m_intermediateTorceB.getData(),
+                                                   m_torce.getData(),
+                                                   nPairs);
 }
 
 // -------------------------------------------------------------------------------------------------

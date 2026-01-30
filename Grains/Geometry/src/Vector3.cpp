@@ -145,6 +145,18 @@ __HOSTDEVICE__ void Vector3<T>::reset() noexcept
 }
 
 // -------------------------------------------------------------------------------------------------
+// Atomically add a vector to this vector (GPU safe)
+template <typename T>
+__device__ void Vector3<T>::atomicAdd(const Vector3<T>& other) noexcept
+{
+    T*       thisPtr  = m_comp;
+    const T* otherPtr = other.m_comp;
+    ::atomicAdd(thisPtr + 0, otherPtr + 0);
+    ::atomicAdd(thisPtr + 1, otherPtr + 1);
+    ::atomicAdd(thisPtr + 2, otherPtr + 2);
+}
+
+// -------------------------------------------------------------------------------------------------
 // ith component accessor
 template <typename T>
 __HOSTDEVICE__ T const& Vector3<T>::operator[](size_t i) const noexcept

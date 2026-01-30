@@ -107,7 +107,7 @@ __HOSTDEVICE__ void
     T normFN = norm(delFN);
 
     // Tangential dissipative force
-    delFT    = (T(2) * m_etat * averageMass) * v_t;
+    delFT    = (-T(2) * m_etat * averageMass) * v_t;
     T normFT = norm(delFT);
 
     // Tangential Coulomb saturation
@@ -141,9 +141,13 @@ __HOSTDEVICE__ void HookeContactForceModel<T>::computeForces(const ContactInfo<T
                                                              const Vector3<T>& vA,
                                                              const Vector3<T>& vB,
                                                              const T           averageMass,
-                                                             Torce<T>&         torceA,
-                                                             Torce<T>&         torceB) const
+                                                             ContactHistory<T>* contactHistory,
+                                                             Torce<T>&          torceA,
+                                                             Torce<T>&          torceB) const
 {
+    // Note: contactHistory is unused for non-memory models
+    (void)contactHistory;
+
     // Extract contact vector
     Vector3<T> geometricPointOfContact = contactInfos.getContactPoint();
     Vector3<T> contactVector           = contactInfos.getContactVector();

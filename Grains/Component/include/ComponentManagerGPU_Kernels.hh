@@ -243,16 +243,17 @@ __GLOBAL__ void transformContactInfo_Kernel(const uint2*         pairList,
 }
 
 // -------------------------------------------------------------------------------------------------
-/** @brief Computes the contact forces
+/** @brief Computes the contact forces (writes to intermediate per-pair storage)
     @param CF contact force models
     @param pairList list of rigid bodies pairs
     @param contactInfo contact information
     @param activeIdx list of active pair indices
-    @param rigidBody rigid body of components
     @param position position of the components
     @param velocity kinematics of the components
-    @param torce torce acting on the components
-    @param nPairs number of pairs */
+    @param intermediateTorceA intermediate torce storage for particle A in each pair
+    @param intermediateTorceB intermediate torce storage for particle B in each pair
+    @param contactMemory view of contact memory (hash table + history data)
+    @param nActive number of active pairs */
 template <typename T>
 __GLOBAL__ void computeContactForces_Kernel(const ContactForceModel<T>* const* CF,
                                             const uint2*                       pairList,
@@ -260,7 +261,9 @@ __GLOBAL__ void computeContactForces_Kernel(const ContactForceModel<T>* const* C
                                             const uint*                        activeIdx,
                                             const Vector3<T>*                  position,
                                             const Kinematics<T>*               velocity,
-                                            Torce<T>*                          torce,
+                                            Torce<T>*                          intermediateTorceA,
+                                            Torce<T>*                          intermediateTorceB,
+                                            ContactMemoryView<T>               contactMemory,
                                             const uint                         nActive)
 {
     uint tID = blockIdx.x * blockDim.x + threadIdx.x;
@@ -270,12 +273,60 @@ __GLOBAL__ void computeContactForces_Kernel(const ContactForceModel<T>* const* C
 
     if(activeIdx == nullptr)
     {
-        computeContactForces_common(CF, pairList, contactInfo, position, velocity, torce, tID);
+        computeContactForces_common(CF,
+                                    pairList,
+                                    contactInfo,
+                                    position,
+                                    velocity,
+                                    intermediateTorceA,
+                                    intermediateTorceB,
+                                    contactMemory,
+                                    tID);
     }
     else
     {
         const uint i = activeIdx[tID];
-        computeContactForces_common(CF, pairList, contactInfo, position, velocity, torce, i);
+        computeContactForces_common(CF,
+                                    pairList,
+                                    contactInfo,
+                                    position,
+                                    velocity,
+                                    intermediateTorceA,
+                                    intermediateTorceB,
+                                    contactMemory,
+                                    i);
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+/** @brief Reduces per-pair intermediate torces to per-particle torces using atomics
+    @param pairList list of rigid bodies pairs
+    @param activeIdx list of active pair indices
+    @param intermediateTorceA intermediate torce storage for particle A in each pair
+    @param intermediateTorceB intermediate torce storage for particle B in each pair
+    @param torce final per-particle torce array (accumulated atomically)
+    @param nActive number of active pairs */
+template <typename T>
+__GLOBAL__ void reduceTorces_Kernel(const uint2*    pairList,
+                                    const uint*     activeIdx,
+                                    const Torce<T>* intermediateTorceA,
+                                    const Torce<T>* intermediateTorceB,
+                                    Torce<T>*       torce,
+                                    const uint      nActive)
+{
+    uint tID = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if(tID >= nActive)
+        return;
+
+    if(activeIdx == nullptr)
+    {
+        reduceTorces_common(pairList, intermediateTorceA, intermediateTorceB, torce, tID);
+    }
+    else
+    {
+        const uint i = activeIdx[tID];
+        reduceTorces_common(pairList, intermediateTorceA, intermediateTorceB, torce, i);
     }
 }
 

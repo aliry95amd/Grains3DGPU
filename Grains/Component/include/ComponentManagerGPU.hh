@@ -36,6 +36,10 @@ private:
     GrainsMemBuffer<uint, MemType::DEVICE> m_prefixScan;
     GrainsMemBuffer<uint, MemType::DEVICE> m_activeIndex;
 
+    // Intermediate per-pair storage for contact forces
+    GrainsMemBuffer<Torce<T>, MemType::DEVICE> m_intermediateTorceA;
+    GrainsMemBuffer<Torce<T>, MemType::DEVICE> m_intermediateTorceB;
+
 public:
     /** @name Constructors */
     //@{

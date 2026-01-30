@@ -104,6 +104,10 @@ public:
     /** @brief set all components to zero */
     __HOSTDEVICE__
     void reset() noexcept;
+
+    /** @brief Atomically add a vector to this vector (GPU safe)
+        @param other vector to add atomically */
+    __device__ void atomicAdd(const Vector3<T>& other) noexcept;
     //@}
 
     /** @name Operators */

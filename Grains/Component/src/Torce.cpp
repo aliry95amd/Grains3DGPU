@@ -94,6 +94,31 @@ __HOSTDEVICE__ void Torce<T>::addForce(const Vector3<T>& f, const Vector3<T>& p)
 }
 
 // -------------------------------------------------------------------------------------------------
+// Atomically adds a torque to the torce (GPU safe)
+template <typename T>
+__device__ void Torce<T>::addTorqueAtomic(const Vector3<T>& t)
+{
+    m_torque.atomicAdd(t);
+}
+
+// -------------------------------------------------------------------------------------------------
+// Atomically adds a force to the torce (GPU safe)
+template <typename T>
+__device__ void Torce<T>::addForceAtomic(const Vector3<T>& f)
+{
+    m_force.atomicAdd(f);
+}
+
+// -------------------------------------------------------------------------------------------------
+// Atomically adds both force and torque from another Torce (GPU safe)
+template <typename T>
+__device__ void Torce<T>::addTorceAtomic(const Torce<T>& other)
+{
+    m_force.atomicAdd(other.m_force);
+    m_torque.atomicAdd(other.m_torque);
+}
+
+// -------------------------------------------------------------------------------------------------
 // Output operator
 template <typename T>
 __HOST__ std::ostream& operator<<(std::ostream& fileOut, const Torce<T>& t)

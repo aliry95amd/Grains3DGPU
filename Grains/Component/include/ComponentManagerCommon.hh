@@ -4,6 +4,7 @@
 #include "CollisionDetection.hh"
 #include "ContactForceModel.hh"
 #include "ContactForceModelFactory.hh"
+#include "ContactTable.hh"
 #include "GrainsParameters.hh"
 #include "Kinematics.hh"
 #include "Quaternion.hh"
@@ -218,10 +219,10 @@ __HOSTDEVICE__ static INLINE void transformContactInfo_common(const uint2*      
     @param CF contact force models
     @param pairList list of pairs
     @param contactInfo contact information in the world frame
-    @param rigidBody rigid body of components
     @param position position of the components
     @param velocity kinematics of the components
     @param torce torce acting on the components
+    @param contactMemory view of contact memory (hash table + history data)
     @param pairID ID of the pair */
 template <typename T>
 __HOSTDEVICE__ static INLINE void computeContactForces_common(const ContactForceModel<T>* const* CF,
@@ -230,6 +231,7 @@ __HOSTDEVICE__ static INLINE void computeContactForces_common(const ContactForce
                                                               const Vector3<T>*     position,
                                                               const Kinematics<T>*  velocity,
                                                               Torce<T>*             torce,
+                                                              ContactMemoryView<T>  contactMemory,
                                                               const uint            pairID)
 {
     using CMPacker = BitPacker<uint32_t,
@@ -247,8 +249,7 @@ __HOSTDEVICE__ static INLINE void computeContactForces_common(const ContactForce
     avgMass = 1 / avgMass;  // converting back to average mass from its reciprocal stored value
 
     // Compute the forces
-    // On device path, this is redundant.
-    if(isContact)
+    if(isContact)  // On device path, this check is redundant.
     {
         const uint2 pair = pairList[pairID];
         const uint  idA  = pair.x;
@@ -263,6 +264,16 @@ __HOSTDEVICE__ static INLINE void computeContactForces_common(const ContactForce
         const Vector3<T>& relVel(vA.kinematicsAtPoint(contactPt) - vB.kinematicsAtPoint(contactPt));
         // relative angular velocity
         const Vector3<T>& relAngVel(vA.getAngularComponent() - vB.getAngularComponent());
+
+        // Look up or create contact history entry
+        ContactHistory<T>* historyPtr = nullptr;
+        if(contactMemory.m_hashTable != nullptr)
+        {
+            uint historyIndex;
+            contactMemory.findOrInsert(pair, historyIndex);
+            historyPtr = &(contactMemory.m_historyData[historyIndex]);
+        }
+
         // note that we will add torce to obstacles as well.
         CF[contactForceID]->computeForces(ci,
                                           relVel,
@@ -270,11 +281,37 @@ __HOSTDEVICE__ static INLINE void computeContactForces_common(const ContactForce
                                           position[idA],
                                           position[idB],
                                           avgMass,
+                                          historyPtr,
                                           torce[idA],
                                           torce[idB]);
     }
     // reset the distance so we don't compute the torce twice
     ci.setOverlapDistance(T(0));
+}
+
+// -------------------------------------------------------------------------------------------------
+/** @brief Reduces per-pair intermediate torces to per-particle torces (DEVICE kernel helper)
+    @param pairList list of pairs
+    @param intermediateTorceA intermediate torce storage for particle A in each pair
+    @param intermediateTorceB intermediate torce storage for particle B in each pair
+    @param torce final per-particle torce array (accumulated atomically)
+    @param pairID ID of the pair */
+template <typename T>
+__device__ static INLINE void reduceTorces_common(const uint2*    pairList,
+                                                  const Torce<T>* intermediateTorceA,
+                                                  const Torce<T>* intermediateTorceB,
+                                                  Torce<T>*       torce,
+                                                  const uint      pairID)
+{
+    const uint2     pair = pairList[pairID];
+    const uint      idA  = pair.x;
+    const uint      idB  = pair.y;
+    const Torce<T>& tA   = intermediateTorceA[pairID];
+    const Torce<T>& tB   = intermediateTorceB[pairID];
+
+    // Atomically accumulate all components (6 atomics per particle)
+    torce[idA].addTorceAtomic(tA);
+    torce[idB].addTorceAtomic(tB);
 }
 
 // -------------------------------------------------------------------------------------------------

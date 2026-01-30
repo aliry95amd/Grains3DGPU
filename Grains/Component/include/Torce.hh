@@ -84,6 +84,18 @@ public:
         @param p point of application */
     __HOSTDEVICE__
     void addForce(const Vector3<T>& f, const Vector3<T>& p);
+
+    /** @brief Atomically adds a torque to the torce (GPU safe)
+        @param t added torque */
+    __device__ void addTorqueAtomic(const Vector3<T>& t);
+
+    /** @brief Atomically adds a force to the torce (GPU safe)
+        @param f added force */
+    __device__ void addForceAtomic(const Vector3<T>& f);
+
+    /** @brief Atomically adds both force and torque from another Torce (GPU safe)
+        @param other Torce containing force and torque to add */
+    __device__ void addTorceAtomic(const Torce<T>& other);
     //@}
 };
 

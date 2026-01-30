@@ -1,5 +1,7 @@
 #include "HookeMemoryContactForceModel.hh"
+#include "GrainsParameters.hh"
 #include "GrainsUtils.hh"
+#include "QuaternionMath.hh"
 #include "VectorMath.hh"
 
 // -------------------------------------------------------------------------------------------------
@@ -81,73 +83,123 @@ __HOSTDEVICE__ void HookeMemoryContactForceModel<T>::getContactForceModelParamet
 }
 
 // -------------------------------------------------------------------------------------------------
-// Performs forces & torques computation
+// Performs forces & torques computation with optional memory tracking
 template <typename T>
 __HOSTDEVICE__ void
-    HookeMemoryContactForceModel<T>::performForcesCalculus(const Vector3<T>& contactVector,
-                                                           const Vector3<T>& relVelocityAtContact,
-                                                           const Vector3<T>& relAngVelocity,
-                                                           const T           overlapDistance,
-                                                           const T           averageMass,
-                                                           Vector3<T>&       delFN,
-                                                           Vector3<T>&       delFT,
-                                                           Vector3<T>&       delM) const
+    HookeMemoryContactForceModel<T>::performForcesCalculus(const Vector3<T>&  contactVector,
+                                                           const Vector3<T>&  relVelocityAtContact,
+                                                           const Vector3<T>&  relAngVelocity,
+                                                           const T            overlapDistance,
+                                                           const T            averageMass,
+                                                           ContactHistory<T>* contactHistory,
+                                                           Vector3<T>&        delFN,
+                                                           Vector3<T>&        delFT,
+                                                           Vector3<T>&        delM) const
 {
-    // // Notes:
-    // // - contactVector is a unit vector pointing from B to A
-    // // - overlapDistance is negative when there is penetration
+    // Notes:
+    // - contactVector is a unit vector pointing from B to A (the normal)
+    // - overlapDistance is negative when there is penetration
 
-    // // Normal linear elastic force
-    // // We do this here as we want to modify the penetration vector later
-    // delFN = m_kn * overlapDistance * contactVector;
+    // Penetration vector
+    Vector3<T> normal = contactVector;
 
-    // // Unit normal vector at contact point
-    // Vector3<T> v_n = (relVelocityAtContact * contactVector) * contactVector;
-    // Vector3<T> v_t = relVelocityAtContact - v_n;
+    // Relative velocity components
+    Vector3<T> v_n = (relVelocityAtContact * normal) * normal;
+    Vector3<T> v_t = relVelocityAtContact - v_n;
 
-    // // Unit tangential vector along relative velocity at contact point
-    // T          normv_t = norm(v_t);
-    // Vector3<T> tangent(0, 0, 0);
-    // if(normv_t > EPS<T>)
-    //     tangent = v_t / normv_t;
+    // =============================================================================================
+    // 1) Compute normal force
+    // =============================================================================================
+    // Normal linear elastic force
+    delFN = m_kn * overlapDistance * normal;
 
-    // // Normal dissipative force
-    // T gamman = - 2. * m_muen * sqrt(averageMass * m_kn);
-    // delFN -= gamman * v_n;
-    // T normFN = norm(delFN);
+    // Normal dissipative force
+    T gamman = -T(2) * m_muen * sqrt(averageMass * m_kn);
+    delFN -= gamman * v_n;
+    T normFN = norm(delFN);
 
-    // // Tangential dissipative force
-    // delFT = (T(2) * m_etat * averageMass) * v_t;
-    // T normFT = norm(delFT);
+    // =============================================================================================
+    // 2) Compute tangential force with memory
+    // =============================================================================================
+    // Check if this is a new contact (previousNormal is zero)
+    bool contactExisted = (norm(contactHistory->m_previousNormal) > EPS<T>);
 
-    // // Tangential Coulomb saturation
-    // T fn = m_muc * normFN;
-    // if(fn < normFT)
-    //     delFT = (-fn) * tangent;
+    // Rotate previous cumulative displacement to current contact plane
+    if(contactExisted)
+    {
+        Quaternion<T> qrot;
+        qrot.setRotFromTwoVectors(contactHistory->m_previousNormal, normal);
+        contactHistory->m_tangentialDisplacement = qrot >> contactHistory->m_tangentialDisplacement;
+    }
 
-    // // Rolling resistance moment
-    // if(m_kr)
-    // {
-    //     // Relative angular velocity at contact point
-    //     Vector3<T> wn     = (relAngVelocity * contactVector) * contactVector;
-    //     Vector3<T> wt     = relAngVelocity - wn;
-    //     T          normwt = norm(wt);
+    // Add contribution of current timestep (using dt from GrainsParameters)
+    T dt = GrainsParameters<T>::m_dt;
+    contactHistory->m_tangentialDisplacement += dt * m_kt * v_t;
 
-    //     // Anti-spinning effect along the normal wn
-    //     delM = -m_kr * normFN * T(0.001) * wn;
+    // Update the normal vector in history
+    contactHistory->m_previousNormal = normal;
 
-    //     // Classical rolling resistance moment
-    //     if(normwt > EPS<T>)
-    //         delM -= m_kr * normFN * wt;
-    // }
+    // Compute tangential force direction
+    Vector3<T> tentativeFT
+        = -contactHistory->m_tangentialDisplacement + (-T(2) * m_etat * averageMass) * v_t;
+    T          normFT     = norm(tentativeFT);
+    Vector3<T> tangentDir = (normFT > EPS<T>) ? tentativeFT / normFT : Vector3<T>(T(0), T(0), T(0));
 
-    delFN.setValue(0, 0, 0);
-    delFT.setValue(0, 0, 0);
-    delM.setValue(0, 0, 0);
+    // Compute tangential force with Coulomb limit
+    if(normFT <= m_muc * normFN)
+    {
+        // Below Coulomb limit
+        delFT = normFT * tangentDir;
+    }
+    else
+    {
+        // Above Coulomb limit - apply saturation and adjust history
+        delFT = m_muc * normFN * tangentDir;
+        if(m_kt > EPS<T>)
+        {
+            contactHistory->m_tangentialDisplacement
+                = (-m_muc * normFN * tangentDir + viscousFT) / m_kt;
+        }
+    }
+
+    // =============================================================================================
+    // 3) Compute rolling resistance torque with memory (if applicable)
+    // =============================================================================================
+    delM = Vector3<T>(T(0), T(0), T(0));
+    if(m_mur > EPS<T>)
+    {
+        // Using Jiang et al (2005, 2015) formulation
+        // Note: Req would require particle radii - using a simplified approach here
+        // For now, use a characteristic length scale based on penetration
+        T Req  = T(1);  // Placeholder - should be computed from particle radii if available
+        T kr   = T(3) * m_kn * m_mur * m_mur * Req * Req;       // torque spring stiffness
+        T etar = T(3) * (-gamman) * m_mur * m_mur * Req * Req;  // torque dissipative coefficient
+        T maxNormMk = m_mur * Req * normFN;                     // saturation torque
+
+        // Rotate previous rolling friction spring to current plane
+        if(contactExisted)
+        {
+            Quaternion<T> qrot;
+            qrot.setRotFromTwoVectors(contactHistory->m_previousNormal, normal);
+            contactHistory->m_rollingDisplacement = qrot >> contactHistory->m_rollingDisplacement;
+        }
+
+        // Update rolling friction spring
+        contactHistory->m_rollingDisplacement -= kr * dt * relAngVelocity;
+        T normMk = norm(contactHistory->m_rollingDisplacement);
+
+        // Apply saturation
+        if(normMk > maxNormMk)
+        {
+            contactHistory->m_rollingDisplacement *= maxNormMk / normMk;
+        }
+
+        delM = contactHistory->m_rollingDisplacement - m_etarpf * etar * relAngVelocity;
+    }
 }
 
 // -------------------------------------------------------------------------------------------------
-// Returns a force based on the contact information
+// Returns a force based on the contact information with memory tracking
 template <typename T>
 __HOSTDEVICE__ void
     HookeMemoryContactForceModel<T>::computeForces(const ContactInfo<T>& contactInfos,
@@ -156,6 +208,7 @@ __HOSTDEVICE__ void
                                                    const Vector3<T>&     vA,
                                                    const Vector3<T>&     vB,
                                                    const T               averageMass,
+                                                   ContactHistory<T>*    contactHistory,
                                                    Torce<T>&             torceA,
                                                    Torce<T>&             torceB) const
 {
@@ -164,21 +217,24 @@ __HOSTDEVICE__ void
     Vector3<T> contactVector           = contactInfos.getContactVector();
     T          overlapDistance         = contactInfos.getOverlapDistance();
 
-    // Compute contact force and torque
+    // Compute contact forces and torques
     Vector3<T> delFN, delFT, delM;
     performForcesCalculus(contactVector,
                           relVelocityAtContact,
                           relAngVelocity,
                           overlapDistance,
                           averageMass,
+                          contactHistory,
                           delFN,
                           delFT,
                           delM);
 
-    delFN += delFT;
-    torceA.addForce(delFN, geometricPointOfContact - vA);
-    torceB.addForce(-delFN, geometricPointOfContact - vB);
-    if(m_mur)
+    // Apply forces and torques
+    Vector3<T> totalForce = delFN + delFT;
+    torceA.addForce(totalForce, geometricPointOfContact - vA);
+    torceB.addForce(-totalForce, geometricPointOfContact - vB);
+
+    if(m_mur > EPS<T>)
     {
         torceA.addTorque(delM);
         torceB.addTorque(-delM);
