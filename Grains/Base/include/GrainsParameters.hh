@@ -154,6 +154,8 @@ public:
     static std::unordered_map<std::string, uint> m_materialMap;
     /** \brief Number of different possible contact pairs (incl. obs-obs) */
     static uint m_numContactPairs;
+    /** \brief Is contact with memory activated? */
+    static bool m_isContactWithMemory;
 
     /* Temporal */
     /** @brief Initial simulation time */

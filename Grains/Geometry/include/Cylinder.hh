@@ -135,7 +135,4 @@ public:
     //@}
 };
 
-typedef Cylinder<float>  CylinderF;
-typedef Cylinder<double> CylinderD;
-
 #endif

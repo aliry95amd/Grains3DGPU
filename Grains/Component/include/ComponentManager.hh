@@ -422,8 +422,11 @@ public:
 
         // Initialize contact hash table with capacity based on expected contacts
         // Use a load factor of 0.7 for good performance (capacity = expected_contacts / 0.7)
-        uint hashCapacity = static_cast<uint>(estimatedPairs / 0.7);
-        m_contactTable.allocate(hashCapacity, estimatedPairs);
+        if(GrainsParameters<T>::m_isContactWithMemory)
+        {
+            uint hashCapacity = static_cast<uint>(estimatedPairs / 0.7);
+            m_contactTable.allocate(hashCapacity, estimatedPairs);
+        }
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -523,6 +526,21 @@ public:
     }
 
     // ---------------------------------------------------------------------------------------------
+    /** @brief Performs periodic cleanup of contact table (mark-and-sweep) */
+    void cleanupContactTable()
+    {
+        using GP = GrainsParameters<T>;
+        if(!GP::m_isContactWithMemory)
+            return;
+
+        auto& SS = GP::m_simulationState;
+        if(SS.neighborListUpdateCount % 1000 == 0)
+        {
+            m_contactTable.markAndSweep();
+        }
+    }
+
+    // ---------------------------------------------------------------------------------------------
     /** @brief Sorts particles by Morton codes for improved cache efficiency */
     virtual void sortParticles()
     {
@@ -544,9 +562,7 @@ public:
             SS.particlesSorted = true;
         }
         else
-        {
             SS.particlesSorted = false;
-        }
     }
 
     // ---------------------------------------------------------------------------------------------

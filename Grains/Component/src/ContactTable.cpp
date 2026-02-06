@@ -1,6 +1,36 @@
 #include "ContactTable.hh"
 
 // -------------------------------------------------------------------------------------------------
+// CUDA kernel for mark-and-sweep cleanup
+template <typename T>
+__GLOBAL__ void markAndSweepKernel(ContactEntry*      table,
+                                   ContactHistory<T>* history,
+                                   uint               capacity,
+                                   uint               maxContacts)
+{
+    uint idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if(idx >= capacity)
+        return;
+
+    ContactEntry& entry = table[idx];
+
+    if(entry.m_valid == 1)
+    {
+        // Stale entry - remove it and reset history
+        if(entry.m_index < maxContacts)
+        {
+            history[entry.m_index] = ContactHistory<T>();
+        }
+        entry.m_valid = 0;
+    }
+    else if(entry.m_valid == 2)
+    {
+        // Active entry - demote to stale
+        entry.m_valid = 1;
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
 // Default constructor
 template <typename T, MemType M>
 ContactHashTable<T, M>::ContactHashTable()
@@ -102,10 +132,10 @@ const uint* ContactHashTable<T, M>::getNextIndexPointer() const
 template <typename T, MemType M>
 ContactMemoryView<T> ContactHashTable<T, M>::getView()
 {
-    return ContactMemoryView<T>(m_table.getData(),
+    return ContactMemoryView<T>(m_historyData.getData(),
+                                m_table.getData(),
                                 m_capacity,
-                                m_nextIndex,
-                                m_historyData.getData());
+                                m_nextIndex);
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -265,6 +295,55 @@ void ContactHashTable<T, M>::resetIndexCounter()
         {
             cudaErrCheck(cudaMemset(m_nextIndex, 0, sizeof(uint)));
         }
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+// Performs mark-and-sweep cleanup
+template <typename T, MemType M>
+void ContactHashTable<T, M>::markAndSweep()
+{
+    if(m_table.getSize() == 0)
+        return;
+
+    if constexpr(M == MemType::HOST)
+    {
+        // CPU version
+        ContactEntry*      table   = m_table.getData();
+        ContactHistory<T>* history = m_historyData.getData();
+
+        for(uint i = 0; i < m_capacity; ++i)
+        {
+            ContactEntry& entry = table[i];
+
+            if(entry.m_valid == 1)
+            {
+                // Stale entry - remove it and reset history
+                if(entry.m_index < m_maxContacts)
+                {
+                    history[entry.m_index] = ContactHistory<T>();
+                }
+                entry.m_valid = 0;
+            }
+            else if(entry.m_valid == 2)
+            {
+                // Active entry - demote to stale
+                entry.m_valid = 1;
+            }
+        }
+    }
+    else if constexpr(M == MemType::DEVICE)
+    {
+        uint numBlocks, numThreads;
+        computeOptimalThreadsAndBlocks(m_capacity,
+                                       GrainsParameters<T>::m_GPU,
+                                       numBlocks,
+                                       numThreads);
+        markAndSweepKernel<T><<<numBlocks, numThreads>>>(m_table.getData(),
+                                                         m_historyData.getData(),
+                                                         m_capacity,
+                                                         m_maxContacts);
+        cudaErrCheck(cudaGetLastError());
     }
 }
 

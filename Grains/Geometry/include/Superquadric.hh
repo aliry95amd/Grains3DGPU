@@ -141,7 +141,4 @@ public:
     //@}
 };
 
-typedef Superquadric<float>  SuperquadricF;
-typedef Superquadric<double> SuperquadricD;
-
 #endif

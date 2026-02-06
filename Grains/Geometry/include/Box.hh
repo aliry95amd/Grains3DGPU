@@ -148,7 +148,4 @@ public:
     //@}
 };
 
-typedef Box<float>  BoxF;
-typedef Box<double> BoxD;
-
 #endif

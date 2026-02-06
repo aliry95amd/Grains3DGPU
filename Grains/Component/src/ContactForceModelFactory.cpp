@@ -1,6 +1,7 @@
 #include "ContactForceModelFactory.hh"
 #include "GrainsParameters.hh"
 #include "HookeContactForceModel.hh"
+#include "HookeMemoryContactForceModel.hh"
 
 /* ============================================================================================== */
 /* Low-Level Methods                                                                              */
@@ -19,10 +20,21 @@ __GLOBAL__ void createContactForceModelKernel(ContactForceModel<T>** CF,
     if(tID > 0)
         return;
 
-    if(contactForceModelType == HOOKE)
+    if constexpr(sizeof...(args) == 5)
     {
-        static_assert(sizeof...(args) == 5, "Hooke contact force model requires 5 parameters!");
+        // Hooke: kn, en, etat, muc, kr
         CF[index] = new HookeContactForceModel<T>(args...);
+    }
+    else if constexpr(sizeof...(args) == 8)
+    {
+        // HookeMemory: kn, en, kt, etat, muc, mur, etarpf, dt
+        CF[index] = new HookeMemoryContactForceModel<T>(args...);
+    }
+    else
+    {
+        // Unsupported parameter count
+        static_assert(sizeof...(args) == 5 || sizeof...(args) == 8,
+                      "Unsupported number of parameters for createContactForceModelKernel");
     }
 }
 
@@ -53,6 +65,11 @@ __HOST__ void
         DOMNode* parameters = ReaderXML::getNode(contact, "Parameters");
         if(contactType == "Hooke")
             CF[index] = new HookeContactForceModel<T>(parameters);
+        else if(contactType == "HookeMemory")
+        {
+            GrainsParameters<T>::m_isContactWithMemory = true;
+            CF[index] = new HookeMemoryContactForceModel<T>(parameters);
+        }
         else
             GAbort("Unknown contact force model! Aborting Grains!");
     }
@@ -89,6 +106,25 @@ __HOST__ void ContactForceModelFactory<T>::copyHostToDevice(
                                                     etat,
                                                     muc,
                                                     kr);
+        }
+        else if(contactType == HOOKEMEMORY)
+        {
+            HookeMemoryContactForceModel<T>* c
+                = dynamic_cast<HookeMemoryContactForceModel<T>*>(contact);
+            T kn, en, kt, etat, muc, mur, etarpf;
+            c->getContactForceModelParameters(kn, en, kt, etat, muc, mur, etarpf);
+            T dt = GrainsParameters<T>::m_dt;
+            createContactForceModelKernel<<<1, 1>>>(d_CF.getData(),
+                                                    i,
+                                                    HOOKEMEMORY,
+                                                    kn,
+                                                    en,
+                                                    kt,
+                                                    etat,
+                                                    muc,
+                                                    mur,
+                                                    etarpf,
+                                                    dt);
         }
         else
             GAbort("Contact force model is not implemented for GPU!", "Aborting Grains!");

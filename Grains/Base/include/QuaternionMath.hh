@@ -230,8 +230,8 @@ __HOSTDEVICE__ static INLINE Quaternion<T> operator*(const Vector3<T>&    v,
 }
 
 // -------------------------------------------------------------------------------------------------
-/** @brief Vector-quaternion multiplication in-place. Note that this modifies
-    the quaternion, not the vector.
+/** @brief Vector-quaternion multiplication in-place. Note that this modifies the quaternion, not
+    the vector.
     @param v the vector
     @param q the quaternion */
 template <typename T>
@@ -250,8 +250,7 @@ __HOSTDEVICE__ static INLINE void operator*=(const Vector3<T>& v, Quaternion<T>&
 }
 
 // -------------------------------------------------------------------------------------------------
-/** @brief Rotates a vector by the inverse of a quaternion. Unit quaternion is
-    assumed.
+/** @brief Rotates a vector by the inverse of a quaternion. Unit quaternion is assumed.
     @param q the quaternion
     @param v the vector */
 template <typename T>
@@ -271,8 +270,8 @@ __HOSTDEVICE__ static INLINE Vector3<T> operator<<(const Quaternion<T>& q,
 }
 
 // -------------------------------------------------------------------------------------------------
-/** @brief Rotates a vector by the inverse of a quaternion in-place. Note that
-    this modifies the vector, not the quaternion.
+/** @brief Rotates a vector by the inverse of a quaternion in-place. Note that this modifies the
+    vector, not the quaternion.
     @param v the vector
     @param q the quaternion */
 template <typename T>
@@ -312,8 +311,8 @@ __HOSTDEVICE__ static INLINE Vector3<T> operator>>(const Quaternion<T>& q,
 }
 
 // -------------------------------------------------------------------------------------------------
-/** @brief Rotates a vector by a quaternion in-place. Note that this modifies
-    the vector, not the quaternion. Also, Unit quaternion is assumed.
+/** @brief Rotates a vector by a quaternion in-place. Note that this modifies the vector, not the
+    quaternion. Also, Unit quaternion is assumed.
     @param v the vector
     @param q the quaternion */
 template <typename T>
@@ -510,7 +509,6 @@ __HOSTDEVICE__ static INLINE void
     bw[1] += bq[3] * ty + (bq[2] * tx - bq[0] * tz) + bv[1];
     bw[2] += bq[3] * tz + (bq[0] * ty - bq[1] * tx) + bv[2];
 }
-
 //@}
 
 #endif

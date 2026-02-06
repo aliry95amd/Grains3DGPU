@@ -21,6 +21,7 @@ __HOST__ HookeMemoryContactForceModel<T>::HookeMemoryContactForceModel(DOMNode* 
     GAssert(ReaderXML::hasNodeAttr(root, "kt"), "kt not defined! Aborting Grains!");
     GAssert(ReaderXML::hasNodeAttr(root, "etat"), "etat not defined! Aborting Grains!");
     GAssert(ReaderXML::hasNodeAttr(root, "muc"), "muc not defined! Aborting Grains!");
+    GAssert(GrainsParameters<T>::m_dt > T(0), "Time step not defined! Aborting Grains!");
 
     m_kn   = T(ReaderXML::getNodeAttr_Double(root, "kn"));
     m_en   = T(ReaderXML::getNodeAttr_Double(root, "en"));
@@ -33,13 +34,14 @@ __HOST__ HookeMemoryContactForceModel<T>::HookeMemoryContactForceModel(DOMNode* 
         m_etarpf = T(ReaderXML::getNodeAttr_Double(root, "etarpf"));
 
     m_muen = log(m_en) / sqrt(PI<T> * PI<T> + log(m_en) * log(m_en));
+    m_dt   = GrainsParameters<T>::m_dt;
 }
 
 // -------------------------------------------------------------------------------------------------
 // Constructor with eight values as contact parameters
 template <typename T>
 __HOSTDEVICE__ HookeMemoryContactForceModel<T>::HookeMemoryContactForceModel(
-    T kn, T en, T kt, T etat, T muc, T mur, T etarpf)
+    T kn, T en, T kt, T etat, T muc, T mur, T etarpf, T dt)
     : m_kn(kn)
     , m_en(en)
     , m_kt(kt)
@@ -47,6 +49,7 @@ __HOSTDEVICE__ HookeMemoryContactForceModel<T>::HookeMemoryContactForceModel(
     , m_muc(muc)
     , m_mur(mur)
     , m_etarpf(etarpf)
+    , m_dt(dt)
 {
     m_muen = log(m_en) / sqrt(PI<T> * PI<T> + log(m_en) * log(m_en));
 }
@@ -107,9 +110,7 @@ __HOSTDEVICE__ void
     Vector3<T> v_n = (relVelocityAtContact * normal) * normal;
     Vector3<T> v_t = relVelocityAtContact - v_n;
 
-    // =============================================================================================
     // 1) Compute normal force
-    // =============================================================================================
     // Normal linear elastic force
     delFN = m_kn * overlapDistance * normal;
 
@@ -118,9 +119,7 @@ __HOSTDEVICE__ void
     delFN -= gamman * v_n;
     T normFN = norm(delFN);
 
-    // =============================================================================================
     // 2) Compute tangential force with memory
-    // =============================================================================================
     // Check if this is a new contact (previousNormal is zero)
     bool contactExisted = (norm(contactHistory->m_previousNormal) > EPS<T>);
 
@@ -132,17 +131,19 @@ __HOSTDEVICE__ void
         contactHistory->m_tangentialDisplacement = qrot >> contactHistory->m_tangentialDisplacement;
     }
 
-    // Add contribution of current timestep (using dt from GrainsParameters)
-    T dt = GrainsParameters<T>::m_dt;
-    contactHistory->m_tangentialDisplacement += dt * m_kt * v_t;
+    // Add contribution of current timestep
+    contactHistory->m_tangentialDisplacement += m_dt * m_kt * v_t;
 
     // Update the normal vector in history
     contactHistory->m_previousNormal = normal;
 
     // Compute tangential force direction
-    Vector3<T> tentativeFT
-        = -contactHistory->m_tangentialDisplacement + (-T(2) * m_etat * averageMass) * v_t;
-    T          normFT     = norm(tentativeFT);
+    // If m_etat = -1, we compute its value such that gamma_n = gamma_t, i.e., same damping in the
+    // normal and tangential directions
+    T          etat        = (m_etat == T(-1)) ? (-m_muen * sqrt(m_kn / averageMass)) : m_etat;
+    Vector3<T> viscousFT   = (-T(2) * etat * averageMass) * v_t;
+    Vector3<T> tentativeFT = -contactHistory->m_tangentialDisplacement + viscousFT;
+    T          normFT      = norm(tentativeFT);
     Vector3<T> tangentDir = (normFT > EPS<T>) ? tentativeFT / normFT : Vector3<T>(T(0), T(0), T(0));
 
     // Compute tangential force with Coulomb limit
@@ -162,9 +163,7 @@ __HOSTDEVICE__ void
         }
     }
 
-    // =============================================================================================
     // 3) Compute rolling resistance torque with memory (if applicable)
-    // =============================================================================================
     delM = Vector3<T>(T(0), T(0), T(0));
     if(m_mur > EPS<T>)
     {
@@ -185,7 +184,7 @@ __HOSTDEVICE__ void
         }
 
         // Update rolling friction spring
-        contactHistory->m_rollingDisplacement -= kr * dt * relAngVelocity;
+        contactHistory->m_rollingDisplacement -= kr * m_dt * relAngVelocity;
         T normMk = norm(contactHistory->m_rollingDisplacement);
 
         // Apply saturation

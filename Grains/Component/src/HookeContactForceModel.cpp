@@ -107,7 +107,10 @@ __HOSTDEVICE__ void
     T normFN = norm(delFN);
 
     // Tangential dissipative force
-    delFT    = (-T(2) * m_etat * averageMass) * v_t;
+    // If m_etat = -1, we compute its value such that gamma_n = gamma_t, i.e., same damping in the
+    // normal and tangential directions
+    T etat   = (m_etat == T(-1)) ? (-m_muen * sqrt(m_kn / averageMass)) : m_etat;
+    delFT    = (-T(2) * etat * averageMass) * v_t;
     T normFT = norm(delFT);
 
     // Tangential Coulomb saturation
@@ -116,6 +119,7 @@ __HOSTDEVICE__ void
         delFT = (-fn) * tangent;
 
     // Rolling resistance moment
+    delM = Vector3<T>(0, 0, 0);
     if(m_kr)
     {
         // Relative angular velocity at contact point

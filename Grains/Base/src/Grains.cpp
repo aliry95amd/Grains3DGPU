@@ -332,21 +332,6 @@ void Grains<T>::Construction(DOMElement* rootElement)
     GoutWI(6, "Reading collision detection completed!");
 
     // ---------------------------------------------------------------------------------------------
-    // Contact force models
-    // Calculating the proper array size for the contact force array
-    // We might need to redute it by removing the obstacle-obstacle pairs,
-    // but it should be fine by now
-    uint numMaterials     = GP::m_materialMap.size();
-    GP::m_numContactPairs = numMaterials * (numMaterials + 1) / 2;
-    DOMNode* contacts     = ReaderXML::getNode(root, "ContactForceModels");
-    if(contacts)
-    {
-        GoutWI(6, "Reading contact force models ...");
-        ContactForceModelFactory<T>::create(rootElement, m_contactForce);
-        GoutWI(6, "Reading contact force models completed!");
-    }
-
-    // ---------------------------------------------------------------------------------------------
     // Temporal setting and time integration
     DOMNode* tempSetting = ReaderXML::getNode(root, "TemporalSetting");
     if(tempSetting)
@@ -365,6 +350,22 @@ void Grains<T>::Construction(DOMElement* rootElement)
             TimeIntegratorFactory<T>::create(nTI, GP::m_dt, m_timeIntegrator);
             GoutWI(6, "Reading time integration model completed!");
         }
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // Contact Force Models
+    // NOTE: Read contact force models after time integrator, as some models might need dt
+    // Calculating the proper array size for the contact force array
+    // We might need to reduce it by removing the obstacle-obstacle pairs, but it should be fine by
+    // now
+    uint numMaterials     = GP::m_materialMap.size();
+    GP::m_numContactPairs = numMaterials * (numMaterials + 1) / 2;
+    DOMNode* contacts     = ReaderXML::getNode(root, "ContactForceModels");
+    if(contacts)
+    {
+        GoutWI(6, "Reading contact force models ...");
+        ContactForceModelFactory<T>::create(rootElement, m_contactForce);
+        GoutWI(6, "Reading contact force models completed!");
     }
 
     // ---------------------------------------------------------------------------------------------

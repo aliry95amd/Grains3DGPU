@@ -321,9 +321,9 @@ __HOSTDEVICE__ void RigidBody<T>::setProperties(uint64_t p)
 }
 
 // -------------------------------------------------------------------------------------------------
-// Computes the acceleration of the rigid body given a torce and angular
-// velocity in the body-fixed coordinate system -- In the body-fixed coordinate
-// system, the moment of inertia tensor is assumed to be diagonal.
+// Computes the acceleration of the rigid body given a torce and angular velocity in the body-fixed
+// coordinate system -- In the body-fixed coordinate system, the moment of inertia tensor is
+// assumed to be diagonal.
 template <typename T>
 __HOSTDEVICE__ Kinematics<T> RigidBody<T>::computeMomentum(const Vector3<T>& omega,
                                                            const Torce<T>&   t) const
@@ -347,8 +347,8 @@ __HOSTDEVICE__ Kinematics<T> RigidBody<T>::computeMomentum(const Vector3<T>& ome
 }
 
 // -------------------------------------------------------------------------------------------------
-// Computes the acceleration of the rigid body given the angular velocity and a
-// torce in the space-fixed coordinate system
+// Computes the acceleration of the rigid body given the angular velocity and a torce in the
+// space-fixed coordinate system
 template <typename T>
 __HOSTDEVICE__ Kinematics<T> RigidBody<T>::computeMomentum(const Vector3<T>&    omega,
                                                            const Torce<T>&      t,

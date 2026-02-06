@@ -122,6 +122,9 @@ void ComponentManagerGPU<T>::transformContactInfoToWorld()
 template <typename T>
 void ComponentManagerGPU<T>::detectCollisions()
 {
+    // Perform contact table cleanup periodically
+    this->cleanupContactTable();
+
     // Sorts particles by Morton codes for improved cache efficiency
     this->sortParticles();
 

@@ -1,8 +1,8 @@
 <Grains3D Type="Standard" Precision="Double">
 
 <Construction>
-	<Origin X="0.0" Y="0.0" Z="0.0"/>
-	<MaxCoordinate X="1.152" Y="1.152" Z="1.152"/>
+	<Origin X="-0.03" Y="-0.03" Z="0.0"/>
+	<MaxCoordinate X="0.03" Y="0.03" Z="0.15"/>
 	<Periodicity PX="0" PY="0" PZ="0"/>
 
 	<CollisionDetection>
@@ -15,67 +15,73 @@
 	<ContactForceModels>
 		<ContactForceModel Type='Hooke'>
 			<Material materialA="matP" materialB="matP"/>
-			<Parameters kn="1.2e8" en="0.85" etat="1.e6" muc="0.5" kr="0.0"/>
+			<Parameters kn="1.2e6" en="0.6" etat="-1" muc="0.5" kr="0.0"/>
 		</ContactForceModel>
 	</ContactForceModels>
 
 	<TemporalSetting>
-		<TimeInterval Start="0." End="1e-00" dt="1e-05"/>
+		<TimeInterval Start="0." End="5.e-1" dt="1e-6"/>
 		<TimeIntegration Type="FirstOrderExplicit"/>
 	</TemporalSetting>
 
 	<Particles>
 		<Particle Number="1" Density="1163.66" Material="matP">
 			<Convex CrustThickness="1.e-4">
-				<Superquadric a="0.04" b="0.04" c="0.0265" n1="8" n2="2"/>
+				<Cylinder Radius="0.004" Height="0.0053"/>
 			</Convex>
+			<Transformation>
+				<Centre X="-0.02" Y="-0.02" Z="0.015"/>
+				<AngularPosition Type="Angles" aX="30." aY="0." aZ="30."/>
+			</Transformation>
 		</Particle>
 	</Particles>
+	<!-- <Cylinder Radius="0.004" Height="0.0053"/> -->
+	<!-- <Superquadric a="0.004" b="0.004" c="0.00265" n1="8" n2="2"/> -->
 
 	<Obstacles>
 		<Obstacle Material="matP">
-			<Convex CrustThickness="1.e-5">
-				<Rectangle LX="1.152" LY="1.152" LZ="0.0"/>
+			<Convex CrustThickness="1.e-4">
+				<Rectangle LX="0.06" LY="0.06" LZ="0.001"/>
 			</Convex>
 			<Transformation>
-				<Centre X="0.576" Y="0.576" Z="0.0"/>
-				<AngularPosition Type="Angle" aX="0." aY="0." aZ="0"/>
+				<Centre X="0" Y="0" Z="0"/>
+				<AngularPosition Type="Angles" aX="0." aY="0." aZ="0"/>
 			</Transformation>
 		</Obstacle>
 		<Obstacle Material="matP">
-			<Convex CrustThickness="1.e-5">
-				<Rectangle LX="1.152" LY="1.152" LZ="0.001"/>
+			<Convex CrustThickness="1.e-4">
+				<Rectangle LX="0.15" LY="0.06" LZ="0.001"/>
 			</Convex>
 			<Transformation>
-				<Centre X="1.152" Y="0.576" Z="0.576"/>
-				<AngularPosition Type="Angle" aX="0." aY="-90." aZ="0."/>
+				<Centre X="0.03" Y="0.0" Z="0.075"/>
+				<AngularPosition Type="Angles" aX="0." aY="-90." aZ="0."/>
 			</Transformation>
 		</Obstacle>
 		<Obstacle Material="matP">
-			<Convex CrustThickness="1.e-5">
-				<Rectangle LX="1.152" LY="1.152" LZ="0.001"/>
+			<Convex CrustThickness="1.e-4">
+				<Rectangle LX="0.15" LY="0.06" LZ="0.001"/>
 			</Convex>
 			<Transformation>
-				<Centre X="0.0" Y="0.576" Z="0.576"/>
-				<AngularPosition Type="Angle" aX="0." aY="90." aZ="0."/>
+				<Centre X="-0.03" Y="0.0" Z="0.075"/>
+				<AngularPosition Type="Angles" aX="0." aY="90." aZ="0."/>
 			</Transformation>
 		</Obstacle>
 		<Obstacle Material="matP">
-			<Convex CrustThickness="1.e-5">
-				<Rectangle LX="1.152" LY="1.152" LZ="0.001"/>
+			<Convex CrustThickness="1.e-4">
+				<Rectangle LX="0.06" LY="0.15" LZ="0.001"/>
 			</Convex>
 			<Transformation>
-				<Centre X="0.576" Y="1.152" Z="0.576"/>
-				<AngularPosition Type="Angle" aX="90." aY="0." aZ="0."/>
+				<Centre X="0.0" Y="0.03" Z="0.075"/>
+				<AngularPosition Type="Angles" aX="90." aY="0." aZ="0."/>
 			</Transformation>
 		</Obstacle>
 		<Obstacle Material="matP">
-			<Convex CrustThickness="1.e-5">
-				<Rectangle LX="1.152" LY="1.152" LZ="0.001"/>
+			<Convex CrustThickness="1.e-4">
+				<Rectangle LX="0.06" LY="0.15" LZ="0.001"/>
 			</Convex>
 			<Transformation>
-				<Centre X="0.576" Y="0.0" Z="0.576"/>
-				<AngularPosition Type="Angle" aX="-90." aY="0." aZ="0."/>
+				<Centre X="0.0" Y="-0.03" Z="0.075"/>
+				<AngularPosition Type="Angles" aX="-90." aY="0." aZ="0."/>
 			</Transformation>
 		</Obstacle>
 	</Obstacles>
@@ -90,12 +96,12 @@
 		<InitialPosition Type="Random" Seed="UserDefined" Value="1">
 			<Windows>
 				<Window Type="Box">
-					<MinPoint X="0.0" Y="0.0" Z="0.0"/>
-					<MaxPoint X="1.10" Y="1.10" Z="1.10"/>
+					<MinPoint X="-0.0" Y="-0.0" Z="0.015"/>
+					<MaxPoint X="-0.0" Y="-0.0" Z="0.015"/>
 				</Window>
 			</Windows>
 		</InitialPosition>
-        <InitialOrientation Type="Random" Seed="UserDefined" Value="1">
+        <InitialOrientation Type="Zero" Seed="UserDefined" Value="1">
 			<Windows>
 				<Window Type="Box">
 					<MinPoint X="0" Y="0" Z="0"/>
@@ -105,7 +111,7 @@
 		</InitialOrientation>
 	</ParticleInsertion>
 	<PostProcessing>
-		<TimeSave dt="1e-2"/>
+		<TimeSave dt="5e-3"/>
 		<Writers>
 			<Paraview Directory="./Grains/Init" RootName="S4_N2"/>
 			<RawData  Directory="./Grains/Init" RootName="S4_N2"/>

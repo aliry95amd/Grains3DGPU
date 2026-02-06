@@ -29,6 +29,8 @@ template <typename T>
 std::unordered_map<std::string, uint> GrainsParameters<T>::m_materialMap;
 template <typename T>
 uint GrainsParameters<T>::m_numContactPairs = 0;
+template <typename T>
+bool GrainsParameters<T>::m_isContactWithMemory = false;
 
 /* Temporal */
 template <typename T>

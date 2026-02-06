@@ -43,6 +43,8 @@ private:
     T m_mur = T(0);
     /** \brief Rolling friction prefactor */
     T m_etarpf = T(0);
+    /** \brief Time step */
+    T m_dt;
     //@}
 
 public:
@@ -67,6 +69,18 @@ public:
         @param etarpf rolling friction prefactor */
     __HOSTDEVICE__
     HookeMemoryContactForceModel(T kn, T en, T kt, T etat, T muc, T mur = T(0), T etarpf = T(0));
+
+    /** @brief Constructor with eight values as contact parameters including dt
+        @param kn normal stiffness coefficient
+        @param en normal restitution coefficient
+        @param kt tangential stiffness coefficient
+        @param etat tangential damping coefficient
+        @param muc tangential Coulomb friction coefficient
+        @param mur rolling resistance coefficient
+        @param etarpf rolling friction prefactor
+        @param dt time step */
+    __HOSTDEVICE__
+    HookeMemoryContactForceModel(T kn, T en, T kt, T etat, T muc, T mur, T etarpf, T dt);
 
     /** @brief Destructor */
     __HOSTDEVICE__

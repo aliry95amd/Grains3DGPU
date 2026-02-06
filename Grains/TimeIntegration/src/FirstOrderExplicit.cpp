@@ -48,13 +48,14 @@ __HOSTDEVICE__ void FirstOrderExplicit<T>::Move(const Kinematics<T>& momentum,
                                                 Quaternion<T>&       rotMotion) const
 {
     T dt = TimeIntegrator<T>::m_dt;
-    // Translational velocity and motion
-    transMotion = dt * velocity.getTranslationalComponent();
+    // Semi-implicit (symplectic) Euler for better stability with stiff forces:
+    //   v_{n+1} = v_n + dt * a_n
+    //   x_{n+1} = x_n + dt * v_{n+1}
     velocity.addToTranslationalComponent(dt * momentum.getTranslationalComponent());
+    transMotion = dt * velocity.getTranslationalComponent();
 
-    // Angular velocity and motion
-    rotMotion = this->computeQuaternionChange(velocity.getAngularComponent());
     velocity.addToAngularComponent(dt * momentum.getAngularComponent());
+    rotMotion = this->computeQuaternionChange(velocity.getAngularComponent());
 }
 
 // -------------------------------------------------------------------------------------------------

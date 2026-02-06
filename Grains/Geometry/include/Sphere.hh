@@ -137,7 +137,4 @@ public:
     //@}
 };
 
-typedef Sphere<float>  SphereF;
-typedef Sphere<double> SphereD;
-
 #endif

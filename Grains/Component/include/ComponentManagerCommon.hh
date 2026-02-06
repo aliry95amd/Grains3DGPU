@@ -261,13 +261,14 @@ __HOSTDEVICE__ static INLINE void computeContactForces_common(const ContactForce
         // geometric point of contact
         const Vector3<T>& contactPt(ci.getContactPoint());
         // relative velocity at contact point
-        const Vector3<T>& relVel(vA.kinematicsAtPoint(contactPt) - vB.kinematicsAtPoint(contactPt));
+        const Vector3<T>& relVel(vA.kinematicsAtPoint(contactPt - position[idA])
+                                 - vB.kinematicsAtPoint(contactPt - position[idB]));
         // relative angular velocity
         const Vector3<T>& relAngVel(vA.getAngularComponent() - vB.getAngularComponent());
 
         // Look up or create contact history entry
         ContactHistory<T>* historyPtr = nullptr;
-        if(contactMemory.m_hashTable != nullptr)
+        if(contactMemory.m_historyData != nullptr)
         {
             uint historyIndex;
             contactMemory.findOrInsert(pair, historyIndex);
@@ -284,6 +285,84 @@ __HOSTDEVICE__ static INLINE void computeContactForces_common(const ContactForce
                                           historyPtr,
                                           torce[idA],
                                           torce[idB]);
+    }
+    // reset the distance so we don't compute the torce twice
+    ci.setOverlapDistance(T(0));
+}
+
+// -------------------------------------------------------------------------------------------------
+/** @brief Computes the contact forces
+    @param CF contact force models
+    @param pairList list of pairs
+    @param contactInfo contact information in the world frame
+    @param position position of the components
+    @param velocity kinematics of the components
+    @param torceA torce acting on the first component
+    @param torceB torce acting on the second component
+    @param contactMemory view of contact memory (hash table + history data)
+    @param pairID ID of the pair */
+template <typename T>
+__HOSTDEVICE__ static INLINE void computeContactForces_common(const ContactForceModel<T>* const* CF,
+                                                              const uint2*          pairList,
+                                                              const ContactInfo<T>* contactInfo,
+                                                              const Vector3<T>*     position,
+                                                              const Kinematics<T>*  velocity,
+                                                              Torce<T>*             torceA,
+                                                              Torce<T>*             torceB,
+                                                              ContactMemoryView<T>  contactMemory,
+                                                              const uint            pairID)
+{
+    using CMPacker = BitPacker<uint32_t,
+                               ContactInfo<T>::B_OVERLAP_SIGN,
+                               ContactInfo<T>::B_CONTACT_HASH,
+                               ContactInfo<T>::B_AVG_MASS>;
+    // Contact Details
+    ContactInfo<T> ci = contactInfo[pairID];
+    // one load of metadata
+    CMPacker metaData       = ci.getContactMetaData();
+    bool     isContact      = metaData.template get<0>();  // is in contact/negative distance
+    uint     contactForceID = metaData.template get<1>();  // material hash
+    T        avgMass        = metaData.template getFixed<2, T>(ContactInfo<T>::DEFAULT_AVG_MASS_MIN,
+                                                 ContactInfo<T>::DEFAULT_AVG_MASS_MAX);
+    avgMass = 1 / avgMass;  // converting back to average mass from its reciprocal stored value
+
+    // Compute the forces
+    if(isContact)  // On device path, this check is redundant.
+    {
+        const uint2 pair = pairList[pairID];
+        const uint  idA  = pair.x;
+        const uint  idB  = pair.y;
+
+        // velocities of the components
+        const Kinematics<T>& vA(velocity[idA]);
+        const Kinematics<T>& vB(velocity[idB]);
+        // geometric point of contact
+        const Vector3<T>& contactPt(ci.getContactPoint());
+        // relative velocity at contact point
+        const Vector3<T>& relVel(vA.kinematicsAtPoint(contactPt - position[idA])
+                                 - vB.kinematicsAtPoint(contactPt - position[idB]));
+        // relative angular velocity
+        const Vector3<T>& relAngVel(vA.getAngularComponent() - vB.getAngularComponent());
+
+        // Look up or create contact history entry
+        ContactHistory<T>* historyPtr = nullptr;
+        if(contactMemory.m_historyData != nullptr)
+        {
+            uint historyIndex;
+            contactMemory.findOrInsert(pair, historyIndex);
+            historyPtr = &(contactMemory.m_historyData[historyIndex]);
+        }
+
+        // note that we will add torce to obstacles as well.
+        CF[contactForceID]->computeForces(ci,
+                                          relVel,
+                                          relAngVel,
+                                          position[idA],
+                                          position[idB],
+                                          avgMass,
+                                          historyPtr,
+                                          torceA[pairID],
+                                          torceB[pairID]);
     }
     // reset the distance so we don't compute the torce twice
     ci.setOverlapDistance(T(0));
@@ -364,8 +443,9 @@ __HOSTDEVICE__ static INLINE void moveParticles_common(const TimeIntegrator<T>* 
 
     position[cID] += transMotion;
     quaternion[cID] *= rotMotion;
-
-    const T* rotMotionBuffer = rotMotion.getBuffer();
+    T qn = norm(quaternion[cID]);
+    if(qn > EPS<T>)
+        quaternion[cID] *= (T(1) / qn);
 }
 
 #endif

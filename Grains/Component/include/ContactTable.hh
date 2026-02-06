@@ -22,7 +22,7 @@ struct ContactEntry
     uint2 m_key;
     /** \brief Index into the ContactForce array */
     uint m_index;
-    /** \brief Validity flag for the contact entry */
+    /** \brief Validity and activity flag: 0=empty, 1=stale (not touched this step), 2=active */
     uint m_valid;
     //@}
 
@@ -156,8 +156,8 @@ struct ContactMemoryView
             if(e.m_valid == 0)
                 return false;
 
-            // Key found
-            if(e.m_valid == 1 && e.m_key.x == key.x && e.m_key.y == key.y)
+            // Key found (either stale or active)
+            if((e.m_valid == 1 || e.m_valid == 2) && e.m_key.x == key.x && e.m_key.y == key.y)
             {
 #ifdef __CUDA_ARCH__
                 // Ensure all writes are visible before reading (GPU only)
@@ -195,8 +195,8 @@ struct ContactMemoryView
             // Empty slot - try to claim it atomically
             if(e.m_valid == 0)
             {
-                // Atomic compare-and-swap: if e.m_valid is 0, set it to 1
-                if(atomicCAS(&e.m_valid, 0u, 1u) == 0u)
+                // Atomic compare-and-swap: if e.m_valid is 0, set it to 2 (active)
+                if(atomicCAS(&e.m_valid, 0u, 2u) == 0u)
                 {
                     // Successfully claimed this slot
                     e.m_key = key;
@@ -213,10 +213,18 @@ struct ContactMemoryView
                 }
                 // Another thread claimed it, continue probing
             }
-            // Slot already occupied - check if it's our key
+            // Stale entry - reactivate it
             else if(e.m_valid == 1 && e.m_key.x == key.x && e.m_key.y == key.y)
             {
-                // Ensure we read the fully written data
+                // Mark as active for this timestep
+                atomicExch(&e.m_valid, 2u);
+                __threadfence();
+                index = e.m_index;
+                return true;
+            }
+            // Already active - just return the index
+            else if(e.m_valid == 2 && e.m_key.x == key.x && e.m_key.y == key.y)
+            {
                 __threadfence();
                 index = e.m_index;
                 return true;
@@ -226,14 +234,21 @@ struct ContactMemoryView
             // Empty slot - claim it
             if(e.m_valid == 0)
             {
-                e.m_valid = 1;
+                e.m_valid = 2;  // Mark as active
                 e.m_key   = key;
                 e.m_index = (*m_nextIndex)++;
                 index     = e.m_index;
                 return true;
             }
-            // Slot already occupied - check if it's our key
+            // Stale entry - reactivate it
             else if(e.m_valid == 1 && e.m_key.x == key.x && e.m_key.y == key.y)
+            {
+                e.m_valid = 2;  // Mark as active
+                index     = e.m_index;
+                return true;
+            }
+            // Already active - just return the index
+            else if(e.m_valid == 2 && e.m_key.x == key.x && e.m_key.y == key.y)
             {
                 index = e.m_index;
                 return true;
@@ -376,6 +391,10 @@ public:
 
     /** @brief Resets the index counter */
     void resetIndexCounter();
+
+    /** @brief Performs mark-and-sweep cleanup: demotes active to stale, removes stale to empty.
+        Should be called at the beginning of each timestep before contact detection */
+    void markAndSweep();
     //@}
 };
 
