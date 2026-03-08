@@ -10,7 +10,7 @@
 enum TimeIntegratorType
 {
     FIRSTORDEREXPLICIT,
-    SECONDORDEREXPLICIT
+    SECONDORDERLEAPFROG
 };
 
 // =================================================================================================
@@ -83,6 +83,13 @@ public:
                       Vector3<T>&          transMotion,
                       Quaternion<T>&       rotMotion) const
         = 0;
+
+    /** @brief Performs the second velocity half-kick for split-step schemes (e.g. leapfrog).
+        For single-pass schemes (e.g. FirstOrderExplicit) this does nothing.
+        @param momentum acceleration at the new position
+        @param velocity velocity to update in-place */
+    __HOSTDEVICE__
+    virtual void AdvanceVelocity(const Kinematics<T>& momentum, Kinematics<T>& velocity) const {}
     //@}
 };
 

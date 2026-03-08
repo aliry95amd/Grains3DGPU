@@ -92,25 +92,59 @@ void GrainsGPU<T>::simulate()
     Gout("Starting the simulation on GPU");
     Gout(std::string(80, '='));
 
-    // first, inserting partilces
+    // first, inserting particles
     Grains<T>::m_components->insertParticles(Grains<T>::m_insertion);
     // Copying to device
     cout << "Copying the inserted particles to the device ..." << endl;
     Grains<T>::m_components->copyTo(m_d_components);
     cout << "Copying completed!" << endl;
     cout << "\nTime \t TO \tend \tParticles \tIn \tOut" << endl;
-    for(SS.time = GP::m_tStart; SS.time <= GP::m_tEnd; SS.time += GP::m_dt)
-    {
-        // Output time
-        ostringstream oss;
-        oss.width(10);
-        oss << left << SS.time;
-        std::cout << '\r' << oss.str() << "  \t" << GP::m_tEnd << std::flush;
 
+    // Pre-compute forces on the initial configuration so the first moveParticles call (and the
+    // KDK first half-kick) has valid accelerations.
+    if(GP::m_isLeapFrog)
+    {
         m_d_components->detectCollisions();
         m_d_components->computeContactForces(m_d_contactForce);
         m_d_components->addExternalForces();
-        m_d_components->moveParticles(m_d_timeIntegrator);
+    }
+
+    // Write initial state (t = tStart) before advancing
+    SS.time = GP::m_tStart;
+    Grains<T>::postProcess(Grains<T>::m_components);
+
+    uint stepCount = 0;
+    for(SS.time = GP::m_tStart + GP::m_dt; SS.time <= GP::m_tEnd; SS.time += GP::m_dt)
+    {
+        stepCount++;
+        // Output time
+        if(GP::m_verbosityFrequency > 0 && (stepCount % GP::m_verbosityFrequency == 0))
+        {
+            ostringstream oss;
+            oss.width(10);
+            oss << left << SS.time;
+            std::cout << oss.str() << "  \t" << GP::m_tEnd << std::endl;
+        }
+
+        if(GP::m_isLeapFrog)
+        {
+            // KDK Step 1: half-kick + drift using f_n (from pre-loop or previous step).
+            m_d_components->moveParticles(m_d_timeIntegrator);
+            // Detect collisions and compute forces at x_{n+1}.
+            m_d_components->detectCollisions();
+            m_d_components->computeContactForces(m_d_contactForce);
+            m_d_components->addExternalForces();
+            // KDK Step 3: second half-kick using f_{n+1}.
+            m_d_components->advanceVelocity(m_d_timeIntegrator);
+        }
+        else
+        {
+            // Single-pass scheme: compute forces at x_n, then advance.
+            m_d_components->detectCollisions();
+            m_d_components->computeContactForces(m_d_contactForce);
+            m_d_components->addExternalForces();
+            m_d_components->moveParticles(m_d_timeIntegrator);
+        }
 
         // Post-Processing
         Grains<T>::postProcess(m_d_components);

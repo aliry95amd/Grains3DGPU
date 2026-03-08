@@ -148,7 +148,6 @@ template class Torce<double>;
 
 #define X(T)                                                                          \
     template std::ostream& operator<< <T>(std::ostream & fileOut, const Torce<T>& t); \
-                                                                                      \
     template std::istream& operator>> <T>(std::istream & fileIn, Torce<T> & t);
 X(float)
 X(double)

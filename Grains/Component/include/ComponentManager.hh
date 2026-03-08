@@ -599,6 +599,13 @@ public:
     /** @brief Updates the position and velocities of particles
         @param TI time integration scheme */
     virtual void moveParticles(const GrainsMemBuffer<TimeIntegrator<T>*, M>& TI) = 0;
+
+    // ---------------------------------------------------------------------------------------------
+    /** @brief Performs the second velocity half-kick for split-step schemes (e.g. Leapfrog).
+        For single-pass schemes (e.g. FirstOrderExplicit) this is a no-op because
+        TimeIntegrator::AdvanceVelocity defaults to an empty body.
+        @param TI time integration scheme */
+    virtual void advanceVelocity(const GrainsMemBuffer<TimeIntegrator<T>*, M>& TI) = 0;
     //@}
 };
 

@@ -174,6 +174,8 @@ public:
     /* Post-Processing */
     /** \brief Queue of simulation time to write Post-Processing */
     static std::queue<T> m_tSave;
+    /** @brief Frequency of time output (print every N steps, 0=never, 1=every step) */
+    static uint m_verbosityFrequency;
     //@}
 };
 

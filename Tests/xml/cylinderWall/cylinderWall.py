@@ -109,6 +109,7 @@ def main():
 
     fig = plt.figure(figsize=(5, 5))
     ax1 = fig.add_subplot(111)
+    ax1.plot(theta / math.pi * 180, analResults, linewidth=1, linestyle="--", c="k", zorder=1, label="Analytical solution")
     ax1.plot(
         thetaArray,
         simResults.flatten(),
@@ -116,16 +117,17 @@ def main():
         c="tab:blue",
         marker="o",
         markerfacecolor="tab:blue",
+        zorder=2,
         label="Numerical solution",
     )
-    ax1.plot(theta / math.pi * 180, analResults, linewidth=1, linestyle="--", c="k", label="Analytical solution")
     ax1.set_xlabel(r"$\theta$, Impact angle [deg]")
     ax1.set_ylabel(r"$V^+_z/V^-_z$, Dimensionless rebound speed [-]")
     ax1.set_xlim(-5, 95)
     ax1.set_xticks(np.arange(0, 91, step=10))
     ax1.set_ylim(-0.9, 0.9)
     ax1.set_box_aspect(1)
-    ax1.legend()
+    handles, labels = ax1.get_legend_handles_labels()
+    ax1.legend(handles[1:] + [handles[0]], labels[1:] + [labels[0]])
     ax1.grid(color="lightgrey", linestyle="--", linewidth=0.5)
 
     out_dir = os.path.join(plots_root)

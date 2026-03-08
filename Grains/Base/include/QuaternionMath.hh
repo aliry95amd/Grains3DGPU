@@ -439,9 +439,9 @@ __HOSTDEVICE__ static INLINE void FusedMinkowskiDifference(const Vector3<T>&    
     const T* __RESTRICT__ ba = a.getBuffer();
     const T* __RESTRICT__ bv = v.getBuffer();
     T* __RESTRICT__       bw = const_cast<T*>(w.getBuffer());
-    bw[0]                    = ba[0] - bb[0] - bq[3] * tx - bq[1] * tz + bq[2] * ty + bv[0];
-    bw[1]                    = ba[1] - bb[1] - bq[3] * ty - bq[2] * tx + bq[0] * tz + bv[1];
-    bw[2]                    = ba[2] - bb[2] - bq[3] * tz - bq[0] * ty + bq[1] * tx + bv[2];
+    bw[0]                    = ba[0] - bb[0] - bq[3] * tx - bq[1] * tz + bq[2] * ty - bv[0];
+    bw[1]                    = ba[1] - bb[1] - bq[3] * ty - bq[2] * tx + bq[0] * tz - bv[1];
+    bw[2]                    = ba[2] - bb[2] - bq[3] * tz - bq[0] * ty + bq[1] * tx - bv[2];
 }
 
 // -------------------------------------------------------------------------------------------------

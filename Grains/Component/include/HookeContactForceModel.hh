@@ -103,7 +103,6 @@ public:
         @param relAngVelocity relative angular velocity
         @param vA position of the first component
         @param vB position of the second component
-        @param averageMass average mass of the two components
         @param contactHistory pointer to contact history (unused, always nullptr)
         @param torceA computed force and torque for the first component
         @param torceB computed force and torque for the second component */
@@ -113,7 +112,6 @@ public:
                        const Vector3<T>&     relAngVelocity,
                        const Vector3<T>&     vA,
                        const Vector3<T>&     vB,
-                       const T               averageMass,
                        ContactHistory<T>*    contactHistory,
                        Torce<T>&             torceA,
                        Torce<T>&             torceB) const final;

@@ -80,6 +80,8 @@ DEFAULT_CONFIG: Dict[str, Any] = {
 
     "SimulationSettings": {
         "ForceInsertion": "0",
+        "VerbosityFrequency": 1000,
+        "OutputPrecision": 6,
         # The following sections may be strings or lists (lists become XML fragments)
         "PositionSection": "",
         "OrientationSection": "",
@@ -204,6 +206,7 @@ class TemplatePopulator:
         # Simulation settings and sections
         ss = self.config.get("SimulationSettings", {})
         m["force_insertion"] = ss.get("ForceInsertion", "false")
+        m["verbosity_frequency"] = ss.get("VerbosityFrequency", 1000)
 
         # Sections: if the config provides lists, assemble XML lines; if strings, use as-is.
         def build_section(key: str, tag: str) -> str:
@@ -244,16 +247,18 @@ class TemplatePopulator:
         Produces lines like: <RawData Directory ="..." RootName="..."/>
         """
         lines = []
+        default_precision = self.config.get("SimulationSettings", {}).get("OutputPrecision", 6)
         for w in writers_list:
             typ = w.get("Type", "Raw")
             directory = w.get("Directory", "./results")
             root = w.get("RootName", "output")
             if typ.lower() in ("raw", "rawdata"):
-                lines.append(f'            <RawData Directory ="{directory}" RootName="{root}"/>')
+                precision = w.get("Precision", default_precision)
+                lines.append(f'            <RawData Directory ="{directory}" RootName="{root}" Precision="{precision}"/>')
             elif typ.lower() in ("paraview", "para", "pv"):
                 lines.append(f'            <Paraview Directory ="{directory}" RootName="{root}"/>')
             else:
-                lines.append(f'            <RawData Directory ="{directory}" RootName="{root}"/>')
+                lines.append(f'            <RawData Directory ="{directory}" RootName="{root}" Precision="{default_precision}"/>')
         return lines
 
     def render_from_template(self, tpl: str) -> str:

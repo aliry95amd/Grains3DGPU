@@ -383,6 +383,33 @@ __GLOBAL__ void moveParticles_Kernel(const TimeIntegrator<T>* const* TI,
 
     moveParticles_common(TI, rigidBody, position, quaternion, velocity, torce, nObstacles + pID);
 }
+
+// -------------------------------------------------------------------------------------------------
+/** @brief Performs the second velocity half-kick for split-step schemes (KDK Leapfrog Step 3).
+    For single-pass schemes the underlying AdvanceVelocity is a no-op.
+    @param TI time integrator scheme
+    @param rigidBody array of rigid bodies for components
+    @param quaternion array of components quaternions
+    @param velocity array of components velocities
+    @param torce array of components torces (read but NOT reset)
+    @param nObstacles number of obstacles
+    @param nParticles number of particles */
+template <typename T>
+__GLOBAL__ void advanceVelocity_Kernel(const TimeIntegrator<T>* const* TI,
+                                       const RigidBody<T>* const*      rigidBody,
+                                       const Quaternion<T>*            quaternion,
+                                       Kinematics<T>*                  velocity,
+                                       const Torce<T>*                 torce,
+                                       const uint                      nObstacles,
+                                       const uint                      nParticles)
+{
+    uint pID = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if(pID >= nParticles)
+        return;
+
+    advanceVelocity_common(TI, rigidBody, quaternion, velocity, torce, nObstacles + pID);
+}
 //@}
 
 #endif

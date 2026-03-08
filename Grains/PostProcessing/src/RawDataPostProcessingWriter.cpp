@@ -16,9 +16,12 @@ RawDataPostProcessingWriter<T>::RawDataPostProcessingWriter(DOMNode* dn)
 {
     m_directory = ReaderXML::getNodeAttr_String(dn, "Directory");
     m_rootName  = ReaderXML::getNodeAttr_String(dn, "RootName");
+    if(ReaderXML::hasNodeAttr(dn, "Precision"))
+        m_ndigits = ReaderXML::getNodeAttr_Int(dn, "Precision");
     GoutWI(9, "Type = RawData");
     GoutWI(12, "Output file directory name =", m_directory);
     GoutWI(12, "Output file root name =", m_rootName);
+    GoutWI(12, "Output precision (digits) =", m_ndigits);
 }
 
 // -------------------------------------------------------------------------------------------------

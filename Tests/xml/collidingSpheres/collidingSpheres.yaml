@@ -1,7 +1,6 @@
 # Colliding Spheres Test Configuration
 # Two spheres colliding head-on with initial velocities
 
-# Define reusable particle template using YAML anchor
 _particle_template: &sphere_particle
   Density: 1000
   Material: matP

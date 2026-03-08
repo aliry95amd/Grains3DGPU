@@ -75,20 +75,15 @@ __HOSTDEVICE__ T Rectangle<T>::computeVolume() const
 }
 
 // -------------------------------------------------------------------------------------------------
-// Computes the inertia tensor and the inverse of the inertia tensor
+// Computes the diagonal inertia tensor
 template <typename T>
-__HOSTDEVICE__ void Rectangle<T>::computeInertia(T (&inertia)[6], T (&inertia_1)[6]) const
+__HOSTDEVICE__ void Rectangle<T>::computeInertia(T (&inertia)[3]) const
 {
     // Active 2D plane is XY -> rotation around Z
-    inertia[1] = inertia[2] = inertia[4] = T(0);
-    inertia[0]                           = T(4) / T(3) * m_LX * m_LY * m_LY * m_LY;
-    inertia[3]                           = T(4) / T(3) * m_LX * m_LX * m_LX * m_LY;
-    inertia[5]                           = T(2) / T(3) * m_LX * m_LY * (m_LX * m_LX + m_LY * m_LY);
-
-    inertia_1[1] = inertia_1[2] = inertia_1[4] = T(0);
-    inertia_1[0]                               = T(1) / inertia[0];
-    inertia_1[3]                               = T(1) / inertia[3];
-    inertia_1[5]                               = T(1) / inertia[5];
+    // Diagonal components: Ixx, Iyy, Izz
+    inertia[0] = T(4) / T(3) * m_LX * m_LY * m_LY * m_LY;
+    inertia[1] = T(4) / T(3) * m_LX * m_LX * m_LX * m_LY;
+    inertia[2] = T(2) / T(3) * m_LX * m_LY * (m_LX * m_LX + m_LY * m_LY);
 }
 
 // -------------------------------------------------------------------------------------------------

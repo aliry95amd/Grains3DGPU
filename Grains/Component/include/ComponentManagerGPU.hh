@@ -105,6 +105,10 @@ public:
     /** @brief Updates the position and velocities of particles
         @param TI time integration scheme */
     void moveParticles(const GrainsMemBuffer<TimeIntegrator<T>*, MemType::DEVICE>& TI) final;
+
+    /** @brief Performs the second velocity half-kick (KDK Step 3; no-op for single-pass schemes)
+        @param TI time integration scheme */
+    void advanceVelocity(const GrainsMemBuffer<TimeIntegrator<T>*, MemType::DEVICE>& TI) final;
     //@}
 };
 

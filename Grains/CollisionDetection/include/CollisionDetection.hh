@@ -1,6 +1,8 @@
 #ifndef _COLLISIONDETECTION_HH_
 #define _COLLISIONDETECTION_HH_
 
+#include <tuple>
+
 #include "ContactInfo.hh"
 #include "GJK.hh"
 #include "GrainsUtils.hh"
@@ -21,63 +23,43 @@
 // =================================================================================================
 /** @name CollisionDetection Low-Level Methods */
 //@{
-/** @brief Template alias for ContactMetaDataPacker */
-template <typename T>
-using ContactMetaDataPacker = BitPacker<uint32_t,
-                                        ContactInfo<T>::B_OVERLAP_SIGN,
-                                        ContactInfo<T>::B_CONTACT_HASH,
-                                        ContactInfo<T>::B_AVG_MASS>;
-
-/** @brief Helper function to extract rigid body properties and build contact metadata. This
-    function extracts material, mass, and crust properties from two rigid bodies and constructs the
-    contact metadata including material hash and average mass.
+/** @brief Helper that extracts commonly-used rigid-body properties for contact handling.
     @param rbA first rigid body
-    @param rbB second rigid body
-    @param crustA output crust thickness for body A
-    @param crustB output crust thickness for body B
-    @param contactMetaData output contact metadata */
+    @param rbB second rigid body */
 template <typename T>
-__HOSTDEVICE__ static INLINE void buildContactMetaData(const RigidBody<T>&       rbA,
-                                                       const RigidBody<T>&       rbB,
-                                                       T&                        crustA,
-                                                       T&                        crustB,
-                                                       ContactMetaDataPacker<T>& contactMetaData)
+__HOSTDEVICE__ static INLINE auto getPropertiesForContact(const RigidBody<T>& rbA,
+                                                          const RigidBody<T>& rbB)
 {
-    // Load all properties at once using BitPacker
-    using RBPacker
-        = BitPacker<uint64_t, RigidBody<T>::B_MAT, RigidBody<T>::B_MASS, RigidBody<T>::B_CRUST>;
+    auto sa = rbA.getPropertiesSnapshot();
+    auto sb = rbB.getPropertiesSnapshot();
 
-    // Component A
-    const RBPacker& propertiesA = rbA.getProperties();
-    crustA          = propertiesA.template getFixed<2, T>(RigidBody<T>::DEFAULT_CRUST_MIN,
-                                                 RigidBody<T>::DEFAULT_CRUST_MAX);
-    float massA     = propertiesA.template getFixed<1, T>(RigidBody<T>::DEFAULT_MASS_MIN,
-                                                      RigidBody<T>::DEFAULT_MASS_MAX);
-    uint  materialA = propertiesA.template get<0>();
+    const Convex<T>* convexA     = sa.convex;
+    const Convex<T>* convexB     = sb.convex;
+    T                crustA      = sa.crustThickness;
+    T                crustB      = sb.crustThickness;
+    T                circRadiusA = sa.circumscribedRadius;
+    T                circRadiusB = sb.circumscribedRadius;
 
-    // Component B
-    const RBPacker& propertiesB = rbB.getProperties();
-    crustB          = propertiesB.template getFixed<2, T>(RigidBody<T>::DEFAULT_CRUST_MIN,
-                                                 RigidBody<T>::DEFAULT_CRUST_MAX);
-    float massB     = propertiesB.template getFixed<1, T>(RigidBody<T>::DEFAULT_MASS_MIN,
-                                                      RigidBody<T>::DEFAULT_MASS_MAX);
-    uint  materialB = propertiesB.template get<0>();
+    T massA          = sa.mass;
+    T massB          = sb.mass;
+    T invMassA       = (massA == T(0)) ? T(0) : T(1) / massA;
+    T invMassB       = (massB == T(0)) ? T(0) : T(1) / massB;
+    T invReducedMass = 1 / (invMassA + invMassB);
 
-    // Compute symmetric material hash (order-independent)
-    uint matHash = triangularHash(materialA, materialB);
-    // Compute inverse reduced mass (with protection against infinity mass (obstacle))
-    massA = (massA == 0.f) ? 0.f : 1.f / massA;
-    massB = (massB == 0.f) ? 0.f : 1.f / massB;
+    T    invRadA       = (circRadiusA == T(0)) ? T(0) : T(1) / circRadiusA;
+    T    invRadB       = (circRadiusB == T(0)) ? T(0) : T(1) / circRadiusB;
+    T    averageRadius = 1 / (invRadA + invRadB);
+    uint materialHash  = triangularHash(sa.material, sb.material);
 
-    // Set inverse reduced mass with quantization (store 1/avgMass for better range)
-    bool saturated = false;
-    contactMetaData.template set<1>(matHash);
-    float invReducedMass = massA + massB;  // Store inverse to avoid small values
-    contactMetaData.template setFixed<2, T>(invReducedMass,
-                                            ContactInfo<T>::DEFAULT_AVG_MASS_MIN,
-                                            ContactInfo<T>::DEFAULT_AVG_MASS_MAX,
-                                            saturated);
-    GAssert(!saturated, "Inverse reduced mass saturation in contact metadata");
+    return std::make_tuple(convexA,
+                           crustA,
+                           circRadiusA,
+                           convexB,
+                           crustB,
+                           circRadiusB,
+                           invReducedMass,
+                           averageRadius,
+                           materialHash);
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -191,28 +173,38 @@ __HOSTDEVICE__ inline void closestPointsRigidBodies(const RigidBody<T>&  rbA,
     positive and we do not care about the direction of overlap_vector. Assuming A and B are the
     centers of the 2 convex bodies overlap_vector = overlap * Vector3(A to B)
     --------------------------------------------------------------------------------------------- */
-    const Convex<T>& convexA = *(rbA.getConvex());
-    const Convex<T>& convexB = *(rbB.getConvex());
+    // Extract properties for contact and populate snapshot
+    auto [convexA_ptr,
+          crustA,
+          circRadiusA,
+          convexB_ptr,
+          crustB,
+          circRadiusB,
+          averageMass,
+          averageRadius,
+          contactHash]
+        = getPropertiesForContact(rbA, rbB);
+    typename ContactInfo<T>::Snapshot snapshot;
+    snapshot.averageMass     = averageMass;
+    snapshot.averageRadius   = averageRadius;
+    snapshot.contactHash     = contactHash;
+    snapshot.overlapDistance = std::numeric_limits<T>::max();
+
+    // Get convexes and their types
+    const Convex<T>& convexA = *(convexA_ptr);
+    const Convex<T>& convexB = *(convexB_ptr);
     const ConvexType typeA   = convexA.getConvexType();
     const ConvexType typeB   = convexB.getConvexType();
-
-    // Extract properties and build contact metadata using helper function
-    T                        crustA, crustB;
-    ContactMetaDataPacker<T> contactMetaData;
-    buildContactMetaData(rbA, rbB, crustA, crustB, contactMetaData);
-
-    Vector3<T> contactPoint, contactVector;
-    T          distance = std::numeric_limits<T>::max();
 
     // Sphere-Sphere Case
     if(typeA == ConvexType::SPHERE && typeB == ConvexType::SPHERE)
     {
-        T rA          = rbA.getCircumscribedRadius();
-        T rB          = rbB.getCircumscribedRadius();
-        contactVector = b2a.getOrigin();
-        distance      = norm(contactVector) - rA - rB;
-        contactPoint  = (rA + T(.5) * distance) * contactVector;
-        contactVector.normalize();
+        T rA                     = rbA.getCircumscribedRadius();
+        T rB                     = rbB.getCircumscribedRadius();
+        snapshot.contactVector   = b2a.getOrigin();
+        snapshot.overlapDistance = norm(snapshot.contactVector) - rA - rB;
+        snapshot.contactPoint    = (rA + T(.5) * snapshot.overlapDistance) * snapshot.contactVector;
+        snapshot.contactVector.normalize();
     }
     // Rectangle-Particle Case
     else if(typeA == ConvexType::RECTANGLE)
@@ -226,10 +218,10 @@ __HOSTDEVICE__ inline void closestPointsRigidBodies(const RigidBody<T>&  rbA,
             ptA = Vector3<T>(ptB[X], ptB[Y], T(0));
             if(convexA.isInside(ptA))
             {
-                contactPoint = T(0.5) * (ptA + ptB);
+                snapshot.contactPoint = T(0.5) * (ptA + ptB);
                 ptB -= ptA;
-                distance      = -norm(ptB);
-                contactVector = ptB / distance;
+                snapshot.overlapDistance = -norm(ptB);
+                snapshot.contactVector   = ptB / snapshot.overlapDistance;
             }
         }
     }
@@ -258,8 +250,8 @@ __HOSTDEVICE__ inline void closestPointsRigidBodies(const RigidBody<T>&  rbA,
         uint           crustIteration     = 0;
         do
         {
-            distance = computeDistance();
-            if(fabs(distance) >= HIGHEPS<T>)
+            snapshot.overlapDistance = computeDistance();
+            if(fabs(snapshot.overlapDistance) >= HIGHEPS<T>)
                 break;
             Gout("Warning: GJK too close bodies, increasing crust thicknesses ...");
             crustA *= 10;
@@ -268,16 +260,15 @@ __HOSTDEVICE__ inline void closestPointsRigidBodies(const RigidBody<T>&  rbA,
         } while(crustIteration < maxCrustIterations);
 
         // Actual overlap
-        distance -= crustA + crustB;
+        snapshot.overlapDistance -= crustA + crustB;
         // ptA = (a2a)(ptA);
-        ptB           = (b2a)(ptB);
-        contactPoint  = T(0.5) * (ptA + ptB);
-        contactVector = (ptA - ptB).normalized();
+        ptB                    = (b2a)(ptB);
+        snapshot.contactPoint  = T(0.5) * (ptA + ptB);
+        snapshot.contactVector = (ptA - ptB).normalized();
     }
 
-    // Set contact information and metadata
-    contactMetaData.template set<0>(distance < T(0) ? 1 : 0);
-    contactInfo.setContactInfo(contactPoint, contactVector, distance, contactMetaData.getValue());
+    // Set contact information
+    contactInfo.setSnapshot(snapshot);
     return;
 }
 
@@ -295,29 +286,41 @@ __HOSTDEVICE__ inline void closestPointsRigidBodies(const RigidBody<T>&  rbA,
                                                     const Transform3<T>& b2w,
                                                     ContactInfo<T>&      contactInfo)
 {
-    const Convex<T>& convexA = *(rbA.getConvex());
-    const Convex<T>& convexB = *(rbB.getConvex());
+    // Extract properties for contact and populate snapshot
+    auto [convexA_ptr,
+          crustA,
+          circRadiusA,
+          convexB_ptr,
+          crustB,
+          circRadiusB,
+          averageMass,
+          averageRadius,
+          contactHash]
+        = getPropertiesForContact(rbA, rbB);
+    typename ContactInfo<T>::Snapshot snapshot;
+    snapshot.averageMass     = averageMass;
+    snapshot.averageRadius   = averageRadius;
+    snapshot.contactHash     = contactHash;
+    snapshot.overlapDistance = std::numeric_limits<T>::max();
+
+    // Get convexes and their types
+    const Convex<T>& convexA = *(convexA_ptr);
+    const Convex<T>& convexB = *(convexB_ptr);
     const ConvexType typeA   = convexA.getConvexType();
     const ConvexType typeB   = convexB.getConvexType();
 
-    // Extract properties and build contact metadata using helper function
-    T                        crustA, crustB;
-    ContactMetaDataPacker<T> contactMetaData;
-    buildContactMetaData(rbA, rbB, crustA, crustB, contactMetaData);
-
-    Vector3<T> contactPoint, contactVector, ptA, ptB;
-    T          distance = std::numeric_limits<T>::max();
+    Vector3<T> ptA, ptB;
 
     // Sphere-Sphere Case
     if(typeA == ConvexType::SPHERE && typeB == ConvexType::SPHERE)
     {
-        T rA          = rbA.getCircumscribedRadius();
-        T rB          = rbB.getCircumscribedRadius();
-        ptA           = a2w.getOrigin();
-        ptB           = b2w.getOrigin() - ptA;
-        distance      = norm(ptB) - rA - rB;
-        contactPoint  = ptA + (rA + T(.5) * distance) * ptB;
-        contactVector = ptA + distance * ptB;
+        T rA                     = rbA.getCircumscribedRadius();
+        T rB                     = rbB.getCircumscribedRadius();
+        ptA                      = a2w.getOrigin();
+        ptB                      = b2w.getOrigin() - ptA;
+        snapshot.overlapDistance = norm(ptB) - rA - rB;
+        snapshot.contactPoint    = ptA + (rA + T(.5) * snapshot.overlapDistance) * ptB;
+        snapshot.contactVector   = ptA + snapshot.overlapDistance * ptB;
     }
     // Rectangle-Particle Case
     else if(typeA == ConvexType::RECTANGLE)
@@ -335,10 +338,10 @@ __HOSTDEVICE__ inline void closestPointsRigidBodies(const RigidBody<T>&  rbA,
             ptA = ((c - ptB) * r) * r + ptB;
             if(convexA.isInside(inverse(m) * (ptA - c)))
             {
-                contactPoint = T(0.5) * (ptA + ptB);
+                snapshot.contactPoint = T(0.5) * (ptA + ptB);
                 ptB -= ptA;
-                distance      = -norm(ptB);
-                contactVector = ptB / distance;
+                snapshot.overlapDistance = -norm(ptB);
+                snapshot.contactVector   = ptB / snapshot.overlapDistance;
             }
         }
     }
@@ -367,8 +370,8 @@ __HOSTDEVICE__ inline void closestPointsRigidBodies(const RigidBody<T>&  rbA,
         uint           crustIteration     = 0;
         do
         {
-            distance = computeDistance();
-            if(fabs(distance) >= HIGHEPS<T>)
+            snapshot.overlapDistance = computeDistance();
+            if(fabs(snapshot.overlapDistance) >= HIGHEPS<T>)
                 break;
             Gout("Warning: GJK too close bodies, increasing crust thicknesses ...");
             crustA *= 10;
@@ -377,16 +380,15 @@ __HOSTDEVICE__ inline void closestPointsRigidBodies(const RigidBody<T>&  rbA,
         } while(crustIteration < maxCrustIterations);
 
         // Computation of the actual overlap
-        distance -= crustA + crustB;
-        ptA           = (a2w)(ptA);
-        ptB           = (b2w)(ptB);
-        contactPoint  = T(0.5) * (ptA + ptB);
-        contactVector = (ptA - ptB).normalized();
+        snapshot.overlapDistance -= crustA + crustB;
+        ptA                    = (a2w)(ptA);
+        ptB                    = (b2w)(ptB);
+        snapshot.contactPoint  = T(0.5) * (ptA + ptB);
+        snapshot.contactVector = (ptA - ptB).normalized();
     }
 
-    // Set contact information and metadata
-    contactMetaData.template set<0>(distance < T(0) ? 1 : 0);
-    contactInfo.setContactInfo(contactPoint, contactVector, distance, contactMetaData.getValue());
+    // Set contact information
+    contactInfo.setSnapshot(snapshot);
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -403,28 +405,38 @@ __HOSTDEVICE__ inline void closestPointsRigidBodies(const RigidBody<T>&  rbA,
                                                     const Quaternion<T>& q_b2a,
                                                     ContactInfo<T>&      contactInfo)
 {
-    const Convex<T>& convexA = *(rbA.getConvex());
-    const Convex<T>& convexB = *(rbB.getConvex());
+    // Extract properties for contact and populate snapshot
+    auto [convexA_ptr,
+          crustA,
+          circRadiusA,
+          convexB_ptr,
+          crustB,
+          circRadiusB,
+          averageMass,
+          averageRadius,
+          contactHash]
+        = getPropertiesForContact(rbA, rbB);
+    typename ContactInfo<T>::Snapshot snapshot;
+    snapshot.averageMass     = averageMass;
+    snapshot.averageRadius   = averageRadius;
+    snapshot.contactHash     = contactHash;
+    snapshot.overlapDistance = std::numeric_limits<T>::max();
+
+    // Get convexes and their types
+    const Convex<T>& convexA = *(convexA_ptr);
+    const Convex<T>& convexB = *(convexB_ptr);
     const ConvexType typeA   = convexA.getConvexType();
     const ConvexType typeB   = convexB.getConvexType();
-
-    // Extract properties and build contact metadata using helper function
-    T                        crustA, crustB;
-    ContactMetaDataPacker<T> contactMetaData;
-    buildContactMetaData(rbA, rbB, crustA, crustB, contactMetaData);
-
-    Vector3<T> contactPoint, contactVector;
-    T          distance = std::numeric_limits<T>::max();
 
     // Sphere-Sphere Case
     if(typeA == ConvexType::SPHERE && typeB == ConvexType::SPHERE)
     {
-        T rA          = rbA.getCircumscribedRadius();
-        T rB          = rbB.getCircumscribedRadius();
-        contactVector = v_b2a;
-        distance      = norm(contactVector) - rA - rB;
-        contactPoint  = (rA + T(.5) * distance) * contactVector;
-        contactVector.normalize();
+        T rA                     = rbA.getCircumscribedRadius();
+        T rB                     = rbB.getCircumscribedRadius();
+        snapshot.contactVector   = v_b2a;
+        snapshot.overlapDistance = norm(snapshot.contactVector) - rA - rB;
+        snapshot.contactPoint    = (rA + T(.5) * snapshot.overlapDistance) * snapshot.contactVector;
+        snapshot.contactVector.normalize();
     }
     // Rectangle-Particle Case
     else if(typeA == ConvexType::RECTANGLE)
@@ -439,10 +451,10 @@ __HOSTDEVICE__ inline void closestPointsRigidBodies(const RigidBody<T>&  rbA,
             ptA = Vector3<T>(ptB[X], ptB[Y], T(0));
             if(convexA.isInside(ptA))
             {
-                contactPoint = T(0.5) * (ptA + ptB);
+                snapshot.contactPoint = T(0.5) * (ptA + ptB);
                 ptB -= ptA;
-                distance      = -norm(ptB);
-                contactVector = ptB / distance;
+                snapshot.overlapDistance = -norm(ptB);
+                snapshot.contactVector   = ptB / snapshot.overlapDistance;
             }
         }
     }
@@ -472,8 +484,8 @@ __HOSTDEVICE__ inline void closestPointsRigidBodies(const RigidBody<T>&  rbA,
         uint           crustIteration     = 0;
         do
         {
-            distance = computeDistance();
-            if(fabs(distance) >= HIGHEPS<T>)
+            snapshot.overlapDistance = computeDistance();
+            if(fabs(snapshot.overlapDistance) >= HIGHEPS<T>)
                 break;
             Gout("Warning: GJK too close bodies, increasing crust thicknesses ...");
             crustA *= 10;
@@ -482,16 +494,15 @@ __HOSTDEVICE__ inline void closestPointsRigidBodies(const RigidBody<T>&  rbA,
         } while(crustIteration < maxCrustIterations);
 
         // Computation of the actual overlap
-        distance -= crustA + crustB;
+        snapshot.overlapDistance -= crustA + crustB;
         // transform(q_a2a, v_a2a, ptA);
         transform(q_b2a, v_b2a, ptB);
-        contactPoint  = T(0.5) * (ptA + ptB);
-        contactVector = (ptA - ptB).normalized();
+        snapshot.contactPoint  = T(0.5) * (ptA + ptB);
+        snapshot.contactVector = (ptA - ptB).normalized();
     }
 
-    // Set contact information and metadata
-    contactMetaData.template set<0>(distance < T(0) ? 1 : 0);
-    contactInfo.setContactInfo(contactPoint, contactVector, distance, contactMetaData.getValue());
+    // Set contact information
+    contactInfo.setSnapshot(snapshot);
     return;
 }
 
@@ -513,29 +524,41 @@ __HOSTDEVICE__ inline void closestPointsRigidBodies(const RigidBody<T>&  rbA,
                                                     const Quaternion<T>& q_b2w,
                                                     ContactInfo<T>&      contactInfo)
 {
-    const Convex<T>& convexA = *(rbA.getConvex());
-    const Convex<T>& convexB = *(rbB.getConvex());
+    // Extract properties for contact and populate snapshot
+    auto [convexA_ptr,
+          crustA,
+          circRadiusA,
+          convexB_ptr,
+          crustB,
+          circRadiusB,
+          averageMass,
+          averageRadius,
+          contactHash]
+        = getPropertiesForContact(rbA, rbB);
+    typename ContactInfo<T>::Snapshot snapshot;
+    snapshot.averageMass     = averageMass;
+    snapshot.averageRadius   = averageRadius;
+    snapshot.contactHash     = contactHash;
+    snapshot.overlapDistance = std::numeric_limits<T>::max();
+
+    // Get convexes and their types
+    const Convex<T>& convexA = *(convexA_ptr);
+    const Convex<T>& convexB = *(convexB_ptr);
     const ConvexType typeA   = convexA.getConvexType();
     const ConvexType typeB   = convexB.getConvexType();
 
-    // Extract properties and build contact metadata using helper function
-    T                        crustA, crustB;
-    ContactMetaDataPacker<T> contactMetaData;
-    buildContactMetaData(rbA, rbB, crustA, crustB, contactMetaData);
-
-    Vector3<T> contactPoint, contactVector, ptA, ptB;
-    T          distance = std::numeric_limits<T>::max();
+    Vector3<T> ptA, ptB;
 
     // Sphere-Sphere Case
     if(typeA == ConvexType::SPHERE && typeB == ConvexType::SPHERE)
     {
-        T rA          = rbA.getCircumscribedRadius();
-        T rB          = rbB.getCircumscribedRadius();
-        ptA           = v_a2w;
-        ptB           = v_b2w - ptA;
-        distance      = norm(ptB) - rA - rB;
-        contactPoint  = ptA + (rA + T(.5) * distance) * ptB;
-        contactVector = ptA + distance * ptB;
+        T rA                     = rbA.getCircumscribedRadius();
+        T rB                     = rbB.getCircumscribedRadius();
+        ptA                      = v_a2w;
+        ptB                      = v_b2w - ptA;
+        snapshot.overlapDistance = norm(ptB) - rA - rB;
+        snapshot.contactPoint    = ptA + (rA + T(.5) * snapshot.overlapDistance) * ptB;
+        snapshot.contactVector   = ptA + snapshot.overlapDistance * ptB;
     }
     // Rectangle-Particle Case
     else if(typeA == ConvexType::RECTANGLE)
@@ -550,10 +573,10 @@ __HOSTDEVICE__ inline void closestPointsRigidBodies(const RigidBody<T>&  rbA,
             ptA = ((v_a2w - ptB) * r) * r + ptB;
             if(convexA.isInside(q_a2w << (ptA - v_a2w)))
             {
-                contactPoint = T(0.5) * (ptA + ptB);
+                snapshot.contactPoint = T(0.5) * (ptA + ptB);
                 ptB -= ptA;
-                distance      = -norm(ptB);
-                contactVector = ptB / distance;
+                snapshot.overlapDistance = -norm(ptB);
+                snapshot.contactVector   = ptB / snapshot.overlapDistance;
             }
         }
     }
@@ -584,8 +607,8 @@ __HOSTDEVICE__ inline void closestPointsRigidBodies(const RigidBody<T>&  rbA,
         uint           crustIteration     = 0;
         do
         {
-            distance = computeDistance();
-            if(fabs(distance) >= HIGHEPS<T>)
+            snapshot.overlapDistance = computeDistance();
+            if(fabs(snapshot.overlapDistance) >= HIGHEPS<T>)
                 break;
             Gout("Warning: GJK too close bodies, increasing crust thicknesses ...");
             crustA *= 10;
@@ -594,16 +617,15 @@ __HOSTDEVICE__ inline void closestPointsRigidBodies(const RigidBody<T>&  rbA,
         } while(crustIteration < maxCrustIterations);
 
         // Computation of the actual overlap
-        distance -= crustA + crustB;
+        snapshot.overlapDistance -= crustA + crustB;
         transform(q_a2w, v_a2w, ptA);
         transform(q_b2w, v_b2w, ptB);
-        contactPoint  = T(0.5) * (ptA + ptB);
-        contactVector = (ptA - ptB).normalized();
+        snapshot.contactPoint  = T(0.5) * (ptA + ptB);
+        snapshot.contactVector = (ptA - ptB).normalized();
     }
 
-    // Set contact information and metadata
-    contactMetaData.template set<0>(distance < T(0) ? 1 : 0);
-    contactInfo.setContactInfo(contactPoint, contactVector, distance, contactMetaData.getValue());
+    // Set contact information
+    contactInfo.setSnapshot(snapshot);
 }
 
 // -------------------------------------------------------------------------------------------------

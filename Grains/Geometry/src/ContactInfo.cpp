@@ -9,7 +9,9 @@ __HOSTDEVICE__ ContactInfo<T>::ContactInfo()
     : m_contactPoint()
     , m_contactVector()
     , m_overlapDistance(T(0))
-    , m_contactMetaData()
+    , m_averageMass(T(0))
+    , m_averageRadius(T(0))
+    , m_contactHash(0)
 {
 }
 
@@ -20,10 +22,10 @@ __HOSTDEVICE__ ContactInfo<T>::ContactInfo(const Vector3<T>& pt, const Vector3<T
     : m_contactPoint(pt)
     , m_contactVector(vec)
     , m_overlapDistance(overlap)
-    , m_contactMetaData()
+    , m_averageMass(T(0))
+    , m_averageRadius(T(0))
+    , m_contactHash(0)
 {
-    // Set overlap sign based on whether overlap is negative
-    setOverlapSign(overlap < T(0));
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -58,31 +60,19 @@ __HOSTDEVICE__ T ContactInfo<T>::getOverlapDistance() const
 }
 
 // -------------------------------------------------------------------------------------------------
-// Gets the entire packed contact metadata as BitPacker
-template <typename T>
-__HOSTDEVICE__ const BitPacker<uint32_t,
-                               ContactInfo<T>::B_OVERLAP_SIGN,
-                               ContactInfo<T>::B_CONTACT_HASH,
-                               ContactInfo<T>::B_AVG_MASS>&
-                     ContactInfo<T>::getContactMetaData() const
-{
-    return m_contactMetaData;
-}
-
-// -------------------------------------------------------------------------------------------------
-// Gets the entire packed contact metadata as raw value
-template <typename T>
-__HOSTDEVICE__ uint32_t ContactInfo<T>::getContactMetaDataRaw() const
-{
-    return m_contactMetaData.getValue();
-}
-
-// -------------------------------------------------------------------------------------------------
 // Gets the average mass
 template <typename T>
 __HOSTDEVICE__ T ContactInfo<T>::getAverageMass() const
 {
-    return m_contactMetaData.template getFixed<2, T>(DEFAULT_AVG_MASS_MIN, DEFAULT_AVG_MASS_MAX);
+    return m_averageMass;
+}
+
+// -------------------------------------------------------------------------------------------------
+// Gets the average radius
+template <typename T>
+__HOSTDEVICE__ T ContactInfo<T>::getAverageRadius() const
+{
+    return m_averageRadius;
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -90,29 +80,22 @@ __HOSTDEVICE__ T ContactInfo<T>::getAverageMass() const
 template <typename T>
 __HOSTDEVICE__ uint ContactInfo<T>::getContactHash() const
 {
-    return static_cast<uint>(m_contactMetaData.template get<1>());
+    return m_contactHash;
 }
 
 // -------------------------------------------------------------------------------------------------
-// Gets the overlap sign
+// Gets snapshot
 template <typename T>
-__HOSTDEVICE__ bool ContactInfo<T>::getOverlapSign() const
+__HOSTDEVICE__ typename ContactInfo<T>::Snapshot ContactInfo<T>::getSnapshot() const
 {
-    return m_contactMetaData.template get<0>() != 0;
-}
-
-// -------------------------------------------------------------------------------------------------
-// Sets all contact information in one call
-template <typename T>
-__HOSTDEVICE__ void ContactInfo<T>::setContactInfo(const Vector3<T>& pt,
-                                                   const Vector3<T>& vec,
-                                                   T                 dist,
-                                                   uint32_t          metadata)
-{
-    m_contactPoint    = pt;
-    m_contactVector   = vec;
-    m_overlapDistance = dist;
-    m_contactMetaData.setValue(metadata);
+    Snapshot s;
+    s.contactPoint    = m_contactPoint;
+    s.contactVector   = m_contactVector;
+    s.overlapDistance = m_overlapDistance;
+    s.averageMass     = m_averageMass;
+    s.averageRadius   = m_averageRadius;
+    s.contactHash     = m_contactHash;
+    return s;
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -137,25 +120,6 @@ template <typename T>
 __HOSTDEVICE__ void ContactInfo<T>::setOverlapDistance(T d)
 {
     m_overlapDistance = d;
-    // Automatically update overlap sign
-    setOverlapSign(d < T(0));
-}
-
-// -------------------------------------------------------------------------------------------------
-// Sets the entire packed contact metadata from BitPacker
-template <typename T>
-__HOSTDEVICE__ void ContactInfo<T>::setContactMetaData(
-    const BitPacker<uint32_t, B_OVERLAP_SIGN, B_CONTACT_HASH, B_AVG_MASS>& metadata)
-{
-    m_contactMetaData = metadata;
-}
-
-// -------------------------------------------------------------------------------------------------
-// Sets the entire packed contact metadata from raw value
-template <typename T>
-__HOSTDEVICE__ void ContactInfo<T>::setContactMetaDataRaw(uint32_t metadata)
-{
-    m_contactMetaData.setValue(metadata);
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -163,11 +127,15 @@ __HOSTDEVICE__ void ContactInfo<T>::setContactMetaDataRaw(uint32_t metadata)
 template <typename T>
 __HOSTDEVICE__ void ContactInfo<T>::setAverageMass(T avgMass)
 {
-    bool saturated = false;
-    m_contactMetaData.template setFixed<2, T>(avgMass,
-                                              DEFAULT_AVG_MASS_MIN,
-                                              DEFAULT_AVG_MASS_MAX,
-                                              saturated);
+    m_averageMass = avgMass;
+}
+
+// -------------------------------------------------------------------------------------------------
+// Sets the average radius
+template <typename T>
+__HOSTDEVICE__ void ContactInfo<T>::setAverageRadius(T avgRadius)
+{
+    m_averageRadius = avgRadius;
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -175,15 +143,19 @@ __HOSTDEVICE__ void ContactInfo<T>::setAverageMass(T avgMass)
 template <typename T>
 __HOSTDEVICE__ void ContactInfo<T>::setContactHash(uint hash)
 {
-    m_contactMetaData.template set<1>(hash);
+    m_contactHash = hash;
 }
 
 // -------------------------------------------------------------------------------------------------
-// Sets the overlap sign
 template <typename T>
-__HOSTDEVICE__ void ContactInfo<T>::setOverlapSign(bool isNegative)
+__HOSTDEVICE__ void ContactInfo<T>::setSnapshot(const ContactInfo<T>::Snapshot& s)
 {
-    m_contactMetaData.template set<0>(isNegative ? 1 : 0);
+    m_contactPoint    = s.contactPoint;
+    m_contactVector   = s.contactVector;
+    m_overlapDistance = s.overlapDistance;
+    m_averageMass     = s.averageMass;
+    m_averageRadius   = s.averageRadius;
+    m_contactHash     = s.contactHash;
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -193,7 +165,8 @@ __HOSTDEVICE__ bool ContactInfo<T>::operator==(const ContactInfo<T>& other) cons
 {
     return (m_contactPoint == other.m_contactPoint) && (m_contactVector == other.m_contactVector)
            && (m_overlapDistance == other.m_overlapDistance)
-           && (m_contactMetaData.getValue() == other.m_contactMetaData.getValue());
+           && (m_averageMass == other.m_averageMass) && (m_averageRadius == other.m_averageRadius)
+           && (m_contactHash == other.m_contactHash);
 }
 
 // -------------------------------------------------------------------------------------------------

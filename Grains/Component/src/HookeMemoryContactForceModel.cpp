@@ -206,23 +206,20 @@ __HOSTDEVICE__ void
                                                    const Vector3<T>&     relAngVelocity,
                                                    const Vector3<T>&     vA,
                                                    const Vector3<T>&     vB,
-                                                   const T               averageMass,
                                                    ContactHistory<T>*    contactHistory,
                                                    Torce<T>&             torceA,
                                                    Torce<T>&             torceB) const
 {
-    // Extract contact info
-    Vector3<T> geometricPointOfContact = contactInfos.getContactPoint();
-    Vector3<T> contactVector           = contactInfos.getContactVector();
-    T          overlapDistance         = contactInfos.getOverlapDistance();
+    // Get snapshot with all contact information
+    auto snapshot = contactInfos.getSnapshot();
 
     // Compute contact forces and torques
     Vector3<T> delFN, delFT, delM;
-    performForcesCalculus(contactVector,
+    performForcesCalculus(snapshot.contactVector,
                           relVelocityAtContact,
                           relAngVelocity,
-                          overlapDistance,
-                          averageMass,
+                          snapshot.overlapDistance,
+                          snapshot.averageMass,
                           contactHistory,
                           delFN,
                           delFT,
@@ -230,8 +227,8 @@ __HOSTDEVICE__ void
 
     // Apply forces and torques
     Vector3<T> totalForce = delFN + delFT;
-    torceA.addForce(totalForce, geometricPointOfContact - vA);
-    torceB.addForce(-totalForce, geometricPointOfContact - vB);
+    torceA.addForce(totalForce, snapshot.contactPoint - vA);
+    torceB.addForce(-totalForce, snapshot.contactPoint - vB);
 
     if(m_mur > EPS<T>)
     {

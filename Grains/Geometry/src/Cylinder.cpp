@@ -78,19 +78,15 @@ __HOSTDEVICE__ T Cylinder<T>::computeVolume() const
 }
 
 // -------------------------------------------------------------------------------------------------
-// Computes the inertia tensor and the inverse of the inertia tensor
+// Computes the diagonal inertia tensor
 template <typename T>
-__HOSTDEVICE__ void Cylinder<T>::computeInertia(T (&inertia)[6], T (&inertia_1)[6]) const
+__HOSTDEVICE__ void Cylinder<T>::computeInertia(T (&inertia)[3]) const
 {
-    T r2       = m_radius * m_radius;
-    T c        = T(.5) * PI<T> * m_halfHeight * r2;
-    inertia[1] = inertia[2] = inertia[4] = T(0);
-    inertia[0] = inertia[5] = c * (T(4) * m_halfHeight * m_halfHeight / T(3) + r2);
-    inertia[3]              = T(2) * c * r2;
-
-    inertia_1[1] = inertia_1[2] = inertia_1[4] = T(0);
-    inertia_1[5] = inertia_1[0] = T(1) / inertia[0];
-    inertia_1[3]                = T(1) / inertia[3];
+    T r2 = m_radius * m_radius;
+    T c  = T(.5) * PI<T> * m_halfHeight * r2;
+    // Diagonal components: Ixx = Izz (perpendicular to axis), Iyy (along axis)
+    inertia[0] = inertia[2] = c * (T(4) * m_halfHeight * m_halfHeight / T(3) + r2);
+    inertia[1]              = T(2) * c * r2;
 }
 
 // -------------------------------------------------------------------------------------------------

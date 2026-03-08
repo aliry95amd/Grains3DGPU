@@ -76,11 +76,10 @@ public:
     __HOSTDEVICE__
     T computeVolume() const final;
 
-    /** @brief Computes the inertia tensor and the inverse of the inertia tensor
-        @param inertia inertia tensor
-        @param inertia_1 inverse of the inertia tensor */
+    /** @brief Computes the inertia tensor
+        @param inertia inertia tensor */
     __HOSTDEVICE__
-    void computeInertia(T (&inertia)[6], T (&inertia_1)[6]) const final;
+    void computeInertia(T (&inertia)[3]) const final;
 
     /** @brief Computes and returns the circumscribed radius of the Superquadric */
     __HOSTDEVICE__

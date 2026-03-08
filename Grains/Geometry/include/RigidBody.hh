@@ -3,7 +3,6 @@
 
 #include <limits>
 
-#include "BitPacker.hh"
 #include "Convex.hh"
 #include "Kinematics.hh"
 #include "Quaternion.hh"
@@ -20,49 +19,45 @@
 template <typename T>
 class RigidBody
 {
-public:
-    /** @name BitPacker constants */
-    //@{
-    /** \brief Number of bits for each field in the packed properties */
-    static constexpr int B_MAT   = 4;
-    static constexpr int B_MASS  = 30;
-    static constexpr int B_CRUST = 30;
-    static_assert(B_MAT + B_MASS + B_CRUST == 64, "Property bits must sum to 64");
-
-    /** \brief Default minimum and maximum values for mass and crust thickness */
-    static constexpr T DEFAULT_CRUST_MIN = 0;
-    static constexpr T DEFAULT_CRUST_MAX = T(1);
-    static constexpr T DEFAULT_MASS_MIN  = 0;
-    // Finite sentinel to represent unspecified/obstacle masses without producing inf.
-    static constexpr T DEFAULT_MASS_MAX = T(1e5);
-    //@}
-
 protected:
     /** @name Parameters */
     //@{
     /** \brief Convex shape */
     Convex<T>* m_convex;
-    /** \brief Inertia tensor */
-    T m_inertia[6];
-    /** \brief Inverse of the inertia tensor */
-    T m_inertia_1[6];
-    /** \brief Packed properties:
-        BitPacker field order is LSB->MSB: material(4), mass(30), crust(30) */
-    BitPacker<uint64_t, B_MAT, B_MASS, B_CRUST> m_properties;
+    /** \brief Crust thickness */
+    T m_crustThickness;
+    /** \brief Circumscribed radius */
+    T m_circumscribedRadius;
+    /** \brief Mass of the rigid body */
+    T m_mass;
+    /** \brief Equivalent radius */
+    T m_equivalentRadius;
+    /** \brief Material ID */
+    uint m_material;
+    /** \brief Diagonal inertia tensor (3 components: Ixx, Iyy, Izz) */
+    T m_inertia[3];
     //@}
 
 public:
+    /** @name Structures */
+    //@{
+    /** @brief Snapshot of commonly used properties for fast bulk access */
+    struct PropertiesSnapshot
+    {
+        Convex<T>* convex              = nullptr;
+        T          crustThickness      = T(0);
+        T          circumscribedRadius = T(0);
+        T          mass                = T(0);
+        T          equivalentRadius    = T(0);
+        uint       material            = std::numeric_limits<uint>::max();
+    };
+    //@}
+
     /** @name Constructors */
     //@{
     /** @brief Default constructor */
     __HOSTDEVICE__
     RigidBody();
-
-    /** @brief Constructor that accepts pre-packed properties produced by BitPacker.
-        This is intended for fast device-side construction when the packed properties
-        are already available on the caller side. */
-    __HOSTDEVICE__
-    RigidBody(Convex<T>* convex, uint64_t propertiesRaw);
 
     /** @brief Constructor with a convex, crust thickness, material, and density.
         @param convex convex
@@ -108,60 +103,45 @@ public:
     __HOSTDEVICE__
     Convex<T>* getConvex() const;
 
-    /** @brief Gets the rigid body's inertia
-        @param inertia the destination for inertia */
-    __HOSTDEVICE__
-    void getInertia(T (&inertia)[6]) const;
-
-    /** @brief Gets the inverse of rigid body's inertia
-        @param inertia_1 the destination for the inverse inertia */
-    __HOSTDEVICE__
-    void getInertia_1(T (&inertia_1)[6]) const;
-
-    /** @brief Gets the packed properties */
-    __HOSTDEVICE__
-    const BitPacker<uint64_t, B_MAT, B_MASS, B_CRUST>& getProperties() const;
-
-    /** @brief Gets the packed properties as raw uint64_t */
-    __HOSTDEVICE__
-    uint64_t getPropertiesRaw() const;
-
     /** @brief Gets the rigid body's crust thickness */
     __HOSTDEVICE__
     T getCrustThickness() const;
+
+    /** @brief Gets the circumcribed radius of the rigid body */
+    __HOSTDEVICE__
+    T getCircumscribedRadius() const;
 
     /** @brief Gets the rigid body's mass */
     __HOSTDEVICE__
     T getMass() const;
 
+    /** @brief Gets the equivalent radius of the rigid body */
+    __HOSTDEVICE__
+    T getEquivalentRadius() const;
+
     /** @brief Gets the rigid body's material ID */
     __HOSTDEVICE__
     uint getMaterial() const;
+
+    /** @brief Gets the rigid body's diagonal inertia
+        @param inertia the destination for diagonal inertia (3 components) */
+    __HOSTDEVICE__
+    void getInertia(T (&inertia)[3]) const;
 
     /** @brief Gets the rigid body's volume */
     __HOSTDEVICE__
     T getVolume() const;
 
-    /** @brief Gets the circumcribed radius of the rigid body */
+    /** @brief Gets a snapshot of commonly used properties (excluding inertia) */
     __HOSTDEVICE__
-    T getCircumscribedRadius() const;
+    PropertiesSnapshot getPropertiesSnapshot() const;
     //@}
 
     /**@name Set methods */
     //@{
-    /** @brief Sets the rigid body's inertia and its inverse */
+    /** @brief Sets the rigid body's inertia and circumscribed radius */
     __HOSTDEVICE__
     void setInertia();
-
-    /** @brief Sets the packed properties directly
-        @param p packed properties */
-    __HOSTDEVICE__
-    void setProperties(BitPacker<uint64_t, B_MAT, B_MASS, B_CRUST> p);
-
-    /** @brief Sets the packed properties from raw uint64_t
-        @param p packed properties as uint64_t */
-    __HOSTDEVICE__
-    void setProperties(uint64_t p);
     //@}
 
     /**@name Methods */

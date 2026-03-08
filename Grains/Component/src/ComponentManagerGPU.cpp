@@ -247,6 +247,27 @@ void ComponentManagerGPU<T>::moveParticles(
 }
 
 // -------------------------------------------------------------------------------------------------
+// Performs the second velocity half-kick (KDK Step 3; no-op for single-pass schemes)
+template <typename T>
+void ComponentManagerGPU<T>::advanceVelocity(
+    const GrainsMemBuffer<TimeIntegrator<T>*, MemType::DEVICE>& TI)
+{
+    uint numThreads, numBlocks;
+    computeOptimalThreadsAndBlocks(m_numParticles,
+                                   GrainsParameters<T>::m_GPU,
+                                   numBlocks,
+                                   numThreads);
+
+    advanceVelocity_Kernel<<<numBlocks, numThreads>>>(TI.getData(),
+                                                      m_rigidBody->getData(),
+                                                      m_quaternion.getData(),
+                                                      m_velocity.getData(),
+                                                      m_torce.getData(),
+                                                      m_numObstacles,
+                                                      m_numParticles);
+}
+
+// -------------------------------------------------------------------------------------------------
 // Explicit instantiation
 template class ComponentManagerGPU<float>;
 template class ComponentManagerGPU<double>;

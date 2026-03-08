@@ -57,11 +57,10 @@ public:
     __HOSTDEVICE__
     virtual T computeVolume() const = 0;
 
-    /** @brief Computes the inertia tensor and the inverse of the inertia tensor
-        @param inertia inertia tensor
-        @param inertia_1 inverse of the inertia tensor */
+    /** @brief Computes the diagonal inertia tensor
+        @param inertia diagonal inertia tensor (3 components: Ixx, Iyy, Izz) */
     __HOSTDEVICE__
-    virtual void computeInertia(T (&inertia)[6], T (&inertia_1)[6]) const = 0;
+    virtual void computeInertia(T (&inertia)[3]) const = 0;
 
     /** @brief Computes and returns the circumscribed radius of the reference convex shape */
     __HOSTDEVICE__

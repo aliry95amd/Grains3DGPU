@@ -115,8 +115,6 @@ void ComponentManagerCPU<T>::detectCollisions()
 
     // Transforms contact info to world frame
     transformContactInfoToWorld();
-
-    m_contactInfoWorld.print();
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -141,7 +139,6 @@ void ComponentManagerCPU<T>::computeContactForces(
                                     contactMemory,
                                     i);
     }
-    m_torce.print();
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -176,6 +173,23 @@ void ComponentManagerCPU<T>::moveParticles(
                              m_velocity.getData(),
                              m_torce.getData(),
                              pID);
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+// Performs the second velocity half-kick (KDK Step 3; no-op for single-pass schemes)
+template <typename T>
+void ComponentManagerCPU<T>::advanceVelocity(
+    const GrainsMemBuffer<TimeIntegrator<T>*, MemType::HOST>& TI)
+{
+    for(uint pID = m_numObstacles; pID < m_numObstacles + m_numParticles; ++pID)
+    {
+        advanceVelocity_common(TI.getData(),
+                               m_rigidBody->getData(),
+                               m_quaternion.getData(),
+                               m_velocity.getData(),
+                               m_torce.getData(),
+                               pID);
     }
 }
 

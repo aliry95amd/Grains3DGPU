@@ -341,13 +341,15 @@ void Grains<T>::Construction(DOMElement* rootElement)
         T        tEnd   = ReaderXML::getNodeAttr_Double(nTime, "End");
         T        tStep  = ReaderXML::getNodeAttr_Double(nTime, "dt");
         GP::m_tStart    = tStart;
-        GP::m_tEnd      = tEnd + HIGHEPS<T>;
         GP::m_dt        = tStep;
+        GP::m_tEnd      = tEnd + 0.01 * tStep;  // Adding a small tolerance
         DOMNode* nTI    = ReaderXML::getNode(tempSetting, "TimeIntegration");
         if(nTI)
         {
             GoutWI(6, "Reading time integration model ...");
             TimeIntegratorFactory<T>::create(nTI, GP::m_dt, m_timeIntegrator);
+            GP::m_isLeapFrog
+                = (m_timeIntegrator[0]->getTimeIntegratorType() == SECONDORDERLEAPFROG);
             GoutWI(6, "Reading time integration model completed!");
         }
     }
@@ -406,6 +408,8 @@ void Grains<T>::Forces(DOMElement* rootElement)
 template <typename T>
 void Grains<T>::AdditionalFeatures(DOMElement* rootElement)
 {
+    using GP = GrainsParameters<T>;
+
     // Output message
     GoutWI(3, "Simulation");
     // ---------------------------------------------------------------------------------------------
@@ -413,6 +417,15 @@ void Grains<T>::AdditionalFeatures(DOMElement* rootElement)
     assert(rootElement != NULL);
     DOMNode* root = ReaderXML::getNode(rootElement, "Simulation");
     GAssert(root, "Simulation node is mandatory!");
+
+    // ---------------------------------------------------------------------------------------------
+    // Verbosity
+    DOMNode* nVerbosity = ReaderXML::getNode(root, "Verbosity");
+    if(nVerbosity)
+    {
+        GP::m_verbosityFrequency = ReaderXML::getNodeAttr_Int(nVerbosity, "Frequency");
+        GoutWI(6, "Verbosity frequency set to", GP::m_verbosityFrequency);
+    }
 
     // ---------------------------------------------------------------------------------------------
     // Insertion policies

@@ -38,7 +38,7 @@ __HOSTDEVICE__ Quaternion<T>
 {
     // Quaternion change over dt
     const T nOmega = norm(avgAngVel);
-    if(nOmega > HIGHEPS<T>)
+    if(nOmega > EPS<T>)
     {
         const T c = cos(nOmega * m_dt / T(2));
         const T s = sin(nOmega * m_dt / T(2));

@@ -20,7 +20,9 @@
 template <typename T, typename... Arguments>
 __GLOBAL__ void createRigidBodiesBatchKernel(RigidBody<T>** rb,
                                              const uint*    indices,
-                                             uint64_t       packedProperties,
+                                             T              crustThickness,
+                                             T              density,
+                                             uint           material,
                                              ConvexType     convexType,
                                              uint           count,
                                              Arguments... args)
@@ -59,7 +61,7 @@ __GLOBAL__ void createRigidBodiesBatchKernel(RigidBody<T>** rb,
     if(convex)
     {
         uint targetIdx = indices[idx];
-        rb[targetIdx]  = new RigidBody<T>(convex, packedProperties);
+        rb[targetIdx]  = new RigidBody<T>(convex, crustThickness, density, material);
     }
 }
 
@@ -175,7 +177,9 @@ __HOST__ void
     struct RBProperties
     {
         ConvexType type;
-        uint64_t   packedProperties;
+        T          density;
+        T          crustThickness;
+        uint       material;
         // Parameters for convex shapes (max 5 for superquadric)
         T    params[5];
         uint numParams;
@@ -264,8 +268,11 @@ __HOST__ void
             }
         }
 
-        // Record packed properties for kernel launches
-        prop.packedProperties = h_RB[i]->getPropertiesRaw();
+        // Record unpacked properties for kernel launches
+        auto snapshot       = h_RB[i]->getPropertiesSnapshot();
+        prop.density        = snapshot.mass / snapshot.convex->computeVolume();
+        prop.crustThickness = snapshot.crustThickness;
+        prop.material       = snapshot.material;
 
         // Add to existing type or create new type
         if(typeIdx >= 0)
@@ -274,21 +281,6 @@ __HOST__ void
         }
         else
         {
-            // Debug print: show host-side mass/crust/material and packed properties for this
-            // rigid body when a new unique type is recorded. This helps inspect what values
-            // are being quantized and stored in the packedProperties.
-            {
-                const char* dbg = std::getenv("GRAINS_DEBUG");
-                if(dbg && dbg[0] == '1')
-                {
-                    std::cout << "[RigidBodyFactory] New unique type RB[" << i << "] "
-                              << "mass=" << h_RB[i]->getMass() << " "
-                              << "crust=" << h_RB[i]->getCrustThickness() << " "
-                              << "material=" << h_RB[i]->getMaterial() << " " << "packed=0x"
-                              << std::hex << prop.packedProperties << std::dec << std::endl;
-                }
-            }
-
             uniqueTypes.push_back(prop);
             indicesPerType.push_back({i});
         }
@@ -333,7 +325,9 @@ __HOST__ void
             {
                 createRigidBodiesBatchKernel<<<numBlocks, numThreads>>>(d_RB.getData(),
                                                                         d_indices + batchStart,
-                                                                        prop.packedProperties,
+                                                                        prop.crustThickness,
+                                                                        prop.density,
+                                                                        prop.material,
                                                                         SPHERE,
                                                                         batchSize,
                                                                         prop.params[0]);
@@ -342,7 +336,9 @@ __HOST__ void
             {
                 createRigidBodiesBatchKernel<<<numBlocks, numThreads>>>(d_RB.getData(),
                                                                         d_indices + batchStart,
-                                                                        prop.packedProperties,
+                                                                        prop.crustThickness,
+                                                                        prop.density,
+                                                                        prop.material,
                                                                         BOX,
                                                                         batchSize,
                                                                         prop.params[0],
@@ -353,7 +349,9 @@ __HOST__ void
             {
                 createRigidBodiesBatchKernel<<<numBlocks, numThreads>>>(d_RB.getData(),
                                                                         d_indices + batchStart,
-                                                                        prop.packedProperties,
+                                                                        prop.crustThickness,
+                                                                        prop.density,
+                                                                        prop.material,
                                                                         CYLINDER,
                                                                         batchSize,
                                                                         prop.params[0],
@@ -363,7 +361,9 @@ __HOST__ void
             {
                 createRigidBodiesBatchKernel<<<numBlocks, numThreads>>>(d_RB.getData(),
                                                                         d_indices + batchStart,
-                                                                        prop.packedProperties,
+                                                                        prop.crustThickness,
+                                                                        prop.density,
+                                                                        prop.material,
                                                                         CONE,
                                                                         batchSize,
                                                                         prop.params[0],
@@ -373,7 +373,9 @@ __HOST__ void
             {
                 createRigidBodiesBatchKernel<<<numBlocks, numThreads>>>(d_RB.getData(),
                                                                         d_indices + batchStart,
-                                                                        prop.packedProperties,
+                                                                        prop.crustThickness,
+                                                                        prop.density,
+                                                                        prop.material,
                                                                         RECTANGLE,
                                                                         batchSize,
                                                                         prop.params[0],
@@ -383,7 +385,9 @@ __HOST__ void
             {
                 createRigidBodiesBatchKernel<<<numBlocks, numThreads>>>(d_RB.getData(),
                                                                         d_indices + batchStart,
-                                                                        prop.packedProperties,
+                                                                        prop.crustThickness,
+                                                                        prop.density,
+                                                                        prop.material,
                                                                         SUPERQUADRIC,
                                                                         batchSize,
                                                                         prop.params[0],
@@ -399,7 +403,6 @@ __HOST__ void
             }
 
             cudaDeviceSynchronize();
-
             // Check for errors after each batch
             cudaError_t err = cudaGetLastError();
             if(err != cudaSuccess)

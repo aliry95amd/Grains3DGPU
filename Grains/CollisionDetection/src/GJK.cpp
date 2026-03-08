@@ -67,7 +67,7 @@ __HOSTDEVICE__ static INLINE bool valid(const uint s, const uint all_bits, const
         {
             if(s & bit)
             {
-                if(det[s][i] <= EPS<T>)
+                if(det[s][i] < HIGHEPS<T>)
                     return (false);
             }
             else if(det[s | bit][i] > T(0))
@@ -167,7 +167,7 @@ template <typename T>
 __HOSTDEVICE__ static INLINE bool proper(const uint s, const T det[16][4])
 {
     for(uint i = 0, bit = 1; i < 4; ++i, bit <<= 1)
-        if((s & bit) && det[s][i] <= EPS<T>)
+        if((s & bit) && det[s][i] < HIGHEPS<T>)
             return (false);
     return (true);
 }
@@ -233,13 +233,13 @@ template <typename T>
 __HOSTDEVICE__ static INLINE bool
     degenerate(const uint bits, const Vector3<T> (&y)[4], const Vector3<T>& w)
 {
-    T err = HIGHEPS<T>;
+    constexpr T err = HIGHEPS<T>;
     for(uint i = 0, bit = 1; i < 4; ++i, bit <<= 1)
     {
         if(bits & bit)
         {
             // Use ::fabs instead of fabs to avoid the template error
-            if(::fabs(w * y[i] - y[i] * y[i]) < err * y[i] * y[i])
+            if(::fabs(w * y[i] - y[i] * y[i]) < err * std::max(y[i] * y[i], err))
                 return (true);
         }
     }
@@ -415,7 +415,7 @@ __HOSTDEVICE__ static INLINE void s2d(const Vector3<T> (&y)[4], uint& bits, T (&
     }
     else
     {
-        T          d = T(100000);
+        T          d = std::numeric_limits<T>::max();
         Vector3<T> new_point;
         uint       new_bits = 0;
         for(uint j = 0; j < 3; ++j)
@@ -497,7 +497,7 @@ __HOSTDEVICE__ static INLINE void s3d(const Vector3<T> (&y)[4], uint& bits, T (&
     }
     else
     {
-        T          d = T(100000), d_star = T(0);
+        T          d = std::numeric_limits<T>::max(), d_star = T(0);
         Vector3<T> new_point;
         uint       new_bits = 0;
         for(uint j = 0; j < 4; ++j)

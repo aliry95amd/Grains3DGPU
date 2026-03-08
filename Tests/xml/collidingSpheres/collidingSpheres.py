@@ -45,21 +45,22 @@ def main():
 
     fig = plt.figure(figsize=(5, 5))
     ax1 = fig.add_subplot(111)
+    ax1.plot(data[:, 0], analSolution,
+             linewidth=1, linestyle='--', c="k",
+             zorder=1, label="Analytical solution")
     ax1.plot(data[::8, 0], numSolution[::8],
              linewidth=0, c="tab:blue", marker='o', markerfacecolor="tab:blue",
-             label="Numerical solution")
-    ax1.plot(data[:, 0], analSolution,
-             linewidth=1, c="k",
-             label="Analytical solution")
+             zorder=2, label="Numerical solution")
     ax1.set_xlabel(r"Time [s]")
     ax1.set_ylabel(r"Overlap [m]")
     ax1.set_xlim(0, contactTime)
     # ax1.set_ylim( 0, 0.04 )
     ax1.set_box_aspect(1)
-    ax1.legend()
+    handles, labels = ax1.get_legend_handles_labels()
+    ax1.legend(handles[1:] + [handles[0]], labels[1:] + [labels[0]])
     ax1.grid(color='lightgrey', linestyle='--', linewidth=0.5)
 
-    out_plot = os.path.join(plots_root, 'overlap.eps')
+    out_plot = os.path.join(plots_root, 'CollidingSpheresOverlap.eps')
     os.makedirs(os.path.dirname(out_plot), exist_ok=True)
     plt.savefig(out_plot, format='eps', bbox_inches='tight')
 

@@ -102,7 +102,7 @@ __HOSTDEVICE__ void
         tangent = v_t / normv_t;
 
     // Normal dissipative force
-    T gamman = -2. * m_muen * sqrt(averageMass * m_kn);
+    T gamman = -T(2) * m_muen * sqrt(averageMass * m_kn);
     delFN -= gamman * v_n;
     T normFN = norm(delFN);
 
@@ -144,7 +144,6 @@ __HOSTDEVICE__ void HookeContactForceModel<T>::computeForces(const ContactInfo<T
                                                              const Vector3<T>& relAngVelocity,
                                                              const Vector3<T>& vA,
                                                              const Vector3<T>& vB,
-                                                             const T           averageMass,
                                                              ContactHistory<T>* contactHistory,
                                                              Torce<T>&          torceA,
                                                              Torce<T>&          torceB) const
@@ -152,25 +151,23 @@ __HOSTDEVICE__ void HookeContactForceModel<T>::computeForces(const ContactInfo<T
     // Note: contactHistory is unused for non-memory models
     (void)contactHistory;
 
-    // Extract contact vector
-    Vector3<T> geometricPointOfContact = contactInfos.getContactPoint();
-    Vector3<T> contactVector           = contactInfos.getContactVector();
-    T          overlapDistance         = contactInfos.getOverlapDistance();
+    // Get snapshot with all contact information
+    auto snapshot = contactInfos.getSnapshot();
 
     // Compute contact force and torque
     Vector3<T> delFN, delFT, delM;
-    performForcesCalculus(contactVector,
+    performForcesCalculus(snapshot.contactVector,
                           relVelocityAtContact,
                           relAngVelocity,
-                          overlapDistance,
-                          averageMass,
+                          snapshot.overlapDistance,
+                          snapshot.averageMass,
                           delFN,
                           delFT,
                           delM);
 
     delFN += delFT;
-    torceA.addForce(delFN, geometricPointOfContact - vA);
-    torceB.addForce(-delFN, geometricPointOfContact - vB);
+    torceA.addForce(delFN, snapshot.contactPoint - vA);
+    torceB.addForce(-delFN, snapshot.contactPoint - vB);
     if(m_kr)
     {
         torceA.addTorque(delM);

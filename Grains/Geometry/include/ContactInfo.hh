@@ -4,7 +4,6 @@
 #include <limits>
 #include <type_traits>
 
-#include "BitPacker.hh"
 #include "Vector3.hh"
 
 // =================================================================================================
@@ -17,24 +16,6 @@
 template <typename T>
 class ContactInfo
 {
-public:
-    /** @name BitPacker constants */
-    //@{
-    /** \brief Number of bits for each field in the packed contact metadata */
-    static constexpr int B_OVERLAP_SIGN = 1;
-    static constexpr int B_CONTACT_HASH = 5;
-    static constexpr int B_AVG_MASS     = 26;
-    static_assert(B_OVERLAP_SIGN + B_CONTACT_HASH + B_AVG_MASS == 32,
-                  "Bits must match storage type size");
-
-    /** \brief Default minimum and maximum values for average mass */
-    static constexpr T DEFAULT_AVG_MASS_MIN = 0;
-    static constexpr T DEFAULT_AVG_MASS_MAX = T(1e5);
-
-    /** \brief Storage type for contact metadata (uint32_t for float/double) */
-    using StorageType = uint32_t;
-    //@}
-
 protected:
     /** @name Parameters */
     //@{
@@ -44,11 +25,29 @@ protected:
     Vector3<T> m_contactVector;
     /** \brief Overlap distance */
     T m_overlapDistance;
-    /** \brief Packed contact metadata: sign(1), hash(5), avgMass(26) */
-    BitPacker<uint32_t, B_OVERLAP_SIGN, B_CONTACT_HASH, B_AVG_MASS> m_contactMetaData;
+    /** \brief Average mass */
+    T m_averageMass;
+    /** \brief Average radius */
+    T m_averageRadius;
+    /** \brief Contact hash */
+    uint m_contactHash;
     //@}
 
 public:
+    /** @name Structures */
+    //@{
+    /** @brief Snapshot of commonly used properties for fast bulk access */
+    struct Snapshot
+    {
+        Vector3<T> contactPoint    = Vector3<T>(T(0), T(0), T(0));
+        Vector3<T> contactVector   = Vector3<T>(T(0), T(0), T(0));
+        T          overlapDistance = std::numeric_limits<T>::max();
+        T          averageMass     = T(0);
+        T          averageRadius   = T(0);
+        uint       contactHash     = std::numeric_limits<uint>::max();
+    };
+    //@}
+
     /** @name Constructors */
     //@{
     /** @brief Default constructor */
@@ -82,38 +81,25 @@ public:
     __HOSTDEVICE__
     T getOverlapDistance() const;
 
-    /** @brief Gets the entire packed contact metadata as BitPacker */
-    __HOSTDEVICE__
-    const BitPacker<uint32_t, B_OVERLAP_SIGN, B_CONTACT_HASH, B_AVG_MASS>&
-        getContactMetaData() const;
-
-    /** @brief Gets the entire packed contact metadata as raw value */
-    __HOSTDEVICE__
-    uint32_t getContactMetaDataRaw() const;
-
     /** @brief Gets the average mass */
     __HOSTDEVICE__
     T getAverageMass() const;
+
+    /** @brief Gets the average radius */
+    __HOSTDEVICE__
+    T getAverageRadius() const;
 
     /** @brief Gets the contact hash */
     __HOSTDEVICE__
     uint getContactHash() const;
 
-    /** @brief Gets the overlap sign (true if negative) */
+    /** @brief Gets a POD snapshot containing all contact fields */
     __HOSTDEVICE__
-    bool getOverlapSign() const;
+    Snapshot getSnapshot() const;
     //@}
 
     /** @name Set methods */
     //@{
-    /** @brief Sets all contact information in one call
-        @param pt contact point
-        @param vec contact vector
-        @param dist overlap distance
-        @param metadata packed metadata value */
-    __HOSTDEVICE__
-    void setContactInfo(const Vector3<T>& pt, const Vector3<T>& vec, T dist, uint32_t metadata);
-
     /** @brief Sets the contact point
         @param p contact point */
     __HOSTDEVICE__
@@ -129,30 +115,23 @@ public:
     __HOSTDEVICE__
     void setOverlapDistance(T d);
 
-    /** @brief Sets the entire packed contact metadata from BitPacker
-        @param metadata BitPacker containing packed metadata */
-    __HOSTDEVICE__
-    void setContactMetaData(
-        const BitPacker<uint32_t, B_OVERLAP_SIGN, B_CONTACT_HASH, B_AVG_MASS>& metadata);
-
-    /** @brief Sets the entire packed contact metadata from raw value
-        @param metadata packed metadata value */
-    __HOSTDEVICE__
-    void setContactMetaDataRaw(uint32_t metadata);
-
     /** @brief Sets the average mass
         @param avgMass average mass of contacting particles */
     __HOSTDEVICE__
     void setAverageMass(T avgMass);
 
+    /** @brief Sets the average radius
+        @param avgRadius average radius of contacting particles */
+    __HOSTDEVICE__
+    void setAverageRadius(T avgRadius);
+
     /** @brief Sets the contact hash from two material IDs */
     __HOSTDEVICE__
     void setContactHash(uint hash);
 
-    /** @brief Sets the overlap sign
-        @param isNegative true if overlap is negative */
+    /** @brief Sets all contact fields from a POD snapshot */
     __HOSTDEVICE__
-    void setOverlapSign(bool isNegative);
+    void setSnapshot(const Snapshot& s);
     //@}
 
     /** @name Operators */

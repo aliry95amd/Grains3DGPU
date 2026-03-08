@@ -1,5 +1,6 @@
 #include "TimeIntegratorFactory.hh"
 #include "FirstOrderExplicit.hh"
+#include "SecondOrderLeapFrog.hh"
 
 /* ============================================================================================== */
 /* Low-Level Methods                                                                              */
@@ -20,6 +21,8 @@ __GLOBAL__ void createTimeIntegratorKernel(TimeIntegrator<T>**      TI,
 
     if(timeIntegratorType == FIRSTORDEREXPLICIT)
         TI[index] = new FirstOrderExplicit<T>(dt);
+    else if(timeIntegratorType == SECONDORDERLEAPFROG)
+        TI[index] = new SecondOrderLeapFrog<T>(dt);
     else
         GAbort("Time integrator is not implemented for GPU!", "Aborting Grains!");
 }
@@ -37,6 +40,8 @@ __HOST__ void TimeIntegratorFactory<T>::create(
     std::string type = ReaderXML::getNodeAttr_String(root, "Type");
     if(type == "FirstOrderExplicit")
         TI[0] = new FirstOrderExplicit<T>(dt);
+    else if(type == "SecondOrderLeapFrog")
+        TI[0] = new SecondOrderLeapFrog<T>(dt);
     else
         GAbort("Unknown time integration! Aborting Grains!");
 }

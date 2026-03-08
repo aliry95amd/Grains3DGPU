@@ -75,16 +75,13 @@ __HOSTDEVICE__ T Sphere<T>::computeVolume() const
 }
 
 // -------------------------------------------------------------------------------------------------
-// Computes the inertia tensor and the inverse of the inertia tensor
+// Computes the diagonal inertia tensor
 template <typename T>
-__HOSTDEVICE__ void Sphere<T>::computeInertia(T (&inertia)[6], T (&inertia_1)[6]) const
+__HOSTDEVICE__ void Sphere<T>::computeInertia(T (&inertia)[3]) const
 {
-    T r5       = m_radius * m_radius * m_radius * m_radius * m_radius;
-    inertia[1] = inertia[2] = inertia[4] = T(0);
-    inertia[5] = inertia[3] = inertia[0] = T(8) * PI<T> / T(15) * r5;
-
-    inertia_1[1] = inertia_1[2] = inertia_1[4] = T(0);
-    inertia_1[5] = inertia_1[3] = inertia_1[0] = T(1) / inertia[0];
+    T r5 = m_radius * m_radius * m_radius * m_radius * m_radius;
+    // Diagonal components: Ixx = Iyy = Izz for sphere
+    inertia[2] = inertia[1] = inertia[0] = T(8) * PI<T> / T(15) * r5;
 }
 
 // -------------------------------------------------------------------------------------------------

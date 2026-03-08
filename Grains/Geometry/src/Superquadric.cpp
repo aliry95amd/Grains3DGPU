@@ -91,9 +91,9 @@ __HOSTDEVICE__ T Superquadric<T>::computeVolume() const
 }
 
 // -------------------------------------------------------------------------------------------------
-// Computes the inertia tensor and the inverse of the inertia tensor
+// Computes the diagonal inertia tensor
 template <typename T>
-__HOSTDEVICE__ void Superquadric<T>::computeInertia(T (&inertia)[6], T (&inertia_1)[6]) const
+__HOSTDEVICE__ void Superquadric<T>::computeInertia(T (&inertia)[3]) const
 {
     T const eps1 = T(2) / m_n1;
     T const eps2 = T(2) / m_n2;
@@ -105,15 +105,10 @@ __HOSTDEVICE__ void Superquadric<T>::computeInertia(T (&inertia)[6], T (&inertia
     T const prod2
         = m_c * m_c * grainsBeta(T(0.5) * eps2, T(0.5) * eps2) * grainsBeta(T(1.5) * eps1, eps1);
 
-    inertia[1] = inertia[2] = inertia[4] = T(0);
-    inertia[0]                           = C * (m_b * m_b * prod1 + prod2);
-    inertia[3]                           = C * (m_a * m_a * prod1 + prod2);
-    inertia[5]                           = C * (m_a * m_a + m_b * m_b) * prod1;
-
-    inertia_1[1] = inertia_1[2] = inertia_1[4] = T(0);
-    inertia_1[0]                               = T(1) / inertia[0];
-    inertia_1[3]                               = T(1) / inertia[3];
-    inertia_1[5]                               = T(1) / inertia[5];
+    // Diagonal components: Ixx, Iyy, Izz
+    inertia[0] = C * (m_b * m_b * prod1 + prod2);
+    inertia[1] = C * (m_a * m_a * prod1 + prod2);
+    inertia[2] = C * (m_a * m_a + m_b * m_b) * prod1;
 }
 
 // -------------------------------------------------------------------------------------------------

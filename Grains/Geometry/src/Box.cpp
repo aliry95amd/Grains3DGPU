@@ -83,22 +83,17 @@ __HOSTDEVICE__ T Box<T>::computeVolume() const
 }
 
 // -------------------------------------------------------------------------------------------------
-// Computes the inertia tensor and the inverse of the inertia tensor
+// Computes the diagonal inertia tensor
 template <typename T>
-__HOSTDEVICE__ void Box<T>::computeInertia(T (&inertia)[6], T (&inertia_1)[6]) const
+__HOSTDEVICE__ void Box<T>::computeInertia(T (&inertia)[3]) const
 {
-    inertia[1] = inertia[2] = inertia[4] = T(0);
-    inertia[0]                           = T(8) * m_extent[X] * m_extent[Y] * m_extent[Z]
+    // Diagonal components: Ixx, Iyy, Izz
+    inertia[0] = T(8) * m_extent[X] * m_extent[Y] * m_extent[Z]
                  * (m_extent[Y] * m_extent[Y] + m_extent[Z] * m_extent[Z]) / T(3);
-    inertia[3] = T(8) * m_extent[X] * m_extent[Y] * m_extent[Z]
+    inertia[1] = T(8) * m_extent[X] * m_extent[Y] * m_extent[Z]
                  * (m_extent[X] * m_extent[X] + m_extent[Z] * m_extent[Z]) / T(3);
-    inertia[5] = T(8) * m_extent[X] * m_extent[Y] * m_extent[Z]
+    inertia[2] = T(8) * m_extent[X] * m_extent[Y] * m_extent[Z]
                  * (m_extent[Y] * m_extent[Y] + m_extent[X] * m_extent[X]) / T(3);
-
-    inertia_1[1] = inertia_1[2] = inertia_1[4] = T(0);
-    inertia_1[0]                               = T(1) / inertia[0];
-    inertia_1[3]                               = T(1) / inertia[3];
-    inertia_1[5]                               = T(1) / inertia[5];
 }
 
 // -------------------------------------------------------------------------------------------------

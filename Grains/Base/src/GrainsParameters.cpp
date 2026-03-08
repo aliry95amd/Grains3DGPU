@@ -39,6 +39,8 @@ template <typename T>
 T GrainsParameters<T>::m_tEnd;
 template <typename T>
 T GrainsParameters<T>::m_dt;
+template <typename T>
+bool GrainsParameters<T>::m_isLeapFrog = false;
 
 /* Physical */
 template <typename T>
@@ -47,6 +49,8 @@ Vector3<T> GrainsParameters<T>::m_gravity = Vector3<T>(0, 0, 0);
 /* Post-Processing */
 template <typename T>
 std::queue<T> GrainsParameters<T>::m_tSave;
+template <typename T>
+uint GrainsParameters<T>::m_verbosityFrequency = 1;
 
 // -------------------------------------------------------------------------------------------------
 // Explicit instantiation

@@ -201,17 +201,13 @@ __HOSTDEVICE__ static INLINE void transformContactInfo_common(const uint2*      
                                                               const uint           pairID)
 {
     // Transform point and vector from A-local to world using A's pose
-    const ContactInfo<T> ciL = contactInfoLocal[pairID];
-    ContactInfo<T>&      ciW = contactInfoWorld[pairID];
-    uint                 idA = pairList[pairID].x;
-    const Quaternion<T>& qA  = quaternion[idA];
-    ciW.setContactPoint((qA >> ciL.getContactPoint()) + position[idA]);
-    ciW.setContactVector((qA >> ciL.getContactVector()));
-    ciW.setOverlapDistance(ciL.getOverlapDistance());
-    ciW.setContactInfo((qA >> ciL.getContactPoint()) + position[idA],
-                       (qA >> ciL.getContactVector()),
-                       ciL.getOverlapDistance(),
-                       ciL.getContactMetaDataRaw());
+    uint                              idA      = pairList[pairID].x;
+    const Quaternion<T>&              qA       = quaternion[idA];
+    const ContactInfo<T>              ciL      = contactInfoLocal[pairID];
+    typename ContactInfo<T>::Snapshot snapshot = ciL.getSnapshot();
+    snapshot.contactPoint                      = qA >> snapshot.contactPoint + position[idA];
+    snapshot.contactVector                     = qA >> snapshot.contactVector;
+    contactInfoWorld[pairID].setSnapshot(snapshot);
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -234,19 +230,11 @@ __HOSTDEVICE__ static INLINE void computeContactForces_common(const ContactForce
                                                               ContactMemoryView<T>  contactMemory,
                                                               const uint            pairID)
 {
-    using CMPacker = BitPacker<uint32_t,
-                               ContactInfo<T>::B_OVERLAP_SIGN,
-                               ContactInfo<T>::B_CONTACT_HASH,
-                               ContactInfo<T>::B_AVG_MASS>;
     // Contact Details
     ContactInfo<T> ci = contactInfo[pairID];
     // one load of metadata
-    CMPacker metaData       = ci.getContactMetaData();
-    bool     isContact      = metaData.template get<0>();  // is in contact/negative distance
-    uint     contactForceID = metaData.template get<1>();  // material hash
-    T        avgMass        = metaData.template getFixed<2, T>(ContactInfo<T>::DEFAULT_AVG_MASS_MIN,
-                                                 ContactInfo<T>::DEFAULT_AVG_MASS_MAX);
-    avgMass = 1 / avgMass;  // converting back to average mass from its reciprocal stored value
+    typename ContactInfo<T>::Snapshot snapshot = ci.getSnapshot();
+    bool isContact = snapshot.overlapDistance < T(0);  // is in contact/negative distance
 
     // Compute the forces
     if(isContact)  // On device path, this check is redundant.
@@ -276,15 +264,46 @@ __HOSTDEVICE__ static INLINE void computeContactForces_common(const ContactForce
         }
 
         // note that we will add torce to obstacles as well.
+        uint contactForceID = snapshot.contactHash;
         CF[contactForceID]->computeForces(ci,
                                           relVel,
                                           relAngVel,
                                           position[idA],
                                           position[idB],
-                                          avgMass,
                                           historyPtr,
                                           torce[idA],
                                           torce[idB]);
+
+        // printf("Contact Point: (%f, %f, %f), Normal: (%f, %f, %f), Overlap Distance: %f\n",
+        //        snapshot.contactPoint[X],
+        //        snapshot.contactPoint[Y],
+        //        snapshot.contactPoint[Z],
+        //        snapshot.contactVector[X],
+        //        snapshot.contactVector[Y],
+        //        snapshot.contactVector[Z],
+        //        snapshot.overlapDistance);
+        // printf("Pair %u: relVel = (%f, %f, %f), relAngVel = (%f, %f, %f), delTorceA = (%f, %f,
+        // %f, "
+        //        "%f, %f, %f), delTorceB = (%f, %f, %f, %f, %f, %f)\n",
+        //        pairID,
+        //        relVel[X],
+        //        relVel[Y],
+        //        relVel[Z],
+        //        relAngVel[X],
+        //        relAngVel[Y],
+        //        relAngVel[Z],
+        //        torce[idA].getForce()[X],
+        //        torce[idA].getForce()[Y],
+        //        torce[idA].getForce()[Z],
+        //        torce[idA].getTorque()[X],
+        //        torce[idA].getTorque()[Y],
+        //        torce[idA].getTorque()[Z],
+        //        torce[idB].getForce()[X],
+        //        torce[idB].getForce()[Y],
+        //        torce[idB].getForce()[Z],
+        //        torce[idB].getTorque()[X],
+        //        torce[idB].getTorque()[Y],
+        //        torce[idB].getTorque()[Z]);
     }
     // reset the distance so we don't compute the torce twice
     ci.setOverlapDistance(T(0));
@@ -312,19 +331,11 @@ __HOSTDEVICE__ static INLINE void computeContactForces_common(const ContactForce
                                                               ContactMemoryView<T>  contactMemory,
                                                               const uint            pairID)
 {
-    using CMPacker = BitPacker<uint32_t,
-                               ContactInfo<T>::B_OVERLAP_SIGN,
-                               ContactInfo<T>::B_CONTACT_HASH,
-                               ContactInfo<T>::B_AVG_MASS>;
     // Contact Details
     ContactInfo<T> ci = contactInfo[pairID];
     // one load of metadata
-    CMPacker metaData       = ci.getContactMetaData();
-    bool     isContact      = metaData.template get<0>();  // is in contact/negative distance
-    uint     contactForceID = metaData.template get<1>();  // material hash
-    T        avgMass        = metaData.template getFixed<2, T>(ContactInfo<T>::DEFAULT_AVG_MASS_MIN,
-                                                 ContactInfo<T>::DEFAULT_AVG_MASS_MAX);
-    avgMass = 1 / avgMass;  // converting back to average mass from its reciprocal stored value
+    typename ContactInfo<T>::Snapshot snapshot = ci.getSnapshot();
+    bool isContact = snapshot.overlapDistance < T(0);  // is in contact/negative distance
 
     // Compute the forces
     if(isContact)  // On device path, this check is redundant.
@@ -354,15 +365,46 @@ __HOSTDEVICE__ static INLINE void computeContactForces_common(const ContactForce
         }
 
         // note that we will add torce to obstacles as well.
+        uint contactForceID = snapshot.contactHash;
         CF[contactForceID]->computeForces(ci,
                                           relVel,
                                           relAngVel,
                                           position[idA],
                                           position[idB],
-                                          avgMass,
                                           historyPtr,
                                           torceA[pairID],
                                           torceB[pairID]);
+
+        // printf("Contact Point: (%f, %f, %f), Normal: (%f, %f, %f), Overlap Distance: %f\n",
+        //        snapshot.contactPoint[X],
+        //        snapshot.contactPoint[Y],
+        //        snapshot.contactPoint[Z],
+        //        snapshot.contactVector[X],
+        //        snapshot.contactVector[Y],
+        //        snapshot.contactVector[Z],
+        //        snapshot.overlapDistance);
+        // printf("Pair %u: relVel = (%f, %f, %f), relAngVel = (%f, %f, %f), delTorceA = (%f, %f,
+        // %f, "
+        //        "%f, %f, %f), delTorceB = (%f, %f, %f, %f, %f, %f)\n",
+        //        pairID,
+        //        relVel[X],
+        //        relVel[Y],
+        //        relVel[Z],
+        //        relAngVel[X],
+        //        relAngVel[Y],
+        //        relAngVel[Z],
+        //        torceA[pairID].getForce()[X],
+        //        torceA[pairID].getForce()[Y],
+        //        torceA[pairID].getForce()[Z],
+        //        torceA[pairID].getTorque()[X],
+        //        torceA[pairID].getTorque()[Y],
+        //        torceA[pairID].getTorque()[Z],
+        //        torceB[pairID].getForce()[X],
+        //        torceB[pairID].getForce()[Y],
+        //        torceB[pairID].getForce()[Z],
+        //        torceB[pairID].getTorque()[X],
+        //        torceB[pairID].getTorque()[Y],
+        //        torceB[pairID].getTorque()[Z]);
     }
     // reset the distance so we don't compute the torce twice
     ci.setOverlapDistance(T(0));
@@ -446,6 +488,32 @@ __HOSTDEVICE__ static INLINE void moveParticles_common(const TimeIntegrator<T>* 
     T qn = norm(quaternion[cID]);
     if(qn > EPS<T>)
         quaternion[cID] *= (T(1) / qn);
+}
+
+// -------------------------------------------------------------------------------------------------
+/** @brief Performs the second velocity half-kick for split-step schemes (KDK leapfrog Step 3).
+    Computes the acceleration from the current torce (forces at x_{n+1}) and delegates to
+    TI[0]->AdvanceVelocity. The torce is intentionally NOT reset here so that it remains
+    available as a_n for the next call to moveParticles_common.
+    @param TI the time integrator
+    @param rigidBody the rigid body of the components
+    @param quaternion the quaternion of the component
+    @param kinematics the kinematics of the component (velocity updated in-place)
+    @param torce the accumulated torce at x_{n+1} (read but not reset)
+    @param cID the ID of the component */
+template <typename T>
+__HOSTDEVICE__ static INLINE void advanceVelocity_common(const TimeIntegrator<T>* const* TI,
+                                                         const RigidBody<T>* const*      rigidBody,
+                                                         const Quaternion<T>*            quaternion,
+                                                         Kinematics<T>*                  kinematics,
+                                                         const Torce<T>*                 torce,
+                                                         const uint                      cID)
+{
+    const RigidBody<T>* rb = rigidBody[cID];
+    // Compute acceleration from forces at x_{n+1} — torce is NOT reset
+    const Kinematics<T> acceleration
+        = rb->computeMomentum(kinematics[cID].getAngularComponent(), torce[cID], quaternion[cID]);
+    TI[0]->AdvanceVelocity(acceleration, kinematics[cID]);
 }
 
 #endif

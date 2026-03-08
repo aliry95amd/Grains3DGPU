@@ -54,6 +54,7 @@
 </Forces>
 
 <Simulation>
+    <Verbosity Frequency="{verbosity_frequency}"/>
     <ParticleInsertion ForceInsertion="{force_insertion}">
 {position_section}
 {orientation_section}

@@ -20,18 +20,17 @@
 	</ContactForceModels>
 
 	<TemporalSetting>
-		<TimeInterval Start="0." End="5.e-1" dt="1e-6"/>
-		<TimeIntegration Type="FirstOrderExplicit"/>
+		<TimeInterval Start="0." End="1.e-0" dt="1e-6"/>
+		<TimeIntegration Type="SecondOrderLeapFrog"/>
 	</TemporalSetting>
 
 	<Particles>
 		<Particle Number="1" Density="1163.66" Material="matP">
-			<Convex CrustThickness="1.e-4">
+			<Convex CrustThickness="1.e-5">
 				<Cylinder Radius="0.004" Height="0.0053"/>
 			</Convex>
 			<Transformation>
-				<Centre X="-0.02" Y="-0.02" Z="0.015"/>
-				<AngularPosition Type="Angles" aX="30." aY="0." aZ="30."/>
+				<AngularPosition Type="Angles" aX="30." aY="0." aZ="30."/>		
 			</Transformation>
 		</Particle>
 	</Particles>
@@ -48,7 +47,11 @@
 				<AngularPosition Type="Angles" aX="0." aY="0." aZ="0"/>
 			</Transformation>
 		</Obstacle>
-		<Obstacle Material="matP">
+	</Obstacles>
+</Construction>
+
+
+		<!-- <Obstacle Material="matP">
 			<Convex CrustThickness="1.e-4">
 				<Rectangle LX="0.15" LY="0.06" LZ="0.001"/>
 			</Convex>
@@ -83,21 +86,20 @@
 				<Centre X="0.0" Y="-0.03" Z="0.075"/>
 				<AngularPosition Type="Angles" aX="-90." aY="0." aZ="0."/>
 			</Transformation>
-		</Obstacle>
-	</Obstacles>
-</Construction>
+		</Obstacle> -->
 
 <Forces>
 	<Gravity GX="0.0" GY="0.0" GZ="-9.81"/>
 </Forces>
 
 <Simulation>
+	<Verbosity Frequency="1000"/>
 	<ParticleInsertion ForceInsertion="0">
 		<InitialPosition Type="Random" Seed="UserDefined" Value="1">
 			<Windows>
 				<Window Type="Box">
-					<MinPoint X="-0.0" Y="-0.0" Z="0.015"/>
-					<MaxPoint X="-0.0" Y="-0.0" Z="0.015"/>
+					<MinPoint X="-0.0" Y="-0.0" Z="0.010"/>
+					<MaxPoint X="-0.0" Y="-0.0" Z="0.010"/>
 				</Window>
 			</Windows>
 		</InitialPosition>
@@ -111,7 +113,7 @@
 		</InitialOrientation>
 	</ParticleInsertion>
 	<PostProcessing>
-		<TimeSave dt="5e-3"/>
+		<TimeSave dt="1e-2"/>
 		<Writers>
 			<Paraview Directory="./Grains/Init" RootName="S4_N2"/>
 			<RawData  Directory="./Grains/Init" RootName="S4_N2"/>
