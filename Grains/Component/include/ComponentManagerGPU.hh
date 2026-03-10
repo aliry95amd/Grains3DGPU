@@ -25,20 +25,7 @@ class ComponentManagerGPU : public ComponentManager<T, MemType::DEVICE>
     using CM::m_torce;
     using CM::m_velocity;
 
-    using CM::m_contactInfo;
-    using CM::m_contactInfoWorld;
-    using CM::m_neighborList;
-    using CM::m_relPosition;
-    using CM::m_relQuaternion;
-
-private:
-    // Persistent buffers to avoid per-call allocations for compaction
-    GrainsMemBuffer<uint, MemType::DEVICE> m_prefixScan;
-    GrainsMemBuffer<uint, MemType::DEVICE> m_activeIndex;
-
-    // Intermediate per-pair storage for contact forces
-    GrainsMemBuffer<Torce<T>, MemType::DEVICE> m_intermediateTorceA;
-    GrainsMemBuffer<Torce<T>, MemType::DEVICE> m_intermediateTorceB;
+    using CM::m_collisionDetectionModule;
 
 public:
     /** @name Constructors */
@@ -68,40 +55,10 @@ public:
 
     /** @name Manager methods */
     //@{
-    /** @brief Initializes buffers for pair-dependent data */
-    void initialize();
-
-    /** @brief Resizes pair-dependent buffers based on current neighbor list size.
-        @param size New size for the pair-dependent buffers */
-    void resizePairBuffers(const uint size);
     //@}
 
     /** @name Methods */
     //@{
-    /** @brief Updates neighbor list */
-    void updateNeighborList() final;
-
-    /** @brief Computes the relative transformations */
-    void computeRelativeTransformations() final;
-
-    /** @brief Detects collisions between components */
-    // template <GJKType GJKVARIANT = GJKType::JOHNSON, bool GJKACC = false>
-    void detectCollisionsComponents() final;
-
-    /** @brief Transforms contact info to world frame and flags active pairs */
-    void transformContactInfoToWorld() final;
-
-    /** @brief Detects collision */
-    void detectCollisions() final;
-
-    /** @brief Computes contact forces between different components
-        @param CF array of all contact force models */
-    void computeContactForces(
-        const GrainsMemBuffer<ContactForceModel<T>*, MemType::DEVICE>& CF) final;
-
-    /** @brief Adds external forces such as gravity */
-    void addExternalForces() final;
-
     /** @brief Updates the position and velocities of particles
         @param TI time integration scheme */
     void moveParticles(const GrainsMemBuffer<TimeIntegrator<T>*, MemType::DEVICE>& TI) final;

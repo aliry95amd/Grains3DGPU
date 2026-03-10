@@ -1,9 +1,10 @@
 #ifndef _COMPONENTMANAGER_HH_
 #define _COMPONENTMANAGER_HH_
 
-#include "ComponentManagerCommon.hh"
+#include "CollisionDetectionModule.hh"
 #include "ContactForceModel.hh"
-#include "ContactTable.hh"
+#include "ForceModule.hh"
+#include "ForceModuleFactory.hh"
 #include "GrainsMemBuffer.hh"
 #include "GrainsParameters.hh"
 #include "Insertion.hh"
@@ -15,8 +16,6 @@
 
 #include "ContactInfo.hh"
 #include "NeighborList.hh"
-#include "NeighborListFactory.hh"
-#include "ParticleSorter.hh"
 
 // =================================================================================================
 /** @brief The class ComponentManager.
@@ -31,6 +30,9 @@ class ComponentManager
 protected:
     /** @name Parameters */
     //@{
+    /** \brief Collision detection module */
+    std::unique_ptr<CollisionDetectionModule<T, M>> m_collisionDetectionModule;
+
     // TODO: What to do with pointers? Better design? unique_ptr?
     /** \brief Pointer to buffer of components rigid bodies */
     const GrainsMemBuffer<RigidBody<T>*, M>* m_rigidBody;
@@ -48,26 +50,20 @@ protected:
     /** \brief Components Id */
     GrainsMemBuffer<uint, M> m_componentId;
 
-    /** \brief Neighbor list object */
-    std::unique_ptr<NeighborList<T, M>> m_neighborList;
-    /** \brief Particle sorter for Morton code-based reordering */
-    ParticleSorter<T, M> m_particleSorter;
-    /** \brief Relative position */
-    GrainsMemBuffer<Vector3<T>, M> m_relPosition;
-    /** \brief Relative quaternion */
-    GrainsMemBuffer<Quaternion<T>, M> m_relQuaternion;
-    /** \brief Contact information */
+    /** \brief Per-pair contact information in world frame */
     GrainsMemBuffer<ContactInfo<T>, M> m_contactInfo;
-    /** \brief Contact information in world frame */
-    GrainsMemBuffer<ContactInfo<T>, M> m_contactInfoWorld;
+    /** \brief Pair list (indices of interacting particle pairs, populated by CDModule) */
+    GrainsMemBuffer<uint2, M> m_pairList;
 
-    /** \brief Contact history table for memory-enabled force models */
-    ContactHashTable<T, M> m_contactTable;
+    /** \brief Force computation module (owns contact table + GPU intermediate buffers) */
+    std::unique_ptr<ForceModule<T, M>> m_forceModule;
 
-    /** \brief Number of particles in manager */
-    uint m_numParticles;
     /** \brief Number of obstacles in manager */
     uint m_numObstacles;
+    /** \brief Number of particles in manager */
+    uint m_numParticles;
+    /** \brief Number of active pairs in manager */
+    uint m_numPairs;
     //@}
 
 public:
@@ -90,9 +86,9 @@ public:
         , m_velocity(nParticles + nObstacles)
         , m_torce(nParticles + nObstacles)
         , m_componentId(nParticles + nObstacles)
-        , m_particleSorter(nObstacles, nParticles)
         , m_numObstacles(nObstacles)
         , m_numParticles(nParticles)
+        , m_numPairs(0)
     {
         GAssert(m_rigidBody->getSize() == m_numParticles + m_numObstacles,
                 "Rigid body size mismatch");
@@ -160,28 +156,10 @@ public:
     }
 
     // ---------------------------------------------------------------------------------------------
-    /** @brief Gets relative position
-        @param buffer host buffer to copy data to */
+    /** @brief Gets contact information in world frame
+        @param buffer destination buffer to copy data into */
     template <MemType destM>
-    void getRelativePosition(GrainsMemBuffer<Vector3<T>, destM>& buffer) const
-    {
-        m_relPosition.copyTo(buffer);
-    }
-
-    // ---------------------------------------------------------------------------------------------
-    /** @brief Gets relative quaternion
-        @param buffer host buffer to copy data to */
-    template <MemType destM>
-    void getRelativeQuaternion(GrainsMemBuffer<Quaternion<T>, destM>& buffer) const
-    {
-        m_relQuaternion.copyTo(buffer);
-    }
-
-    // ---------------------------------------------------------------------------------------------
-    /** @brief Gets contact information
-        @param buffer host buffer to copy data to */
-    template <MemType destM>
-    void getContactInfo(GrainsMemBuffer<ContactInfo<T>, destM>& buffer) const
+    void getContactInfoWorld(GrainsMemBuffer<ContactInfo<T>, destM>& buffer) const
     {
         m_contactInfo.copyTo(buffer);
     }
@@ -235,31 +213,17 @@ public:
     }
 
     // ---------------------------------------------------------------------------------------------
-    /** @brief Gets neighbor list */
+    /** @brief Gets neighbor list (delegated to CollisionDetectionModule) */
     const NeighborList<T, M>* getNeighborList() const
     {
-        return m_neighborList.get();
+        return m_collisionDetectionModule ? m_collisionDetectionModule->getNeighborList() : nullptr;
     }
 
     // ---------------------------------------------------------------------------------------------
-    /** @brief Gets complete contact memory view (hash table + history data) */
-    ContactMemoryView<T> getContactMemoryView()
+    /** @brief Gets the collision detection module */
+    const CollisionDetectionModule<T, M>* getCollisionDetectionModule() const
     {
-        return m_contactTable.getView();
-    }
-
-    // ---------------------------------------------------------------------------------------------
-    /** @brief Gets the contact table */
-    ContactHashTable<T, M>& getContactTable()
-    {
-        return m_contactTable;
-    }
-
-    // ---------------------------------------------------------------------------------------------
-    /** @brief Gets the contact table (const) */
-    const ContactHashTable<T, M>& getContactTable() const
-    {
-        return m_contactTable;
+        return m_collisionDetectionModule.get();
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -332,131 +296,43 @@ public:
     {
         m_componentId.copyFrom(id);
     }
-
-    // ---------------------------------------------------------------------------------------------
-    /** @brief Sets the neighbor list
-        @param neighborList unique pointer to the neighbor list object */
-    void setNeighborList(std::unique_ptr<NeighborList<T, M>> neighborList)
-    {
-        m_neighborList = std::move(neighborList);
-    }
-
-    // ---------------------------------------------------------------------------------------------
-    /** @brief Sets the particle sorter
-        @param particleSorter pointer to the particle sorter object */
-    void setParticleSorter(ParticleSorter<T, M>* particleSorter)
-    {
-        if(m_particleSorter)
-            delete m_particleSorter;
-        m_particleSorter = particleSorter;
-    }
-
-    // ---------------------------------------------------------------------------------------------
-    /** @brief Sets the relative position
-        @param relPosition host buffer containing the relative positions */
-    template <MemType srcM>
-    void setRelativePosition(const GrainsMemBuffer<Vector3<T>, srcM>& relPosition)
-    {
-        m_relPosition.copyFrom(relPosition);
-    }
-
-    // ---------------------------------------------------------------------------------------------
-    /** @brief Sets the relative quaternion
-        @param relQuaternion host buffer containing the relative quaternions */
-    template <MemType srcM>
-    void setRelativeQuaternion(const GrainsMemBuffer<Quaternion<T>, srcM>& relQuaternion)
-    {
-        m_relQuaternion.copyFrom(relQuaternion);
-    }
-
-    // ---------------------------------------------------------------------------------------------
-    /** @brief Sets the contact information
-        @param contactInfo host buffer containing the contact information */
-    template <MemType srcM>
-    void setContactInfo(const GrainsMemBuffer<ContactInfo<T>, srcM>& contactInfo)
-    {
-        m_contactInfo.copyFrom(contactInfo);
-    }
     //@}
 
     /** @name Manager methods */
     //@{
     // ---------------------------------------------------------------------------------------------
-    /** @brief Initializes buffers for pair-dependent data */
+    /** @brief Initializes the CollisionDetectionModule and the contact hash table */
     void initialize()
     {
-        m_neighborList
-            = NeighborListFactory<T, M>::create(m_rigidBody,
-                                                m_position,
-                                                m_quaternion,
-                                                GrainsParameters<T>::m_collisionDetection,
-                                                m_numObstacles,
-                                                m_numParticles);
+        m_collisionDetectionModule = std::make_unique<CollisionDetectionModule<T, M>>(
+            m_rigidBody,
+            m_position,
+            m_quaternion,
+            GrainsParameters<T>::m_collisionDetection,
+            m_numObstacles,
+            m_numParticles);
 
-        // Get the amount of memory available
-        size_t freeMem;
-        if constexpr(M == MemType::HOST)
-            freeMem = getAvailableHostMemory();
-        else
-            freeMem = getAvailableDeviceMemory();
+        // Size m_contactInfo and m_pairList to match the module's initial pair buffer capacity
+        size_t pairCapacity = m_collisionDetectionModule->getPairBufferSize();
+        m_contactInfo.initialize(pairCapacity);
+        m_pairList.initialize(pairCapacity);
 
-        // Initialize with maximum possible pairs for dynamic sizing
-        uint initialPairPerComponent = GrainsParameters<T>::m_collisionDetection
-                                           .linkedCellParameters.initialNumberOfPairsPerParticle;
-        size_t estimatedPairs = m_numParticles * initialPairPerComponent;
-        size_t maxPairs
-            = m_numObstacles * m_numParticles + m_numParticles * (m_numParticles - 1) / 2;
-        estimatedPairs = std::min(estimatedPairs, maxPairs);
-        size_t sizePerPair
-            = sizeof(m_relPosition.getData()[0]) + sizeof(m_relQuaternion.getData()[0])
-              + sizeof(m_contactInfo.getData()[0]) + sizeof(m_contactInfoWorld.getData()[0]);
-        size_t sizeNeeded = estimatedPairs * sizePerPair;
-        GAssert(sizeNeeded < freeMem,
-                "Not enough memory to allocate pair-dependent buffers in ComponentManager!");
-        size_t maxPairsFinal = sizeNeeded / sizePerPair;
-
-        m_relPosition.initialize(maxPairsFinal);
-        m_relQuaternion.initialize(maxPairsFinal);
-        m_contactInfo.initialize(maxPairsFinal);
-        m_contactInfoWorld.initialize(maxPairsFinal);
-
-        // Initialize contact hash table with capacity based on expected contacts
-        // Use a load factor of 0.7 for good performance (capacity = expected_contacts / 0.7)
-        if(GrainsParameters<T>::m_isContactWithMemory)
-        {
-            uint hashCapacity = static_cast<uint>(estimatedPairs / 0.7);
-            m_contactTable.allocate(hashCapacity, estimatedPairs);
-        }
+        // Create ForceModule (owns contact table + GPU intermediate buffers)
+        m_forceModule = ForceModuleFactory<T, M>::create(pairCapacity);
     }
 
     // ---------------------------------------------------------------------------------------------
-    /** @brief Resizes pair-dependent buffers based on current neighbor list size.
-        @param size new size for the pair buffers */
-    virtual void resizePairBuffers(const uint size)
-    {
-        m_relPosition.resize(size);
-        m_relQuaternion.resize(size);
-        m_contactInfo.resize(size);
-        m_contactInfoWorld.resize(size);
-    }
-
-    // ---------------------------------------------------------------------------------------------
-    /** @brief Copies data from another ComponentManager object.
-        @param other other component manager */
+    /** @brief Copies particle state from this manager to another.
+        @param other destination component manager */
     template <MemType srcM>
     void copyTo(const std::unique_ptr<ComponentManager<T, srcM>>& other)
     {
-        // Particles
         other->setRigidBodyId(m_rigidBodyId);
         other->setPosition(m_position);
         other->setQuaternion(m_quaternion);
         other->setVelocity(m_velocity);
         other->setTorce(m_torce);
         other->setComponentId(m_componentId);
-        // Neighbor list
-        other->setRelativePosition(m_relPosition);
-        other->setRelativeQuaternion(m_relQuaternion);
-        other->setContactInfo(m_contactInfo);
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -526,74 +402,47 @@ public:
     }
 
     // ---------------------------------------------------------------------------------------------
-    /** @brief Performs periodic cleanup of contact table (mark-and-sweep) */
-    void cleanupContactTable()
+    /** @brief Runs the full collision detection pipeline via CollisionDetectionModule.
+        Delegates sorting, neighbor list update, bounding volume, and narrow phase steps, as well as
+        contact info transformation to world frame */
+    void detectCollisions()
     {
-        using GP = GrainsParameters<T>;
-        if(!GP::m_isContactWithMemory)
-            return;
-
-        auto& SS = GP::m_simulationState;
-        if(SS.neighborListUpdateCount % 1000 == 0)
-        {
-            m_contactTable.markAndSweep();
-        }
+        m_collisionDetectionModule->run(m_rigidBody->getData(),
+                                        m_position,
+                                        m_quaternion,
+                                        m_velocity,
+                                        m_torce,
+                                        m_rigidBodyId,
+                                        m_componentId,
+                                        m_contactInfo,
+                                        m_pairList,
+                                        m_numPairs,
+                                        m_numObstacles,
+                                        m_numParticles);
     }
 
     // ---------------------------------------------------------------------------------------------
-    /** @brief Sorts particles by Morton codes for improved cache efficiency */
-    virtual void sortParticles()
-    {
-        using GP = GrainsParameters<T>;
-        auto& SS = GP::m_simulationState;
-        auto& LC = GP::m_collisionDetection.linkedCellParameters;
-
-        // Increment update counter and sort if needed
-        if(LC.sortFrequency > 0 && SS.neighborListUpdateCount % LC.sortFrequency == 0)
-        {
-            m_particleSorter.sortParticles(m_position,
-                                           m_velocity,
-                                           m_quaternion,
-                                           m_torce,
-                                           m_rigidBodyId,
-                                           m_componentId,
-                                           m_numObstacles,
-                                           m_numParticles);
-            SS.particlesSorted = true;
-        }
-        else
-            SS.particlesSorted = false;
-    }
-
-    // ---------------------------------------------------------------------------------------------
-    /** @brief Updates neighbor list */
-    virtual void updateNeighborList() = 0;
-
-    // ---------------------------------------------------------------------------------------------
-    /** @brief Computes the relative transformations */
-    virtual void computeRelativeTransformations() = 0;
-
-    // ---------------------------------------------------------------------------------------------
-    /** @brief Detects collisions between components */
-    // template <GJKType GJKVARIANT = GJKType::JOHNSON, bool GJKACC = false>
-    virtual void detectCollisionsComponents() = 0;
-
-    // ---------------------------------------------------------------------------------------------
-    /** @brief Transforms contact info to world frame and flags active pairs */
-    virtual void transformContactInfoToWorld() = 0;
-
-    // ---------------------------------------------------------------------------------------------
-    /** @brief Detects collision */
-    virtual void detectCollisions() = 0;
-
-    // ---------------------------------------------------------------------------------------------
-    /** @brief Computes contact forces between different components
+    /** @brief Computes contact forces and external forces via ForceModule.
+        Delegates the complete force pipeline (contact forces + gravity) to m_forceModule->run().
         @param CF array of all contact force models */
-    virtual void computeContactForces(const GrainsMemBuffer<ContactForceModel<T>*, M>& CF) = 0;
+    void computeContactForces(const GrainsMemBuffer<ContactForceModel<T>*, M>& CF)
+    {
+        m_forceModule->run(CF,
+                           m_contactInfo,
+                           m_pairList,
+                           m_numPairs,
+                           m_position,
+                           m_velocity,
+                           m_torce,
+                           m_rigidBody,
+                           m_numObstacles,
+                           m_numParticles);
+    }
 
     // ---------------------------------------------------------------------------------------------
-    /** @brief Adds external forces such as gravity */
-    virtual void addExternalForces() = 0;
+    /** @brief No-op: external forces (gravity) are applied inside computeContactForces via
+        ForceModule::run().  Kept for API compatibility with the simulation loop. */
+    void addExternalForces() {}
 
     // ---------------------------------------------------------------------------------------------
     /** @brief Updates the position and velocities of particles

@@ -5,6 +5,7 @@
 
 #include "ContactInfo.hh"
 #include "GJK.hh"
+#include "GrainsParameters.hh"
 #include "GrainsUtils.hh"
 #include "MatrixMath.hh"
 #include "MiscMath.hh"
@@ -153,12 +154,32 @@ __HOSTDEVICE__ inline bool intersectRigidBodies(const RigidBody<T>&  rbA,
     @param rbB second rigid body
     @param b2a geometric transformation describing convex B in the A's reference frame
     @param contactInfo output contact information */
-template <typename T, GJKType GJKVARIANT, bool GJKACC>
+template <typename T,
+          GJKType            GJKVARIANT,
+          bool               GJKACC,
+          BoundingVolumeType BVType = BoundingVolumeType::OFF>
 __HOSTDEVICE__ inline void closestPointsRigidBodies(const RigidBody<T>&  rbA,
                                                     const RigidBody<T>&  rbB,
                                                     const Transform3<T>& b2a,
                                                     ContactInfo<T>&      contactInfo)
 {
+    // BV pre-filter: sphere reject then OBB SAT before entering GJK
+    if constexpr(BVType == BoundingVolumeType::OBB)
+    {
+        const T radiiSum = rbA.getCircumscribedRadius() + rbB.getCircumscribedRadius();
+        if(norm2(b2a.getOrigin()) >= radiiSum * radiiSum)
+        {
+            contactInfo.setOverlapDistance(T(1));
+            return;
+        }
+        if(!intersectOrientedBoundingBox(rbA.getConvex()->computeBoundingBox(),
+                                         rbB.getConvex()->computeBoundingBox(),
+                                         b2a))
+        {
+            contactInfo.setOverlapDistance(T(1));
+            return;
+        }
+    }
     /* ---------------------------------------------------------------------------------------------
     Comments on the contactInfo. It applies to all variants of this function:
     1. If actual overlap distance (GJK dist - crustA - crustB < 0), there is contact otherwise no
@@ -279,13 +300,34 @@ __HOSTDEVICE__ inline void closestPointsRigidBodies(const RigidBody<T>&  rbA,
     @param a2w geometric transformation describing convex A in the world reference frame
     @param b2w geometric transformation describing convex B in the world reference frame
     @param contactInfo output contact information */
-template <typename T, GJKType GJKVARIANT, bool GJKACC>
+template <typename T,
+          GJKType            GJKVARIANT,
+          bool               GJKACC,
+          BoundingVolumeType BVType = BoundingVolumeType::OFF>
 __HOSTDEVICE__ inline void closestPointsRigidBodies(const RigidBody<T>&  rbA,
                                                     const RigidBody<T>&  rbB,
                                                     const Transform3<T>& a2w,
                                                     const Transform3<T>& b2w,
                                                     ContactInfo<T>&      contactInfo)
 {
+    // BV pre-filter: sphere reject then OBB SAT before entering GJK
+    if constexpr(BVType == BoundingVolumeType::OBB)
+    {
+        const T radiiSum = rbA.getCircumscribedRadius() + rbB.getCircumscribedRadius();
+        if(norm2(b2w.getOrigin() - a2w.getOrigin()) >= radiiSum * radiiSum)
+        {
+            contactInfo.setOverlapDistance(T(1));
+            return;
+        }
+        if(!intersectOrientedBoundingBox(rbA.getConvex()->computeBoundingBox(),
+                                         rbB.getConvex()->computeBoundingBox(),
+                                         a2w,
+                                         b2w))
+        {
+            contactInfo.setOverlapDistance(T(1));
+            return;
+        }
+    }
     // Extract properties for contact and populate snapshot
     auto [convexA_ptr,
           crustA,
@@ -398,13 +440,34 @@ __HOSTDEVICE__ inline void closestPointsRigidBodies(const RigidBody<T>&  rbA,
     @param v_b2a position describing convex B in the A's reference frame
     @param q_b2a rotation describing convex B in the A's reference frame
     @param contactInfo output contact information */
-template <typename T, GJKType GJKVARIANT, bool GJKACC>
+template <typename T,
+          GJKType            GJKVARIANT,
+          bool               GJKACC,
+          BoundingVolumeType BVType = BoundingVolumeType::OFF>
 __HOSTDEVICE__ inline void closestPointsRigidBodies(const RigidBody<T>&  rbA,
                                                     const RigidBody<T>&  rbB,
                                                     const Vector3<T>&    v_b2a,
                                                     const Quaternion<T>& q_b2a,
                                                     ContactInfo<T>&      contactInfo)
 {
+    // BV pre-filter: sphere reject then OBB SAT before entering GJK
+    if constexpr(BVType == BoundingVolumeType::OBB)
+    {
+        const T radiiSum = rbA.getCircumscribedRadius() + rbB.getCircumscribedRadius();
+        if(norm2(v_b2a) >= radiiSum * radiiSum)
+        {
+            contactInfo.setOverlapDistance(T(1));
+            return;
+        }
+        if(!intersectOrientedBoundingBox(rbA.getConvex()->computeBoundingBox(),
+                                         rbB.getConvex()->computeBoundingBox(),
+                                         v_b2a,
+                                         q_b2a))
+        {
+            contactInfo.setOverlapDistance(T(1));
+            return;
+        }
+    }
     // Extract properties for contact and populate snapshot
     auto [convexA_ptr,
           crustA,
@@ -515,7 +578,10 @@ __HOSTDEVICE__ inline void closestPointsRigidBodies(const RigidBody<T>&  rbA,
     @param q_a2w rotation describing convex A in the world reference frame
     @param q_b2w rotation describing convex B in the world reference frame
     @param contactInfo output contact information */
-template <typename T, GJKType GJKVARIANT, bool GJKACC>
+template <typename T,
+          GJKType            GJKVARIANT,
+          bool               GJKACC,
+          BoundingVolumeType BVType = BoundingVolumeType::OFF>
 __HOSTDEVICE__ inline void closestPointsRigidBodies(const RigidBody<T>&  rbA,
                                                     const RigidBody<T>&  rbB,
                                                     const Vector3<T>&    v_a2w,
@@ -524,6 +590,26 @@ __HOSTDEVICE__ inline void closestPointsRigidBodies(const RigidBody<T>&  rbA,
                                                     const Quaternion<T>& q_b2w,
                                                     ContactInfo<T>&      contactInfo)
 {
+    // BV pre-filter: sphere reject then OBB SAT before entering GJK
+    if constexpr(BVType == BoundingVolumeType::OBB)
+    {
+        const T radiiSum = rbA.getCircumscribedRadius() + rbB.getCircumscribedRadius();
+        if(norm2(v_b2w - v_a2w) >= radiiSum * radiiSum)
+        {
+            contactInfo.setOverlapDistance(T(1));
+            return;
+        }
+        if(!intersectOrientedBoundingBox(rbA.getConvex()->computeBoundingBox(),
+                                         rbB.getConvex()->computeBoundingBox(),
+                                         v_a2w,
+                                         v_b2w,
+                                         q_a2w,
+                                         q_b2w))
+        {
+            contactInfo.setOverlapDistance(T(1));
+            return;
+        }
+    }
     // Extract properties for contact and populate snapshot
     auto [convexA_ptr,
           crustA,

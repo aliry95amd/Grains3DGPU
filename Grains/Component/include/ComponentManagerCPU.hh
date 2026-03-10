@@ -25,11 +25,7 @@ class ComponentManagerCPU : public ComponentManager<T, MemType::HOST>
     using CM::m_torce;
     using CM::m_velocity;
 
-    using CM::m_contactInfo;
-    using CM::m_contactInfoWorld;
-    using CM::m_neighborList;
-    using CM::m_relPosition;
-    using CM::m_relQuaternion;
+    using CM::m_collisionDetectionModule;
 
 public:
     /** @name Constructors */
@@ -63,32 +59,8 @@ public:
 
     /** @name Methods */
     //@{
-    /** @brief Updates neighbor list */
-    void updateNeighborList() final;
-
-    /** @brief Computes the relative transformations */
-    void computeRelativeTransformations() final;
-
-    /** @brief Detects collisions between components */
-    // template <GJKType GJKVARIANT = GJKType::JOHNSON, bool GJKACC = false>
-    void detectCollisionsComponents() final;
-
-    /** @brief Transforms contact info to world frame and flags active pairs */
-    void transformContactInfoToWorld() final;
-
-    /** @brief Detects collision */
-    void detectCollisions() final;
-
-    /** @brief Computes contact forces between different components
-        @param CF array of all contact force models */
-    void
-        computeContactForces(const GrainsMemBuffer<ContactForceModel<T>*, MemType::HOST>& CF) final;
-
-    /** @brief Adds external forces such as gravity */
-    void addExternalForces() final;
-
     /** @brief Updates the position and velocities of particles
-        @param TI time integration scheme */
+        @param CF array of all contact force models */
     void moveParticles(const GrainsMemBuffer<TimeIntegrator<T>*, MemType::HOST>& TI) final;
 
     /** @brief Performs the second velocity half-kick (KDK Step 3; no-op for single-pass schemes)
