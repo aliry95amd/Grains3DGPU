@@ -231,6 +231,16 @@ void Grains<T>::Construction(DOMElement* rootElement)
     GoutWI(6, "Reading collision detection ...");
     DOMNode* collisionDetection = ReaderXML::getNode(root, "CollisionDetection");
     GAssert(collisionDetection, "CollisionDetection node is mandatory!");
+    if(ReaderXML::getNodeAttr_String(collisionDetection, "EnableTimings") == "true")
+    {
+        GoutWI(9, "Collision detection timings enabled!");
+        CD.timer = true;
+    }
+    if(ReaderXML::getNodeAttr_String(collisionDetection, "UseRelativeTransformations") == "true")
+    {
+        GoutWI(9, "Collision detection using relative transformations enabled!");
+        CD.useRelativeTransformations = true;
+    }
 
     // Neighbor list
     DOMNode* nNeighborList = ReaderXML::getNode(collisionDetection, "NeighborList");
@@ -325,9 +335,17 @@ void Grains<T>::Construction(DOMElement* rootElement)
         std::string narrowPhaseType = ReaderXML::getNodeAttr_String(nNarrowPhase, "Type");
         if(narrowPhaseType == "GJK")
             CD.narrowPhaseType = NarrowPhaseType::GJK;
+        else if(narrowPhaseType == "GJK_SV")
+            CD.narrowPhaseType = NarrowPhaseType::GJK_SV;
         else
             GAbort("Unknown narrow phase type! Aborting Grains!");
-        GoutWI(9, "NarrowPhase: " + narrowPhaseType);
+        // GJK warm-start acceleration: "true" to enable (default: false)
+        std::string gjkAcc = ReaderXML::getNodeAttr_String(nNarrowPhase, "Acceleration");
+        CD.gjkAcceleration = (gjkAcc == "true");
+        GoutWI(9,
+               "NarrowPhase: " + narrowPhaseType + ", Acceleration: "
+                   + (CD.gjkAcceleration ? "true" : "false") + ", UseRelativeTransformations: "
+                   + (CD.useRelativeTransformations ? "true" : "false"));
     }
     GoutWI(6, "Reading collision detection completed!");
 

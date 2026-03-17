@@ -83,6 +83,7 @@ public:
 
         if constexpr(M == MemType::DEVICE)
         {
+            cudaGetLastError();
             // Initialize CUB sort workspace
             uint64_t* dummyKeys   = nullptr;
             uint*     dummyValues = nullptr;
@@ -124,20 +125,14 @@ public:
             for(int i = 0; i < 6; ++i)
                 cudaStreamDestroy(m_streams[i]);
 
-            // Free the Cells object on device
-            if(m_cells.getSize() > 0)
+            // Free the Cells object on device.
+            // The Cells object was created via device 'new' inside createCells_Kernel, so it
+            // lives on the device heap.  Host-side cudaFree cannot free device-heap allocations
+            // (it would return cudaErrorInvalidValue).  Use a device kernel instead.
+            if(m_cells.getSize() > 0 && m_cells.getData() != nullptr)
             {
-                Cells<T, CellOrdering::MORTON>** d_cells = m_cells.getData();
-                if(d_cells != nullptr)
-                {
-                    Cells<T, CellOrdering::MORTON>* h_cellPtr = nullptr;
-                    cudaMemcpy(&h_cellPtr,
-                               d_cells,
-                               sizeof(Cells<T, CellOrdering::MORTON>*),
-                               cudaMemcpyDeviceToHost);
-                    if(h_cellPtr != nullptr)
-                        cudaFree(h_cellPtr);
-                }
+                deleteCells_Kernel<T, CellOrdering::MORTON><<<1, 1>>>(m_cells.getData());
+                cudaDeviceSynchronize();
             }
         }
     }

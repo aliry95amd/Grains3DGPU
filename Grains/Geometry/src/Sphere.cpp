@@ -101,6 +101,15 @@ __HOSTDEVICE__ Vector3<T> Sphere<T>::computeBoundingBox() const
 }
 
 // -------------------------------------------------------------------------------------------------
+// Returns the bounding cylinder to Sphere
+template <typename T>
+__HOSTDEVICE__ Vector3<T> Sphere<T>::computeBoundingCylinder() const
+{
+    // [radius, halfHeight, axisIndex=Z(2)] — any axis is equivalent for a sphere
+    return Vector3<T>(m_radius, m_radius, T(2));
+}
+
+// -------------------------------------------------------------------------------------------------
 // Sphere support function, returns the support point P, i.e. the point on the
 // surface of the Sphere that satisfies max(P.v)
 template <typename T>

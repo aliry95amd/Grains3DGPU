@@ -23,6 +23,8 @@ bool GrainsParameters<T>::m_isPeriodic = false;
 /* Collision Detection */
 template <typename T>
 CollisionDetectionParameters<T> GrainsParameters<T>::m_collisionDetection;
+template <typename T>
+Timer GrainsParameters<T>::m_timer;
 
 /* Material */
 template <typename T>

@@ -1,9 +1,11 @@
 #include <cmath>
 #include <gtest/gtest.h>
+#include <random>
 
 #include "Box.hh"
 #include "GJK.hh"
 #include "Quaternion.hh"
+#include "QuaternionMath.hh"
 #include "Sphere.hh"
 #include "Superquadric.hh"
 #include "Transform3.hh"
@@ -915,4 +917,577 @@ TEST_F(GJKTest, MultiShapeEdgeCases)
     result = intersectGJK(*boxA, *superquadricB, close_pos, large_rotation);
     EXPECT_TRUE(result) << "Box-Superquadric should intersect with large "
                            "rotation at close position";
+}
+
+// =================================================================================================
+// Overload-consistency tests
+//
+// intersectGJK and computeClosestPoints_GJK each have 4 overloads:
+//   1. Relative Transform3  (b2a)
+//   2. Absolute Transform3  (a2w, b2w)
+//   3. Relative quat/vec    (v_b2a, q_b2a)
+//   4. Absolute quat/vec    (v_a2w, v_b2w, q_a2w, q_b2w)
+//
+// All derive their inputs from the same world-space description, so every
+// result must be numerically identical.
+//
+// NOTE on closest-point frames:
+//   pa is always returned in A's LOCAL frame for all 4 overloads.
+//   pb is always returned in B's LOCAL frame for all 4 overloads.
+//   Therefore pa1==pa2==pa3==pa4 and pb1==pb2==pb3==pb4 (within floating
+//   point tolerance), and no coordinate-change is needed.
+// =================================================================================================
+
+// -------------------------------------------------------------------------------------------------
+/** @brief Builds a unit quaternion from axis (ax,ay,az) and angle (rad). */
+static Quaternion<double> gjkMakeQuat(double ax, double ay, double az, double angle)
+{
+    const double s   = std::sin(angle * 0.5);
+    const double c   = std::cos(angle * 0.5);
+    const double len = std::sqrt(ax * ax + ay * ay + az * az);
+    return Quaternion<double>((ax / len) * s, (ay / len) * s, (az / len) * s, c);
+}
+
+// -------------------------------------------------------------------------------------------------
+/** @brief Calls all 4 intersectGJK overloads from world-space inputs and
+    asserts they all return `expected` and agree with each other. */
+static void checkAllGJKIntersectOverloads(const Convex<double>&     a,
+                                          const Convex<double>&     b,
+                                          const Vector3<double>&    v_a2w,
+                                          const Quaternion<double>& q_a2w,
+                                          const Vector3<double>&    v_b2w,
+                                          const Quaternion<double>& q_b2w,
+                                          bool                      expected,
+                                          const std::string&        label)
+{
+    const Transform3<double> trA2W(q_a2w, v_a2w);
+    const Transform3<double> trB2W(q_b2w, v_b2w);
+    // Derive relative inputs: B expressed in A's frame
+    const Transform3<double> trB2A(trA2W, trB2W);
+    const Quaternion<double> q_b2a = inverse(q_a2w) * q_b2w;
+    const Vector3<double>    v_b2a = q_a2w << (v_b2w - v_a2w);
+
+    // Overload 1: relative Transform3
+    const bool res1 = intersectGJK(a, b, trB2A);
+    // Overload 2: absolute Transform3
+    const bool res2 = intersectGJK(a, b, trA2W, trB2W);
+    // Overload 3: relative quat/vec
+    const bool res3 = intersectGJK(a, b, v_b2a, q_b2a);
+    // Overload 4: absolute quat/vec
+    const bool res4 = intersectGJK(a, b, v_a2w, v_b2w, q_a2w, q_b2w);
+
+    EXPECT_EQ(res1, expected) << "[" << label << "] overload 1 (rel Transform3) wrong";
+    EXPECT_EQ(res2, expected) << "[" << label << "] overload 2 (abs Transform3) wrong";
+    EXPECT_EQ(res3, expected) << "[" << label << "] overload 3 (rel quat/vec) wrong";
+    EXPECT_EQ(res4, expected) << "[" << label << "] overload 4 (abs quat/vec) wrong";
+
+    EXPECT_EQ(res1, res2) << "[" << label << "] overloads 1 vs 2 disagree";
+    EXPECT_EQ(res1, res3) << "[" << label << "] overloads 1 vs 3 disagree";
+    EXPECT_EQ(res1, res4) << "[" << label << "] overloads 1 vs 4 disagree";
+}
+
+// -------------------------------------------------------------------------------------------------
+/** @brief Calls all 4 computeClosestPoints_GJK overloads from world-space
+    inputs and asserts distances and closest points agree.
+    Only call this when the shapes are NOT intersecting (d > 0).
+    @param distEPS  Tolerance for distance comparison
+    @param ptEPS    Tolerance for closest-point component comparison */
+static void checkAllGJKClosestPointsOverloads(const Convex<double>&     a,
+                                              const Convex<double>&     b,
+                                              const Vector3<double>&    v_a2w,
+                                              const Quaternion<double>& q_a2w,
+                                              const Vector3<double>&    v_b2w,
+                                              const Quaternion<double>& q_b2w,
+                                              const std::string&        label,
+                                              double                    distEPS = 1e-6,
+                                              double                    ptEPS   = 1e-5)
+{
+    const Transform3<double> trA2W(q_a2w, v_a2w);
+    const Transform3<double> trB2W(q_b2w, v_b2w);
+    const Transform3<double> trB2A(trA2W, trB2W);
+    const Quaternion<double> q_b2a = inverse(q_a2w) * q_b2w;
+    const Vector3<double>    v_b2a = q_a2w << (v_b2w - v_a2w);
+
+    constexpr double crust = 0.0;
+    uint             nbIter1, nbIter2, nbIter3, nbIter4;
+    Vector3<double>  pa1, pb1, pa2, pb2, pa3, pb3, pa4, pb4;
+
+    // Overload 1: relative Transform3
+    const double d1 = computeClosestPoints_GJK<double, GJKType::JOHNSON>(a,
+                                                                         b,
+                                                                         trB2A,
+                                                                         crust,
+                                                                         crust,
+                                                                         pa1,
+                                                                         pb1,
+                                                                         nbIter1);
+    // Overload 2: absolute Transform3
+    const double d2 = computeClosestPoints_GJK<double, GJKType::JOHNSON>(a,
+                                                                         b,
+                                                                         trA2W,
+                                                                         trB2W,
+                                                                         crust,
+                                                                         crust,
+                                                                         pa2,
+                                                                         pb2,
+                                                                         nbIter2);
+    // Overload 3: relative quat/vec
+    const double d3 = computeClosestPoints_GJK<double, GJKType::JOHNSON>(a,
+                                                                         b,
+                                                                         v_b2a,
+                                                                         q_b2a,
+                                                                         crust,
+                                                                         crust,
+                                                                         pa3,
+                                                                         pb3,
+                                                                         nbIter3);
+    // Overload 4: absolute quat/vec
+    const double d4 = computeClosestPoints_GJK<double, GJKType::JOHNSON>(a,
+                                                                         b,
+                                                                         v_a2w,
+                                                                         v_b2w,
+                                                                         q_a2w,
+                                                                         q_b2w,
+                                                                         crust,
+                                                                         crust,
+                                                                         pa4,
+                                                                         pb4,
+                                                                         nbIter4);
+
+    // All distances must agree
+    EXPECT_NEAR(d1, d2, distEPS) << "[" << label << "] distance: overloads 1 vs 2 differ";
+    EXPECT_NEAR(d1, d3, distEPS) << "[" << label << "] distance: overloads 1 vs 3 differ";
+    EXPECT_NEAR(d1, d4, distEPS) << "[" << label << "] distance: overloads 1 vs 4 differ";
+
+    // pa is in A's local frame for ALL overloads → compare directly
+    // pb is in B's local frame for ALL overloads → compare directly
+    for(int i = 0; i < 3; ++i)
+    {
+        EXPECT_NEAR(pa1[i], pa2[i], ptEPS)
+            << "[" << label << "] pa[" << i << "]: overloads 1 vs 2 differ";
+        EXPECT_NEAR(pa1[i], pa3[i], ptEPS)
+            << "[" << label << "] pa[" << i << "]: overloads 1 vs 3 differ";
+        EXPECT_NEAR(pa1[i], pa4[i], ptEPS)
+            << "[" << label << "] pa[" << i << "]: overloads 1 vs 4 differ";
+
+        EXPECT_NEAR(pb1[i], pb2[i], ptEPS)
+            << "[" << label << "] pb[" << i << "]: overloads 1 vs 2 differ";
+        EXPECT_NEAR(pb1[i], pb3[i], ptEPS)
+            << "[" << label << "] pb[" << i << "]: overloads 1 vs 3 differ";
+        EXPECT_NEAR(pb1[i], pb4[i], ptEPS)
+            << "[" << label << "] pb[" << i << "]: overloads 1 vs 4 differ";
+    }
+}
+
+// =================================================================================================
+// Overload-consistency fixture
+// =================================================================================================
+class GJKOverloadConsistencyTest : public ::testing::Test
+{
+protected:
+    void SetUp() override
+    {
+        boxA          = new Box<double>(1.0, 1.0, 1.0);
+        boxB          = new Box<double>(0.5, 0.5, 0.5);
+        sphereA       = new Sphere<double>(1.0);
+        sphereB       = new Sphere<double>(0.5);
+        superquadricA = new Superquadric<double>(1.0, 1.0, 1.0, 2.0, 2.0);
+        superquadricB = new Superquadric<double>(0.5, 0.5, 0.5, 1.5, 1.5);
+
+        q_id      = Quaternion<double>(0.0, 0.0, 0.0, 1.0);
+        q_rot90Y  = gjkMakeQuat(0.0, 1.0, 0.0, M_PI / 2.0);
+        q_rot45Z  = gjkMakeQuat(0.0, 0.0, 1.0, M_PI / 4.0);
+        q_oblique = gjkMakeQuat(1.0, 1.0, 0.0, M_PI / 6.0);
+    }
+
+    void TearDown() override
+    {
+        delete boxA;
+        delete boxB;
+        delete sphereA;
+        delete sphereB;
+        delete superquadricA;
+        delete superquadricB;
+    }
+
+    Box<double>*          boxA;
+    Box<double>*          boxB;
+    Sphere<double>*       sphereA;
+    Sphere<double>*       sphereB;
+    Superquadric<double>* superquadricA;
+    Superquadric<double>* superquadricB;
+
+    Quaternion<double> q_id;
+    Quaternion<double> q_rot90Y;
+    Quaternion<double> q_rot45Z;
+    Quaternion<double> q_oblique;
+};
+
+// =================================================================================================
+// intersectGJK -- all 4 overloads produce consistent results
+// =================================================================================================
+
+TEST_F(GJKOverloadConsistencyTest, IntersectOverloads_BoxBox_Overlapping)
+{
+    checkAllGJKIntersectOverloads(*boxA,
+                                  *boxB,
+                                  Vector3<double>(0.0, 0.0, 0.0),
+                                  q_id,
+                                  Vector3<double>(0.5, 0.0, 0.0),
+                                  q_id,
+                                  true,
+                                  "BoxBox_Overlapping");
+}
+
+TEST_F(GJKOverloadConsistencyTest, IntersectOverloads_BoxBox_Separated)
+{
+    checkAllGJKIntersectOverloads(*boxA,
+                                  *boxB,
+                                  Vector3<double>(0.0, 0.0, 0.0),
+                                  q_id,
+                                  Vector3<double>(3.0, 0.0, 0.0),
+                                  q_id,
+                                  false,
+                                  "BoxBox_Separated");
+}
+
+TEST_F(GJKOverloadConsistencyTest, IntersectOverloads_BoxBox_Rotated_Overlapping)
+{
+    // A rotated 45° around Z, B displaced 0.5 in X, rotated 90° around Y
+    checkAllGJKIntersectOverloads(*boxA,
+                                  *boxB,
+                                  Vector3<double>(0.0, 0.0, 0.0),
+                                  q_rot45Z,
+                                  Vector3<double>(0.5, 0.0, 0.0),
+                                  q_rot90Y,
+                                  true,
+                                  "BoxBox_Rotated_Overlapping");
+}
+
+TEST_F(GJKOverloadConsistencyTest, IntersectOverloads_BoxBox_Rotated_Separated)
+{
+    checkAllGJKIntersectOverloads(*boxA,
+                                  *boxB,
+                                  Vector3<double>(0.0, 0.0, 0.0),
+                                  q_oblique,
+                                  Vector3<double>(5.0, 0.0, 0.0),
+                                  q_rot90Y,
+                                  false,
+                                  "BoxBox_Rotated_Separated");
+}
+
+TEST_F(GJKOverloadConsistencyTest, IntersectOverloads_BoxSphere_Overlapping)
+{
+    checkAllGJKIntersectOverloads(*boxA,
+                                  *sphereB,
+                                  Vector3<double>(0.0, 0.0, 0.0),
+                                  q_id,
+                                  Vector3<double>(0.5, 0.0, 0.0),
+                                  q_id,
+                                  true,
+                                  "BoxSphere_Overlapping");
+}
+
+TEST_F(GJKOverloadConsistencyTest, IntersectOverloads_BoxSphere_Separated)
+{
+    checkAllGJKIntersectOverloads(*boxA,
+                                  *sphereB,
+                                  Vector3<double>(0.0, 0.0, 0.0),
+                                  q_rot90Y,
+                                  Vector3<double>(4.0, 0.0, 0.0),
+                                  q_oblique,
+                                  false,
+                                  "BoxSphere_Separated");
+}
+
+TEST_F(GJKOverloadConsistencyTest, IntersectOverloads_SphereSphere_Overlapping)
+{
+    checkAllGJKIntersectOverloads(*sphereA,
+                                  *sphereB,
+                                  Vector3<double>(0.0, 0.0, 0.0),
+                                  q_id,
+                                  Vector3<double>(1.2, 0.0, 0.0),
+                                  q_id,
+                                  true,
+                                  "SphereSphere_Overlapping");
+}
+
+TEST_F(GJKOverloadConsistencyTest, IntersectOverloads_SphereSphere_Separated)
+{
+    checkAllGJKIntersectOverloads(*sphereA,
+                                  *sphereB,
+                                  Vector3<double>(0.0, 0.0, 0.0),
+                                  q_id,
+                                  Vector3<double>(4.0, 0.0, 0.0),
+                                  q_id,
+                                  false,
+                                  "SphereSphere_Separated");
+}
+
+TEST_F(GJKOverloadConsistencyTest, IntersectOverloads_BoxSuperquadric_Overlapping)
+{
+    checkAllGJKIntersectOverloads(*boxA,
+                                  *superquadricB,
+                                  Vector3<double>(0.0, 0.0, 0.0),
+                                  q_rot45Z,
+                                  Vector3<double>(0.4, 0.0, 0.0),
+                                  q_rot90Y,
+                                  true,
+                                  "BoxSuperquadric_Overlapping");
+}
+
+TEST_F(GJKOverloadConsistencyTest, IntersectOverloads_BoxSuperquadric_Separated)
+{
+    checkAllGJKIntersectOverloads(*boxA,
+                                  *superquadricB,
+                                  Vector3<double>(0.0, 0.0, 0.0),
+                                  q_oblique,
+                                  Vector3<double>(6.0, 0.0, 0.0),
+                                  q_rot90Y,
+                                  false,
+                                  "BoxSuperquadric_Separated");
+}
+
+// =================================================================================================
+// computeClosestPoints_GJK -- all 4 overloads produce same distance and closest points
+// (Only tested for non-intersecting pairs where the distance result is meaningful)
+// =================================================================================================
+
+TEST_F(GJKOverloadConsistencyTest, ClosestPoints_BoxBox_IdentityOrientation)
+{
+    // Separated boxes, identity orientation, gap = 3 - 1 - 0.5 = 1.5
+    checkAllGJKClosestPointsOverloads(*boxA,
+                                      *boxB,
+                                      Vector3<double>(0.0, 0.0, 0.0),
+                                      q_id,
+                                      Vector3<double>(3.0, 0.0, 0.0),
+                                      q_id,
+                                      "ClosestPts_BoxBox_Identity");
+}
+
+TEST_F(GJKOverloadConsistencyTest, ClosestPoints_BoxBox_Rotated)
+{
+    // Box A identity at origin, box B rotated 90°Y, center at (4, 0, 0)
+    checkAllGJKClosestPointsOverloads(*boxA,
+                                      *boxB,
+                                      Vector3<double>(0.0, 0.0, 0.0),
+                                      q_id,
+                                      Vector3<double>(4.0, 0.0, 0.0),
+                                      q_rot90Y,
+                                      "ClosestPts_BoxBox_Rotated");
+}
+
+TEST_F(GJKOverloadConsistencyTest, ClosestPoints_BoxSphere_Separated)
+{
+    // Box A at origin, sphere B at (4, 0, 0): gap = 4 - 1 - 0.5 = 2.5
+    checkAllGJKClosestPointsOverloads(*boxA,
+                                      *sphereB,
+                                      Vector3<double>(0.0, 0.0, 0.0),
+                                      q_id,
+                                      Vector3<double>(4.0, 0.0, 0.0),
+                                      q_id,
+                                      "ClosestPts_BoxSphere_Separated");
+}
+
+TEST_F(GJKOverloadConsistencyTest, ClosestPoints_BoxSphere_Rotated_A)
+{
+    // Rotated box A separated from sphere B
+    checkAllGJKClosestPointsOverloads(*boxA,
+                                      *sphereB,
+                                      Vector3<double>(0.0, 0.0, 0.0),
+                                      q_rot45Z,
+                                      Vector3<double>(5.0, 0.0, 0.0),
+                                      q_id,
+                                      "ClosestPts_BoxSphere_RotatedA");
+}
+
+TEST_F(GJKOverloadConsistencyTest, ClosestPoints_SphereSphere_Separated)
+{
+    // Sphere A at origin, sphere B at (5, 0, 0): gap = 5 - 1 - 0.5 = 3.5
+    checkAllGJKClosestPointsOverloads(*sphereA,
+                                      *sphereB,
+                                      Vector3<double>(0.0, 0.0, 0.0),
+                                      q_id,
+                                      Vector3<double>(5.0, 0.0, 0.0),
+                                      q_id,
+                                      "ClosestPts_SphereSphere_Separated");
+}
+
+TEST_F(GJKOverloadConsistencyTest, ClosestPoints_SphereSphere_DiagonalSeparation)
+{
+    // Diagonal separation: A at origin, B at (3, 3, 3)
+    checkAllGJKClosestPointsOverloads(*sphereA,
+                                      *sphereB,
+                                      Vector3<double>(0.0, 0.0, 0.0),
+                                      q_id,
+                                      Vector3<double>(3.0, 3.0, 3.0),
+                                      q_id,
+                                      "ClosestPts_SphereSphere_Diagonal");
+}
+
+TEST_F(GJKOverloadConsistencyTest, ClosestPoints_BoxSuperquadric_Separated)
+{
+    // Box A rotated at origin, superquadric B far away with oblique rotation
+    checkAllGJKClosestPointsOverloads(*boxA,
+                                      *superquadricB,
+                                      Vector3<double>(0.0, 0.0, 0.0),
+                                      q_rot90Y,
+                                      Vector3<double>(5.0, 0.0, 0.0),
+                                      q_oblique,
+                                      "ClosestPts_BoxSuperquadric_Separated");
+}
+
+TEST_F(GJKOverloadConsistencyTest, ClosestPoints_NonIdentityBothShapes)
+{
+    // Both shapes at non-trivial world poses
+    checkAllGJKClosestPointsOverloads(*boxA,
+                                      *sphereA,
+                                      Vector3<double>(-3.0, 1.0, 0.0),
+                                      q_rot45Z,
+                                      Vector3<double>(3.0, -1.0, 0.0),
+                                      q_oblique,
+                                      "ClosestPts_NonIdentityBoth");
+}
+
+// =================================================================================================
+// Random 100-config consistency test
+// =================================================================================================
+TEST_F(GJKOverloadConsistencyTest, RandomConfigs_AllOverloadsConsistent)
+{
+    std::mt19937_64                        rng(20260315ULL);
+    std::uniform_real_distribution<double> distPos(-4.0, 4.0);
+    std::uniform_real_distribution<double> distDim(0.1, 1.5);
+    std::uniform_real_distribution<double> distAxis(-1.0, 1.0);
+    std::uniform_real_distribution<double> distAngle(0.0, 2.0 * M_PI);
+
+    auto randUnitAxis = [&]() -> std::tuple<double, double, double> {
+        double x, y, z, len;
+        do
+        {
+            x   = distAxis(rng);
+            y   = distAxis(rng);
+            z   = distAxis(rng);
+            len = std::sqrt(x * x + y * y + z * z);
+        } while(len < 1e-6);
+        return {x / len, y / len, z / len};
+    };
+
+    auto randQuat = [&]() -> Quaternion<double> {
+        auto [ax, ay, az]  = randUnitAxis();
+        const double angle = distAngle(rng);
+        const double s     = std::sin(angle * 0.5);
+        const double c     = std::cos(angle * 0.5);
+        return Quaternion<double>(ax * s, ay * s, az * s, c);
+    };
+
+    // Shape pool to randomly pick from each trial
+    Convex<double>* shapes[]  = {boxA, boxB, sphereA, sphereB, superquadricA, superquadricB};
+    constexpr int   numShapes = 6;
+    std::uniform_int_distribution<int> distShape(0, numShapes - 1);
+
+    constexpr double crust   = 0.0;
+    constexpr double distEPS = 1e-6;
+    // ptEPS is intentionally looser than the deterministic tests: overloads that accept
+    // absolute world-space transforms (2 & 4) perform an extra absolute→relative coordinate
+    // conversion internally, introducing additional floating-point rounding (~1–3e-5).
+    // 5e-5 comfortably covers the observed worst-case difference while still catching
+    // any genuine disagreement between overloads.
+    constexpr double ptEPS = 5e-5;
+
+    for(int trial = 0; trial < 100; ++trial)
+    {
+        const Convex<double>& shapeA = *shapes[distShape(rng)];
+        const Convex<double>& shapeB = *shapes[distShape(rng)];
+
+        const Vector3<double>    v_a2w(distPos(rng), distPos(rng), distPos(rng));
+        const Vector3<double>    v_b2w(distPos(rng), distPos(rng), distPos(rng));
+        const Quaternion<double> q_a2w = randQuat();
+        const Quaternion<double> q_b2w = randQuat();
+
+        // ---- Derive relative inputs ----
+        const Transform3<double> trA2W(q_a2w, v_a2w);
+        const Transform3<double> trB2W(q_b2w, v_b2w);
+        const Transform3<double> trB2A(trA2W, trB2W);
+        const Quaternion<double> q_b2a = inverse(q_a2w) * q_b2w;
+        const Vector3<double>    v_b2a = q_a2w << (v_b2w - v_a2w);
+
+        // ---- intersectGJK: all 4 overloads must agree ----
+        const bool iRes1 = intersectGJK(shapeA, shapeB, trB2A);
+        const bool iRes2 = intersectGJK(shapeA, shapeB, trA2W, trB2W);
+        const bool iRes3 = intersectGJK(shapeA, shapeB, v_b2a, q_b2a);
+        const bool iRes4 = intersectGJK(shapeA, shapeB, v_a2w, v_b2w, q_a2w, q_b2w);
+
+        EXPECT_EQ(iRes1, iRes2) << "trial " << trial << ": intersect overloads 1 vs 2 disagree";
+        EXPECT_EQ(iRes1, iRes3) << "trial " << trial << ": intersect overloads 1 vs 3 disagree";
+        EXPECT_EQ(iRes1, iRes4) << "trial " << trial << ": intersect overloads 1 vs 4 disagree";
+
+        // ---- computeClosestPoints_GJK: all 4 overloads must agree ----
+        // Only meaningful when shapes are not intersecting (d > small threshold)
+        uint            nbIter1, nbIter2, nbIter3, nbIter4;
+        Vector3<double> pa1, pb1, pa2, pb2, pa3, pb3, pa4, pb4;
+
+        const double d1 = computeClosestPoints_GJK<double, GJKType::JOHNSON>(shapeA,
+                                                                             shapeB,
+                                                                             trB2A,
+                                                                             crust,
+                                                                             crust,
+                                                                             pa1,
+                                                                             pb1,
+                                                                             nbIter1);
+        const double d2 = computeClosestPoints_GJK<double, GJKType::JOHNSON>(shapeA,
+                                                                             shapeB,
+                                                                             trA2W,
+                                                                             trB2W,
+                                                                             crust,
+                                                                             crust,
+                                                                             pa2,
+                                                                             pb2,
+                                                                             nbIter2);
+        const double d3 = computeClosestPoints_GJK<double, GJKType::JOHNSON>(shapeA,
+                                                                             shapeB,
+                                                                             v_b2a,
+                                                                             q_b2a,
+                                                                             crust,
+                                                                             crust,
+                                                                             pa3,
+                                                                             pb3,
+                                                                             nbIter3);
+        const double d4 = computeClosestPoints_GJK<double, GJKType::JOHNSON>(shapeA,
+                                                                             shapeB,
+                                                                             v_a2w,
+                                                                             v_b2w,
+                                                                             q_a2w,
+                                                                             q_b2w,
+                                                                             crust,
+                                                                             crust,
+                                                                             pa4,
+                                                                             pb4,
+                                                                             nbIter4);
+
+        // Distance must agree across all overloads
+        EXPECT_NEAR(d1, d2, distEPS) << "trial " << trial << ": distance overloads 1 vs 2 differ";
+        EXPECT_NEAR(d1, d3, distEPS) << "trial " << trial << ": distance overloads 1 vs 3 differ";
+        EXPECT_NEAR(d1, d4, distEPS) << "trial " << trial << ": distance overloads 1 vs 4 differ";
+
+        // Closest points: pa in A's local frame, pb in B's local frame -- same for all overloads
+        if(!iRes1)  // Only compare when not intersecting (pa/pb well-defined)
+        {
+            for(int i = 0; i < 3; ++i)
+            {
+                EXPECT_NEAR(pa1[i], pa2[i], ptEPS)
+                    << "trial " << trial << ": pa[" << i << "] overloads 1 vs 2";
+                EXPECT_NEAR(pa1[i], pa3[i], ptEPS)
+                    << "trial " << trial << ": pa[" << i << "] overloads 1 vs 3";
+                EXPECT_NEAR(pa1[i], pa4[i], ptEPS)
+                    << "trial " << trial << ": pa[" << i << "] overloads 1 vs 4";
+
+                EXPECT_NEAR(pb1[i], pb2[i], ptEPS)
+                    << "trial " << trial << ": pb[" << i << "] overloads 1 vs 2";
+                EXPECT_NEAR(pb1[i], pb3[i], ptEPS)
+                    << "trial " << trial << ": pb[" << i << "] overloads 1 vs 3";
+                EXPECT_NEAR(pb1[i], pb4[i], ptEPS)
+                    << "trial " << trial << ": pb[" << i << "] overloads 1 vs 4";
+            }
+        }
+    }
 }

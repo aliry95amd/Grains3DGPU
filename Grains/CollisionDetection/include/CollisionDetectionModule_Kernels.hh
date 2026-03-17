@@ -5,6 +5,7 @@
 #include <cuda_runtime.h>
 
 #include "ContactInfo.hh"
+#include "GJK.hh"
 #include "GrainsParameters.hh"
 #include "Quaternion.hh"
 #include "RigidBody.hh"
@@ -57,9 +58,8 @@ __GLOBAL__ void filterPairsBV_Kernel(const RigidBody<T>* const* rigidBodies,
                                      const uint                 nPairs);
 
 /** @brief Narrow-phase GJK detection (relative vec/quat).
-    When @p activePairIndices is non-null each thread resolves its original pair index through
-    the indirection table (BV-compacted path, zero divergence); when null the thread ID is used
-    directly (BV-off path, all pairs).
+    When activePairIndices is non-null each thread resolves its original pair index through the
+    indirection table; when null the thread ID is used directly.
     @param rigidBody         Rigid body array
     @param pairList          Full pair list
     @param activePairIndices Compacted index table from CUB, or nullptr to process all pairs
@@ -75,6 +75,30 @@ __GLOBAL__ void detectCollisionsComponents_Kernel(const RigidBody<T>* const* rig
                                                   const Quaternion<T>*       relQuaternion,
                                                   ContactInfo<T>*            contactInfo,
                                                   const uint                 nPairs);
+
+/** @brief Narrow-phase GJK detection using absolute world-frame positions and quaternions.
+    Used when relative transformations are disabled (e.g. sphere-only simulations where computing
+    relative transforms is more expensive than running GJK directly in world frame).
+    When @p activePairIndices is non-null each thread resolves its original pair index through the
+    indirection table (BV-compacted path); when null the thread ID is used directly.
+    @param rigidBody         Rigid body array
+    @param pairList          Full pair list
+    @param activePairIndices Compacted index table from CUB, or nullptr to process all pairs
+    @param position          World-frame positions
+    @param quaternion        World-frame quaternions
+    @param contactInfo       Output contact information
+    @param nPairs            Number of pairs to process (active or total) */
+template <typename T,
+          GJKType            GJKVARIANT = GJKType::JOHNSON,
+          bool               GJKACC     = false,
+          BoundingVolumeType BVType     = BoundingVolumeType::OFF>
+__GLOBAL__ void detectCollisionsComponentsGlobal_Kernel(const RigidBody<T>* const* rigidBody,
+                                                        const uint2*               pairList,
+                                                        const uint*          activePairIndices,
+                                                        const Vector3<T>*    position,
+                                                        const Quaternion<T>* quaternion,
+                                                        ContactInfo<T>*      contactInfo,
+                                                        const uint           nPairs);
 
 /** @brief Transforms contact info from A-local frame to world frame for all pairs in parallel.
     @param pairList list of pairs

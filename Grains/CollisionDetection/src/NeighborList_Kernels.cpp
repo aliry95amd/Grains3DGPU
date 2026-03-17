@@ -108,9 +108,21 @@ __HOST__ void updateNeighborList_LC_Host(const uint*                            
             {
                 for(uint otherParticle : neighborCellParticles)
                 {
-                    // ordering to avoid duplicates
-                    if(primaryParticle < otherParticle)
-                        pairList.push_back(make_uint2(primaryParticle, otherParticle));
+                    if(targetCell == c)
+                    {
+                        // Same-cell: avoid duplicates with ordering check
+                        if(primaryParticle < otherParticle)
+                            pairList.push_back(make_uint2(primaryParticle, otherParticle));
+                    }
+                    else
+                    {
+                        // Cross-cell: always emit – uniqueness is guaranteed by targetCell > c
+                        const uint lo
+                            = primaryParticle < otherParticle ? primaryParticle : otherParticle;
+                        const uint hi
+                            = primaryParticle < otherParticle ? otherParticle : primaryParticle;
+                        pairList.push_back(make_uint2(lo, hi));
+                    }
                 }
             }
         }
@@ -227,14 +239,18 @@ __GLOBAL__ void countNeighbors_Device(const uint*     cellNeighborsList,
         if(k == numCells)
             cellEnd = numParticles;
 
-        // Count particles in this neighbor cell
+        // Count particles in this neighbor cell.
+        // For same-cell pairs (c == cell): use i < j to avoid duplicates.
+        // For cross-cell pairs (c > cell): the c >= cell condition already ensures
+        // only this thread processes the (cell, c) cell pair, so emit all pairs.
         for(uint p = cellStart; p < cellEnd; ++p)
         {
             const uint j = (uint)(cellParticleIDs[p] & 0xFFFFFFFF);
 
-            // Only count if j > i (matching the write condition)
-            if(j > i)
-                totalNeighbors++;
+            if(c == cell && j <= i)
+                continue;
+
+            totalNeighbors++;
         }
     }
 
@@ -294,16 +310,20 @@ __GLOBAL__ void updateNeighborList_LC_Device(const uint*     cellNeighborsList,
         if(k == numCells)
             cellEnd = numParticles;
 
-        // Loop through particles in the neighbor cell
+        // Loop through particles in the neighbor cell.
+        // For same-cell pairs (c == cell): use i < j to avoid duplicates.
+        // For cross-cell pairs (c > cell): the c >= cell condition already ensures
+        // only this thread processes the (cell, c) cell pair, so emit all pairs.
         for(uint p = cellStart; p < cellEnd; ++p)
         {
             // Unpack particle ID from cellParticleIDs
             const uint j = (uint)(cellParticleIDs[p] & 0xFFFFFFFF);
 
-            if(i >= j)
+            if(c == cell && i >= j)
                 continue;
 
-            pairList[insertIndex++] = make_uint2(i, j);
+            // Always write (min,max) to keep pairs canonically ordered.
+            pairList[insertIndex++] = (i < j) ? make_uint2(i, j) : make_uint2(j, i);
         }
     }
 }
@@ -311,7 +331,8 @@ __GLOBAL__ void updateNeighborList_LC_Device(const uint*     cellNeighborsList,
 // -------------------------------------------------------------------------------------------------
 // Count neighbors per particle for AtomicFixed using direct count lookup
 __GLOBAL__ void countNeighbors_AtomicFixed_Device(const uint*     cellNeighborsList,
-                                                  const uint64_t* cellParticleIDs,
+                                                  const uint64_t* cellParticleIDsFixed,
+                                                  const uint64_t* particleCellIDsSeq,
                                                   const uint*     numParticlesPerCell,
                                                   const uint      maxParticlesPerCell,
                                                   const uint      numParticles,
@@ -324,8 +345,9 @@ __GLOBAL__ void countNeighbors_AtomicFixed_Device(const uint*     cellNeighborsL
     if(tID >= numParticles)
         return;
 
-    // Unpack cellID and particleID from uint64
-    const uint64_t packed = cellParticleIDs[tID];
+    // Use sequential buffer: particleCellIDsSeq[tID] = (cellID<<32 | particleID)
+    // cellParticleIDsFixed uses 2D layout [cellID*maxPerCell+slot] for neighbour traversal.
+    const uint64_t packed = particleCellIDsSeq[tID];
     const uint     cell   = (uint)(packed >> 32);
     const uint     i      = (uint)(packed & 0xFFFFFFFF);
 
@@ -347,12 +369,15 @@ __GLOBAL__ void countNeighbors_AtomicFixed_Device(const uint*     cellNeighborsL
         uint cellStart = c * maxParticlesPerCell;
         uint cellEnd   = cellStart + numParticlesPerCell[c];
 
-        // Count particles in the neighbor cell
+        // Count particles in the neighbor cell.
+        // For same-cell pairs (c == cell): use i < j to avoid duplicates.
+        // For cross-cell pairs (c > cell): the c >= cell condition already ensures
+        // only this thread processes the (cell, c) cell pair, so emit all pairs.
         for(uint p = cellStart; p < cellEnd; ++p)
         {
-            const uint j = (uint)(cellParticleIDs[p] & 0xFFFFFFFF);
+            const uint j = (uint)(cellParticleIDsFixed[p] & 0xFFFFFFFF);
 
-            if(i >= j)
+            if(c == cell && i >= j)
                 continue;
 
             count++;
@@ -365,7 +390,8 @@ __GLOBAL__ void countNeighbors_AtomicFixed_Device(const uint*     cellNeighborsL
 // -------------------------------------------------------------------------------------------------
 // Updates the neighbor list for AtomicFixed using direct count lookup
 __GLOBAL__ void updateNeighborList_LC_AtomicFixed_Device(const uint*     cellNeighborsList,
-                                                         const uint64_t* cellParticleIDs,
+                                                         const uint64_t* cellParticleIDsFixed,
+                                                         const uint64_t* particleCellIDsSeq,
                                                          const uint*     numParticlesPerCell,
                                                          const uint*     numNeighborsPrefixSums,
                                                          const uint      maxParticlesPerCell,
@@ -381,8 +407,9 @@ __GLOBAL__ void updateNeighborList_LC_AtomicFixed_Device(const uint*     cellNei
     if(tID >= numParticles)
         return;
 
-    // Unpack cellID and particleID from uint64
-    const uint64_t packed = cellParticleIDs[tID];
+    // Use sequential buffer: particleCellIDsSeq[tID] = (cellID<<32 | particleID)
+    // cellParticleIDsFixed uses 2D layout [cellID*maxPerCell+slot] for neighbour traversal.
+    const uint64_t packed = particleCellIDsSeq[tID];
     const uint     cell   = (uint)(packed >> 32);
     const uint     i      = (uint)(packed & 0xFFFFFFFF);
 
@@ -404,15 +431,19 @@ __GLOBAL__ void updateNeighborList_LC_AtomicFixed_Device(const uint*     cellNei
         uint cellStart = c * maxParticlesPerCell;
         uint cellEnd   = cellStart + numParticlesPerCell[c];
 
-        // Loop through particles in the neighbor cell
+        // Loop through particles in the neighbor cell.
+        // For same-cell pairs (c == cell): use i < j to avoid duplicates.
+        // For cross-cell pairs (c > cell): the c >= cell condition already ensures
+        // only this thread processes the (cell, c) cell pair, so emit all pairs.
         for(uint p = cellStart; p < cellEnd; ++p)
         {
-            const uint j = (uint)(cellParticleIDs[p] & 0xFFFFFFFF);
+            const uint j = (uint)(cellParticleIDsFixed[p] & 0xFFFFFFFF);
 
-            if(i >= j)
+            if(c == cell && i >= j)
                 continue;
 
-            pairList[insertIndex++] = make_uint2(i, j);
+            // Always write (min,max) to keep pairs canonically ordered.
+            pairList[insertIndex++] = (i < j) ? make_uint2(i, j) : make_uint2(j, i);
         }
     }
 }

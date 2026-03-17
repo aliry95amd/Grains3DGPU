@@ -120,6 +120,7 @@ set(POTENTIAL_TEST_FILES
     geometry/test_transform.cpp
     collision/test_gjk.cpp
     collision/test_obb.cpp
+    collision/test_obc.cpp
     collision/test_collision_detection.cpp
     collision/test_neighborlist.cpp
     component/test_rigid_body.cpp

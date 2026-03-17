@@ -1,10 +1,36 @@
+#include <chrono>
 #include <cub/cub.cuh>
+#include <type_traits>
+#include <vector>
 
 #include "CollisionDetectionCommon.hh"
 #include "CollisionDetectionModule.hh"
 #include "CollisionDetectionModule_Kernels.hh"
 #include "GrainsParameters.hh"
 #include "GrainsUtils.hh"
+
+// Clock type used for all pipeline timing measurements.
+using GrainsClock = std::chrono::high_resolution_clock;
+
+// -------------------------------------------------------------------------------------------------
+// Dispatches from runtime (NarrowPhaseType, bool) to compile-time template arguments by calling
+//   f( std::integral_constant<GJKType, GJKV>{}, std::bool_constant<GJKA>{} )
+// with the four concrete instantiations. The generic lambda in the call site then recovers
+// GJKV / GJKA as constexpr values via "constexpr auto V = decltype(tag)::value".
+template <typename Func>
+static void dispatchGJK(NarrowPhaseType npType, bool gjkAcc, Func&& f)
+{
+    using J  = std::integral_constant<GJKType, GJKType::JOHNSON>;
+    using SV = std::integral_constant<GJKType, GJKType::SIGNEDVOLUME>;
+    if(npType == NarrowPhaseType::GJK && !gjkAcc)
+        std::forward<Func>(f)(J{}, std::false_type{});
+    else if(npType == NarrowPhaseType::GJK && gjkAcc)
+        std::forward<Func>(f)(J{}, std::true_type{});
+    else if(npType == NarrowPhaseType::GJK_SV && !gjkAcc)
+        std::forward<Func>(f)(SV{}, std::false_type{});
+    else
+        std::forward<Func>(f)(SV{}, std::true_type{});
+}
 
 // -------------------------------------------------------------------------------------------------
 // Constructor: builds the NeighborList object, then allocates pair-indexed buffers
@@ -116,9 +142,18 @@ void CollisionDetectionModule<T, M>::run(const RigidBody<T>* const*          rig
                   nObstacles,
                   nParticles);
     updateNeighborList(positions, pairList, contactInfo, numPairs, nObstacles, nParticles);
-    computeRelativeTransformations(positions, orientations, pairList);
-    detectCollisionsComponents(rigidBodies, pairList);
-    transformContactInfo(positions, orientations, pairList, contactInfo);
+    if(GrainsParameters<T>::m_collisionDetection.useRelativeTransformations)
+    {
+        computeRelativeTransformations(positions, orientations, pairList);
+        detectCollisionsComponents(rigidBodies, pairList);
+        transformContactInfo(positions, orientations, pairList, contactInfo);
+    }
+    else
+        detectCollisionsComponentsGlobal(rigidBodies,
+                                         positions,
+                                         orientations,
+                                         pairList,
+                                         contactInfo);
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -167,6 +202,10 @@ void CollisionDetectionModule<T, M>::updateNeighborList(
 {
     auto& SS = GrainsParameters<T>::m_simulationState;
 
+    GrainsClock::time_point t0;
+    if(GrainsParameters<T>::m_collisionDetection.timer)
+        t0 = GrainsClock::now();
+
     bool updated = m_neighborList->updateNeighborList(positions, nObstacles, nParticles);
     if(updated)
     {
@@ -175,6 +214,14 @@ void CollisionDetectionModule<T, M>::updateNeighborList(
         m_neighborList->getBuffer().copyTo(pairList);
         numPairs = newSize;
         SS.neighborListUpdateCount++;
+    }
+
+    if(GrainsParameters<T>::m_collisionDetection.timer)
+    {
+        if constexpr(M == MemType::DEVICE)
+            cudaDeviceSynchronize();
+        GrainsParameters<T>::m_timer.neighborListTime
+            += std::chrono::duration<double>(GrainsClock::now() - t0).count();
     }
 }
 
@@ -187,6 +234,11 @@ void CollisionDetectionModule<T, M>::computeRelativeTransformations(
     const GrainsMemBuffer<uint2, M>&         pairList)
 {
     const uint nPairs = m_neighborList->getSize();
+
+    const bool              timing = GrainsParameters<T>::m_collisionDetection.timer;
+    GrainsClock::time_point t0;
+    if(timing)
+        t0 = GrainsClock::now();
 
     if constexpr(M == MemType::HOST)
     {
@@ -211,6 +263,10 @@ void CollisionDetectionModule<T, M>::computeRelativeTransformations(
                                                                          nPairs);
         cudaDeviceSynchronize();
     }
+
+    if(timing)
+        GrainsParameters<T>::m_timer.relativeTransformTime
+            += std::chrono::duration<double>(GrainsClock::now() - t0).count();
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -222,67 +278,236 @@ void CollisionDetectionModule<T, M>::detectCollisionsComponents(
 {
     const uint               nPairs = m_neighborList->getSize();
     const BoundingVolumeType bvType = GrainsParameters<T>::m_collisionDetection.boundingVolumeType;
+    const NarrowPhaseType    npType = GrainsParameters<T>::m_collisionDetection.narrowPhaseType;
+    const bool               gjkAcc = GrainsParameters<T>::m_collisionDetection.gjkAcceleration;
+    const bool               timing = GrainsParameters<T>::m_collisionDetection.timer;
 
     if constexpr(M == MemType::HOST)
     {
-        for(uint i = 0; i < nPairs; ++i)
-        {
-            if(bvType == BoundingVolumeType::OBB)
-                detectCollisionsComponents_common<T,
-                                                  GJKType::JOHNSON,
-                                                  false,
-                                                  BoundingVolumeType::OBB>(
-                    pairList.getData(),
-                    rigidBodies,
-                    m_relPosition.getData(),
-                    m_relQuaternion.getData(),
-                    m_contactInfoLocal.getData(),
-                    i);
-            else
-                detectCollisionsComponents_common(pairList.getData(),
-                                                  rigidBodies,
-                                                  m_relPosition.getData(),
-                                                  m_relQuaternion.getData(),
-                                                  m_contactInfoLocal.getData(),
-                                                  i);
-        }
+        // BVType is passed directly to detectCollisionsComponents_common, which forwards it to
+        // closestPointsRigidBodies. The BV early-out and no-contact sentinel are handled
+        // internally, so no separate filter loop or explicit sentinel write is needed here.
+        auto run = [&](auto bvTypeTag) {
+            constexpr BoundingVolumeType BVT = decltype(bvTypeTag)::value;
+            GrainsClock::time_point      t0;
+            if(timing)
+                t0 = GrainsClock::now();
+            dispatchGJK(npType, gjkAcc, [&](auto gjkV_tag, auto gjkA_tag) {
+                constexpr GJKType GJKV = decltype(gjkV_tag)::value;
+                constexpr bool    GJKA = decltype(gjkA_tag)::value;
+                for(uint i = 0; i < nPairs; ++i)
+                    detectCollisionsComponents_common<T, GJKV, GJKA, BVT>(
+                        pairList.getData(),
+                        rigidBodies,
+                        m_relPosition.getData(),
+                        m_relQuaternion.getData(),
+                        m_contactInfoLocal.getData(),
+                        i);
+            });
+            if(timing)
+                GrainsParameters<T>::m_timer.narrowPhaseTime
+                    += std::chrono::duration<double>(GrainsClock::now() - t0).count();
+        };
+
+        using OFFT = std::integral_constant<BoundingVolumeType, BoundingVolumeType::OFF>;
+        using OBBT = std::integral_constant<BoundingVolumeType, BoundingVolumeType::OBB>;
+        using OBCT = std::integral_constant<BoundingVolumeType, BoundingVolumeType::OBC>;
+        if(bvType == BoundingVolumeType::OBB)
+            run(OBBT{});
+        else if(bvType == BoundingVolumeType::OBC)
+            run(OBCT{});
+        else
+            run(OFFT{});
     }
     else
     {
-        if(bvType == BoundingVolumeType::OBB)
+        if(bvType == BoundingVolumeType::OBB || bvType == BoundingVolumeType::OBC)
         {
             filterPairsBV(rigidBodies, pairList, m_contactInfoLocal);
+            GrainsClock::time_point t0;
+            if(timing)
+                t0 = GrainsClock::now();
             uint numThreads, numBlocks;
             computeOptimalThreadsAndBlocks((uint)m_bvPassPairCount,
                                            GrainsParameters<T>::m_GPU,
                                            numBlocks,
                                            numThreads);
-            detectCollisionsComponents_Kernel<T, GJKType::JOHNSON, false>
-                <<<numBlocks, numThreads>>>(rigidBodies,
-                                            pairList.getData(),
-                                            m_bvPassPairIndices.getData(),
-                                            m_relPosition.getData(),
-                                            m_relQuaternion.getData(),
-                                            m_contactInfoLocal.getData(),
-                                            (uint)m_bvPassPairCount);
+            dispatchGJK(npType, gjkAcc, [&](auto gjkV_tag, auto gjkA_tag) {
+                constexpr GJKType GJKV = decltype(gjkV_tag)::value;
+                constexpr bool    GJKA = decltype(gjkA_tag)::value;
+                detectCollisionsComponents_Kernel<T, GJKV, GJKA>
+                    <<<numBlocks, numThreads>>>(rigidBodies,
+                                                pairList.getData(),
+                                                m_bvPassPairIndices.getData(),
+                                                m_relPosition.getData(),
+                                                m_relQuaternion.getData(),
+                                                m_contactInfoLocal.getData(),
+                                                (uint)m_bvPassPairCount);
+            });
+            cudaDeviceSynchronize();
+            if(timing)
+                GrainsParameters<T>::m_timer.narrowPhaseTime
+                    += std::chrono::duration<double>(GrainsClock::now() - t0).count();
         }
         else
         {
+            GrainsClock::time_point t0;
+            if(timing)
+                t0 = GrainsClock::now();
             uint numThreads, numBlocks;
             computeOptimalThreadsAndBlocks(nPairs,
                                            GrainsParameters<T>::m_GPU,
                                            numBlocks,
                                            numThreads);
-            detectCollisionsComponents_Kernel<T, GJKType::JOHNSON, false>
-                <<<numBlocks, numThreads>>>(rigidBodies,
+            dispatchGJK(npType, gjkAcc, [&](auto gjkV_tag, auto gjkA_tag) {
+                constexpr GJKType GJKV = decltype(gjkV_tag)::value;
+                constexpr bool    GJKA = decltype(gjkA_tag)::value;
+                detectCollisionsComponents_Kernel<T, GJKV, GJKA>
+                    <<<numBlocks, numThreads>>>(rigidBodies,
+                                                pairList.getData(),
+                                                nullptr,
+                                                m_relPosition.getData(),
+                                                m_relQuaternion.getData(),
+                                                m_contactInfoLocal.getData(),
+                                                nPairs);
+            });
+            cudaDeviceSynchronize();
+            if(timing)
+                GrainsParameters<T>::m_timer.narrowPhaseTime
+                    += std::chrono::duration<double>(GrainsClock::now() - t0).count();
+        }
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+// Narrow-phase GJK using world-frame positions/quaternions directly
+template <typename T, MemType M>
+void CollisionDetectionModule<T, M>::detectCollisionsComponentsGlobal(
+    const RigidBody<T>* const*               rigidBodies,
+    const GrainsMemBuffer<Vector3<T>, M>&    positions,
+    const GrainsMemBuffer<Quaternion<T>, M>& orientations,
+    const GrainsMemBuffer<uint2, M>&         pairList,
+    GrainsMemBuffer<ContactInfo<T>, M>&      contactInfo)
+{
+    const uint               nPairs = m_neighborList->getSize();
+    const BoundingVolumeType bvType = GrainsParameters<T>::m_collisionDetection.boundingVolumeType;
+    const NarrowPhaseType    npType = GrainsParameters<T>::m_collisionDetection.narrowPhaseType;
+    const bool               gjkAcc = GrainsParameters<T>::m_collisionDetection.gjkAcceleration;
+    const bool               timing = GrainsParameters<T>::m_collisionDetection.timer;
+
+    if constexpr(M == MemType::HOST)
+    {
+        // BVType is passed directly to detectCollisionsComponentsGlobal_common, which forwards
+        // it to closestPointsRigidBodies. The BV early-out and no-contact sentinel are handled
+        // internally, so no separate filter loop or explicit sentinel write is needed here.
+        auto run = [&](auto bvTypeTag) {
+            constexpr BoundingVolumeType BVT = decltype(bvTypeTag)::value;
+            GrainsClock::time_point      t0;
+            if(timing)
+                t0 = GrainsClock::now();
+            dispatchGJK(npType, gjkAcc, [&](auto gjkV_tag, auto gjkA_tag) {
+                constexpr GJKType GJKV = decltype(gjkV_tag)::value;
+                constexpr bool    GJKA = decltype(gjkA_tag)::value;
+                for(uint i = 0; i < nPairs; ++i)
+                    detectCollisionsComponentsGlobal_common<T, GJKV, GJKA, BVT>(
+                        pairList.getData(),
+                        rigidBodies,
+                        positions.getData(),
+                        orientations.getData(),
+                        contactInfo.getData(),
+                        i);
+            });
+            if(timing)
+                GrainsParameters<T>::m_timer.narrowPhaseTime
+                    += std::chrono::duration<double>(GrainsClock::now() - t0).count();
+        };
+
+        using OFFT = std::integral_constant<BoundingVolumeType, BoundingVolumeType::OFF>;
+        using OBBT = std::integral_constant<BoundingVolumeType, BoundingVolumeType::OBB>;
+        using OBCT = std::integral_constant<BoundingVolumeType, BoundingVolumeType::OBC>;
+        if(bvType == BoundingVolumeType::OBB)
+            run(OBBT{});
+        else if(bvType == BoundingVolumeType::OBC)
+            run(OBCT{});
+        else
+            run(OFFT{});
+    }
+    else
+    {
+        if(bvType == BoundingVolumeType::OBB || bvType == BoundingVolumeType::OBC)
+        {
+            // Re-use the relative-transform BV filter infrastructure: compute relPos/relQuat
+            // on-the-fly (they live in m_relPosition / m_relQuaternion) then run filterPairsBV.
+            uint numBlocks, numThreads;
+            computeOptimalThreadsAndBlocks(nPairs,
+                                           GrainsParameters<T>::m_GPU,
+                                           numBlocks,
+                                           numThreads);
+            // Step 1: compute relative transforms needed by filterPairsBV_Kernel
+            computeRelativeTransformations_Kernel<T>
+                <<<numBlocks, numThreads>>>(positions.getData(),
+                                            orientations.getData(),
                                             pairList.getData(),
-                                            nullptr,
                                             m_relPosition.getData(),
                                             m_relQuaternion.getData(),
-                                            m_contactInfoLocal.getData(),
                                             nPairs);
+            cudaDeviceSynchronize();
+
+            // Step 2: BV filter (writes flags + sentinels)
+            filterPairsBV(rigidBodies, pairList, contactInfo);
+
+            // Step 3: GJK on compacted BV-passing pairs
+            GrainsClock::time_point t0;
+            if(timing)
+                t0 = GrainsClock::now();
+            computeOptimalThreadsAndBlocks((uint)m_bvPassPairCount,
+                                           GrainsParameters<T>::m_GPU,
+                                           numBlocks,
+                                           numThreads);
+            dispatchGJK(npType, gjkAcc, [&](auto gjkV_tag, auto gjkA_tag) {
+                constexpr GJKType GJKV = decltype(gjkV_tag)::value;
+                constexpr bool    GJKA = decltype(gjkA_tag)::value;
+                detectCollisionsComponentsGlobal_Kernel<T, GJKV, GJKA, BoundingVolumeType::OFF>
+                    <<<numBlocks, numThreads>>>(rigidBodies,
+                                                pairList.getData(),
+                                                m_bvPassPairIndices.getData(),
+                                                positions.getData(),
+                                                orientations.getData(),
+                                                contactInfo.getData(),
+                                                (uint)m_bvPassPairCount);
+            });
+            cudaDeviceSynchronize();
+            if(timing)
+                GrainsParameters<T>::m_timer.narrowPhaseTime
+                    += std::chrono::duration<double>(GrainsClock::now() - t0).count();
         }
-        cudaDeviceSynchronize();
+        else
+        {
+            GrainsClock::time_point t0;
+            if(timing)
+                t0 = GrainsClock::now();
+            uint numThreads, numBlocks;
+            computeOptimalThreadsAndBlocks(nPairs,
+                                           GrainsParameters<T>::m_GPU,
+                                           numBlocks,
+                                           numThreads);
+            dispatchGJK(npType, gjkAcc, [&](auto gjkV_tag, auto gjkA_tag) {
+                constexpr GJKType GJKV = decltype(gjkV_tag)::value;
+                constexpr bool    GJKA = decltype(gjkA_tag)::value;
+                detectCollisionsComponentsGlobal_Kernel<T, GJKV, GJKA, BoundingVolumeType::OFF>
+                    <<<numBlocks, numThreads>>>(rigidBodies,
+                                                pairList.getData(),
+                                                nullptr,
+                                                positions.getData(),
+                                                orientations.getData(),
+                                                contactInfo.getData(),
+                                                nPairs);
+            });
+            cudaDeviceSynchronize();
+            if(timing)
+                GrainsParameters<T>::m_timer.narrowPhaseTime
+                    += std::chrono::duration<double>(GrainsClock::now() - t0).count();
+        }
     }
 }
 
@@ -297,19 +522,35 @@ void CollisionDetectionModule<T, M>::filterPairsBV(
 {
     if constexpr(M == MemType::DEVICE)
     {
+        GrainsClock::time_point t0;
+        if(GrainsParameters<T>::m_collisionDetection.timer)
+            t0 = GrainsClock::now();
+
         const uint nPairs = m_neighborList->getSize();
         uint       numThreads, numBlocks;
         computeOptimalThreadsAndBlocks(nPairs, GrainsParameters<T>::m_GPU, numBlocks, numThreads);
 
         // Step 1: BV pass/fail flags + no-contact sentinels for rejected pairs
-        filterPairsBV_Kernel<T, BoundingVolumeType::OBB>
-            <<<numBlocks, numThreads>>>(rigidBodies,
-                                        pairList.getData(),
-                                        m_relPosition.getData(),
-                                        m_relQuaternion.getData(),
-                                        contactInfoLocal.getData(),
-                                        m_bvPassFlags.getData(),
-                                        nPairs);
+        const BoundingVolumeType bvType
+            = GrainsParameters<T>::m_collisionDetection.boundingVolumeType;
+        if(bvType == BoundingVolumeType::OBC)
+            filterPairsBV_Kernel<T, BoundingVolumeType::OBC>
+                <<<numBlocks, numThreads>>>(rigidBodies,
+                                            pairList.getData(),
+                                            m_relPosition.getData(),
+                                            m_relQuaternion.getData(),
+                                            contactInfoLocal.getData(),
+                                            m_bvPassFlags.getData(),
+                                            nPairs);
+        else
+            filterPairsBV_Kernel<T, BoundingVolumeType::OBB>
+                <<<numBlocks, numThreads>>>(rigidBodies,
+                                            pairList.getData(),
+                                            m_relPosition.getData(),
+                                            m_relQuaternion.getData(),
+                                            contactInfoLocal.getData(),
+                                            m_bvPassFlags.getData(),
+                                            nPairs);
         cudaDeviceSynchronize();
 
         // Step 2: CUB compaction - select original pair indices where flag == 1
@@ -328,6 +569,10 @@ void CollisionDetectionModule<T, M>::filterPairsBV(
                    m_bvPassPairCountDevice.getData(),
                    sizeof(int),
                    cudaMemcpyDeviceToHost);
+
+        if(GrainsParameters<T>::m_collisionDetection.timer)
+            GrainsParameters<T>::m_timer.bvFilterTime
+                += std::chrono::duration<double>(GrainsClock::now() - t0).count();
     }
 }
 
@@ -341,6 +586,11 @@ void CollisionDetectionModule<T, M>::transformContactInfo(
     GrainsMemBuffer<ContactInfo<T>, M>&      contactInfo)
 {
     const uint nPairs = m_neighborList->getSize();
+    const bool timing = GrainsParameters<T>::m_collisionDetection.timer;
+
+    GrainsClock::time_point t0;
+    if(timing)
+        t0 = GrainsClock::now();
 
     if constexpr(M == MemType::HOST)
     {
@@ -365,6 +615,9 @@ void CollisionDetectionModule<T, M>::transformContactInfo(
                                                                nPairs);
         cudaDeviceSynchronize();
     }
+    if(timing)
+        GrainsParameters<T>::m_timer.transformTime
+            += std::chrono::duration<double>(GrainsClock::now() - t0).count();
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -383,6 +636,10 @@ void CollisionDetectionModule<T, M>::sortParticles(GrainsMemBuffer<Vector3<T>, M
     auto& SS = GP::m_simulationState;
     auto& LC = GP::m_collisionDetection.linkedCellParameters;
 
+    GrainsClock::time_point t0;
+    if(GP::m_collisionDetection.timer)
+        t0 = GrainsClock::now();
+
     if(LC.sortFrequency > 0 && SS.neighborListUpdateCount % LC.sortFrequency == 0)
     {
         m_particleSorter.sortParticles(positions,
@@ -397,6 +654,13 @@ void CollisionDetectionModule<T, M>::sortParticles(GrainsMemBuffer<Vector3<T>, M
     }
     else
         SS.particlesSorted = false;
+
+    if(GP::m_collisionDetection.timer)
+    {
+        if constexpr(M == MemType::DEVICE)
+            cudaDeviceSynchronize();
+        GP::m_timer.sortTime += std::chrono::duration<double>(GrainsClock::now() - t0).count();
+    }
 }
 
 // -------------------------------------------------------------------------------------------------

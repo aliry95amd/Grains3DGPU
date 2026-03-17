@@ -5,6 +5,7 @@
 #include "ContactInfo.hh"
 #include "GrainsParameters.hh"
 #include "OBB.hh"
+#include "OBC.hh"
 #include "Quaternion.hh"
 #include "QuaternionMath.hh"
 #include "RigidBody.hh"
@@ -220,6 +221,56 @@ __HOSTDEVICE__ static INLINE void transformContactInfo_common(const uint2*      
     snapshot.contactPoint                      = qA >> snapshot.contactPoint + position[idA];
     snapshot.contactVector                     = qA >> snapshot.contactVector;
     contactInfoWorld[pairID].setSnapshot(snapshot);
+}
+
+// -------------------------------------------------------------------------------------------------
+/** @brief BV-only test for a single pair (bounding sphere + optional OBB SAT / OBC test).
+    Returns true if the pair passes all BV filters and should proceed to narrow-phase GJK.
+    For rejected pairs the caller is responsible for writing a no-contact sentinel to contactInfo.
+    @param rbA rigid body A
+    @param rbB rigid body B
+    @param v_b2a relative position of B in A-local frame
+    @param q_b2a relative quaternion of B w.r.t. A */
+template <typename T, BoundingVolumeType BVType = BoundingVolumeType::OBB>
+__HOSTDEVICE__ static INLINE bool filterPairBV_common(const RigidBody<T>&  rbA,
+                                                      const RigidBody<T>&  rbB,
+                                                      const Vector3<T>&    v_b2a,
+                                                      const Quaternion<T>& q_b2a)
+{
+    const T radiiSum = rbA.getCircumscribedRadius() + rbB.getCircumscribedRadius();
+    if(norm2(v_b2a) >= radiiSum * radiiSum)
+        return false;
+    if constexpr(BVType == BoundingVolumeType::OBB)
+    {
+        if(!intersectOrientedBoundingBox(rbA.getConvex()->computeBoundingBox(),
+                                         rbB.getConvex()->computeBoundingBox(),
+                                         v_b2a,
+                                         q_b2a))
+            return false;
+    }
+    if constexpr(BVType == BoundingVolumeType::OBC)
+    {
+        // bc = [radius, halfHeight, axisIndex(0=X,1=Y,2=Z)]
+        const Vector3<T> bcA           = rbA.getConvex()->computeBoundingCylinder();
+        const Vector3<T> bcB           = rbB.getConvex()->computeBoundingCylinder();
+        auto             axisFromIndex = [](T idx) -> Vector3<T> {
+            if(idx == T(0))
+                return Vector3<T>(T(1), T(0), T(0));
+            if(idx == T(1))
+                return Vector3<T>(T(0), T(1), T(0));
+            return Vector3<T>(T(0), T(0), T(1));
+        };
+        if(!intersectOrientedBoundingCylinder(bcA[X],
+                                              bcA[Y],
+                                              axisFromIndex(bcA[Z]),
+                                              bcB[X],
+                                              bcB[Y],
+                                              axisFromIndex(bcB[Z]),
+                                              v_b2a,
+                                              q_b2a))
+            return false;
+    }
+    return true;
 }
 //@}
 

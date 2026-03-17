@@ -310,7 +310,7 @@ __HOSTDEVICE__ inline void closestPointsRigidBodies(const RigidBody<T>&  rbA,
                                                     const Transform3<T>& b2w,
                                                     ContactInfo<T>&      contactInfo)
 {
-    // BV pre-filter: sphere reject then OBB SAT before entering GJK
+    // BV pre-filter: sphere reject then OBB or OBC SAT before entering GJK
     if constexpr(BVType == BoundingVolumeType::OBB)
     {
         const T radiiSum = rbA.getCircumscribedRadius() + rbB.getCircumscribedRadius();
@@ -323,6 +323,36 @@ __HOSTDEVICE__ inline void closestPointsRigidBodies(const RigidBody<T>&  rbA,
                                          rbB.getConvex()->computeBoundingBox(),
                                          a2w,
                                          b2w))
+        {
+            contactInfo.setOverlapDistance(T(1));
+            return;
+        }
+    }
+    if constexpr(BVType == BoundingVolumeType::OBC)
+    {
+        const T radiiSum = rbA.getCircumscribedRadius() + rbB.getCircumscribedRadius();
+        if(norm2(b2w.getOrigin() - a2w.getOrigin()) >= radiiSum * radiiSum)
+        {
+            contactInfo.setOverlapDistance(T(1));
+            return;
+        }
+        auto axisFromIndex = [](T idx) -> Vector3<T> {
+            if(idx == T(0))
+                return Vector3<T>(T(1), T(0), T(0));
+            if(idx == T(1))
+                return Vector3<T>(T(0), T(1), T(0));
+            return Vector3<T>(T(0), T(0), T(1));
+        };
+        const Vector3<T> bcA = rbA.getConvex()->computeBoundingCylinder();
+        const Vector3<T> bcB = rbB.getConvex()->computeBoundingCylinder();
+        if(!intersectOrientedBoundingCylinder(bcA[X],
+                                              bcA[Y],
+                                              axisFromIndex(bcA[Z]),
+                                              bcB[X],
+                                              bcB[Y],
+                                              axisFromIndex(bcB[Z]),
+                                              a2w,
+                                              b2w))
         {
             contactInfo.setOverlapDistance(T(1));
             return;
@@ -590,7 +620,7 @@ __HOSTDEVICE__ inline void closestPointsRigidBodies(const RigidBody<T>&  rbA,
                                                     const Quaternion<T>& q_b2w,
                                                     ContactInfo<T>&      contactInfo)
 {
-    // BV pre-filter: sphere reject then OBB SAT before entering GJK
+    // BV pre-filter: sphere reject then OBB or OBC SAT before entering GJK
     if constexpr(BVType == BoundingVolumeType::OBB)
     {
         const T radiiSum = rbA.getCircumscribedRadius() + rbB.getCircumscribedRadius();
@@ -605,6 +635,38 @@ __HOSTDEVICE__ inline void closestPointsRigidBodies(const RigidBody<T>&  rbA,
                                          v_b2w,
                                          q_a2w,
                                          q_b2w))
+        {
+            contactInfo.setOverlapDistance(T(1));
+            return;
+        }
+    }
+    if constexpr(BVType == BoundingVolumeType::OBC)
+    {
+        const T radiiSum = rbA.getCircumscribedRadius() + rbB.getCircumscribedRadius();
+        if(norm2(v_b2w - v_a2w) >= radiiSum * radiiSum)
+        {
+            contactInfo.setOverlapDistance(T(1));
+            return;
+        }
+        auto axisFromIndex = [](T idx) -> Vector3<T> {
+            if(idx == T(0))
+                return Vector3<T>(T(1), T(0), T(0));
+            if(idx == T(1))
+                return Vector3<T>(T(0), T(1), T(0));
+            return Vector3<T>(T(0), T(0), T(1));
+        };
+        const Vector3<T> bcA = rbA.getConvex()->computeBoundingCylinder();
+        const Vector3<T> bcB = rbB.getConvex()->computeBoundingCylinder();
+        if(!intersectOrientedBoundingCylinder(bcA[X],
+                                              bcA[Y],
+                                              axisFromIndex(bcA[Z]),
+                                              bcB[X],
+                                              bcB[Y],
+                                              axisFromIndex(bcB[Z]),
+                                              v_a2w,
+                                              v_b2w,
+                                              q_a2w,
+                                              q_b2w))
         {
             contactInfo.setOverlapDistance(T(1));
             return;

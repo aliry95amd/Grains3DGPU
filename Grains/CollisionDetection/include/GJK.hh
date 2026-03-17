@@ -5,6 +5,7 @@
 #include "Quaternion.hh"
 #include "Transform3.hh"
 
+/** @brief GJK sub-algorithm variant */
 enum class GJKType
 {
     JOHNSON,     /**< Johnson's algorithm */
@@ -14,10 +15,9 @@ enum class GJKType
 // =================================================================================================
 /** @brief The header for the GJK distance query algorithm.
 
-    The GJK distance query algorithm using the Johnson and signedVolume
-    subalgorithm with the backup procedure. It supports both single and double
-    floating point operations, but it is not recommended to use the single
-    precision version as it is prone to numerical instabilities.
+    The GJK distance query algorithm using the Johnson and signedVolume subalgorithm with the
+    backup procedure. It supports both single and double floating point operations, but it is not
+    recommended to use the single precision version as it is prone to numerical instabilities.
 
     @author A.Yazdani - 2024 - Construction */
 // =================================================================================================

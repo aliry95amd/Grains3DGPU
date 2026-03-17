@@ -70,11 +70,11 @@ __HOST__ static INLINE void computeOptimalThreadsAndBlocks(const uint           
     numThreads = 128;
     numBlocks  = (numElements + numThreads - 1) / numThreads;
 
-    // If we’re not filling the SMs enough, reduce threads
+    // If we're not filling the SMs enough, reduce threads but ensure full coverage
     if(numBlocks < minBlocks && numThreads > minThreads)
     {
-        numBlocks  = minBlocks;
         numThreads = minThreads;
+        numBlocks  = max(minBlocks, (numElements + numThreads - 1) / numThreads);
     }
     // If we're oversubscribing the SMs too much, increase thread count
     if(numBlocks > 4 * prop.multiProcessorCount && numThreads < maxThreads)

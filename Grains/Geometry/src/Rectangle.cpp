@@ -103,6 +103,16 @@ __HOSTDEVICE__ Vector3<T> Rectangle<T>::computeBoundingBox() const
 }
 
 // -------------------------------------------------------------------------------------------------
+// Returns the bounding cylinder to Rectangle
+template <typename T>
+__HOSTDEVICE__ Vector3<T> Rectangle<T>::computeBoundingCylinder() const
+{
+    // Rectangle is flat in Z; choose Z axis for cylinder, small half-height EPS
+    const T radius = sqrt(m_LX * m_LX + m_LY * m_LY);
+    return Vector3<T>(radius, EPS<T>, T(2));
+}
+
+// -------------------------------------------------------------------------------------------------
 // Box support function, returns the support point P, i.e. the point on the
 // surface of the box that satisfies max(P.v)
 template <typename T>

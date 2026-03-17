@@ -113,6 +113,21 @@ __HOSTDEVICE__ Vector3<T> Box<T>::computeBoundingBox() const
 }
 
 // -------------------------------------------------------------------------------------------------
+// Returns the bounding cylinder to Box
+template <typename T>
+__HOSTDEVICE__ Vector3<T> Box<T>::computeBoundingCylinder() const
+{
+    // [radius, halfHeight, axisIndex(0=X,1=Y,2=Z)]
+    const T ex = m_extent[X], ey = m_extent[Y], ez = m_extent[Z];
+    if(ez <= ex && ez <= ey)
+        return Vector3<T>(sqrt(ex * ex + ey * ey), ez, T(2));
+    else if(ey <= ex && ey <= ez)
+        return Vector3<T>(sqrt(ex * ex + ez * ez), ey, T(1));
+    else
+        return Vector3<T>(sqrt(ey * ey + ez * ez), ex, T(0));
+}
+
+// -------------------------------------------------------------------------------------------------
 // Box support function, returns the support point P, i.e. the point on the
 // surface of the box that satisfies max(P.v)
 template <typename T>

@@ -153,6 +153,20 @@ __HOSTDEVICE__ Vector3<T> Superquadric<T>::computeBoundingBox() const
 }
 
 // -------------------------------------------------------------------------------------------------
+// Returns the bounding cylinder to Superquadric
+template <typename T>
+__HOSTDEVICE__ Vector3<T> Superquadric<T>::computeBoundingCylinder() const
+{
+    // [radius, halfHeight, axisIndex(0=X,1=Y,2=Z)]
+    if(m_c <= m_a && m_c <= m_b)
+        return Vector3<T>(sqrt(m_a * m_a + m_b * m_b), m_c, T(2));
+    else if(m_b <= m_a && m_b <= m_c)
+        return Vector3<T>(sqrt(m_a * m_a + m_c * m_c), m_b, T(1));
+    else
+        return Vector3<T>(sqrt(m_b * m_b + m_c * m_c), m_a, T(0));
+}
+
+// -------------------------------------------------------------------------------------------------
 // Superquadric support function, returns the support point P, i.e. the point on
 // the surface of the Superquadric that satisfies max(P.v)
 template <typename T>

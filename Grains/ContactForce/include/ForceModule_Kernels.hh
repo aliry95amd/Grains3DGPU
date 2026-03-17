@@ -2,11 +2,7 @@
 #ifndef _FORCEMODULE_KERNELS_CUH_
 #define _FORCEMODULE_KERNELS_CUH_
 
-#include "thrust/device_ptr.h"
-#include "thrust/execution_policy.h"
-#include "thrust/for_each.h"
-#include "thrust/iterator/counting_iterator.h"
-#include "thrust/scan.h"
+#include <cub/cub.cuh>
 #include <cuda_runtime.h>
 
 #include "ContactForceModel.hh"
@@ -21,48 +17,72 @@
 /** @brief GPU kernels for the ForceModule class.
 
     Contains the contact-force and external-force kernels migrated from
-    ComponentManagerGPU_Kernels.hh, plus the active-pair compaction helper
-    buildCompactActiveIndex.
+    ComponentManagerGPU_Kernels.hh, plus the active-pair compaction helper buildCompactActiveIndex.
 
-    @author A.Yazdani - 2024 - Construction */
+    @author A.Yazdani - 2026 - Construction */
 // =================================================================================================
 /** @name ForceModule GPU kernels */
 //@{
+/** @brief Flags pairs that are in contact (overlap distance < 0).
+    @param contactInfo array of contact information
+    @param flags       output flag array (1 = in contact, 0 = not in contact)
+    @param nPairs      total number of pairs */
+template <typename T>
+__GLOBAL__ void
+    flagActivePairs_Kernel(const ContactInfo<T>* contactInfo, uint* flags, const uint nPairs)
+{
+    uint tID = blockIdx.x * blockDim.x + threadIdx.x;
+    if(tID >= nPairs)
+        return;
+    flags[tID] = (contactInfo[tID].getSnapshot().overlapDistance < T(0)) ? 1u : 0u;
+}
 
 // -------------------------------------------------------------------------------------------------
-/** @brief Build a compact list of active pair indices using exclusive scan + scatter.
-    @param flagsDev device array of uint flags (0/1) of length nPairs
-    @param nPairs   total number of pairs
-    @param prefixDev device array of length nPairs to store scan results
-    @param activeIdxDev device array with capacity >= nPairs to receive active indices
-    @return number of active pairs */
-INLINE uint buildCompactActiveIndex(const uint* flagsDev,
-                                    const uint  nPairs,
-                                    uint*       prefixDev,
-                                    uint*       activeIdxDev)
+/** @brief Queries the temporary storage size required by CUB DeviceSelect::Flagged.
+    @param nPairs       total number of pairs
+    @param activeIdxDev device array receiving compact indices (used only for type deduction)
+    @param numSelectedDev device pointer receiving the count of selected items
+    @return required temporary storage size in bytes */
+INLINE size_t queryCubSelectTempStorageBytes(uint nPairs, uint* activeIdxDev, uint* numSelectedDev)
 {
-    cudaErrCheck(cudaGetLastError());
-    auto flagsPtr  = thrust::device_pointer_cast(const_cast<uint*>(flagsDev));
-    auto prefixPtr = thrust::device_pointer_cast(prefixDev);
+    cub::CountingInputIterator<uint> countIter(0u);
+    size_t                           bytes = 0;
+    cudaErrCheck(cub::DeviceSelect::Flagged(nullptr,
+                                            bytes,
+                                            countIter,
+                                            (const uint*)nullptr,
+                                            activeIdxDev,
+                                            numSelectedDev,
+                                            static_cast<int>(nPairs)));
+    return bytes;
+}
 
-    // Exclusive scan to compute output positions for active entries
-    thrust::exclusive_scan(flagsPtr, flagsPtr + nPairs, prefixPtr);
-
-    // Compute total active as last prefix + last flag
-    uint lastPrefix = 0u, lastFlag = 0u;
-    cudaMemcpy(&lastPrefix, prefixDev + (nPairs - 1), sizeof(uint), cudaMemcpyDeviceToHost);
-    cudaMemcpy(&lastFlag, flagsDev + (nPairs - 1), sizeof(uint), cudaMemcpyDeviceToHost);
-    const uint nActive = lastPrefix + lastFlag;
-
-    // Scatter indices for active entries into compact array
-    thrust::for_each_n(thrust::device,
-                       thrust::make_counting_iterator<uint>(0u),
-                       nPairs,
-                       [activeIdxDev, flagsDev, prefixDev] __device__(uint i) {
-                           if(flagsDev[i])
-                               activeIdxDev[prefixDev[i]] = i;
-                       });
-
+// -------------------------------------------------------------------------------------------------
+/** @brief Build a compact list of active pair indices using CUB DeviceSelect::Flagged.
+    @param flagsDev        device array of uint flags (0/1) of length nPairs
+    @param nPairs          total number of pairs
+    @param activeIdxDev    device array with capacity >= nPairs to receive active indices
+    @param numSelectedDev  device pointer to receive the count of selected pairs
+    @param tempStorage     preallocated CUB temporary storage
+    @param tempStorageBytes size of tempStorage in bytes
+    @return number of active pairs (copied from device) */
+INLINE uint buildCompactActiveIndex(const uint* flagsDev,
+                                    uint        nPairs,
+                                    uint*       activeIdxDev,
+                                    uint*       numSelectedDev,
+                                    void*       tempStorage,
+                                    size_t      tempStorageBytes)
+{
+    cub::CountingInputIterator<uint> countIter(0u);
+    cudaErrCheck(cub::DeviceSelect::Flagged(tempStorage,
+                                            tempStorageBytes,
+                                            countIter,
+                                            flagsDev,
+                                            activeIdxDev,
+                                            numSelectedDev,
+                                            static_cast<int>(nPairs)));
+    uint nActive = 0u;
+    cudaErrCheck(cudaMemcpy(&nActive, numSelectedDev, sizeof(uint), cudaMemcpyDeviceToHost));
     return nActive;
 }
 

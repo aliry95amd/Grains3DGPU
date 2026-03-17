@@ -60,6 +60,12 @@ public:
         @param d_RB Device-side RigidBody object */
     static void copyHostToDevice(GrainsMemBuffer<RigidBody<T>*, MemType::HOST>&   h_RB,
                                  GrainsMemBuffer<RigidBody<T>*, MemType::DEVICE>& d_RB);
+
+    /** @brief Frees RigidBody objects that were created on device via copyHostToDevice.
+        Launches a kernel that calls device-side delete on every pointer, then releases
+        the pointer array.  Safe to call even if d_RB is empty.
+        @param d_RB Device-side RigidBody pointer buffer */
+    static void freeDevice(GrainsMemBuffer<RigidBody<T>*, MemType::DEVICE>& d_RB);
     //@}
 };
 

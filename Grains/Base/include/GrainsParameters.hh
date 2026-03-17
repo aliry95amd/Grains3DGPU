@@ -45,8 +45,10 @@ enum class BoundingVolumeType
 /** @brief Type of narrow-phase detection */
 enum class NarrowPhaseType
 {
-    /** @brief Gilbert-Johnson-Keerthi algorithm */
-    GJK = 0
+    /** @brief GJK with Johnson's sub-algorithm */
+    GJK = 0,
+    /** @brief GJK with Signed Volume sub-algorithm */
+    GJK_SV = 1
 };
 //@}
 
@@ -101,6 +103,26 @@ struct LinkedCellParameters
 };
 
 // -------------------------------------------------------------------------------------------------
+/** @brief Accumulated wall-clock time (seconds) for each stage of the collision detection
+    pipeline. Only updated when CollisionDetectionParameters::timer is true.
+    Reset at any time by assigning `GrainsParameters<T>::m_timer = Timer{}`. */
+struct Timer
+{
+    /** \brief Time spent in sortParticles. */
+    double sortTime = 0;
+    /** \brief Time spent building or querying the neighbor list. */
+    double neighborListTime = 0;
+    /** \brief Time spent computing per-pair relative transformations (relative path only). */
+    double relativeTransformTime = 0;
+    /** \brief Time spent in the bounding volume pre-filter. */
+    double bvFilterTime = 0;
+    /** \brief Time spent in GJK narrow-phase detection. */
+    double narrowPhaseTime = 0;
+    /** \brief Time spent transforming contact info to world frame (relative path only). */
+    double transformTime = 0;
+};
+
+// -------------------------------------------------------------------------------------------------
 /** @brief Parameters for collision detection configuration. */
 template <typename T>
 struct CollisionDetectionParameters
@@ -113,6 +135,15 @@ struct CollisionDetectionParameters
     BoundingVolumeType boundingVolumeType = BoundingVolumeType::OFF;
     /** \brief Type of narrow-phase detection. */
     NarrowPhaseType narrowPhaseType = NarrowPhaseType::GJK;
+    /** \brief Use GJK warm-start acceleration. */
+    bool gjkAcceleration = false;
+    /** \brief If true, relative transformations (B in A-local frame) are computed once before
+        narrow-phase detection and cached; set to false (e.g. for spheres) to skip that step and
+        call the GJK overload that works directly in world frame instead. */
+    bool useRelativeTransformations = true;
+    /** \brief Enable per-stage wall-clock timing; accumulated results are written to
+        GrainsParameters::m_timer. */
+    bool timer = false;
 };
 //@}
 
@@ -148,6 +179,9 @@ public:
     /* Collision Detection */
     /** \brief Collision detection parameters. */
     static CollisionDetectionParameters<T> m_collisionDetection;
+    /** \brief Per-stage accumulated wall-clock timing (updated only when timer
+        is true). */
+    static Timer m_timer;
 
     /* Material */
     /** \brief Map from material name to an uint ID */

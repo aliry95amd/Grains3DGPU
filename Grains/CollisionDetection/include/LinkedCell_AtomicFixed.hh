@@ -48,6 +48,10 @@ protected:
     GrainsMemBuffer<uint64_t, MemType::DEVICE> m_cellParticleIDs;
     /** \brief Synthetic prefix sums for uniform interface (cellID * maxParticlesPerCell) */
     GrainsMemBuffer<uint, MemType::DEVICE> m_cellPrefixSums;
+    /** \brief Sequential packed buffer: atomicPackBuffer[tID] = (cellID<<32 | particleID)
+     * Used by NL kernels to map thread tID -> current particle (the 2D cellParticleIDs
+     * array cannot be indexed by tID since its layout is [cellID*maxPerCell+slot]). */
+    GrainsMemBuffer<uint64_t, MemType::DEVICE> m_atomicPackBuffer;
     /** \brief Maximum number of particles that can fit in a single cell */
     uint m_maxParticlesPerCell;
     /** \brief Device pointer for number of cells (used in resize operations) */
@@ -85,6 +89,7 @@ public:
         , m_numParticlesPerCell(m_numCells)
         , m_cellParticleIDs(m_numCells * linkedCellParameters.maxParticlesPerCell)
         , m_cellPrefixSums(m_numCells)
+        , m_atomicPackBuffer(nParticles)
         , m_maxParticlesPerCell(linkedCellParameters.maxParticlesPerCell)
     {
         m_numParticlesPerCell.fill();
@@ -151,6 +156,13 @@ public:
     const uint* getCellPrefixSums() const override
     {
         return m_cellPrefixSums.getData();
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    /** @brief Gets sequential packed buffer (atomicPackBuffer[tID] = cellID<<32 | particleID) */
+    const uint64_t* getAtomicPackBuffer() const
+    {
+        return m_atomicPackBuffer.getData();
     }
     //@}
 
@@ -249,6 +261,14 @@ public:
             m_maxParticlesPerCell,
             m_cellParticleIDs.getData(),
             m_numParticlesPerCell.getData());
+        // Sequential layout: atomicPackBuffer[tID] = (cellID << 32 | particleID)
+        // Uses the SortBased variant (no atomic counting) so tID == particle index.
+        computeCellParticleIDs_Device<<<numBlocks, numThreads, 0, m_stream2>>>(
+            m_cells.getData(),
+            m_positions->getData() + m_numObstacles,
+            m_numParticles,
+            m_numObstacles,
+            m_atomicPackBuffer.getData());
 
         // Synchronize all streams before returning
         cudaStreamSynchronize(m_stream0);  // Old position copy

@@ -5,7 +5,7 @@
 #include "ContactTable.hh"
 
 __GLOBAL__ void testInsertionKernel(
-    ContactHashTableView view, uint2* pairs, uint* indices, bool* results, int numPairs)
+    ContactMemoryView<float> view, uint2* pairs, uint* indices, bool* results, int numPairs)
 {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if(idx >= numPairs)
@@ -14,7 +14,7 @@ __GLOBAL__ void testInsertionKernel(
 }
 
 __GLOBAL__ void testFindKernel(
-    ContactHashTableView view, uint2* pairs, uint* indices, bool* results, int numPairs)
+    ContactMemoryView<float> view, uint2* pairs, uint* indices, bool* results, int numPairs)
 {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if(idx >= numPairs)
@@ -25,8 +25,8 @@ __GLOBAL__ void testFindKernel(
 class ContactTableDeviceTest : public ::testing::Test
 {
 protected:
-    ContactHashTable<MemType::DEVICE> table;
-    ContactHashTableView              view;
+    ContactHashTable<float, MemType::DEVICE> table;
+    ContactMemoryView<float>                 view;
 
     void SetUp() override
     {
@@ -36,7 +36,7 @@ protected:
             GTEST_SKIP() << "No CUDA devices available";
 
         // Default capacity used by most tests
-        table.allocate(200);
+        table.allocate(200, 200);
         view = table.getView();
     }
 
@@ -140,10 +140,10 @@ TEST_F(ContactTableDeviceTest, DeviceFindAfterInsertion)
 
 TEST_F(ContactTableDeviceTest, ConcurrentInsertions)
 {
-    const int                         numPairs = 1000;
-    const int                         capacity = 2000;
-    ContactHashTable<MemType::DEVICE> table(capacity);
-    ContactHashTableView              view = table.getView();
+    const int                                numPairs = 1000;
+    const int                                capacity = 2000;
+    ContactHashTable<float, MemType::DEVICE> table(capacity, capacity);
+    ContactMemoryView<float>                 view = table.getView();
 
     uint2* h_pairs   = new uint2[numPairs];
     uint*  h_indices = new uint[numPairs];

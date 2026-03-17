@@ -23,17 +23,7 @@
       4. [GPU only] Atomic reduction of per-pair intermediate torces to per-particle torces
       5. External forces (gravity applied to each moving particle)
 
-    ComponentManager owns a ForceModule by unique_ptr and calls run() once per timestep after
-    detectCollisions().  All particle-indexed arrays are passed in as non-owning references; the
-    module reads/writes directly into ComponentManager's buffers.
-
-    Owned resources:
-      - ContactHashTable<T,M>     m_contactTable   (contact history for memory-enabled models)
-      - GrainsMemBuffer<uint,M>   m_prefixScan     (exclusive-scan workspace; DEVICE path only)
-      - GrainsMemBuffer<uint,M>   m_activeIndex    (compact active-pair indices; DEVICE path only)
-      - GrainsMemBuffer<Torce,M>  m_intermediateTorceA/B (per-pair staging; DEVICE path only)
-
-    @author A.Yazdani - 2025 - Construction */
+    @author A.Yazdani - 2026 - Construction */
 // =================================================================================================
 template <typename T, MemType M = MemType::HOST>
 class ForceModule
@@ -41,13 +31,17 @@ class ForceModule
 private:
     /** @name Owned resources */
     //@{
-    /** \brief Exclusive-scan workspace for active-pair compaction (DEVICE path only) */
-    GrainsMemBuffer<uint, M> m_prefixScan;
+    /** \brief Active-pair flags: 1 if overlap < 0, 0 otherwise (DEVICE path only) */
+    GrainsMemBuffer<uint, M> m_activeFlags;
     /** \brief Compact array of active pair indices (DEVICE path only) */
     GrainsMemBuffer<uint, M> m_activeIndex;
-    /** \brief Per-pair intermediate torce for particle A (DEVICE path only; lazy resize) */
+    /** \brief Device-side output count from CUB compaction (DEVICE path only) */
+    GrainsMemBuffer<uint, M> m_numActivePairs;
+    /** \brief CUB DeviceSelect::Flagged temporary storage (DEVICE path only) */
+    GrainsMemBuffer<uint8_t, M> m_cubSelectTempStorage;
+    /** \brief Per-pair intermediate torce for particle A (lazy resize; DEVICE path only) */
     GrainsMemBuffer<Torce<T>, M> m_intermediateTorceA;
-    /** \brief Per-pair intermediate torce for particle B (DEVICE path only; lazy resize) */
+    /** \brief Per-pair intermediate torce for particle B (lazy resize; DEVICE path only) */
     GrainsMemBuffer<Torce<T>, M> m_intermediateTorceB;
     /** \brief Contact history hash table (allocated only when isContactWithMemory == true) */
     ContactHashTable<T, M> m_contactTable;
@@ -61,7 +55,7 @@ public:
     ForceModule() = delete;
 
     // ---------------------------------------------------------------------------------------------
-    /** @brief Constructor.
+    /** @brief Constructor
         @param pairCapacity      Initial pair buffer capacity (from CDModule::getPairBufferSize())
         @param isContactWithMemory Whether contact history tracking is needed */
     ForceModule(size_t pairCapacity, bool isContactWithMemory);
@@ -70,63 +64,62 @@ public:
     /** @brief Destructor */
     ~ForceModule() = default;
 
-    // Deleted copy; allow move
-    ForceModule(const ForceModule&)            = delete;
+    // ---------------------------------------------------------------------------------------------
+    /** @brief Deleted copy constructor */
+    ForceModule(const ForceModule&) = delete;
+
+    // ---------------------------------------------------------------------------------------------
+    /** @brief Deleted copy assignment operator */
     ForceModule& operator=(const ForceModule&) = delete;
-    ForceModule(ForceModule&&)                 = default;
-    ForceModule& operator=(ForceModule&&)      = default;
+
+    // ---------------------------------------------------------------------------------------------
+    /** @brief Defaulted move constructor */
+    ForceModule(ForceModule&&) = default;
+
+    // ---------------------------------------------------------------------------------------------
+    /** @brief Defaulted move assignment operator */
+    ForceModule& operator=(ForceModule&&) = default;
     //@}
 
-    /** @name Primary interface */
+    /** @name Methods */
     //@{
+    // ---------------------------------------------------------------------------------------------
+    /** @brief Performs periodic mark-and-sweep cleanup of the contact hash table.
+        No-op when isContactWithMemory == false or the cleanup interval has not elapsed. */
+    void cleanupContactTable();
+
     // ---------------------------------------------------------------------------------------------
     /** @brief Resizes internal GPU compaction buffers when the pair buffer capacity grows.
         @param newPairCapacity New pair buffer capacity */
     void resizeBuffers(size_t newPairCapacity);
 
     // ---------------------------------------------------------------------------------------------
-    /** @brief Runs the complete force computation pipeline.
-
-        Steps:
+    /** @brief Runs the complete force computation pipeline. Steps:
           1. cleanupContactTable (periodic mark-and-sweep every 1000 NL updates)
           2. [DEVICE] resize m_intermediateTorceA/B to numPairs
           3. [DEVICE] computeContactForces_Kernel → reduceTorces_Kernel
              [HOST]   sequential computeContactForces_common loop
           4. addExternalForces (gravity)
-
-        All particle-indexed arrays are passed by reference (non-owning); the module reads/writes
-        directly.  torce is modified in-place (contact contributions accumulated atomically on GPU,
-        sequentially on CPU; gravity then appended for each moving particle).
-
         @param CF            Array of contact force models
-        @param contactInfo   Per-pair contact information in world frame (from CDModule)
-        @param pairList      Per-pair component index pairs (from CDModule)
-        @param numPairs      Number of active pairs (from CDModule)
+        @param rigidBody     Per-component rigid body pointer array
         @param position      Per-component position array
         @param velocity      Per-component kinematics array
+        @param pairList      Per-pair component index pairs (from CDModule)
+        @param contactInfo   Per-pair contact information in world frame (from CDModule)
+        @param numPairs      Number of active pairs (from CDModule)
         @param torce         Per-component torce array (modified in-place)
-        @param rigidBody     Per-component rigid body pointer array
         @param numObstacles  Number of obstacle components
         @param numParticles  Number of moving particle components */
     void run(const GrainsMemBuffer<ContactForceModel<T>*, M>& CF,
-             const GrainsMemBuffer<ContactInfo<T>, M>&        contactInfo,
-             const GrainsMemBuffer<uint2, M>&                 pairList,
-             uint                                             numPairs,
+             const GrainsMemBuffer<RigidBody<T>*, M>*         rigidBody,
              const GrainsMemBuffer<Vector3<T>, M>&            position,
              const GrainsMemBuffer<Kinematics<T>, M>&         velocity,
+             const GrainsMemBuffer<uint2, M>&                 pairList,
+             const GrainsMemBuffer<ContactInfo<T>, M>&        contactInfo,
+             uint                                             numPairs,
              GrainsMemBuffer<Torce<T>, M>&                    torce,
-             const GrainsMemBuffer<RigidBody<T>*, M>*         rigidBody,
              uint                                             numObstacles,
              uint                                             numParticles);
-    //@}
-
-private:
-    /** @name Internal helpers */
-    //@{
-    // ---------------------------------------------------------------------------------------------
-    /** @brief Performs periodic mark-and-sweep cleanup of the contact hash table.
-        No-op when isContactWithMemory == false or the cleanup interval has not elapsed. */
-    void cleanupContactTable();
     //@}
 };
 

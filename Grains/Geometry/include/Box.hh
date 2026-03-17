@@ -98,6 +98,10 @@ public:
     __HOSTDEVICE__
     Vector3<T> computeBoundingBox() const final;
 
+    /** @brief Returns the tightest bounding cylinder fitted to the box in body-local frame. */
+    __HOSTDEVICE__
+    Vector3<T> computeBoundingCylinder() const final;
+
     /** @brief Box support function, returns the support point P, i.e. the point on the surface of
         the box that satisfies max(P.v)
         @param v direction */

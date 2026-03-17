@@ -428,13 +428,13 @@ public:
     void computeContactForces(const GrainsMemBuffer<ContactForceModel<T>*, M>& CF)
     {
         m_forceModule->run(CF,
-                           m_contactInfo,
-                           m_pairList,
-                           m_numPairs,
+                           m_rigidBody,
                            m_position,
                            m_velocity,
+                           m_pairList,
+                           m_contactInfo,
+                           m_numPairs,
                            m_torce,
-                           m_rigidBody,
                            m_numObstacles,
                            m_numParticles);
     }

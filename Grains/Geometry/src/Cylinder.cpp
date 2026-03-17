@@ -107,6 +107,15 @@ __HOSTDEVICE__ Vector3<T> Cylinder<T>::computeBoundingBox() const
 }
 
 // -------------------------------------------------------------------------------------------------
+// Returns the bounding cylinder to Cylinder (exact fit)
+template <typename T>
+__HOSTDEVICE__ Vector3<T> Cylinder<T>::computeBoundingCylinder() const
+{
+    // [radius, halfHeight, axisIndex=Y(1)]
+    return Vector3<T>(m_radius, m_halfHeight, T(1));
+}
+
+// -------------------------------------------------------------------------------------------------
 // Cylinder support function, returns the support point P, i.e. the point on
 // the surface of the Cylinder that satisfies max(P.v)
 template <typename T>

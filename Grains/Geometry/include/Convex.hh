@@ -71,6 +71,12 @@ public:
     __HOSTDEVICE__
     virtual Vector3<T> computeBoundingBox() const = 0;
 
+    /** @brief Returns the tightest bounding cylinder fitted to the convex in body-local frame.
+        The returned Vector3 encodes: [0] radius, [1] half-height, [2] axis index (0=X, 1=Y, 2=Z).
+     */
+    __HOSTDEVICE__
+    virtual Vector3<T> computeBoundingCylinder() const = 0;
+
     /** @brief Convex support function, returns the support point P, i.e. the point on the surface
         of the convex shape that satisfies max(P.v)
         @param v direction vector */

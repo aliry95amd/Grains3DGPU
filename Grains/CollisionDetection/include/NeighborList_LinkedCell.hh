@@ -224,7 +224,8 @@ public:
                         = static_cast<LinkedCell_AtomicFixed<T>*>(m_LinkedCell.get());
                     countNeighbors_AtomicFixed_Device<<<numBlocks, numThreads, 0, m_stream1>>>(
                         neighborCellsList,
-                        cellParticleIDs,
+                        LC_atomicFixed->getCellParticleIDs(),   // 2D fixed layout
+                        LC_atomicFixed->getAtomicPackBuffer(),  // sequential layout
                         LC_atomicFixed->getNumParticlesPerCell(),
                         LC_atomicFixed->getMaxParticlesPerCell(),
                         nParticles,
@@ -290,7 +291,8 @@ public:
                                                                0,
                                                                m_stream1>>>(
                         neighborCellsList,
-                        cellParticleIDs,
+                        LC_atomicFixed->getCellParticleIDs(),   // 2D fixed layout
+                        LC_atomicFixed->getAtomicPackBuffer(),  // sequential layout
                         LC_atomicFixed->getNumParticlesPerCell(),
                         m_numNeighborsPrefixSums.getData(),
                         LC_atomicFixed->getMaxParticlesPerCell(),

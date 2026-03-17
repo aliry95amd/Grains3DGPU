@@ -65,6 +65,19 @@ __GLOBAL__ void createRigidBodiesBatchKernel(RigidBody<T>** rb,
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+/** @brief Calls delete on every RigidBody pointer. */
+template <typename T>
+__GLOBAL__ void deleteRigidBodiesKernel(RigidBody<T>** d_RB, uint n)
+{
+    uint i = blockIdx.x * blockDim.x + threadIdx.x;
+    if(i < n)
+    {
+        delete d_RB[i];
+        d_RB[i] = nullptr;
+    }
+}
+
 /* ============================================================================================== */
 /* High-Level Methods                                                                             */
 /* ============================================================================================== */
@@ -417,6 +430,19 @@ __HOST__ void
         cudaFree(d_indices);
     }
 
+    cudaErrCheck(cudaDeviceSynchronize());
+}
+
+// -------------------------------------------------------------------------------------------------
+template <typename T>
+__HOST__ void RigidBodyFactory<T>::freeDevice(GrainsMemBuffer<RigidBody<T>*, MemType::DEVICE>& d_RB)
+{
+    const uint n = static_cast<uint>(d_RB.getSize());
+    if(n == 0)
+        return;
+    const uint numThreads = 256;
+    const uint numBlocks  = (n + numThreads - 1) / numThreads;
+    deleteRigidBodiesKernel<<<numBlocks, numThreads>>>(d_RB.getData(), n);
     cudaErrCheck(cudaDeviceSynchronize());
 }
 

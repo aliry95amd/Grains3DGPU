@@ -38,7 +38,17 @@ public:
         @param nParticles number of particles */
     NeighborList_Nsq(const uint nObstacles, const uint nParticles)
     {
-        m_pairList.initialize(nObstacles * nParticles + nParticles * (nParticles - 1) / 2);
+        // Pre-allocate with initialPairsPerParticle hint rather than the full
+        // N*(N-1)/2 budget (which can be tens of GB for large N).
+        // updateNeighborList will grow the buffer to the exact size on first call.
+        const auto&  LCD      = GrainsParameters<T>::m_collisionDetection.linkedCellParameters;
+        const size_t allPairs = static_cast<size_t>(nObstacles) * nParticles
+                                + static_cast<size_t>(nParticles) * (nParticles - 1) / 2;
+        const size_t initCapacity
+            = std::min(allPairs,
+                       static_cast<size_t>(nParticles) * LCD.initialNumberOfPairsPerParticle
+                           + static_cast<size_t>(nObstacles) * nParticles);
+        m_pairList.initialize(initCapacity);
         m_pairList.fill();
 
         *m_pairCount = 0;
@@ -65,10 +75,17 @@ public:
         // Only update at the first call
         if(SS.neighborListUpdateCount == 0)
         {
+            // Grow pair buffer to exact size if the lazy initial allocation was capped.
+            const size_t neededPairs = static_cast<size_t>(nObstacles) * nParticles
+                                       + static_cast<size_t>(nParticles) * (nParticles - 1) / 2;
+            if(m_pairList.getCapacity() < neededPairs)
+                m_pairList.reserve(neededPairs);
+            m_pairList.setSize(neededPairs);
+
             if constexpr(M == MemType::HOST || M == MemType::PINNED)
             {
                 updateNeighborList_Nsq_Host(nObstacles, nParticles, m_pairList.getData());
-                *m_pairCount = nObstacles * nParticles + nParticles * (nParticles - 1) / 2;
+                *m_pairCount = neededPairs;
             }
             else if constexpr(M == MemType::DEVICE || M == MemType::MANAGED)
             {
@@ -80,7 +97,7 @@ public:
                 updateNeighborList_Nsq_Device<<<numBlocks, numThreads>>>(nObstacles,
                                                                          nParticles,
                                                                          m_pairList.getData());
-                *m_pairCount = nObstacles * nParticles + nParticles * (nParticles - 1) / 2;
+                *m_pairCount = neededPairs;
                 cudaDeviceSynchronize();
             }
             return true;

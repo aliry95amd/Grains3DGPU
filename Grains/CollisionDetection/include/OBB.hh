@@ -14,7 +14,7 @@
 
     @author A.Yazdani - 2024 - Construction */
 // =================================================================================================
-/** @name OBB : External methods */
+/** @name OBB: External methods */
 //@{
 // Low-level methods for OBB as macros in double precision
 #define TESTCASE1(i) \

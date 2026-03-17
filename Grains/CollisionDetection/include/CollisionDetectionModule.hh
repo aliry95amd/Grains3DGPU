@@ -186,9 +186,9 @@ private:
 
     /** @brief Runs the BV pre-filter (sphere + OBB SAT) as a dedicated DEVICE kernel.
         Writes per-pair pass/fail flags, writes no-contact sentinels for rejected pairs, then
-        uses CUB DeviceSelect::Flagged to compact the passing pair indices into @p
-        m_bvPassPairIndices and copies the result count to @p m_bvPassPairCount.  Must be called
-        after computeRelativeTransformations.  HOST+OBB uses the fused path inside
+        uses CUB DeviceSelect::Flagged to compact the passing pair indices into m_bvPassPairIndices
+        and copies the result count to m_bvPassPairCount. Must be called after
+        computeRelativeTransformations.  HOST+OBB uses the fused path inside
         detectCollisionsComponents_common instead.
         @param rigidBodies      Raw pointer array of RigidBody*
         @param pairList         Pair list buffer
@@ -202,6 +202,19 @@ private:
         @param pairList    Pair list buffer */
     void detectCollisionsComponents(const RigidBody<T>* const*       rigidBodies,
                                     const GrainsMemBuffer<uint2, M>& pairList);
+
+    /** @brief Runs narrow-phase GJK using world-frame positions/quaternions directly, skipping the
+        relative-transformation pre-pass.
+        @param rigidBodies  Raw pointer array of RigidBody*
+        @param positions    World position buffer
+        @param orientations World quaternion buffer
+        @param pairList     Pair list buffer
+        @param contactInfo  ComponentManager's world-frame ContactInfo buffer */
+    void detectCollisionsComponentsGlobal(const RigidBody<T>* const*               rigidBodies,
+                                          const GrainsMemBuffer<Vector3<T>, M>&    positions,
+                                          const GrainsMemBuffer<Quaternion<T>, M>& orientations,
+                                          const GrainsMemBuffer<uint2, M>&         pairList,
+                                          GrainsMemBuffer<ContactInfo<T>, M>&      contactInfo);
 
     /** @brief Transforms per-pair ContactInfo from A-local frame to world frame.
         @param positions    World position buffer
@@ -231,3 +244,6 @@ private:
                        uint                               nObstacles,
                        uint                               nParticles);
     //@}
+};
+
+#endif

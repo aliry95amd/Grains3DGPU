@@ -260,6 +260,8 @@ public:
         computeCellStart_Kernel<<<numBlocks, numThreads, sMemSize>>>(m_cellParticleIDs.getData(),
                                                                      m_numParticles,
                                                                      m_cellPrefixSums.getData());
+        // Sync default stream
+        cudaStreamSynchronize(0);
 
         return true;
     }

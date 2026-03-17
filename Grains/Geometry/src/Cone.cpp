@@ -112,6 +112,15 @@ __HOSTDEVICE__ Vector3<T> Cone<T>::computeBoundingBox() const
 }
 
 // -------------------------------------------------------------------------------------------------
+// Returns the bounding cylinder to Cone
+template <typename T>
+__HOSTDEVICE__ Vector3<T> Cone<T>::computeBoundingCylinder() const
+{
+    // [radius, halfHeight, axisIndex=Y(1)]
+    return Vector3<T>(m_bottomRadius, T(2) * m_quarterHeight, T(1));
+}
+
+// -------------------------------------------------------------------------------------------------
 // Cone support function, returns the support point P, i.e. the point on the
 // surface of the cone that satisfies max(P.v)
 template <typename T>
