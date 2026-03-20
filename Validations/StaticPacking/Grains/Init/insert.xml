@@ -9,7 +9,7 @@
 		<NeighborList Type="LinkedCell" UpdateFrequency="1"/>
 		<LinkedCell Type="Device_Atomic" CellSizeFactor="1.0" UpdatingFrequency="0" SortingFrequency="0"/>
 		<BoundingVolume Type="OFF"/>
-		<NarrowPhase Type="GJK" Acceleration="true"/>
+		<NarrowPhase Type="GJK" Acceleration="false"/>
 	</CollisionDetection>
 
 	<ContactForceModels>
@@ -26,6 +26,8 @@
 
 	<Particles>
 		<Particle Number="1" Density="1163.66" Material="matP">
+				<Box LX="0.004" LY="0.004" LZ="0.0053"/>
+				<Superquadric a="0.004" b="0.004" c="0.00265" n1="32" n2="32"/>
 			<Convex CrustThickness="1.e-5">
 				<Cylinder Radius="0.004" Height="0.0053"/>
 			</Convex>
@@ -35,12 +37,11 @@
 		</Particle>
 	</Particles>
 	<!-- <Cylinder Radius="0.004" Height="0.0053"/> -->
-	<!-- <Superquadric a="0.004" b="0.004" c="0.00265" n1="8" n2="2"/> -->
 
 	<Obstacles>
 		<Obstacle Material="matP">
-			<Convex CrustThickness="1.e-4">
-				<Rectangle LX="0.06" LY="0.06" LZ="0.001"/>
+			<Convex CrustThickness="1.e-5">
+				<Box LX="0.06" LY="0.06" LZ="0.001"/>
 			</Convex>
 			<Transformation>
 				<Centre X="0" Y="0" Z="0"/>
@@ -98,8 +99,8 @@
 		<InitialPosition Type="Random" Seed="UserDefined" Value="1">
 			<Windows>
 				<Window Type="Box">
-					<MinPoint X="-0.0" Y="-0.0" Z="0.010"/>
-					<MaxPoint X="-0.0" Y="-0.0" Z="0.010"/>
+					<MinPoint X="-0.00" Y="-0.00" Z="0.01"/>
+					<MaxPoint X="-0.00" Y="-0.00" Z="0.01"/>
 				</Window>
 			</Windows>
 		</InitialPosition>
@@ -111,6 +112,7 @@
 				</Window>
 			</Windows>
 		</InitialOrientation>
+		<InitialVelocity Type="Constant" X="0.0" Y="0.0" Z="0.0"/>
 	</ParticleInsertion>
 	<PostProcessing>
 		<TimeSave dt="1e-2"/>

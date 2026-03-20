@@ -121,14 +121,23 @@ __HOSTDEVICE__ Vector3<T> Cylinder<T>::computeBoundingCylinder() const
 template <typename T>
 __HOSTDEVICE__ Vector3<T> Cylinder<T>::support(const Vector3<T>& v) const
 {
-    T s = sqrt(v[X] * v[X] + v[Z] * v[Z]);
-    if(s > EPS<T>)
+    T norm = sqrt(v[X] * v[X] + v[Y] * v[Y] + v[Z] * v[Z]);
+    if(norm > EPS<T>)
     {
-        T d = m_radius / s;
-        return (Vector3<T>(v[X] * d, v[Y] < T(0) ? -m_halfHeight : m_halfHeight, v[Z] * d));
+        T s = sqrt(v[X] * v[X] + v[Z] * v[Z]);
+        if(s > EPS<T>)
+        {
+            T d = m_radius / s;
+            if(fabs(v[Y]) < EPS<T>)
+                return (Vector3<T>(v[X] * d, T(0), v[Z] * d));
+            else
+                return (Vector3<T>(v[X] * d, v[Y] < T(0) ? -m_halfHeight : m_halfHeight, v[Z] * d));
+        }
+        else
+            return (Vector3<T>(T(0), v[Y] < T(0) ? -m_halfHeight : m_halfHeight, T(0)));
     }
     else
-        return (Vector3<T>(T(0), v[Y] < T(0) ? -m_halfHeight : m_halfHeight, T(0)));
+        return (Vector3<T>());
 }
 
 // -------------------------------------------------------------------------------------------------

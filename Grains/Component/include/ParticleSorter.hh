@@ -30,10 +30,14 @@ protected:
     //@{
     /** \brief Cells object with Morton ordering */
     GrainsMemBuffer<Cells<T, CellOrdering::MORTON>*, M> m_cells;
-    /** \brief Morton codes for each particle (Z-order curve) */
+    /** \brief Morton codes for each particle (Z-order curve) - CUB sort input */
     GrainsMemBuffer<uint64_t, M> m_mortonCodes;
-    /** \brief Sorted indices array (maps sorted position to original) */
+    /** \brief Auxiliary Morton code buffer - CUB sort keys_out (discarded after sort) */
+    GrainsMemBuffer<uint64_t, M> m_mortonCodesAux;
+    /** \brief Index array initialised to [0..N-1] before each sort - CUB values_in */
     GrainsMemBuffer<uint, M> m_sortedIndices;
+    /** \brief Sorted indices output from CUB - used by gather kernels (values_out) */
+    GrainsMemBuffer<uint, M> m_sortedIndicesOut;
     /** \brief Temporary buffers for gathering sorted data */
     GrainsMemBuffer<Vector3<T>, M>    m_tempPosition;
     GrainsMemBuffer<Kinematics<T>, M> m_tempVelocity;
@@ -71,9 +75,13 @@ public:
                                                                   LCParams.cellSizeFactor,
                                                                   m_cells);
 
-        // Allocate buffers
-        m_mortonCodes.reserve(numParticles);
-        m_sortedIndices.reserve(numParticles);
+        // Allocate buffers.
+        // m_sortedIndices and m_sortedIndicesOut use initialize() (not reserve()) so that
+        // their logical size equals numParticles, which is required by sequence().
+        m_mortonCodes.initialize(numParticles);
+        m_mortonCodesAux.initialize(numParticles);
+        m_sortedIndices.initialize(numParticles);
+        m_sortedIndicesOut.initialize(numParticles);
         m_tempPosition.reserve(numParticles);
         m_tempVelocity.reserve(numParticles);
         m_tempQuaternion.reserve(numParticles);
@@ -227,7 +235,7 @@ public:
             using GP = GrainsParameters<T>;
             // Compute grid dimensions
             uint numBlocks, threadsPerBlock;
-            computeOptimalThreadsAndBlocks(numParticles, GP::m_GPU, threadsPerBlock, numBlocks);
+            computeOptimalThreadsAndBlocks(numParticles, GP::m_GPU, numBlocks, threadsPerBlock);
 
             // Step 1: Compute Morton codes for particles only (skip obstacles)
             computeMortonCodes_Kernel<<<numBlocks, threadsPerBlock>>>(m_cells.getData(),
@@ -241,58 +249,62 @@ public:
             m_sortedIndices.sequence();
             cudaDeviceSynchronize();
 
-            // Step 3: Sort indices based on Morton codes using CUB
+            // Step 3: Sort indices based on Morton codes using CUB.
+            // keys_in/keys_out and values_in/values_out must be non-aliasing buffers.
+            // m_mortonCodesAux receives the (unused) sorted keys.
+            // m_sortedIndicesOut receives the sorted values used by the gather step.
             cudaErrCheck(cub::DeviceRadixSort::SortPairs(m_cubSortTempStorage,
                                                          m_cubSortTempStorageBytes,
                                                          m_mortonCodes.getData(),
-                                                         m_mortonCodes.getData(),
+                                                         m_mortonCodesAux.getData(),
                                                          m_sortedIndices.getData(),
-                                                         m_sortedIndices.getData(),
+                                                         m_sortedIndicesOut.getData(),
                                                          numParticles));
             cudaDeviceSynchronize();
 
             // Step 4: Gather particle arrays according to sorted indices using
-            // multiple streams (skip obstacles)
+            // multiple streams (skip obstacles).
+            // m_sortedIndicesOut holds the CUB output (sorted original indices).
             // Stream 0: Position
             gather_Kernel<<<numBlocks, threadsPerBlock, 0, m_streams[0]>>>(
                 position.getData() + numObstacles,
                 m_tempPosition.getData(),
-                m_sortedIndices.getData(),
+                m_sortedIndicesOut.getData(),
                 numParticles);
 
             // Stream 1: Velocity
             gather_Kernel<<<numBlocks, threadsPerBlock, 0, m_streams[1]>>>(
                 velocity.getData() + numObstacles,
                 m_tempVelocity.getData(),
-                m_sortedIndices.getData(),
+                m_sortedIndicesOut.getData(),
                 numParticles);
 
             // Stream 2: Quaternion
             gather_Kernel<<<numBlocks, threadsPerBlock, 0, m_streams[2]>>>(
                 quaternion.getData() + numObstacles,
                 m_tempQuaternion.getData(),
-                m_sortedIndices.getData(),
+                m_sortedIndicesOut.getData(),
                 numParticles);
 
             // Stream 3: Torce
             gather_Kernel<<<numBlocks, threadsPerBlock, 0, m_streams[3]>>>(
                 torce.getData() + numObstacles,
                 m_tempTorce.getData(),
-                m_sortedIndices.getData(),
+                m_sortedIndicesOut.getData(),
                 numParticles);
 
             // Stream 4: RigidBodyId
             gather_Kernel<<<numBlocks, threadsPerBlock, 0, m_streams[4]>>>(
                 rigidBodyId.getData() + numObstacles,
                 m_tempRigidBodyId.getData(),
-                m_sortedIndices.getData(),
+                m_sortedIndicesOut.getData(),
                 numParticles);
 
             // Stream 5: ComponentId
             gather_Kernel<<<numBlocks, threadsPerBlock, 0, m_streams[5]>>>(
                 componentId.getData() + numObstacles,
                 m_tempComponentId.getData(),
-                m_sortedIndices.getData(),
+                m_sortedIndicesOut.getData(),
                 numParticles);
 
             // Wait for all gather operations to complete

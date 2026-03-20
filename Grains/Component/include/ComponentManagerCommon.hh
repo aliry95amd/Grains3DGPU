@@ -59,8 +59,8 @@ __HOSTDEVICE__ static INLINE void moveParticles_common(const TimeIntegrator<T>* 
     TI[0]->Move(momentum, kinematics[cID], transMotion, rotMotion);
 
     position[cID] += transMotion;
-    quaternion[cID] *= rotMotion;
-    T qn = norm(quaternion[cID]);
+    quaternion[cID] = rotMotion * quaternion[cID];
+    T qn            = norm(quaternion[cID]);
     if(qn > EPS<T>)
         quaternion[cID] *= (T(1) / qn);
 }

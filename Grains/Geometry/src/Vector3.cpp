@@ -133,7 +133,10 @@ __HOSTDEVICE__ void Vector3<T>::normalize() noexcept
 template <typename T>
 __HOSTDEVICE__ Vector3<T> Vector3<T>::normalized() const noexcept
 {
-    return (*this / norm(*this));
+    T n = norm(*this);
+    if(n > EPS<T>)
+        return (*this / n);
+    return Vector3<T>();
 }
 
 // -------------------------------------------------------------------------------------------------

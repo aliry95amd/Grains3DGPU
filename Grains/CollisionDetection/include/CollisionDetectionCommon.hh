@@ -218,7 +218,7 @@ __HOSTDEVICE__ static INLINE void transformContactInfo_common(const uint2*      
     const Quaternion<T>&              qA       = quaternion[idA];
     const ContactInfo<T>              ciL      = contactInfoLocal[pairID];
     typename ContactInfo<T>::Snapshot snapshot = ciL.getSnapshot();
-    snapshot.contactPoint                      = qA >> snapshot.contactPoint + position[idA];
+    snapshot.contactPoint                      = (qA >> snapshot.contactPoint) + position[idA];
     snapshot.contactVector                     = qA >> snapshot.contactVector;
     contactInfoWorld[pairID].setSnapshot(snapshot);
 }

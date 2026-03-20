@@ -36,8 +36,8 @@ __HOSTDEVICE__ static INLINE auto getPropertiesForContact(const RigidBody<T>& rb
 
     const Convex<T>* convexA     = sa.convex;
     const Convex<T>* convexB     = sb.convex;
-    T                crustA      = sa.crustThickness;
-    T                crustB      = sb.crustThickness;
+    T                crustA      = sa.crustThickness * T(0.5);
+    T                crustB      = sb.crustThickness * T(0.5);
     T                circRadiusA = sa.circumscribedRadius;
     T                circRadiusB = sb.circumscribedRadius;
 
@@ -253,39 +253,39 @@ __HOSTDEVICE__ inline void closestPointsRigidBodies(const RigidBody<T>&  rbA,
     // General Case
     else
     {
-        Vector3<T> ptA, ptB;
-        uint       nbIterGJK       = 0;
-        auto       computeDistance = [&]() {
-            return computeClosestPoints_GJK<T, GJKVARIANT, GJKACC>(convexA,
-                                                                   convexB,
-                                                                   b2a,
-                                                                   crustA,
-                                                                   crustB,
-                                                                   ptA,
-                                                                   ptB,
-                                                                   nbIterGJK);
-        };
-
-        // If bodies are too close, increase crust thickness and recompute
+        Vector3<T>     ptA, ptB;
+        uint           nbIterGJK          = 0;
+        const T        crustA_orig        = crustA;
+        const T        crustB_orig        = crustB;
+        constexpr T    CRUST_MULTIPLIER   = T(2);
         constexpr uint maxCrustIterations = 4;
         uint           crustIteration     = 0;
         do
         {
-            snapshot.overlapDistance = computeDistance();
+            snapshot.overlapDistance = computeClosestPoints_GJK<T, GJKVARIANT, GJKACC>(convexA,
+                                                                                       convexB,
+                                                                                       b2a,
+                                                                                       crustA,
+                                                                                       crustB,
+                                                                                       ptA,
+                                                                                       ptB,
+                                                                                       nbIterGJK);
             if(fabs(snapshot.overlapDistance) >= HIGHEPS<T>)
                 break;
             Gout("Warning: GJK too close bodies, increasing crust thicknesses ...");
-            crustA *= 10;
-            crustB *= 10;
+            crustA *= CRUST_MULTIPLIER;
+            crustB *= CRUST_MULTIPLIER;
             crustIteration++;
         } while(crustIteration < maxCrustIterations);
 
-        // Actual overlap
-        snapshot.overlapDistance -= crustA + crustB;
+        if(crustIteration == maxCrustIterations)
+            snapshot.overlapDistance = -(crustA_orig + crustB_orig);
+        else
+            snapshot.overlapDistance -= crustA_orig + crustB_orig;
         // ptA = (a2a)(ptA);
         ptB                    = (b2a)(ptB);
         snapshot.contactPoint  = T(0.5) * (ptA + ptB);
-        snapshot.contactVector = (ptA - ptB).normalized();
+        snapshot.contactVector = (ptB - ptA).normalized();
     }
 
     // Set contact information
@@ -391,8 +391,11 @@ __HOSTDEVICE__ inline void closestPointsRigidBodies(const RigidBody<T>&  rbA,
         ptA                      = a2w.getOrigin();
         ptB                      = b2w.getOrigin() - ptA;
         snapshot.overlapDistance = norm(ptB) - rA - rB;
-        snapshot.contactPoint    = ptA + (rA + T(.5) * snapshot.overlapDistance) * ptB;
-        snapshot.contactVector   = ptA + snapshot.overlapDistance * ptB;
+        {
+            Vector3<T> d_hat       = ptB.normalized();
+            snapshot.contactPoint  = ptA + (rA + T(.5) * snapshot.overlapDistance) * d_hat;
+            snapshot.contactVector = d_hat;
+        }
     }
     // Rectangle-Particle Case
     else if(typeA == ConvexType::RECTANGLE)
@@ -424,39 +427,39 @@ __HOSTDEVICE__ inline void closestPointsRigidBodies(const RigidBody<T>&  rbA,
     // General Case
     else
     {
-        uint nbIterGJK       = 0;
-        auto computeDistance = [&]() {
-            return computeClosestPoints_GJK<T, GJKVARIANT, GJKACC>(convexA,
-                                                                   convexB,
-                                                                   a2w,
-                                                                   b2w,
-                                                                   crustA,
-                                                                   crustB,
-                                                                   ptA,
-                                                                   ptB,
-                                                                   nbIterGJK);
-        };
-
-        // If bodies are too close, increase crust thickness and recompute
+        uint           nbIterGJK          = 0;
+        const T        crustA_orig        = crustA;
+        const T        crustB_orig        = crustB;
+        constexpr T    CRUST_MULTIPLIER   = T(2);
         constexpr uint maxCrustIterations = 4;
         uint           crustIteration     = 0;
         do
         {
-            snapshot.overlapDistance = computeDistance();
+            snapshot.overlapDistance = computeClosestPoints_GJK<T, GJKVARIANT, GJKACC>(convexA,
+                                                                                       convexB,
+                                                                                       a2w,
+                                                                                       b2w,
+                                                                                       crustA,
+                                                                                       crustB,
+                                                                                       ptA,
+                                                                                       ptB,
+                                                                                       nbIterGJK);
             if(fabs(snapshot.overlapDistance) >= HIGHEPS<T>)
                 break;
             Gout("Warning: GJK too close bodies, increasing crust thicknesses ...");
-            crustA *= 10;
-            crustB *= 10;
+            crustA *= CRUST_MULTIPLIER;
+            crustB *= CRUST_MULTIPLIER;
             crustIteration++;
         } while(crustIteration < maxCrustIterations);
 
-        // Computation of the actual overlap
-        snapshot.overlapDistance -= crustA + crustB;
+        if(crustIteration == maxCrustIterations)
+            snapshot.overlapDistance = -(crustA_orig + crustB_orig);
+        else
+            snapshot.overlapDistance -= crustA_orig + crustB_orig;
         ptA                    = (a2w)(ptA);
         ptB                    = (b2w)(ptB);
         snapshot.contactPoint  = T(0.5) * (ptA + ptB);
-        snapshot.contactVector = (ptA - ptB).normalized();
+        snapshot.contactVector = (ptB - ptA).normalized();
     }
 
     // Set contact information
@@ -558,40 +561,40 @@ __HOSTDEVICE__ inline void closestPointsRigidBodies(const RigidBody<T>&  rbA,
     // General Case
     else
     {
-        Vector3<T> ptA, ptB;
-        uint       nbIterGJK       = 0;
-        auto       computeDistance = [&]() {
-            return computeClosestPoints_GJK<T, GJKVARIANT, GJKACC>(convexA,
-                                                                   convexB,
-                                                                   v_b2a,
-                                                                   q_b2a,
-                                                                   crustA,
-                                                                   crustB,
-                                                                   ptA,
-                                                                   ptB,
-                                                                   nbIterGJK);
-        };
-
-        // If bodies are too close, increase crust thickness and recompute
+        Vector3<T>     ptA, ptB;
+        uint           nbIterGJK          = 0;
+        const T        crustA_orig        = crustA;
+        const T        crustB_orig        = crustB;
+        constexpr T    CRUST_MULTIPLIER   = T(2);
         constexpr uint maxCrustIterations = 4;
         uint           crustIteration     = 0;
         do
         {
-            snapshot.overlapDistance = computeDistance();
+            snapshot.overlapDistance = computeClosestPoints_GJK<T, GJKVARIANT, GJKACC>(convexA,
+                                                                                       convexB,
+                                                                                       v_b2a,
+                                                                                       q_b2a,
+                                                                                       crustA,
+                                                                                       crustB,
+                                                                                       ptA,
+                                                                                       ptB,
+                                                                                       nbIterGJK);
             if(fabs(snapshot.overlapDistance) >= HIGHEPS<T>)
                 break;
             Gout("Warning: GJK too close bodies, increasing crust thicknesses ...");
-            crustA *= 10;
-            crustB *= 10;
+            crustA *= CRUST_MULTIPLIER;
+            crustB *= CRUST_MULTIPLIER;
             crustIteration++;
         } while(crustIteration < maxCrustIterations);
 
-        // Computation of the actual overlap
-        snapshot.overlapDistance -= crustA + crustB;
+        if(crustIteration == maxCrustIterations)
+            snapshot.overlapDistance = -(crustA_orig + crustB_orig);
+        else
+            snapshot.overlapDistance -= crustA_orig + crustB_orig;
         // transform(q_a2a, v_a2a, ptA);
         transform(q_b2a, v_b2a, ptB);
         snapshot.contactPoint  = T(0.5) * (ptA + ptB);
-        snapshot.contactVector = (ptA - ptB).normalized();
+        snapshot.contactVector = (ptB - ptA).normalized();
     }
 
     // Set contact information
@@ -705,8 +708,11 @@ __HOSTDEVICE__ inline void closestPointsRigidBodies(const RigidBody<T>&  rbA,
         ptA                      = v_a2w;
         ptB                      = v_b2w - ptA;
         snapshot.overlapDistance = norm(ptB) - rA - rB;
-        snapshot.contactPoint    = ptA + (rA + T(.5) * snapshot.overlapDistance) * ptB;
-        snapshot.contactVector   = ptA + snapshot.overlapDistance * ptB;
+        {
+            Vector3<T> d_hat       = ptB.normalized();
+            snapshot.contactPoint  = ptA + (rA + T(.5) * snapshot.overlapDistance) * d_hat;
+            snapshot.contactVector = d_hat;
+        }
     }
     // Rectangle-Particle Case
     else if(typeA == ConvexType::RECTANGLE)
@@ -715,7 +721,7 @@ __HOSTDEVICE__ inline void closestPointsRigidBodies(const RigidBody<T>&  rbA,
         Vector3<T> r = q_a2w >> Vector3<T>(0, 0, 1);
         r.normalized();
         r *= copysign(T(1), r * (v_b2w - v_a2w));
-        ptB = q_b2w >> convexB.support(q_b2w << r) + v_b2w;
+        ptB = (q_b2w >> convexB.support(q_b2w << r)) + v_b2w;
         if(r * (ptB - v_a2w) < T(0))
         {
             ptA = ((v_a2w - ptB) * r) * r + ptB;
@@ -735,41 +741,41 @@ __HOSTDEVICE__ inline void closestPointsRigidBodies(const RigidBody<T>&  rbA,
     // General Case
     else
     {
-        uint nbIterGJK       = 0;
-        auto computeDistance = [&]() {
-            return computeClosestPoints_GJK<T, GJKVARIANT, GJKACC>(convexA,
-                                                                   convexB,
-                                                                   v_a2w,
-                                                                   v_b2w,
-                                                                   q_a2w,
-                                                                   q_b2w,
-                                                                   crustA,
-                                                                   crustB,
-                                                                   ptA,
-                                                                   ptB,
-                                                                   nbIterGJK);
-        };
-
-        // If bodies are too close, increase crust thickness and recompute
+        uint           nbIterGJK          = 0;
+        const T        crustA_orig        = crustA;
+        const T        crustB_orig        = crustB;
+        constexpr T    CRUST_MULTIPLIER   = T(2);
         constexpr uint maxCrustIterations = 4;
         uint           crustIteration     = 0;
         do
         {
-            snapshot.overlapDistance = computeDistance();
+            snapshot.overlapDistance = computeClosestPoints_GJK<T, GJKVARIANT, GJKACC>(convexA,
+                                                                                       convexB,
+                                                                                       v_a2w,
+                                                                                       v_b2w,
+                                                                                       q_a2w,
+                                                                                       q_b2w,
+                                                                                       crustA,
+                                                                                       crustB,
+                                                                                       ptA,
+                                                                                       ptB,
+                                                                                       nbIterGJK);
             if(fabs(snapshot.overlapDistance) >= HIGHEPS<T>)
                 break;
             Gout("Warning: GJK too close bodies, increasing crust thicknesses ...");
-            crustA *= 10;
-            crustB *= 10;
+            crustA *= CRUST_MULTIPLIER;
+            crustB *= CRUST_MULTIPLIER;
             crustIteration++;
         } while(crustIteration < maxCrustIterations);
 
-        // Computation of the actual overlap
-        snapshot.overlapDistance -= crustA + crustB;
+        if(crustIteration == maxCrustIterations)
+            snapshot.overlapDistance = -(crustA_orig + crustB_orig);
+        else
+            snapshot.overlapDistance -= crustA_orig + crustB_orig;
         transform(q_a2w, v_a2w, ptA);
         transform(q_b2w, v_b2w, ptB);
         snapshot.contactPoint  = T(0.5) * (ptA + ptB);
-        snapshot.contactVector = (ptA - ptB).normalized();
+        snapshot.contactVector = (ptB - ptA).normalized();
     }
 
     // Set contact information

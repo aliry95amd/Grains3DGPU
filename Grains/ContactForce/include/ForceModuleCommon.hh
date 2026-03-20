@@ -1,6 +1,9 @@
 #ifndef _FORCEMODULECOMMON_HH_
 #define _FORCEMODULECOMMON_HH_
 
+// Uncomment to enable contact debug output (CPU path only)
+// #define GRAINS_CONTACT_DEBUG
+
 #include "Basic.hh"
 #include "ContactForceModel.hh"
 #include "ContactInfo.hh"
@@ -72,6 +75,45 @@ __HOSTDEVICE__ static INLINE void computeContactForces_common(const ContactForce
                                  - vB.kinematicsAtPoint(contactPt - position[idB]));
         // relative angular velocity
         const Vector3<T>& relAngVel(vA.getAngularComponent() - vB.getAngularComponent());
+
+#ifdef GRAINS_CONTACT_DEBUG
+        {
+            static uint64_t s_contactStep = 0;
+            ++s_contactStep;
+            const Vector3<T>& cv   = snapshot.contactVector;
+            const Vector3<T>& cp   = snapshot.contactPoint;
+            const Vector3<T>& posB = position[idB];
+            const Vector3<T>  omB  = vB.getAngularComponent();
+            printf("[CD %lu] pair=(%u,%u) "
+                   "cv=(%.4e,%.4e,%.4e) overlap=%.4e "
+                   "cp=(%.4e,%.4e,%.4e) "
+                   "posB=(%.4e,%.4e,%.4e) "
+                   "vB=(%.4e,%.4e,%.4e) omB=(%.4e,%.4e,%.4e) "
+                   "relVel=(%.4e,%.4e,%.4e)\n",
+                   s_contactStep,
+                   idA,
+                   idB,
+                   (double)cv[0],
+                   (double)cv[1],
+                   (double)cv[2],
+                   (double)snapshot.overlapDistance,
+                   (double)cp[0],
+                   (double)cp[1],
+                   (double)cp[2],
+                   (double)posB[0],
+                   (double)posB[1],
+                   (double)posB[2],
+                   (double)vB.getTranslationalComponent()[0],
+                   (double)vB.getTranslationalComponent()[1],
+                   (double)vB.getTranslationalComponent()[2],
+                   (double)omB[0],
+                   (double)omB[1],
+                   (double)omB[2],
+                   (double)relVel[0],
+                   (double)relVel[1],
+                   (double)relVel[2]);
+        }
+#endif
 
         // Look up or create contact history entry
         ContactHistory<T>* historyPtr = nullptr;
