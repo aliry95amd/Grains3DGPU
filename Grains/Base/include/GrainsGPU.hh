@@ -1,7 +1,6 @@
 #ifndef _GRAINSGPU_HH_
 #define _GRAINSGPU_HH_
 
-#include "ComponentManagerGPU.hh"
 #include "Grains.hh"
 #include "ReaderXML.hh"
 

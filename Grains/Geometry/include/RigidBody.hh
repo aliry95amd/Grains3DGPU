@@ -142,6 +142,16 @@ public:
     /** @brief Sets the rigid body's inertia and circumscribed radius */
     __HOSTDEVICE__
     void setInertia();
+
+    /** @brief Overrides mass and principal inertia values for a composite master sub-body.
+        Unlike setInertia(), this bypasses the shape-derived computation and directly injects
+        the composite totals (computed via parallel-axis theorem + diagonalization at init).
+        @param mass total composite mass
+        @param ixx principal moment Ixx
+        @param iyy principal moment Iyy
+        @param izz principal moment Izz */
+    __HOSTDEVICE__
+    void setCompositeProperties(T mass, T ixx, T iyy, T izz);
     //@}
 
     /**@name Methods */

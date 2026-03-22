@@ -5,19 +5,20 @@
 #include <cub/cub.cuh>
 #include <cuda_runtime.h>
 
+#include "BodyTag.hh"
 #include "ContactForceModel.hh"
 #include "ForceModuleCommon.hh"
 #include "GrainsParameters.hh"
 #include "GrainsUtils.hh"
 #include "RigidBody.hh"
+#include "Torce.hh"
 #include "Vector3.hh"
 #include "VectorMath.hh"
 
 // =================================================================================================
 /** @brief GPU kernels for the ForceModule class.
 
-    Contains the contact-force and external-force kernels migrated from
-    ComponentManagerGPU_Kernels.hh, plus the active-pair compaction helper buildCompactActiveIndex.
+    Contains the contact-force and external-force kernels.
 
     @author A.Yazdani - 2026 - Construction */
 // =================================================================================================
@@ -198,6 +199,38 @@ __GLOBAL__ void addExternalForces_Kernel(const T                    gX,
         return;
 
     addExternalForces_common(Vector3<T>(gX, gY, gZ), rigidBody, torce, nObstacles + pID);
+}
+
+// -------------------------------------------------------------------------------------------------
+/** @brief Accumulates forces and torques from non-master sub-bodies into their composite master,
+    then resets the sub-body torces. One thread per component.
+    @param torce      per-component torce (sub-bodies read, master accumulated atomically, reset)
+    @param position   world-frame positions (needed to compute moment arm r = sub - master)
+    @param masterSlot lookup: masterSlot[compositeIdx] = current array slot of composite master
+    @param bodyTag    per-component body tag (encodes isSubBody / compositeIdx / localIdx)
+    @param nComponents total number of components (obstacles + particles) */
+template <typename T>
+__GLOBAL__ void assembleCompositeTorces_Kernel(Torce<T>*         torce,
+                                               const Vector3<T>* position,
+                                               const uint*       masterSlot,
+                                               const uint*       bodyTag,
+                                               const uint        nComponents)
+{
+    uint cID = blockIdx.x * blockDim.x + threadIdx.x;
+    if(cID >= nComponents)
+        return;
+
+    const uint tag = bodyTag[cID];
+    if(!isSubBody(tag) || getSubBodyLocalIdx(tag) == 0u)
+        return;
+
+    const uint       mSlot = masterSlot[getCompositeIdx(tag)];
+    const Vector3<T> r     = position[cID] - position[mSlot];
+    const Vector3<T> f     = torce[cID].getForce();
+    const Vector3<T> tau   = torce[cID].getTorque() + (r ^ f);
+    torce[mSlot].addForceAtomic(f);
+    torce[mSlot].addTorqueAtomic(tau);
+    torce[cID].reset();
 }
 //@}
 

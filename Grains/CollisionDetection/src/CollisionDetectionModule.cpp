@@ -3,6 +3,7 @@
 #include <type_traits>
 #include <vector>
 
+#include "BodyTag.hh"
 #include "CollisionDetectionCommon.hh"
 #include "CollisionDetectionModule.hh"
 #include "CollisionDetectionModule_Kernels.hh"
@@ -125,27 +126,28 @@ void CollisionDetectionModule<T, M>::run(const RigidBody<T>* const*          rig
                                          GrainsMemBuffer<Quaternion<T>, M>&  orientations,
                                          GrainsMemBuffer<Kinematics<T>, M>&  velocities,
                                          GrainsMemBuffer<Torce<T>, M>&       torces,
-                                         GrainsMemBuffer<uint, M>&           rigidBodyIds,
-                                         GrainsMemBuffer<uint, M>&           componentIds,
+                                         GrainsMemBuffer<uint, M>&           bodyTags,
+                                         GrainsMemBuffer<Vector3<T>, M>&     localPos,
+                                         GrainsMemBuffer<Quaternion<T>, M>&  localQuat,
+                                         GrainsMemBuffer<uint, M>&           masterSlot,
                                          GrainsMemBuffer<ContactInfo<T>, M>& contactInfo,
                                          GrainsMemBuffer<uint2, M>&          pairList,
-                                         uint&                               numPairs,
-                                         uint                                nObstacles,
-                                         uint                                nParticles)
+                                         ComponentCounts&                    counts)
 {
     sortParticles(positions,
                   orientations,
                   velocities,
                   torces,
-                  rigidBodyIds,
-                  componentIds,
-                  nObstacles,
-                  nParticles);
-    updateNeighborList(positions, pairList, contactInfo, numPairs, nObstacles, nParticles);
+                  bodyTags,
+                  localPos,
+                  localQuat,
+                  masterSlot,
+                  counts);
+    updateNeighborList(positions, pairList, contactInfo, counts);
     if(GrainsParameters<T>::m_collisionDetection.useRelativeTransformations)
     {
         computeRelativeTransformations(positions, orientations, pairList);
-        detectCollisionsComponents(rigidBodies, pairList);
+        detectCollisionsComponents(rigidBodies, pairList, bodyTags, counts);
         transformContactInfo(positions, orientations, pairList, contactInfo);
     }
     else
@@ -153,7 +155,9 @@ void CollisionDetectionModule<T, M>::run(const RigidBody<T>* const*          rig
                                          positions,
                                          orientations,
                                          pairList,
-                                         contactInfo);
+                                         contactInfo,
+                                         bodyTags,
+                                         counts);
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -196,11 +200,12 @@ void CollisionDetectionModule<T, M>::updateNeighborList(
     GrainsMemBuffer<Vector3<T>, M>&     positions,
     GrainsMemBuffer<uint2, M>&          pairList,
     GrainsMemBuffer<ContactInfo<T>, M>& contactInfo,
-    uint&                               numPairs,
-    uint                                nObstacles,
-    uint                                nParticles)
+    ComponentCounts&                    counts)
 {
-    auto& SS = GrainsParameters<T>::m_simulationState;
+    const uint nObstacles = counts.numObstacles;
+    const uint nParticles = counts.numParticles;
+    uint&      numPairs   = counts.numPairs;
+    auto&      SS         = GrainsParameters<T>::m_simulationState;
 
     GrainsClock::time_point t0;
     if(GrainsParameters<T>::m_collisionDetection.timer)
@@ -271,10 +276,13 @@ void CollisionDetectionModule<T, M>::computeRelativeTransformations(
 
 // -------------------------------------------------------------------------------------------------
 // Performs a narrow-phase GJK-based collision detection for each pair and writes contact info in
-// A-local frame. Might also opionally perform a BV pre-filter.
+// A-local frame. DEVICE BV-ON and composite paths use the compacted m_bvPassPairIndices list.
 template <typename T, MemType M>
 void CollisionDetectionModule<T, M>::detectCollisionsComponents(
-    const RigidBody<T>* const* rigidBodies, const GrainsMemBuffer<uint2, M>& pairList)
+    const RigidBody<T>* const*       rigidBodies,
+    const GrainsMemBuffer<uint2, M>& pairList,
+    const GrainsMemBuffer<uint, M>&  bodyTags,
+    const ComponentCounts&           counts)
 {
     const uint               nPairs = m_neighborList->getSize();
     const BoundingVolumeType bvType = GrainsParameters<T>::m_collisionDetection.boundingVolumeType;
@@ -286,7 +294,7 @@ void CollisionDetectionModule<T, M>::detectCollisionsComponents(
     {
         // BVType is passed directly to detectCollisionsComponents_common, which forwards it to
         // closestPointsRigidBodies. The BV early-out and no-contact sentinel are handled
-        // internally, so no separate filter loop or explicit sentinel write is needed here.
+        // internally. Intra-composite pairs are skipped via an explicit guard before the call.
         auto run = [&](auto bvTypeTag) {
             constexpr BoundingVolumeType BVT = decltype(bvTypeTag)::value;
             GrainsClock::time_point      t0;
@@ -295,7 +303,21 @@ void CollisionDetectionModule<T, M>::detectCollisionsComponents(
             dispatchGJK(npType, gjkAcc, [&](auto gjkV_tag, auto gjkA_tag) {
                 constexpr GJKType GJKV = decltype(gjkV_tag)::value;
                 constexpr bool    GJKA = decltype(gjkA_tag)::value;
+                const uint*       bt   = bodyTags.getData();
                 for(uint i = 0; i < nPairs; ++i)
+                {
+                    if(counts.numComposites > 0)
+                    {
+                        const uint2 p    = pairList.getData()[i];
+                        const uint  tagA = bt[p.x];
+                        const uint  tagB = bt[p.y];
+                        if(isSubBody(tagA) && isSubBody(tagB)
+                           && getCompositeIdx(tagA) == getCompositeIdx(tagB))
+                        {
+                            m_contactInfoLocal.getData()[i].setOverlapDistance(T(1));
+                            continue;
+                        }
+                    }
                     detectCollisionsComponents_common<T, GJKV, GJKA, BVT>(
                         pairList.getData(),
                         rigidBodies,
@@ -303,6 +325,7 @@ void CollisionDetectionModule<T, M>::detectCollisionsComponents(
                         m_relQuaternion.getData(),
                         m_contactInfoLocal.getData(),
                         i);
+                }
             });
             if(timing)
                 GrainsParameters<T>::m_timer.narrowPhaseTime
@@ -321,9 +344,16 @@ void CollisionDetectionModule<T, M>::detectCollisionsComponents(
     }
     else
     {
-        if(bvType == BoundingVolumeType::OBB || bvType == BoundingVolumeType::OBC)
+        if(bvType == BoundingVolumeType::OBB || bvType == BoundingVolumeType::OBC
+           || counts.numComposites > 0)
         {
-            filterPairsBV(rigidBodies, pairList, m_contactInfoLocal);
+            // BV-ON: filter + composite rejection fused in the BV kernel.
+            // BV-OFF with composites: composite-only filter reusing BV CUB machinery.
+            filterPairsBV(rigidBodies,
+                          pairList,
+                          m_contactInfoLocal,
+                          bodyTags.getData(),
+                          counts.numComposites);
             GrainsClock::time_point t0;
             if(timing)
                 t0 = GrainsClock::now();
@@ -351,6 +381,7 @@ void CollisionDetectionModule<T, M>::detectCollisionsComponents(
         }
         else
         {
+            // BV-OFF, no composites: run GJK over all pairs without an index list.
             GrainsClock::time_point t0;
             if(timing)
                 t0 = GrainsClock::now();
@@ -380,14 +411,16 @@ void CollisionDetectionModule<T, M>::detectCollisionsComponents(
 }
 
 // -------------------------------------------------------------------------------------------------
-// Narrow-phase GJK using world-frame positions/quaternions directly
+// Narrow-phase GJK using world-frame positions/quaternions directly.
 template <typename T, MemType M>
 void CollisionDetectionModule<T, M>::detectCollisionsComponentsGlobal(
     const RigidBody<T>* const*               rigidBodies,
     const GrainsMemBuffer<Vector3<T>, M>&    positions,
     const GrainsMemBuffer<Quaternion<T>, M>& orientations,
     const GrainsMemBuffer<uint2, M>&         pairList,
-    GrainsMemBuffer<ContactInfo<T>, M>&      contactInfo)
+    GrainsMemBuffer<ContactInfo<T>, M>&      contactInfo,
+    const GrainsMemBuffer<uint, M>&          bodyTags,
+    const ComponentCounts&                   counts)
 {
     const uint               nPairs = m_neighborList->getSize();
     const BoundingVolumeType bvType = GrainsParameters<T>::m_collisionDetection.boundingVolumeType;
@@ -399,7 +432,7 @@ void CollisionDetectionModule<T, M>::detectCollisionsComponentsGlobal(
     {
         // BVType is passed directly to detectCollisionsComponentsGlobal_common, which forwards
         // it to closestPointsRigidBodies. The BV early-out and no-contact sentinel are handled
-        // internally, so no separate filter loop or explicit sentinel write is needed here.
+        // internally. Intra-composite pairs are skipped via an explicit guard before the call.
         auto run = [&](auto bvTypeTag) {
             constexpr BoundingVolumeType BVT = decltype(bvTypeTag)::value;
             GrainsClock::time_point      t0;
@@ -408,7 +441,21 @@ void CollisionDetectionModule<T, M>::detectCollisionsComponentsGlobal(
             dispatchGJK(npType, gjkAcc, [&](auto gjkV_tag, auto gjkA_tag) {
                 constexpr GJKType GJKV = decltype(gjkV_tag)::value;
                 constexpr bool    GJKA = decltype(gjkA_tag)::value;
+                const uint*       bt   = bodyTags.getData();
                 for(uint i = 0; i < nPairs; ++i)
+                {
+                    if(counts.numComposites > 0)
+                    {
+                        const uint2 p    = pairList.getData()[i];
+                        const uint  tagA = bt[p.x];
+                        const uint  tagB = bt[p.y];
+                        if(isSubBody(tagA) && isSubBody(tagB)
+                           && getCompositeIdx(tagA) == getCompositeIdx(tagB))
+                        {
+                            contactInfo.getData()[i].setOverlapDistance(T(1));
+                            continue;
+                        }
+                    }
                     detectCollisionsComponentsGlobal_common<T, GJKV, GJKA, BVT>(
                         pairList.getData(),
                         rigidBodies,
@@ -416,6 +463,7 @@ void CollisionDetectionModule<T, M>::detectCollisionsComponentsGlobal(
                         orientations.getData(),
                         contactInfo.getData(),
                         i);
+                }
             });
             if(timing)
                 GrainsParameters<T>::m_timer.narrowPhaseTime
@@ -434,29 +482,36 @@ void CollisionDetectionModule<T, M>::detectCollisionsComponentsGlobal(
     }
     else
     {
-        if(bvType == BoundingVolumeType::OBB || bvType == BoundingVolumeType::OBC)
+        const bool needFilter = (bvType == BoundingVolumeType::OBB
+                                 || bvType == BoundingVolumeType::OBC || counts.numComposites > 0);
+
+        if(needFilter)
         {
-            // Re-use the relative-transform BV filter infrastructure: compute relPos/relQuat
-            // on-the-fly (they live in m_relPosition / m_relQuaternion) then run filterPairsBV.
             uint numBlocks, numThreads;
-            computeOptimalThreadsAndBlocks(nPairs,
-                                           GrainsParameters<T>::m_GPU,
-                                           numBlocks,
-                                           numThreads);
-            // Step 1: compute relative transforms needed by filterPairsBV_Kernel
-            computeRelativeTransformations_Kernel<T>
-                <<<numBlocks, numThreads>>>(positions.getData(),
-                                            orientations.getData(),
-                                            pairList.getData(),
-                                            m_relPosition.getData(),
-                                            m_relQuaternion.getData(),
-                                            nPairs);
-            cudaDeviceSynchronize();
+            if(bvType == BoundingVolumeType::OBB || bvType == BoundingVolumeType::OBC)
+            {
+                // BV-ON: compute relPos/relQuat on the fly (needed by the BV kernel)
+                computeOptimalThreadsAndBlocks(nPairs,
+                                               GrainsParameters<T>::m_GPU,
+                                               numBlocks,
+                                               numThreads);
+                computeRelativeTransformations_Kernel<T>
+                    <<<numBlocks, numThreads>>>(positions.getData(),
+                                                orientations.getData(),
+                                                pairList.getData(),
+                                                m_relPosition.getData(),
+                                                m_relQuaternion.getData(),
+                                                nPairs);
+                cudaDeviceSynchronize();
+            }
+            // BV filter (or composite-only filter when BV is OFF)
+            filterPairsBV(rigidBodies,
+                          pairList,
+                          contactInfo,
+                          bodyTags.getData(),
+                          counts.numComposites);
 
-            // Step 2: BV filter (writes flags + sentinels)
-            filterPairsBV(rigidBodies, pairList, contactInfo);
-
-            // Step 3: GJK on compacted BV-passing pairs
+            // GJK on compacted pairs (world frame, no relPos/relQuat needed)
             GrainsClock::time_point t0;
             if(timing)
                 t0 = GrainsClock::now();
@@ -483,6 +538,7 @@ void CollisionDetectionModule<T, M>::detectCollisionsComponentsGlobal(
         }
         else
         {
+            // BV-OFF, no composites: run GJK over all pairs without an index list.
             GrainsClock::time_point t0;
             if(timing)
                 t0 = GrainsClock::now();
@@ -512,13 +568,16 @@ void CollisionDetectionModule<T, M>::detectCollisionsComponentsGlobal(
 }
 
 // -------------------------------------------------------------------------------------------------
-// Launches a BV kernel to write flags, then uses CUB DeviceSelect::Flagged to compact passing pair
-// indices into m_bvPassPairIndices. Only invoked on the DEVICE path.
+// Launches a BV kernel to write flags, then uses CUB DeviceSelect::Flagged to compact passing
+// pair indices into m_bvPassPairIndices. Also serves as the composite-only filter when BV is
+// OFF. Only invoked on the DEVICE path.
 template <typename T, MemType M>
 void CollisionDetectionModule<T, M>::filterPairsBV(
     const RigidBody<T>* const*          rigidBodies,
     const GrainsMemBuffer<uint2, M>&    pairList,
-    GrainsMemBuffer<ContactInfo<T>, M>& contactInfoLocal)
+    GrainsMemBuffer<ContactInfo<T>, M>& contactInfoLocal,
+    const uint*                         bodyTags,
+    uint                                numComposites)
 {
     if constexpr(M == MemType::DEVICE)
     {
@@ -537,17 +596,34 @@ void CollisionDetectionModule<T, M>::filterPairsBV(
             filterPairsBV_Kernel<T, BoundingVolumeType::OBC>
                 <<<numBlocks, numThreads>>>(rigidBodies,
                                             pairList.getData(),
+                                            bodyTags,
+                                            numComposites,
+                                            m_relPosition.getData(),
+                                            m_relQuaternion.getData(),
+                                            contactInfoLocal.getData(),
+                                            m_bvPassFlags.getData(),
+                                            nPairs);
+        else if(bvType == BoundingVolumeType::OBB)
+            filterPairsBV_Kernel<T, BoundingVolumeType::OBB>
+                <<<numBlocks, numThreads>>>(rigidBodies,
+                                            pairList.getData(),
+                                            bodyTags,
+                                            numComposites,
                                             m_relPosition.getData(),
                                             m_relQuaternion.getData(),
                                             contactInfoLocal.getData(),
                                             m_bvPassFlags.getData(),
                                             nPairs);
         else
-            filterPairsBV_Kernel<T, BoundingVolumeType::OBB>
+            // BV is OFF: composite-only filter — relPosition/relQuaternion not used by the
+            // kernel
+            filterPairsBV_Kernel<T, BoundingVolumeType::OFF>
                 <<<numBlocks, numThreads>>>(rigidBodies,
                                             pairList.getData(),
-                                            m_relPosition.getData(),
-                                            m_relQuaternion.getData(),
+                                            bodyTags,
+                                            numComposites,
+                                            nullptr,
+                                            nullptr,
                                             contactInfoLocal.getData(),
                                             m_bvPassFlags.getData(),
                                             nPairs);
@@ -627,14 +703,18 @@ void CollisionDetectionModule<T, M>::sortParticles(GrainsMemBuffer<Vector3<T>, M
                                                    GrainsMemBuffer<Quaternion<T>, M>& orientations,
                                                    GrainsMemBuffer<Kinematics<T>, M>& velocities,
                                                    GrainsMemBuffer<Torce<T>, M>&      torces,
-                                                   GrainsMemBuffer<uint, M>&          rigidBodyIds,
-                                                   GrainsMemBuffer<uint, M>&          componentIds,
-                                                   uint                               nObstacles,
-                                                   uint                               nParticles)
+                                                   GrainsMemBuffer<uint, M>&          bodyTags,
+                                                   GrainsMemBuffer<Vector3<T>, M>&    localPos,
+                                                   GrainsMemBuffer<Quaternion<T>, M>& localQuat,
+                                                   GrainsMemBuffer<uint, M>&          masterSlot,
+                                                   const ComponentCounts&             counts)
 {
-    using GP = GrainsParameters<T>;
-    auto& SS = GP::m_simulationState;
-    auto& LC = GP::m_collisionDetection.linkedCellParameters;
+    const uint numComposites = counts.numComposites;
+    const uint nObstacles    = counts.numObstacles;
+    const uint nParticles    = counts.numParticles;
+    using GP                 = GrainsParameters<T>;
+    auto& SS                 = GP::m_simulationState;
+    auto& LC                 = GP::m_collisionDetection.linkedCellParameters;
 
     GrainsClock::time_point t0;
     if(GP::m_collisionDetection.timer)
@@ -646,11 +726,37 @@ void CollisionDetectionModule<T, M>::sortParticles(GrainsMemBuffer<Vector3<T>, M
                                        velocities,
                                        orientations,
                                        torces,
-                                       rigidBodyIds,
-                                       componentIds,
+                                       bodyTags,
+                                       localPos,
+                                       localQuat,
                                        nObstacles,
                                        nParticles);
         SS.particlesSorted = true;
+        // Rebuild master-slot lookup so composite queries stay valid after the reorder
+        if(numComposites > 0)
+        {
+            const uint nTotal = nObstacles + nParticles;
+            if constexpr(M == MemType::HOST)
+            {
+                for(uint cID = 0; cID < nTotal; ++cID)
+                {
+                    const uint tag = bodyTags[cID];
+                    if(isSubBody(tag) && getSubBodyLocalIdx(tag) == 0u)
+                        masterSlot[getCompositeIdx(tag)] = cID;
+                }
+            }
+            else if constexpr(M == MemType::DEVICE)
+            {
+                uint numThreads, numBlocks;
+                computeOptimalThreadsAndBlocks(nTotal,
+                                               GrainsParameters<T>::m_GPU,
+                                               numBlocks,
+                                               numThreads);
+                rebuildMasterSlot_Kernel<<<numBlocks, numThreads>>>(masterSlot.getData(),
+                                                                    bodyTags.getData(),
+                                                                    nTotal);
+            }
+        }
     }
     else
         SS.particlesSorted = false;

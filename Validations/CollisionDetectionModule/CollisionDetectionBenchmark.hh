@@ -85,7 +85,6 @@ public:
     BenchmarkRunner(const BenchmarkScenario& scenario, CSVWriter& csv)
         : m_scenario(scenario)
         , m_csv(csv)
-        , m_numPairs(0)
     {
         initCommon(scenario, csv);
         insertParticles(buildCDParams().linkedCellParameters);
@@ -103,7 +102,6 @@ public:
                     const HostParticleData<T>& pd)
         : m_scenario(scenario)
         , m_csv(csv)
-        , m_numPairs(0)
         , m_ownsDeviceObjects(false)
     {
         initCommon(scenario, csv);
@@ -131,7 +129,6 @@ public:
                     DeviceParticleData<T>&     dpd)
         : m_scenario(scenario)
         , m_csv(csv)
-        , m_numPairs(0)
         , m_ownsDeviceObjects(false)
     {
         initCommon(scenario, csv);
@@ -288,12 +285,12 @@ public:
                        m_kin,
                        m_torce,
                        m_rbIds,
-                       m_compIds,
+                       m_localPos,
+                       m_localQuat,
+                       m_masterSlot,
                        m_contactInfo,
                        m_pairList,
-                       m_numPairs,
-                       0u,
-                       N);
+                       m_counts);
 
         // ------------------------------------------------------------------
         // Measurement phase (timer ON, accumulate over numMeasureCalls)
@@ -308,12 +305,12 @@ public:
                        m_kin,
                        m_torce,
                        m_rbIds,
-                       m_compIds,
+                       m_localPos,
+                       m_localQuat,
+                       m_masterSlot,
                        m_contactInfo,
                        m_pairList,
-                       m_numPairs,
-                       0u,
-                       N);
+                       m_counts);
 
         if constexpr(M == MemType::DEVICE)
             cudaDeviceSynchronize();
@@ -354,7 +351,7 @@ public:
                        m_scenario.sortFrequency,
                        m_scenario.numWarmupCalls,
                        m_scenario.numMeasureCalls,
-                       m_numPairs,
+                       m_counts.numPairs,
                        sortMs,
                        nlMs,
                        relMs,
@@ -492,33 +489,45 @@ private:
         m_kin.initialize(N);
         m_torce.initialize(N);
         m_rbIds.initialize(N);
-        m_compIds.initialize(N);
+        m_localPos.initialize(N);
+        m_localQuat.initialize(N);
+        m_masterSlot.initialize(N);
 
         if constexpr(M == MemType::HOST)
         {
             for(uint i = 0; i < N; ++i)
             {
-                m_rb[i]      = m_h_rb[i];
-                m_pos[i]     = m_h_pos[i];
-                m_quat[i]    = m_h_quat[i];
-                m_kin[i]     = m_h_kin[i];
-                m_rbIds[i]   = i;
-                m_compIds[i] = i;
+                m_rb[i]         = m_h_rb[i];
+                m_pos[i]        = m_h_pos[i];
+                m_quat[i]       = m_h_quat[i];
+                m_kin[i]        = m_h_kin[i];
+                m_rbIds[i]      = i;
+                m_localPos[i]   = Vector3<T>();
+                m_localQuat[i]  = Quaternion<T>(T(1), T(0), T(0), T(0));
+                m_masterSlot[i] = 0u;
             }
         }
         else
         {
-            GrainsMemBuffer<uint, MemType::HOST> h_rbIds;
-            GrainsMemBuffer<uint, MemType::HOST> h_compIds;
+            GrainsMemBuffer<uint, MemType::HOST>          h_rbIds;
+            GrainsMemBuffer<Vector3<T>, MemType::HOST>    h_localPos;
+            GrainsMemBuffer<Quaternion<T>, MemType::HOST> h_localQuat;
+            GrainsMemBuffer<uint, MemType::HOST>          h_masterSlot;
             h_rbIds.initialize(N);
-            h_compIds.initialize(N);
+            h_localPos.initialize(N);
+            h_localQuat.initialize(N);
+            h_masterSlot.initialize(N);
             for(uint i = 0; i < N; ++i)
             {
-                h_rbIds[i]   = i;
-                h_compIds[i] = i;
+                h_rbIds[i]      = i;
+                h_localPos[i]   = Vector3<T>();
+                h_localQuat[i]  = Quaternion<T>(T(1), T(0), T(0), T(0));
+                h_masterSlot[i] = 0u;
             }
             m_rbIds.copyFrom(h_rbIds);
-            m_compIds.copyFrom(h_compIds);
+            m_localPos.copyFrom(h_localPos);
+            m_localQuat.copyFrom(h_localQuat);
+            m_masterSlot.copyFrom(h_masterSlot);
             m_pos.copyFrom(m_h_pos);
             m_quat.copyFrom(m_h_quat);
             m_kin.copyFrom(m_h_kin);
@@ -528,6 +537,7 @@ private:
         const uint estPairs = m_scenario.initialPairsPerParticle * N;
         m_contactInfo.initialize(estPairs);
         m_pairList.initialize(estPairs);
+        m_counts.numParticles = N;
 
         m_cdm = std::make_unique<CollisionDetectionModule<T, M>>(&m_rb, m_pos, m_quat, cdp, 0u, N);
     }
@@ -556,19 +566,29 @@ private:
         m_kin.initialize(N);
         m_torce.initialize(N);
         m_rbIds.initialize(N);
-        m_compIds.initialize(N);
+        m_localPos.initialize(N);
+        m_localQuat.initialize(N);
+        m_masterSlot.initialize(N);
 
-        GrainsMemBuffer<uint, MemType::HOST> h_rbIds;
-        GrainsMemBuffer<uint, MemType::HOST> h_compIds;
+        GrainsMemBuffer<uint, MemType::HOST>          h_rbIds;
+        GrainsMemBuffer<Vector3<T>, MemType::HOST>    h_localPos;
+        GrainsMemBuffer<Quaternion<T>, MemType::HOST> h_localQuat;
+        GrainsMemBuffer<uint, MemType::HOST>          h_masterSlot;
         h_rbIds.initialize(N);
-        h_compIds.initialize(N);
+        h_localPos.initialize(N);
+        h_localQuat.initialize(N);
+        h_masterSlot.initialize(N);
         for(uint i = 0; i < N; ++i)
         {
-            h_rbIds[i]   = i;
-            h_compIds[i] = i;
+            h_rbIds[i]      = i;
+            h_localPos[i]   = Vector3<T>();
+            h_localQuat[i]  = Quaternion<T>(T(1), T(0), T(0), T(0));
+            h_masterSlot[i] = 0u;
         }
         m_rbIds.copyFrom(h_rbIds);
-        m_compIds.copyFrom(h_compIds);
+        m_localPos.copyFrom(h_localPos);
+        m_localQuat.copyFrom(h_localQuat);
+        m_masterSlot.copyFrom(h_masterSlot);
         m_pos.copyFrom(m_h_pos);
         m_quat.copyFrom(m_h_quat);
         m_kin.copyFrom(m_h_kin);
@@ -576,6 +596,7 @@ private:
         const uint estPairs = m_scenario.initialPairsPerParticle * N;
         m_contactInfo.initialize(estPairs);
         m_pairList.initialize(estPairs);
+        m_counts.numParticles = N;
 
         m_cdm = std::make_unique<CollisionDetectionModule<T, M>>(&m_rb, m_pos, m_quat, cdp, 0u, N);
     }
@@ -713,13 +734,15 @@ private:
     GrainsMemBuffer<Quaternion<T>, M> m_quat;
     GrainsMemBuffer<Kinematics<T>, M> m_kin;
     GrainsMemBuffer<Torce<T>, M>      m_torce;
-    GrainsMemBuffer<uint, M>          m_rbIds;
-    GrainsMemBuffer<uint, M>          m_compIds;
+    GrainsMemBuffer<uint, M>          m_rbIds;       ///< body tags (sequential, no composites)
+    GrainsMemBuffer<Vector3<T>, M>    m_localPos;    ///< local pos offsets (all zero)
+    GrainsMemBuffer<Quaternion<T>, M> m_localQuat;   ///< local quat offsets (all identity)
+    GrainsMemBuffer<uint, M>          m_masterSlot;  ///< master slot lookup (no composites)
 
     // CDM-owned pair buffers resized by CDM internally; pre-allocated here
     GrainsMemBuffer<ContactInfo<T>, M> m_contactInfo;
     GrainsMemBuffer<uint2, M>          m_pairList;
-    uint                               m_numPairs;
+    ComponentCounts                    m_counts;  ///< numParticles set in buildDeviceData
 
     std::unique_ptr<CollisionDetectionModule<T, M>> m_cdm;
 };

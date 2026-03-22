@@ -55,16 +55,23 @@ enum class NarrowPhaseType
 /** @name Structs */
 //@{
 // -------------------------------------------------------------------------------------------------
+/** @brief Plain-old-data struct grouping all simulation-level component counts. */
+struct ComponentCounts
+{
+    uint numObstacles  = 0;  ///< Number of obstacles
+    uint numParticles  = 0;  ///< Number of moving particles
+    uint numPairs      = 0;  ///< Number of active contact pairs (updated each step)
+    uint numComposites = 0;  ///< Number of composite bodies
+    uint numSubBodies  = 0;  ///< Total sub-body slots across all composites
+};
+
+// -------------------------------------------------------------------------------------------------
 /** @brief Parameters to track dynamic simulation state during runtime. */
 template <typename T>
 struct SimulationState
 {
     /** @brief Current simulation time. */
     T time = 0;
-    /** @brief Number of obstacles. */
-    uint numObstacles = 0;
-    /** @brief Number of particles. */
-    uint numParticles = 0;
     /** @brief Number of times neighbor list has been updated. */
     uint neighborListUpdateCount = 0;
     /** @brief did obstacles move in the last step? */

@@ -25,11 +25,14 @@ __GLOBAL__ void computeRelativeTransformations_Kernel(const Vector3<T>*    posit
 }
 
 // -------------------------------------------------------------------------------------------------
-// BV pre-filter kernel: writes per-pair pass/fail flag (1 = pass, 0 = reject) and writes
-// a no-contact sentinel into contactInfo for every rejected pair.
+// BV pre-filter kernel.
+// Rejects intra-composite pairs unconditionally, then applies the BV test.
+// When BVType is OFF the BV section is compiled away, leaving a pure composite-membership test.
 template <typename T, BoundingVolumeType BVType>
 __GLOBAL__ void filterPairsBV_Kernel(const RigidBody<T>* const* rigidBodies,
                                      const uint2*               pairList,
+                                     const uint*                bodyTags,
+                                     uint                       numComposites,
                                      const Vector3<T>*          relPosition,
                                      const Quaternion<T>*       relQuaternion,
                                      ContactInfo<T>*            contactInfo,
@@ -40,18 +43,39 @@ __GLOBAL__ void filterPairsBV_Kernel(const RigidBody<T>* const* rigidBodies,
     if(tID >= nPairs)
         return;
 
-    const uint2         pair = pairList[tID];
-    const RigidBody<T>& rbA  = *(rigidBodies[pair.x]);
-    const RigidBody<T>& rbB  = *(rigidBodies[pair.y]);
+    const uint2 pair = pairList[tID];
 
-    if(filterPairBV_common<T, BVType>(rbA, rbB, relPosition[tID], relQuaternion[tID]))
+    // Reject intra-composite pairs (same composite, different sub-bodies)
+    if(numComposites > 0)
     {
+        const uint tagA = bodyTags[pair.x];
+        const uint tagB = bodyTags[pair.y];
+        if(isSubBody(tagA) && isSubBody(tagB) && getCompositeIdx(tagA) == getCompositeIdx(tagB))
+        {
+            bvPassFlags[tID] = 0;
+            contactInfo[tID].setOverlapDistance(T(1));
+            return;
+        }
+    }
+
+    if constexpr(BVType == BoundingVolumeType::OFF)
+    {
+        // No BV check: all non-composite pairs pass
         bvPassFlags[tID] = 1;
     }
     else
     {
-        bvPassFlags[tID] = 0;
-        contactInfo[tID].setOverlapDistance(T(1));
+        const RigidBody<T>& rbA = *(rigidBodies[pair.x]);
+        const RigidBody<T>& rbB = *(rigidBodies[pair.y]);
+        if(filterPairBV_common<T, BVType>(rbA, rbB, relPosition[tID], relQuaternion[tID]))
+        {
+            bvPassFlags[tID] = 1;
+        }
+        else
+        {
+            bvPassFlags[tID] = 0;
+            contactInfo[tID].setOverlapDistance(T(1));
+        }
     }
 }
 
@@ -105,6 +129,20 @@ __GLOBAL__ void detectCollisionsComponentsGlobal_Kernel(const RigidBody<T>* cons
                                                                            quaternion,
                                                                            contactInfo,
                                                                            pairIdx);
+}
+
+// -------------------------------------------------------------------------------------------------
+// Rebuilds masterSlot lookup after a Morton sort
+__GLOBAL__ void
+    rebuildMasterSlot_Kernel(uint* masterSlot, const uint* bodyTag, const uint nComponents)
+{
+    uint cID = blockIdx.x * blockDim.x + threadIdx.x;
+    if(cID >= nComponents)
+        return;
+
+    const uint tag = bodyTag[cID];
+    if(isSubBody(tag) && getSubBodyLocalIdx(tag) == 0u)
+        masterSlot[getCompositeIdx(tag)] = cID;
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -205,6 +243,8 @@ X(double, GJKType::SIGNEDVOLUME, true, BoundingVolumeType::OBC)
 #define X(T, BV)                                                                     \
     template __GLOBAL__ void filterPairsBV_Kernel<T, BV>(const RigidBody<T>* const*, \
                                                          const uint2*,               \
+                                                         const uint*,                \
+                                                         uint,                       \
                                                          const Vector3<T>*,          \
                                                          const Quaternion<T>*,       \
                                                          ContactInfo<T>*,            \
@@ -214,4 +254,6 @@ X(float, BoundingVolumeType::OBB)
 X(double, BoundingVolumeType::OBB)
 X(float, BoundingVolumeType::OBC)
 X(double, BoundingVolumeType::OBC)
+X(float, BoundingVolumeType::OFF)
+X(double, BoundingVolumeType::OFF)
 #undef X

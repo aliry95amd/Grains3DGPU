@@ -106,7 +106,6 @@ void GrainsGPU<T>::simulate()
     {
         m_d_components->detectCollisions();
         m_d_components->computeContactForces(m_d_contactForce);
-        m_d_components->addExternalForces();
     }
 
     // Write initial state (t = tStart) before advancing
@@ -133,7 +132,6 @@ void GrainsGPU<T>::simulate()
             // Detect collisions and compute forces at x_{n+1}.
             m_d_components->detectCollisions();
             m_d_components->computeContactForces(m_d_contactForce);
-            m_d_components->addExternalForces();
             // KDK Step 3: second half-kick using f_{n+1}.
             m_d_components->advanceVelocity(m_d_timeIntegrator);
         }
@@ -142,7 +140,6 @@ void GrainsGPU<T>::simulate()
             // Single-pass scheme: compute forces at x_n, then advance.
             m_d_components->detectCollisions();
             m_d_components->computeContactForces(m_d_contactForce);
-            m_d_components->addExternalForces();
             m_d_components->moveParticles(m_d_timeIntegrator);
         }
 
@@ -161,7 +158,6 @@ template <typename T>
 void GrainsGPU<T>::Construction(DOMElement* rootElement)
 {
     using GP = GrainsParameters<T>;
-    auto& SS = GP::m_simulationState;
 
     // ---------------------------------------------------------------------------------------------
     // Particles
@@ -188,9 +184,12 @@ void GrainsGPU<T>::Construction(DOMElement* rootElement)
 
     // ---------------------------------------------------------------------------------------------
     // Setting up the component managers
-    m_d_components = std::make_unique<ComponentManagerGPU<T>>(&m_d_rigidBodyList,
-                                                              SS.numObstacles,
-                                                              SS.numParticles);
+    m_d_components = std::make_unique<ComponentManager<T, MemType::DEVICE>>(
+        &m_d_rigidBodyList,
+        Grains<T>::m_components->getNumberOfObstacles(),
+        Grains<T>::m_components->getNumberOfParticles());
+    // Create the collision detection module, pair buffers, and force module
+    m_d_components->initialize();
 }
 
 // -------------------------------------------------------------------------------------------------

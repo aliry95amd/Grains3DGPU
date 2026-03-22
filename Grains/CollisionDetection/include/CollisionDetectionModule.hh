@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <memory>
 
+#include "BodyTag.hh"
 #include "CollisionDetectionCommon.hh"
 #include "ContactInfo.hh"
 #include "GrainsMemBuffer.hh"
@@ -58,7 +59,7 @@ private:
     GrainsMemBuffer<int, M> m_bvPassPairCountDevice;
     /** \brief Host-side copy of the passing-pair count after CUB compaction */
     int m_bvPassPairCount = 0;
-    /** \brief Scratch space for CUB DeviceSelect::Flagged */
+    /** \ brief Scratch space for CUB DeviceSelect::Flagged */
     GrainsMemBuffer<uint8_t, M> m_cubTempStorage;
     /** \brief Byte size of the CUB scratch buffer */
     size_t m_cubTempStorageBytes = 0;
@@ -121,33 +122,35 @@ public:
         Pipeline: 1. sortParticles
                   2. updateNeighborList
                   3. computeRelativeTransformations
-                  4. filterPairsBV (DEVICE and BV only)
+                  4. filterPairsBV (DEVICE: BV-ON always; BV-OFF only when composites > 0)
                   5. detectCollisionsComponents
                   6. transformContactInfo
-        @param rigidBodies  Raw pointer array of RigidBody*
-        @param positions    Position buffer (modified in-place by sorter)
-        @param orientations Quaternion buffer (modified in-place by sorter)
-        @param velocities   Kinematics buffer (modified in-place by sorter)
-        @param torces       Torce buffer (modified in-place by sorter)
-        @param rigidBodyIds RigidBodyId buffer (modified in-place by sorter)
-        @param componentIds ComponentId buffer (modified in-place by sorter)
-        @param contactInfo  ContactInfo world-frame buffer (owned by ComponentManager)
-        @param pairList     Pair list buffer (owned by ComponentManager)
-        @param numPairs     Current active pair count (updated on NL rebuild)
-        @param nObstacles   Number of obstacles
-        @param nParticles   Number of moving particles */
+        @param rigidBodies   Raw pointer array of RigidBody*
+        @param positions     Position buffer (modified in-place by sorter)
+        @param orientations  Quaternion buffer (modified in-place by sorter)
+        @param velocities    Kinematics buffer (modified in-place by sorter)
+        @param torces        Torce buffer (modified in-place by sorter)
+        @param bodyTags      BodyTag buffer (encodes shapeId + composite info; modified in-place
+                             by sorter; used for filtering)
+        @param localPos      Per-component local position offsets (modified in-place by sorter)
+        @param localQuat     Per-component local quaternion offsets (modified in-place by sorter)
+        @param masterSlot    Per-composite master slot lookup (size = numComposites; rewritten
+                             in-place by sortParticles when a sort runs)
+        @param contactInfo   ContactInfo world-frame buffer (owned by ComponentManager)
+        @param pairList      Pair list buffer (owned by ComponentManager)
+        @param counts        Component counts */
     void run(const RigidBody<T>* const*          rigidBodies,
              GrainsMemBuffer<Vector3<T>, M>&     positions,
              GrainsMemBuffer<Quaternion<T>, M>&  orientations,
              GrainsMemBuffer<Kinematics<T>, M>&  velocities,
              GrainsMemBuffer<Torce<T>, M>&       torces,
-             GrainsMemBuffer<uint, M>&           rigidBodyIds,
-             GrainsMemBuffer<uint, M>&           componentIds,
+             GrainsMemBuffer<uint, M>&           bodyTags,
+             GrainsMemBuffer<Vector3<T>, M>&     localPos,
+             GrainsMemBuffer<Quaternion<T>, M>&  localQuat,
+             GrainsMemBuffer<uint, M>&           masterSlot,
              GrainsMemBuffer<ContactInfo<T>, M>& contactInfo,
              GrainsMemBuffer<uint2, M>&          pairList,
-             uint&                               numPairs,
-             uint                                nObstacles,
-             uint                                nParticles);
+             ComponentCounts&                    counts);
     //@}
 
 private:
@@ -166,15 +169,11 @@ private:
         @param positions   Position buffer required by the NL algorithm
         @param pairList    ComponentManager-owned buffer resized if NL grew
         @param contactInfo ComponentManager-owned buffer resized if NL grew
-        @param numPairs    Updated with the new pair count on rebuild
-        @param nObstacles  Number of obstacles
-        @param nParticles  Number of moving particles */
+        @param counts      Component counts */
     void updateNeighborList(GrainsMemBuffer<Vector3<T>, M>&     positions,
                             GrainsMemBuffer<uint2, M>&          pairList,
                             GrainsMemBuffer<ContactInfo<T>, M>& contactInfo,
-                            uint&                               numPairs,
-                            uint                                nObstacles,
-                            uint                                nParticles);
+                            ComponentCounts&                    counts);
 
     /** @brief Computes per-pair relative position/quaternion (B expressed in A-local frame).
         @param positions    World position buffer
@@ -184,37 +183,52 @@ private:
                                         const GrainsMemBuffer<Quaternion<T>, M>& orientations,
                                         const GrainsMemBuffer<uint2, M>&         pairList);
 
-    /** @brief Runs the BV pre-filter (sphere + OBB SAT) as a dedicated DEVICE kernel.
+    /** @brief Runs the BV pre-filter.
+        Also used as the composite-only filter when BV is OFF but composites exist.
         Writes per-pair pass/fail flags, writes no-contact sentinels for rejected pairs, then
         uses CUB DeviceSelect::Flagged to compact the passing pair indices into m_bvPassPairIndices
-        and copies the result count to m_bvPassPairCount. Must be called after
-        computeRelativeTransformations.  HOST+OBB uses the fused path inside
-        detectCollisionsComponents_common instead.
+        and copies the result count to m_bvPassPairCount.
         @param rigidBodies      Raw pointer array of RigidBody*
         @param pairList         Pair list buffer
-        @param contactInfoLocal Per-pair local ContactInfo buffer */
+        @param contactInfoLocal Per-pair local ContactInfo buffer
+        @param bodyTags         Raw device pointer to per-component body tags
+        @param numComposites    Number of composites (0 = skip composite check) */
     void filterPairsBV(const RigidBody<T>* const*          rigidBodies,
                        const GrainsMemBuffer<uint2, M>&    pairList,
-                       GrainsMemBuffer<ContactInfo<T>, M>& contactInfoLocal);
+                       GrainsMemBuffer<ContactInfo<T>, M>& contactInfoLocal,
+                       const uint*                         bodyTags,
+                       uint                                numComposites);
 
     /** @brief Runs narrow-phase GJK and writes ContactInfo in A-local frame.
+        On DEVICE with BV-ON or composites, uses the compacted m_bvPassPairIndices index list.
+        On HOST, skips intra-composite pairs inline.
         @param rigidBodies Raw pointer array of RigidBody*
-        @param pairList    Pair list buffer */
+        @param pairList    Pair list buffer
+        @param bodyTags    Per-component body tag buffer
+        @param counts      Component counts */
     void detectCollisionsComponents(const RigidBody<T>* const*       rigidBodies,
-                                    const GrainsMemBuffer<uint2, M>& pairList);
+                                    const GrainsMemBuffer<uint2, M>& pairList,
+                                    const GrainsMemBuffer<uint, M>&  bodyTags,
+                                    const ComponentCounts&           counts);
 
     /** @brief Runs narrow-phase GJK using world-frame positions/quaternions directly, skipping the
         relative-transformation pre-pass.
+        On DEVICE with BV-ON or composites, uses the compacted m_bvPassPairIndices index list.
+        On HOST, skips intra-composite pairs inline.
         @param rigidBodies  Raw pointer array of RigidBody*
         @param positions    World position buffer
         @param orientations World quaternion buffer
         @param pairList     Pair list buffer
-        @param contactInfo  ComponentManager's world-frame ContactInfo buffer */
+        @param contactInfo  ComponentManager's world-frame ContactInfo buffer
+        @param bodyTags     Per-component body tag buffer
+        @param counts       Component counts */
     void detectCollisionsComponentsGlobal(const RigidBody<T>* const*               rigidBodies,
                                           const GrainsMemBuffer<Vector3<T>, M>&    positions,
                                           const GrainsMemBuffer<Quaternion<T>, M>& orientations,
                                           const GrainsMemBuffer<uint2, M>&         pairList,
-                                          GrainsMemBuffer<ContactInfo<T>, M>&      contactInfo);
+                                          GrainsMemBuffer<ContactInfo<T>, M>&      contactInfo,
+                                          const GrainsMemBuffer<uint, M>&          bodyTags,
+                                          const ComponentCounts&                   counts);
 
     /** @brief Transforms per-pair ContactInfo from A-local frame to world frame.
         @param positions    World position buffer
@@ -231,18 +245,20 @@ private:
         @param orientations Quaternion buffer (reordered in-place)
         @param velocities   Kinematics buffer (reordered in-place)
         @param torces       Torce buffer (reordered in-place)
-        @param rigidBodyIds RigidBodyId buffer (reordered in-place)
-        @param componentIds ComponentId buffer (reordered in-place)
-        @param nObstacles   Number of obstacles
-        @param nParticles   Number of moving particles */
+        @param bodyTags     BodyTag buffer (encodes shapeId + composite info; reordered in-place)
+        @param localPos     LocalPos buffer (reordered in-place)
+        @param localQuat    LocalQuat buffer (reordered in-place)
+        @param masterSlot   Master slot buffer (reordered in-place)
+        @param counts       Component counts */
     void sortParticles(GrainsMemBuffer<Vector3<T>, M>&    positions,
                        GrainsMemBuffer<Quaternion<T>, M>& orientations,
                        GrainsMemBuffer<Kinematics<T>, M>& velocities,
                        GrainsMemBuffer<Torce<T>, M>&      torces,
-                       GrainsMemBuffer<uint, M>&          rigidBodyIds,
-                       GrainsMemBuffer<uint, M>&          componentIds,
-                       uint                               nObstacles,
-                       uint                               nParticles);
+                       GrainsMemBuffer<uint, M>&          bodyTags,
+                       GrainsMemBuffer<Vector3<T>, M>&    localPos,
+                       GrainsMemBuffer<Quaternion<T>, M>& localQuat,
+                       GrainsMemBuffer<uint, M>&          masterSlot,
+                       const ComponentCounts&             counts);
     //@}
 };
 

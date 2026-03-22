@@ -299,6 +299,17 @@ __HOSTDEVICE__ void RigidBody<T>::setInertia()
 }
 
 // -------------------------------------------------------------------------------------------------
+// Overrides mass and principal inertia for a composite master sub-body
+template <typename T>
+__HOSTDEVICE__ void RigidBody<T>::setCompositeProperties(T mass, T ixx, T iyy, T izz)
+{
+    m_mass       = mass;
+    m_inertia[0] = ixx;
+    m_inertia[1] = iyy;
+    m_inertia[2] = izz;
+}
+
+// -------------------------------------------------------------------------------------------------
 // Computes the acceleration of the rigid body given a torce and angular velocity in the body-fixed
 // coordinate system -- In the body-fixed coordinate system, the moment of inertia tensor is
 // assumed to be diagonal.

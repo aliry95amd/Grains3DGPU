@@ -1,5 +1,5 @@
 #include "Grains.hh"
-#include "ComponentManagerCPU.hh"
+#include "ComponentManager.hh"
 #include "ContactForceModelFactory.hh"
 #include "PostProcessingWriterFactory.hh"
 #include "RigidBodyFactory.hh"
@@ -96,7 +96,6 @@ template <typename T>
 void Grains<T>::Construction(DOMElement* rootElement)
 {
     using GP = GrainsParameters<T>;
-    auto& SS = GP::m_simulationState;
     auto& CD = GP::m_collisionDetection;
     auto& LC = CD.linkedCellParameters;
 
@@ -202,9 +201,6 @@ void Grains<T>::Construction(DOMElement* rootElement)
     }
 
     // ---------------------------------------------------------------------------------------------
-    // Setting up some parameters
-    SS.numObstacles = numObstacles;
-    SS.numParticles = numParticles;
 
     // Calculate minCellSize based on maximum particle radius (needed for insertion checks)
     T maxParticleRadius = 0;
@@ -390,9 +386,11 @@ void Grains<T>::Construction(DOMElement* rootElement)
 
     // ---------------------------------------------------------------------------------------------
     // Setting up the component managers
-    m_components = std::make_unique<ComponentManagerCPU<T>>(&m_rigidBodyList,
-                                                            SS.numObstacles,
-                                                            SS.numParticles);
+    m_components = std::make_unique<ComponentManager<T, MemType::HOST>>(&m_rigidBodyList,
+                                                                        numObstacles,
+                                                                        numParticles);
+    // Create the collision detection module, pair buffers, and force module
+    m_components->initialize();
     // Initialize components
     m_components->initializeComponents(initialPosition, initialOrientation);
 }

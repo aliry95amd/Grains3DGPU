@@ -41,7 +41,6 @@ void GrainsCPU<T>::simulate()
     {
         G::m_components->detectCollisions();
         G::m_components->computeContactForces(G::m_contactForce);
-        G::m_components->addExternalForces();
     }
 
     // Write initial state (t = tStart) before advancing
@@ -69,7 +68,6 @@ void GrainsCPU<T>::simulate()
             // Detect collisions and compute forces at x_{n+1}.
             G::m_components->detectCollisions();
             G::m_components->computeContactForces(G::m_contactForce);
-            G::m_components->addExternalForces();
             // KDK Step 3: second half-kick using f_{n+1}.
             G::m_components->advanceVelocity(G::m_timeIntegrator);
         }
@@ -78,7 +76,6 @@ void GrainsCPU<T>::simulate()
             // Single-pass scheme: compute forces at x_n, then advance.
             G::m_components->detectCollisions();
             G::m_components->computeContactForces(G::m_contactForce);
-            G::m_components->addExternalForces();
             G::m_components->moveParticles(G::m_timeIntegrator);
         }
 

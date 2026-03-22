@@ -1,4 +1,5 @@
 #include "ForceModule.hh"
+#include "BodyTag.hh"
 #include "ForceModuleCommon.hh"
 #include "ForceModule_Kernels.hh"
 #include "GrainsParameters.hh"
@@ -59,6 +60,48 @@ void ForceModule<T, M>::cleanupContactTable()
 }
 
 // -------------------------------------------------------------------------------------------------
+// Accumulates non-master sub-body torces into composite masters; resets sub-body torces
+template <typename T, MemType M>
+void ForceModule<T, M>::assembleCompositeTorces(GrainsMemBuffer<Torce<T>, M>&         torce,
+                                                const GrainsMemBuffer<Vector3<T>, M>& position,
+                                                const GrainsMemBuffer<uint, M>&       bodyTag,
+                                                const GrainsMemBuffer<uint, M>&       masterSlot,
+                                                const ComponentCounts&                counts)
+{
+    if(counts.numSubBodies == 0)
+        return;
+
+    const uint nTotal = counts.numObstacles + counts.numParticles;
+
+    if constexpr(M == MemType::HOST)
+    {
+        for(uint cID = counts.numObstacles; cID < nTotal; ++cID)
+        {
+            const uint tag = bodyTag[cID];
+            if(!isSubBody(tag) || getSubBodyLocalIdx(tag) == 0u)
+                continue;
+            const uint       mSlot = masterSlot[getCompositeIdx(tag)];
+            const Vector3<T> r     = position[cID] - position[mSlot];
+            const Vector3<T> f     = torce[cID].getForce();
+            const Vector3<T> tau   = torce[cID].getTorque() + (r ^ f);
+            torce[mSlot].addForce(f);
+            torce[mSlot].addTorque(tau);
+            torce[cID].reset();
+        }
+    }
+    else if constexpr(M == MemType::DEVICE)
+    {
+        uint numThreads, numBlocks;
+        computeOptimalThreadsAndBlocks(nTotal, GrainsParameters<T>::m_GPU, numBlocks, numThreads);
+        assembleCompositeTorces_Kernel<<<numBlocks, numThreads>>>(torce.getData(),
+                                                                  position.getData(),
+                                                                  masterSlot.getData(),
+                                                                  bodyTag.getData(),
+                                                                  nTotal);
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
 // Runs the complete force computation pipeline.
 template <typename T, MemType M>
 void ForceModule<T, M>::run(const GrainsMemBuffer<ContactForceModel<T>*, M>& CF,
@@ -67,11 +110,14 @@ void ForceModule<T, M>::run(const GrainsMemBuffer<ContactForceModel<T>*, M>& CF,
                             const GrainsMemBuffer<Kinematics<T>, M>&         velocity,
                             const GrainsMemBuffer<uint2, M>&                 pairList,
                             const GrainsMemBuffer<ContactInfo<T>, M>&        contactInfo,
-                            uint                                             numPairs,
                             GrainsMemBuffer<Torce<T>, M>&                    torce,
-                            uint                                             numObstacles,
-                            uint                                             numParticles)
+                            const GrainsMemBuffer<uint, M>&                  bodyTag,
+                            const GrainsMemBuffer<uint, M>&                  masterSlot,
+                            const ComponentCounts&                           counts)
 {
+    const uint numPairs     = counts.numPairs;
+    const uint numObstacles = counts.numObstacles;
+    const uint numParticles = counts.numParticles;
     // 1. Periodic cleanup of contact hash table
     cleanupContactTable();
 
@@ -159,6 +205,9 @@ void ForceModule<T, M>::run(const GrainsMemBuffer<ContactForceModel<T>*, M>& CF,
                                                             numObstacles,
                                                             numParticles);
     }
+
+    // 8. Accumulate sub-body torces into composite masters (no-op when no composites)
+    assembleCompositeTorces(torce, position, bodyTag, masterSlot, counts);
 }
 
 // -------------------------------------------------------------------------------------------------

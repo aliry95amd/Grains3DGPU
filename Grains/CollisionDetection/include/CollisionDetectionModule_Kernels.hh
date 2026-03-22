@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <cuda_runtime.h>
 
+#include "BodyTag.hh"
 #include "ContactInfo.hh"
 #include "GJK.hh"
 #include "GrainsParameters.hh"
@@ -38,19 +39,24 @@ __GLOBAL__ void computeRelativeTransformations_Kernel(const Vector3<T>*    posit
                                                       const uint           nPairs);
 
 /** @brief Bounding volume pre-filter kernel (DEVICE path only).
-    Executes sphere and OBB SAT checks for each pair, writes a pass/fail flag, and writes
-    a no-contact sentinel into @p contactInfo for every rejected pair so that the downstream
-    transformContactInfo pass reads a valid value even for pairs that skip GJK.
-    @param pairList      List of pairs
+    First rejects intra-composite pairs (same composite, different sub-bodies) unconditionally.
+    Then applies the BV test for OBB/OBC; when BVType is OFF the BV section is compiled away,
+    leaving a pure composite-membership filter reusing the same CUB compaction machinery.
+    Writes a no-contact sentinel into @p contactInfo for every rejected pair.
     @param rigidBodies   Rigid body array
-    @param relPosition   Per-pair relative positions (B in A-local)
-    @param relQuaternion Per-pair relative quaternions (B in A-local)
+    @param pairList      List of pairs
+    @param bodyTags      Per-component body tags (used for composite membership test)
+    @param numComposites Number of composite bodies (0 = no composites, skip the check)
+    @param relPosition   Per-pair relative positions (B in A-local); unused when BVType == OFF
+    @param relQuaternion Per-pair relative quaternions (B in A-local); unused when BVType == OFF
     @param contactInfo   Per-pair contact info buffer; sentinel written for rejected pairs
     @param bvPassFlags   Output pass/fail flags (0 = reject, 1 = pass)
     @param nPairs        Number of pairs */
 template <typename T, BoundingVolumeType BVType = BoundingVolumeType::OBB>
 __GLOBAL__ void filterPairsBV_Kernel(const RigidBody<T>* const* rigidBodies,
                                      const uint2*               pairList,
+                                     const uint*                bodyTags,
+                                     uint                       numComposites,
                                      const Vector3<T>*          relPosition,
                                      const Quaternion<T>*       relQuaternion,
                                      ContactInfo<T>*            contactInfo,
@@ -114,6 +120,13 @@ __GLOBAL__ void transformContactInfo_Kernel(const Vector3<T>*    position,
                                             ContactInfo<T>*      contactInfoLocal,
                                             ContactInfo<T>*      contactInfoWorld,
                                             const uint           nPairs);
+/** @brief Rebuilds the per-composite masterSlot lookup after a Morton sort.
+    Only threads whose body tag identifies a sub-body with local index 0 write to the table.
+    @param masterSlot  Per-composite master slot array (size = numComposites)
+    @param bodyTag     Per-component body tag array (size = nComponents)
+    @param nComponents Total number of components (obstacles + particles) */
+__GLOBAL__ void
+    rebuildMasterSlot_Kernel(uint* masterSlot, const uint* bodyTag, const uint nComponents);
 //@}
 
 #endif

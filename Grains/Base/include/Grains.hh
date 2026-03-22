@@ -31,9 +31,7 @@ protected:
     GrainsMemBuffer<RigidBody<T>*, MemType::HOST> m_rigidBodyList;
     /** \brief Insertion object. */
     std::unique_ptr<Insertion<T>> m_insertion;
-    /** \brief Manager of the components in the simulation on the host memory. We use a pointer here
-        as we want to use runtime polymorphism for switching between ComponentManagerCPU and
-        ComponentManagerGPU. */
+    /** \brief Manager of the components in the simulation on the host memory. */
     std::unique_ptr<ComponentManager<T, MemType::HOST>> m_components;
     /** \brief Buffer of contact forces. */
     GrainsMemBuffer<ContactForceModel<T>*, MemType::HOST> m_contactForce;
