@@ -13,80 +13,60 @@
 #include "Vector3.hh"
 
 // =================================================================================================
-/** @brief Migrates particles that have left the local subdomain to their new owner rank.
+/** @brief Unified particle migrator templated on MemType.
 
-    After time integration some particles may have moved across the subdomain boundary.  This class
-    detects them, packs their full state (position, orientation, velocity, torce, ids), sends them
-    to the neighboring rank via MPI, and compacts the local arrays.
+    Detects particles that left the local subdomain, sends them to the new owner rank via MPI,
+    and compacts local arrays.  When M == DEVICE, uses cudaMemcpy + pinned staging; when M == HOST,
+    operates directly via operator[].
 
-    Like GhostExchanger, it uses pinned staging buffers and non-blocking MPI for efficiency.
-
-    @author Multi-GPU extension — 2026 */
+    @tparam T scalar type (float / double)
+    @tparam M memory type of the simulation buffers (HOST or DEVICE)
+    @author Multi-rank extension — 2026 */
 // =================================================================================================
-template <typename T>
+template <typename T, MemType M = MemType::HOST>
 class ParticleMigrator
 {
-private:
+    static constexpr MemType StagingMem = (M == MemType::DEVICE) ? MemType::PINNED : MemType::HOST;
+
     const DomainDecomposition<T>* m_decomp;
 
-    // Indices of particles leaving to each neighbor (host-side)
     std::vector<uint> m_emigrateIndicesLower;
     std::vector<uint> m_emigrateIndicesUpper;
 
-    // Pinned staging buffers for the full particle state
-    GrainsMemBuffer<Vector3<T>, MemType::PINNED>    m_sendPosBuf;
-    GrainsMemBuffer<Quaternion<T>, MemType::PINNED>  m_sendQuatBuf;
-    GrainsMemBuffer<Kinematics<T>, MemType::PINNED>  m_sendVelBuf;
-    GrainsMemBuffer<Torce<T>, MemType::PINNED>       m_sendTorceBuf;
-    GrainsMemBuffer<uint, MemType::PINNED>           m_sendRbIdBuf;
-    GrainsMemBuffer<uint, MemType::PINNED>           m_sendCompIdBuf;
+    GrainsMemBuffer<Vector3<T>, StagingMem>    m_sendPosBuf,  m_recvPosBuf;
+    GrainsMemBuffer<Quaternion<T>, StagingMem>  m_sendQuatBuf, m_recvQuatBuf;
+    GrainsMemBuffer<Kinematics<T>, StagingMem>  m_sendVelBuf,  m_recvVelBuf;
+    GrainsMemBuffer<Torce<T>, StagingMem>       m_sendTorceBuf, m_recvTorceBuf;
+    GrainsMemBuffer<uint, StagingMem>           m_sendRbIdBuf, m_recvRbIdBuf;
+    GrainsMemBuffer<uint, StagingMem>           m_sendCompIdBuf, m_recvCompIdBuf;
 
-    GrainsMemBuffer<Vector3<T>, MemType::PINNED>    m_recvPosBuf;
-    GrainsMemBuffer<Quaternion<T>, MemType::PINNED>  m_recvQuatBuf;
-    GrainsMemBuffer<Kinematics<T>, MemType::PINNED>  m_recvVelBuf;
-    GrainsMemBuffer<Torce<T>, MemType::PINNED>       m_recvTorceBuf;
-    GrainsMemBuffer<uint, MemType::PINNED>           m_recvRbIdBuf;
-    GrainsMemBuffer<uint, MemType::PINNED>           m_recvCompIdBuf;
-
-    GrainsMemBuffer<Vector3<T>, MemType::PINNED> m_hostPositions;
+    GrainsMemBuffer<Vector3<T>, StagingMem> m_hostPositions;
 
 public:
     ParticleMigrator();
     explicit ParticleMigrator(const DomainDecomposition<T>* decomp);
     ~ParticleMigrator() = default;
 
-    /** @brief Migrate particles that left the local domain.
-        Returns the new local particle count after migration (may have grown or shrunk).
-        @param positions        device position buffer
-        @param quaternions      device quaternion buffer
-        @param velocities       device velocity buffer
-        @param torces           device torce buffer
-        @param rigidBodyIds     device rigid-body-id buffer
-        @param componentIds     device component-id buffer
-        @param numObstacles     number of obstacles (fixed offset)
-        @param numLocalParticles current local particle count (updated in-place)
-        @return new number of local particles */
-    uint migrate(GrainsMemBuffer<Vector3<T>, MemType::DEVICE>&    positions,
-                 GrainsMemBuffer<Quaternion<T>, MemType::DEVICE>& quaternions,
-                 GrainsMemBuffer<Kinematics<T>, MemType::DEVICE>& velocities,
-                 GrainsMemBuffer<Torce<T>, MemType::DEVICE>&      torces,
-                 GrainsMemBuffer<uint, MemType::DEVICE>&          rigidBodyIds,
-                 GrainsMemBuffer<uint, MemType::DEVICE>&          componentIds,
-                 uint                                             numObstacles,
-                 uint                                             numLocalParticles);
+    uint migrate(GrainsMemBuffer<Vector3<T>, M>&    positions,
+                 GrainsMemBuffer<Quaternion<T>, M>& quaternions,
+                 GrainsMemBuffer<Kinematics<T>, M>& velocities,
+                 GrainsMemBuffer<Torce<T>, M>&      torces,
+                 GrainsMemBuffer<uint, M>&          rigidBodyIds,
+                 GrainsMemBuffer<uint, M>&          componentIds,
+                 uint                               numObstacles,
+                 uint                               numLocalParticles);
 
 private:
-    void identifyEmigrants(const Vector3<T>* hostPos, uint numObstacles, uint numLocalParticles);
+    void identifyEmigrants(const GrainsMemBuffer<Vector3<T>, M>& positions,
+                           uint numObstacles, uint numLocalParticles);
     void ensureStagingCapacity(uint capacity);
-
-    void compactLocal(GrainsMemBuffer<Vector3<T>, MemType::DEVICE>&    positions,
-                      GrainsMemBuffer<Quaternion<T>, MemType::DEVICE>& quaternions,
-                      GrainsMemBuffer<Kinematics<T>, MemType::DEVICE>& velocities,
-                      GrainsMemBuffer<Torce<T>, MemType::DEVICE>&      torces,
-                      GrainsMemBuffer<uint, MemType::DEVICE>&          rigidBodyIds,
-                      GrainsMemBuffer<uint, MemType::DEVICE>&          componentIds,
-                      uint                                             numObstacles,
-                      uint                                             numLocalParticles);
+    void compactLocal(GrainsMemBuffer<Vector3<T>, M>&    positions,
+                      GrainsMemBuffer<Quaternion<T>, M>& quaternions,
+                      GrainsMemBuffer<Kinematics<T>, M>& velocities,
+                      GrainsMemBuffer<Torce<T>, M>&      torces,
+                      GrainsMemBuffer<uint, M>&          rigidBodyIds,
+                      GrainsMemBuffer<uint, M>&          componentIds,
+                      uint numObstacles, uint numLocalParticles);
 };
 
 #endif

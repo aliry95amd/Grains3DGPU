@@ -4,8 +4,7 @@
 #include "GrainsGPU.hh"
 #include "GrainsTestDev.hh"
 #ifdef GRAINS_USE_MPI
-#include "GrainsMultiCPU.hh"
-#include "GrainsMultiGPU.hh"
+#include "GrainsMPI.hh"
 #endif
 
 // -------------------------------------------------------------------------------------------------
@@ -112,9 +111,9 @@ Grains<T>* GrainsFactory<T>::create(DOMElement* root)
         grains = new GrainsGPU<T>();
 #ifdef GRAINS_USE_MPI
     else if(option == "MPI" || option == "MPI_GPU")
-        grains = new GrainsMultiGPU<T>();
+        grains = new GrainsMPI<T, MemType::DEVICE>();
     else if(option == "MPI_CPU")
-        grains = new GrainsMultiCPU<T>();
+        grains = new GrainsMPI<T, MemType::HOST>();
 #endif
     else if(option == "GrainsTestDev")
         grains = new GrainsTestDev<T>();

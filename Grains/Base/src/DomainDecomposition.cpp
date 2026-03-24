@@ -158,6 +158,17 @@ int DomainDecomposition<T>::getOwnerRank(const Vector3<T>& pos) const
 }
 
 // =================================================================================================
+template <typename T>
+void DomainDecomposition<T>::updateBoundaries(T newLocalMin, T newLocalMax)
+{
+    m_localMin[m_splitAxis] = newLocalMin;
+    m_localMax[m_splitAxis] = newLocalMax;
+
+    Gout("[Rank", m_rank, "] Boundaries updated: [",
+         m_localMin[m_splitAxis], ",", m_localMax[m_splitAxis], "]");
+}
+
+// =================================================================================================
 // Explicit instantiation
 template class DomainDecomposition<float>;
 template class DomainDecomposition<double>;

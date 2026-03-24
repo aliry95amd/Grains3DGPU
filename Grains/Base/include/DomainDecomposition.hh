@@ -106,6 +106,11 @@ public:
 
     /** @brief Returns the rank that owns @p pos (-1 if outside global domain). */
     int getOwnerRank(const Vector3<T>& pos) const;
+
+    /** @brief Dynamically update local boundaries (called by LoadBalancer).
+        @param newLocalMin new lower bound along split axis
+        @param newLocalMax new upper bound along split axis */
+    void updateBoundaries(T newLocalMin, T newLocalMax);
     //@}
 
 private:

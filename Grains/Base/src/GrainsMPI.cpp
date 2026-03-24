@@ -1,12 +1,16 @@
 #ifdef GRAINS_USE_MPI
 
-#include "GrainsMultiCPU.hh"
+#include "GrainsMPI.hh"
 #include "ComponentManagerCPU.hh"
+#include "ComponentManagerGPU.hh"
+#include "ContactForceModelFactory.hh"
+#include "RigidBodyFactory.hh"
+#include "TimeIntegratorFactory.hh"
 
 // =================================================================================================
-template <typename T>
-GrainsMultiCPU<T>::GrainsMultiCPU()
-    : GrainsCPU<T>()
+template <typename T, MemType M>
+GrainsMPI<T, M>::GrainsMPI()
+    : Base()
     , m_numLocalParticles(0)
     , m_numGhostParticles(0)
     , m_mpiRank(0)
@@ -17,29 +21,54 @@ GrainsMultiCPU<T>::GrainsMultiCPU()
 }
 
 // =================================================================================================
-template <typename T>
-GrainsMultiCPU<T>::~GrainsMultiCPU()
-{
-}
+template <typename T, MemType M>
+GrainsMPI<T, M>::~GrainsMPI() {}
 
 // =================================================================================================
-template <typename T>
-void GrainsMultiCPU<T>::initialize(DOMElement* rootElement)
+template <typename T, MemType M>
+void GrainsMPI<T, M>::initialize(DOMElement* rootElement)
 {
-    // Base reads Construction, Forces, AdditionalFeatures on HOST
     Grains<T>::initialize(rootElement);
-
-    using GP = GrainsParameters<T>;
-    auto& SS = GP::m_simulationState;
 
     if(m_mpiRank == 0)
     {
         Gout(std::string(80, '='));
-        Gout("Multi-CPU DEM:", m_mpiSize, "MPI ranks");
+        if constexpr(M == MemType::DEVICE)
+            Gout("Multi-GPU DEM:", m_mpiSize, "MPI ranks");
+        else
+            Gout("Multi-CPU DEM:", m_mpiSize, "MPI ranks");
         Gout(std::string(80, '='));
     }
 
-    // -----------------------------------------------------------------------------------------
+    if constexpr(M == MemType::DEVICE)
+    {
+        // Per-rank GPU setup
+        using GP = GrainsParameters<T>;
+        int deviceCount = 0;
+        cudaErrCheck(cudaGetDeviceCount(&deviceCount));
+        GAssert(deviceCount > 0, "No CUDA devices found!");
+        int localDevice = m_mpiRank % deviceCount;
+        cudaErrCheck(cudaSetDevice(localDevice));
+        cudaDeviceProp prop;
+        cudaErrCheck(cudaGetDeviceProperties(&prop, localDevice));
+        Gout("[Rank", m_mpiRank, "] GPU:", prop.name, "( device", localDevice, ")");
+        GP::m_isGPU = true;
+        GP::m_GPU   = prop;
+    }
+
+    constructionMPI(rootElement);
+
+    Gout("[Rank", m_mpiRank, "] MPI setup completed,",
+         m_numLocalParticles, "local particles");
+}
+
+// =================================================================================================
+template <typename T, MemType M>
+void GrainsMPI<T, M>::constructionMPI(DOMElement* /*rootElement*/)
+{
+    using GP = GrainsParameters<T>;
+    auto& SS = GP::m_simulationState;
+
     // Domain decomposition
     T maxParticleRadius = 0;
     for(uint i = 0; i < Grains<T>::m_rigidBodyList.getSize(); ++i)
@@ -56,34 +85,38 @@ void GrainsMultiCPU<T>::initialize(DOMElement* rootElement)
     m_decomp = std::make_unique<DomainDecomposition<T>>(
         MPI_COMM_WORLD, GP::m_origin, GP::m_maxCoordinate, ghostWidth);
 
-    // Override linked cell domain to local subdomain + ghost margin
     auto& LC     = GP::m_collisionDetection.linkedCellParameters;
     LC.minCorner = m_decomp->getGhostMin();
     LC.maxCorner = m_decomp->getGhostMax();
 
-    // -----------------------------------------------------------------------------------------
-    // Partition particles to this rank
     partitionParticlesToLocal();
 
-    // Rebuild the host component manager with local particle count
-    Grains<T>::m_components = std::make_unique<ComponentManagerCPU<T>>(
-        &Grains<T>::m_rigidBodyList, SS.numObstacles, m_numLocalParticles);
+    if constexpr(M == MemType::DEVICE)
+    {
+        RigidBodyFactory<T>::copyHostToDevice(Grains<T>::m_rigidBodyList,
+                                              GrainsGPU<T>::m_d_rigidBodyList);
+        GrainsGPU<T>::m_d_contactForce.reserve(GP::m_numContactPairs);
+        ContactForceModelFactory<T>::copyHostToDevice(Grains<T>::m_contactForce,
+                                                       GrainsGPU<T>::m_d_contactForce);
+        TimeIntegratorFactory<T>::copyHostToDevice(Grains<T>::m_timeIntegrator,
+                                                   GrainsGPU<T>::m_d_timeIntegrator);
+        GrainsGPU<T>::m_d_components = std::make_unique<ComponentManagerGPU<T>>(
+            &GrainsGPU<T>::m_d_rigidBodyList, SS.numObstacles, m_numLocalParticles);
+    }
+    else
+    {
+        Grains<T>::m_components = std::make_unique<ComponentManagerCPU<T>>(
+            &Grains<T>::m_rigidBodyList, SS.numObstacles, m_numLocalParticles);
+    }
 
-    // Re-initialize transformations for the (now local-only) particles
-    // Positions/orientations were already filtered in partitionParticlesToLocal()
-
-    // -----------------------------------------------------------------------------------------
-    // Ghost exchanger and migrator
-    m_ghostExchanger = std::make_unique<GhostExchangerCPU<T>>(m_decomp.get());
-    m_migrator       = std::make_unique<ParticleMigratorCPU<T>>(m_decomp.get());
-
-    Gout("[Rank", m_mpiRank, "] Multi-CPU setup completed,",
-         m_numLocalParticles, "local particles");
+    m_ghostExchanger = std::make_unique<GhostExchanger<T, M>>(m_decomp.get());
+    m_migrator       = std::make_unique<ParticleMigrator<T, M>>(m_decomp.get());
+    m_loadBalancer   = std::make_unique<LoadBalancer<T>>(100, T(0.1), T(1.2));
 }
 
 // =================================================================================================
-template <typename T>
-void GrainsMultiCPU<T>::partitionParticlesToLocal()
+template <typename T, MemType M>
+void GrainsMPI<T, M>::partitionParticlesToLocal()
 {
     using GP = GrainsParameters<T>;
     auto& SS     = GP::m_simulationState;
@@ -129,7 +162,6 @@ void GrainsMultiCPU<T>::partitionParticlesToLocal()
         newQuat[i] = hQuat[i];
         newVel[i]  = hVel[i];
     }
-
     for(uint i = 0; i < m_numLocalParticles; ++i)
     {
         uint srcIdx = numObstacles + localIndices[i];
@@ -147,46 +179,47 @@ void GrainsMultiCPU<T>::partitionParticlesToLocal()
 }
 
 // =================================================================================================
-template <typename T>
-void GrainsMultiCPU<T>::simulate()
+template <typename T, MemType M>
+void GrainsMPI<T, M>::simulate()
 {
-    using G  = Grains<T>;
     using GP = GrainsParameters<T>;
     auto& SS = GP::m_simulationState;
-    auto& cm = G::m_components;
+    auto& cm = getActiveCM();
 
     if(m_mpiRank == 0)
     {
         Gout(std::string(80, '='));
-        Gout("Starting multi-CPU simulation (", m_mpiSize, "ranks )");
+        Gout("Starting MPI simulation (", m_mpiSize, "ranks )");
         Gout(std::string(80, '='));
     }
 
-    // Insert particles on host
-    cm->insertParticles(G::m_insertion);
+    Grains<T>::m_components->insertParticles(Grains<T>::m_insertion);
+
+    if constexpr(M == MemType::DEVICE)
+    {
+        Grains<T>::m_components->copyTo(cm);
+    }
 
     if(m_mpiRank == 0)
         std::cout << "\nTime \t TO \tend \tLocal Particles" << std::endl;
 
-    // Pre-compute forces on initial configuration (KDK warmup)
+    // KDK warmup
     if(GP::m_isLeapFrog)
     {
         m_numGhostParticles = m_ghostExchanger->exchange(
             cm->getPositionBuffer(), cm->getQuaternionBuffer(),
             cm->getVelocityBuffer(), cm->getRigidBodyIdBuffer(),
-            cm->getComponentIdBuffer(),
-            SS.numObstacles, m_numLocalParticles);
+            cm->getComponentIdBuffer(), SS.numObstacles, m_numLocalParticles);
         cm->setNumberOfParticles(m_numLocalParticles + m_numGhostParticles);
 
         cm->detectCollisions();
-        cm->computeContactForces(G::m_contactForce);
+        cm->computeContactForces(getContactForce());
         cm->addExternalForces();
 
-        GhostExchangerCPU<T>::removeGhosts(
+        GhostExchanger<T, M>::removeGhosts(
             cm->getPositionBuffer(), cm->getQuaternionBuffer(),
             cm->getVelocityBuffer(), cm->getRigidBodyIdBuffer(),
-            cm->getComponentIdBuffer(),
-            SS.numObstacles + m_numLocalParticles);
+            cm->getComponentIdBuffer(), SS.numObstacles + m_numLocalParticles);
         cm->setNumberOfParticles(m_numLocalParticles);
     }
 
@@ -208,30 +241,41 @@ void GrainsMultiCPU<T>::simulate()
                       << "  \t" << m_numLocalParticles << std::endl;
         }
 
+        auto t0 = std::chrono::high_resolution_clock::now();
         stepWithCommunication();
+        auto t1 = std::chrono::high_resolution_clock::now();
+        double stepTime = std::chrono::duration<double>(t1 - t0).count();
+
+        // Dynamic load balancing
+        if(m_loadBalancer->shouldRebalance(stepCount))
+        {
+            m_loadBalancer->rebalance(*m_decomp, stepTime);
+            auto& LC     = GP::m_collisionDetection.linkedCellParameters;
+            LC.minCorner = m_decomp->getGhostMin();
+            LC.maxCorner = m_decomp->getGhostMax();
+        }
 
         postProcessParallel(cm);
     }
 
+    if constexpr(M == MemType::DEVICE)
+        cudaDeviceSynchronize();
     MPI_Barrier(MPI_COMM_WORLD);
 }
 
 // =================================================================================================
-template <typename T>
-void GrainsMultiCPU<T>::stepWithCommunication()
+template <typename T, MemType M>
+void GrainsMPI<T, M>::stepWithCommunication()
 {
-    using G  = Grains<T>;
     using GP = GrainsParameters<T>;
     auto& SS = GP::m_simulationState;
-    auto& cm = G::m_components;
+    auto& cm = getActiveCM();
 
     if(GP::m_isLeapFrog)
     {
-        // KDK Step 1: half-kick + drift (local only)
         cm->setNumberOfParticles(m_numLocalParticles);
-        cm->moveParticles(G::m_timeIntegrator);
+        cm->moveParticles(getTimeIntegrator());
 
-        // Migrate particles that left local domain
         m_numLocalParticles = m_migrator->migrate(
             cm->getPositionBuffer(), cm->getQuaternionBuffer(),
             cm->getVelocityBuffer(), cm->getTorceBuffer(),
@@ -239,55 +283,44 @@ void GrainsMultiCPU<T>::stepWithCommunication()
             SS.numObstacles, m_numLocalParticles);
         cm->setNumberOfParticles(m_numLocalParticles);
 
-        // Ghost exchange
         m_numGhostParticles = m_ghostExchanger->exchange(
             cm->getPositionBuffer(), cm->getQuaternionBuffer(),
             cm->getVelocityBuffer(), cm->getRigidBodyIdBuffer(),
-            cm->getComponentIdBuffer(),
-            SS.numObstacles, m_numLocalParticles);
+            cm->getComponentIdBuffer(), SS.numObstacles, m_numLocalParticles);
         cm->setNumberOfParticles(m_numLocalParticles + m_numGhostParticles);
 
-        // Collision detection and forces on local + ghost particles
         cm->detectCollisions();
-        cm->computeContactForces(G::m_contactForce);
+        cm->computeContactForces(getContactForce());
         cm->addExternalForces();
 
-        // Remove ghosts
-        GhostExchangerCPU<T>::removeGhosts(
+        GhostExchanger<T, M>::removeGhosts(
             cm->getPositionBuffer(), cm->getQuaternionBuffer(),
             cm->getVelocityBuffer(), cm->getRigidBodyIdBuffer(),
-            cm->getComponentIdBuffer(),
-            SS.numObstacles + m_numLocalParticles);
+            cm->getComponentIdBuffer(), SS.numObstacles + m_numLocalParticles);
         cm->setNumberOfParticles(m_numLocalParticles);
 
-        // KDK Step 3: second half-kick (local only)
-        cm->advanceVelocity(G::m_timeIntegrator);
+        cm->advanceVelocity(getTimeIntegrator());
     }
     else
     {
-        // Ghost exchange before collision detection
         m_numGhostParticles = m_ghostExchanger->exchange(
             cm->getPositionBuffer(), cm->getQuaternionBuffer(),
             cm->getVelocityBuffer(), cm->getRigidBodyIdBuffer(),
-            cm->getComponentIdBuffer(),
-            SS.numObstacles, m_numLocalParticles);
+            cm->getComponentIdBuffer(), SS.numObstacles, m_numLocalParticles);
         cm->setNumberOfParticles(m_numLocalParticles + m_numGhostParticles);
 
         cm->detectCollisions();
-        cm->computeContactForces(G::m_contactForce);
+        cm->computeContactForces(getContactForce());
         cm->addExternalForces();
 
-        // Remove ghosts before integration
-        GhostExchangerCPU<T>::removeGhosts(
+        GhostExchanger<T, M>::removeGhosts(
             cm->getPositionBuffer(), cm->getQuaternionBuffer(),
             cm->getVelocityBuffer(), cm->getRigidBodyIdBuffer(),
-            cm->getComponentIdBuffer(),
-            SS.numObstacles + m_numLocalParticles);
+            cm->getComponentIdBuffer(), SS.numObstacles + m_numLocalParticles);
         cm->setNumberOfParticles(m_numLocalParticles);
 
-        cm->moveParticles(G::m_timeIntegrator);
+        cm->moveParticles(getTimeIntegrator());
 
-        // Migrate after integration
         m_numLocalParticles = m_migrator->migrate(
             cm->getPositionBuffer(), cm->getQuaternionBuffer(),
             cm->getVelocityBuffer(), cm->getTorceBuffer(),
@@ -298,10 +331,10 @@ void GrainsMultiCPU<T>::stepWithCommunication()
 }
 
 // =================================================================================================
-template <typename T>
-template <MemType M>
-void GrainsMultiCPU<T>::postProcessParallel(
-    const std::unique_ptr<ComponentManager<T, M>>& cm)
+template <typename T, MemType M>
+template <MemType MM>
+void GrainsMPI<T, M>::postProcessParallel(
+    const std::unique_ptr<ComponentManager<T, MM>>& cm)
 {
     using GP = GrainsParameters<T>;
     auto& SS = GP::m_simulationState;
@@ -312,11 +345,20 @@ void GrainsMultiCPU<T>::postProcessParallel(
     if(GP::m_tSave.front() - SS.time < 0.01 * GP::m_dt)
     {
         GP::m_tSave.pop();
-
         cm->setNumberOfParticles(m_numLocalParticles);
 
-        for(auto& pp : Grains<T>::m_postProcessor)
-            pp->PostProcessing(Grains<T>::m_rigidBodyList, cm, SS.time);
+        if constexpr(MM == MemType::DEVICE)
+        {
+            cm->copyTo_PostProcessing(Grains<T>::m_components);
+            for(auto& pp : Grains<T>::m_postProcessor)
+                pp->PostProcessing(Grains<T>::m_rigidBodyList,
+                                   Grains<T>::m_components, SS.time);
+        }
+        else
+        {
+            for(auto& pp : Grains<T>::m_postProcessor)
+                pp->PostProcessing(Grains<T>::m_rigidBodyList, cm, SS.time);
+        }
     }
 
     if(!GP::m_tSave.empty() && SS.time > GP::m_tSave.front())
@@ -324,8 +366,8 @@ void GrainsMultiCPU<T>::postProcessParallel(
 }
 
 // =================================================================================================
-template <typename T>
-void GrainsMultiCPU<T>::finalize()
+template <typename T, MemType M>
+void GrainsMPI<T, M>::finalize()
 {
     MPI_Barrier(MPI_COMM_WORLD);
 
@@ -335,17 +377,24 @@ void GrainsMultiCPU<T>::finalize()
     if(m_mpiRank == 0)
     {
         Gout(std::string(80, '='));
-        Gout("Multi-CPU simulation completed!");
+        Gout("MPI simulation completed!");
         Gout(std::string(80, '='));
     }
 }
 
 // =================================================================================================
-template class GrainsMultiCPU<float>;
-template class GrainsMultiCPU<double>;
-template void GrainsMultiCPU<float>::postProcessParallel<MemType::HOST>(
+template class GrainsMPI<float, MemType::HOST>;
+template class GrainsMPI<double, MemType::HOST>;
+template class GrainsMPI<float, MemType::DEVICE>;
+template class GrainsMPI<double, MemType::DEVICE>;
+
+template void GrainsMPI<float, MemType::HOST>::postProcessParallel<MemType::HOST>(
     const std::unique_ptr<ComponentManager<float, MemType::HOST>>&);
-template void GrainsMultiCPU<double>::postProcessParallel<MemType::HOST>(
+template void GrainsMPI<double, MemType::HOST>::postProcessParallel<MemType::HOST>(
     const std::unique_ptr<ComponentManager<double, MemType::HOST>>&);
+template void GrainsMPI<float, MemType::DEVICE>::postProcessParallel<MemType::DEVICE>(
+    const std::unique_ptr<ComponentManager<float, MemType::DEVICE>>&);
+template void GrainsMPI<double, MemType::DEVICE>::postProcessParallel<MemType::DEVICE>(
+    const std::unique_ptr<ComponentManager<double, MemType::DEVICE>>&);
 
 #endif // GRAINS_USE_MPI
