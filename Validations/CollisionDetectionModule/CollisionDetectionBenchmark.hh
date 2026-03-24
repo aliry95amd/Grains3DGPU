@@ -68,7 +68,7 @@ struct DeviceParticleData
          For M == HOST    : use the host buffers directly.
       5. Construct CollisionDetectionModule<T, M>.
       6. Warmup: call run() numWarmupCalls times (timer disabled).
-      7. Measure: enable timer, reset m_timer, call run() numMeasureCalls times.
+      7. Measure: enable CDM timer, reset it, call run() numMeasureCalls times.
       8. Divide accumulated stage times by numMeasureCalls → per-call averages.
       9. Write one CSV row.
 
@@ -271,9 +271,9 @@ public:
         const uint N = m_scenario.numParticles;
 
         // Re-apply the full CD params each call (in case multiple runners share the process)
-        GP::m_collisionDetection       = buildCDParams();
-        GP::m_collisionDetection.timer = false;  // disable during warmup
-        GP::m_simulationState          = SimulationState<T>{};
+        GP::m_collisionDetection = buildCDParams();
+        GP::m_cdmTimer.disable();  // timer OFF during warmup
+        GP::m_simulationState = SimulationState<T>{};
 
         // ------------------------------------------------------------------
         // Warmup phase (timer OFF)
@@ -295,8 +295,8 @@ public:
         // ------------------------------------------------------------------
         // Measurement phase (timer ON, accumulate over numMeasureCalls)
         // ------------------------------------------------------------------
-        GP::m_collisionDetection.timer = true;
-        GP::m_timer                    = Timer{};  // reset all stage accumulators
+        GP::m_cdmTimer.enable(M == MemType::DEVICE);  // timer ON for measurement
+        GP::m_cdmTimer.reset();                       // zero all stage accumulators
 
         for(uint c = 0; c < m_scenario.numMeasureCalls; ++c)
             m_cdm->run(m_rb.getData(),
@@ -319,14 +319,13 @@ public:
         // Compute per-call averages (seconds → milliseconds)
         // ------------------------------------------------------------------
         const double inv = 1000.0 / static_cast<double>(m_scenario.numMeasureCalls);
-        const Timer& t   = GP::m_timer;
 
-        const double sortMs  = t.sortTime * inv;
-        const double nlMs    = t.neighborListTime * inv;
-        const double relMs   = t.relativeTransformTime * inv;
-        const double bvMs    = t.bvFilterTime * inv;
-        const double gjkMs   = t.narrowPhaseTime * inv;
-        const double trnMs   = t.transformTime * inv;
+        const double sortMs  = GP::m_cdmTimer[CDMStage::Sort] * inv;
+        const double nlMs    = GP::m_cdmTimer[CDMStage::NeighborList] * inv;
+        const double relMs   = GP::m_cdmTimer[CDMStage::RelativeTransform] * inv;
+        const double bvMs    = GP::m_cdmTimer[CDMStage::BVFilter] * inv;
+        const double gjkMs   = GP::m_cdmTimer[CDMStage::NarrowPhase] * inv;
+        const double trnMs   = GP::m_cdmTimer[CDMStage::Transform] * inv;
         const double totalMs = sortMs + nlMs + relMs + bvMs + gjkMs + trnMs;
 
         // ------------------------------------------------------------------

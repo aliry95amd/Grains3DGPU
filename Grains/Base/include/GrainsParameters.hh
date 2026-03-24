@@ -1,6 +1,7 @@
 #ifndef _GRAINSPARAMETERS_HH_
 #define _GRAINSPARAMETERS_HH_
 
+#include "GrainsTimer.hh"
 #include "Vector3.hh"
 
 /** @name Enumerations */
@@ -110,26 +111,6 @@ struct LinkedCellParameters
 };
 
 // -------------------------------------------------------------------------------------------------
-/** @brief Accumulated wall-clock time (seconds) for each stage of the collision detection
-    pipeline. Only updated when CollisionDetectionParameters::timer is true.
-    Reset at any time by assigning `GrainsParameters<T>::m_timer = Timer{}`. */
-struct Timer
-{
-    /** \brief Time spent in sortParticles. */
-    double sortTime = 0;
-    /** \brief Time spent building or querying the neighbor list. */
-    double neighborListTime = 0;
-    /** \brief Time spent computing per-pair relative transformations (relative path only). */
-    double relativeTransformTime = 0;
-    /** \brief Time spent in the bounding volume pre-filter. */
-    double bvFilterTime = 0;
-    /** \brief Time spent in GJK narrow-phase detection. */
-    double narrowPhaseTime = 0;
-    /** \brief Time spent transforming contact info to world frame (relative path only). */
-    double transformTime = 0;
-};
-
-// -------------------------------------------------------------------------------------------------
 /** @brief Parameters for collision detection configuration. */
 template <typename T>
 struct CollisionDetectionParameters
@@ -148,9 +129,6 @@ struct CollisionDetectionParameters
         narrow-phase detection and cached; set to false (e.g. for spheres) to skip that step and
         call the GJK overload that works directly in world frame instead. */
     bool useRelativeTransformations = true;
-    /** \brief Enable per-stage wall-clock timing; accumulated results are written to
-        GrainsParameters::m_timer. */
-    bool timer = false;
 };
 //@}
 
@@ -186,9 +164,6 @@ public:
     /* Collision Detection */
     /** \brief Collision detection parameters. */
     static CollisionDetectionParameters<T> m_collisionDetection;
-    /** \brief Per-stage accumulated wall-clock timing (updated only when timer
-        is true). */
-    static Timer m_timer;
 
     /* Material */
     /** \brief Map from material name to an uint ID */
@@ -217,6 +192,13 @@ public:
     static std::queue<T> m_tSave;
     /** @brief Frequency of time output (print every N steps, 0=never, 1=every step) */
     static uint m_verbosityFrequency;
+    /* Simulation and CDM Timers */
+    /** \brief Simulation-loop timer */
+    static GrainsSimTimer m_simTimer;
+    /** \brief CDM sub-stage timer */
+    static GrainsCDMTimer m_cdmTimer;
+    /** \brief ForceModule sub-stage timer */
+    static GrainsForceTimer m_fmTimer;
     //@}
 };
 

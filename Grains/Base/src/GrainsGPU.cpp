@@ -92,25 +92,37 @@ void GrainsGPU<T>::simulate()
     Gout("Starting the simulation on GPU");
     Gout(std::string(80, '='));
 
-    // first, inserting particles
+    auto& timer = GP::m_simTimer;
+    timer.start(SimStage::Total);
+
+    // Insertion: particle insertion on host + copy to device
+    timer.start(SimStage::Insertion);
     Grains<T>::m_components->insertParticles(Grains<T>::m_insertion);
-    // Copying to device
     cout << "Copying the inserted particles to the device ..." << endl;
     Grains<T>::m_components->copyTo(m_d_components);
     cout << "Copying completed!" << endl;
+    timer.stop(SimStage::Insertion);  // auto-syncs (IsGPU == true)
+
     cout << "\nTime \t TO \tend \tParticles \tIn \tOut" << endl;
 
     // Pre-compute forces on the initial configuration so the first moveParticles call (and the
     // KDK first half-kick) has valid accelerations.
     if(GP::m_isLeapFrog)
     {
+        timer.start(SimStage::DetectCollisions);
         m_d_components->detectCollisions();
+        timer.stop(SimStage::DetectCollisions);  // auto-syncs
+
+        timer.start(SimStage::ComputeContactForces);
         m_d_components->computeContactForces(m_d_contactForce);
+        timer.stop(SimStage::ComputeContactForces);  // auto-syncs
     }
 
     // Write initial state (t = tStart) before advancing
     SS.time = GP::m_tStart;
+    timer.start(SimStage::PostProcess);
     Grains<T>::postProcess(Grains<T>::m_components);
+    timer.stop(SimStage::PostProcess);
 
     uint stepCount = 0;
     for(SS.time = GP::m_tStart + GP::m_dt; SS.time <= GP::m_tEnd; SS.time += GP::m_dt)
@@ -128,25 +140,51 @@ void GrainsGPU<T>::simulate()
         if(GP::m_isLeapFrog)
         {
             // KDK Step 1: half-kick + drift using f_n (from pre-loop or previous step).
+            timer.start(SimStage::MoveParticles);
             m_d_components->moveParticles(m_d_timeIntegrator);
+            timer.stop(SimStage::MoveParticles);  // auto-syncs
             // Detect collisions and compute forces at x_{n+1}.
+            timer.start(SimStage::DetectCollisions);
             m_d_components->detectCollisions();
+            timer.stop(SimStage::DetectCollisions);  // auto-syncs
+            timer.start(SimStage::ComputeContactForces);
             m_d_components->computeContactForces(m_d_contactForce);
+            timer.stop(SimStage::ComputeContactForces);  // auto-syncs
             // KDK Step 3: second half-kick using f_{n+1}.
+            timer.start(SimStage::AdvanceVelocity);
             m_d_components->advanceVelocity(m_d_timeIntegrator);
+            timer.stop(SimStage::AdvanceVelocity);  // auto-syncs
         }
         else
         {
             // Single-pass scheme: compute forces at x_n, then advance.
+            timer.start(SimStage::DetectCollisions);
             m_d_components->detectCollisions();
+            timer.stop(SimStage::DetectCollisions);  // auto-syncs
+            timer.start(SimStage::ComputeContactForces);
             m_d_components->computeContactForces(m_d_contactForce);
+            timer.stop(SimStage::ComputeContactForces);  // auto-syncs
+            timer.start(SimStage::MoveParticles);
             m_d_components->moveParticles(m_d_timeIntegrator);
+            timer.stop(SimStage::MoveParticles);  // auto-syncs
         }
 
         // Post-Processing
+        timer.start(SimStage::PostProcess);
         Grains<T>::postProcess(m_d_components);
+        timer.stop(SimStage::PostProcess);
     }
     cudaDeviceSynchronize();
+
+    timer.stop(SimStage::Total);
+    if(timer.isEnabled())
+    {
+        if(GP::m_cdmTimer.isEnabled())
+            GP::m_cdmTimer.printSummary();
+        if(GP::m_fmTimer.isEnabled())
+            GP::m_fmTimer.printSummary();
+        timer.printSummary();
+    }
 }
 
 /* ============================================================================================== */

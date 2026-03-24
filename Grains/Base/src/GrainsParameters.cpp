@@ -23,8 +23,6 @@ bool GrainsParameters<T>::m_isPeriodic = false;
 /* Collision Detection */
 template <typename T>
 CollisionDetectionParameters<T> GrainsParameters<T>::m_collisionDetection;
-template <typename T>
-Timer GrainsParameters<T>::m_timer;
 
 /* Material */
 template <typename T>
@@ -53,6 +51,12 @@ template <typename T>
 std::queue<T> GrainsParameters<T>::m_tSave;
 template <typename T>
 uint GrainsParameters<T>::m_verbosityFrequency = 1;
+template <typename T>
+GrainsSimTimer GrainsParameters<T>::m_simTimer;
+template <typename T>
+GrainsCDMTimer GrainsParameters<T>::m_cdmTimer;
+template <typename T>
+GrainsForceTimer GrainsParameters<T>::m_fmTimer;
 
 // -------------------------------------------------------------------------------------------------
 // Explicit instantiation

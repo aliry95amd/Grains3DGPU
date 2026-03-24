@@ -25,7 +25,7 @@ enum class ParticleShapeType
 /** @brief All parameters that fully define one benchmark scenario.
     These are passed to BenchmarkRunner<T, M>, which sets the GrainsParameters static fields,
     constructs a CollisionDetectionModule, warms it up, then measures the per-stage pipeline
-    timings using the built-in GrainsParameters<T>::m_timer counters.
+    timings using the built-in GrainsParameters<T>::m_cdmTimer counter.
 
     === Timing modes (numWarmupCalls / numMeasureCalls) ===
       numWarmupCalls = 0   :  The very first run() call (NL rebuild + possible sort) is

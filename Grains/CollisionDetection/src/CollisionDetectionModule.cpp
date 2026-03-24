@@ -1,4 +1,3 @@
-#include <chrono>
 #include <cub/cub.cuh>
 #include <type_traits>
 #include <vector>
@@ -9,9 +8,6 @@
 #include "CollisionDetectionModule_Kernels.hh"
 #include "GrainsParameters.hh"
 #include "GrainsUtils.hh"
-
-// Clock type used for all pipeline timing measurements.
-using GrainsClock = std::chrono::high_resolution_clock;
 
 // -------------------------------------------------------------------------------------------------
 // Dispatches from runtime (NarrowPhaseType, bool) to compile-time template arguments by calling
@@ -206,10 +202,9 @@ void CollisionDetectionModule<T, M>::updateNeighborList(
     const uint nParticles = counts.numParticles;
     uint&      numPairs   = counts.numPairs;
     auto&      SS         = GrainsParameters<T>::m_simulationState;
+    auto&      gt         = GrainsParameters<T>::m_cdmTimer;
 
-    GrainsClock::time_point t0;
-    if(GrainsParameters<T>::m_collisionDetection.timer)
-        t0 = GrainsClock::now();
+    gt.start(CDMStage::NeighborList);
 
     bool updated = m_neighborList->updateNeighborList(positions, nObstacles, nParticles);
     if(updated)
@@ -221,13 +216,7 @@ void CollisionDetectionModule<T, M>::updateNeighborList(
         SS.neighborListUpdateCount++;
     }
 
-    if(GrainsParameters<T>::m_collisionDetection.timer)
-    {
-        if constexpr(M == MemType::DEVICE)
-            cudaDeviceSynchronize();
-        GrainsParameters<T>::m_timer.neighborListTime
-            += std::chrono::duration<double>(GrainsClock::now() - t0).count();
-    }
+    gt.stop(CDMStage::NeighborList);
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -239,11 +228,9 @@ void CollisionDetectionModule<T, M>::computeRelativeTransformations(
     const GrainsMemBuffer<uint2, M>&         pairList)
 {
     const uint nPairs = m_neighborList->getSize();
+    auto&      gt     = GrainsParameters<T>::m_cdmTimer;
 
-    const bool              timing = GrainsParameters<T>::m_collisionDetection.timer;
-    GrainsClock::time_point t0;
-    if(timing)
-        t0 = GrainsClock::now();
+    gt.start(CDMStage::RelativeTransform);
 
     if constexpr(M == MemType::HOST)
     {
@@ -269,9 +256,7 @@ void CollisionDetectionModule<T, M>::computeRelativeTransformations(
         cudaDeviceSynchronize();
     }
 
-    if(timing)
-        GrainsParameters<T>::m_timer.relativeTransformTime
-            += std::chrono::duration<double>(GrainsClock::now() - t0).count();
+    gt.stop(CDMStage::RelativeTransform);
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -288,7 +273,7 @@ void CollisionDetectionModule<T, M>::detectCollisionsComponents(
     const BoundingVolumeType bvType = GrainsParameters<T>::m_collisionDetection.boundingVolumeType;
     const NarrowPhaseType    npType = GrainsParameters<T>::m_collisionDetection.narrowPhaseType;
     const bool               gjkAcc = GrainsParameters<T>::m_collisionDetection.gjkAcceleration;
-    const bool               timing = GrainsParameters<T>::m_collisionDetection.timer;
+    auto&                    gt     = GrainsParameters<T>::m_cdmTimer;
 
     if constexpr(M == MemType::HOST)
     {
@@ -297,9 +282,7 @@ void CollisionDetectionModule<T, M>::detectCollisionsComponents(
         // internally. Intra-composite pairs are skipped via an explicit guard before the call.
         auto run = [&](auto bvTypeTag) {
             constexpr BoundingVolumeType BVT = decltype(bvTypeTag)::value;
-            GrainsClock::time_point      t0;
-            if(timing)
-                t0 = GrainsClock::now();
+            gt.start(CDMStage::NarrowPhase);
             dispatchGJK(npType, gjkAcc, [&](auto gjkV_tag, auto gjkA_tag) {
                 constexpr GJKType GJKV = decltype(gjkV_tag)::value;
                 constexpr bool    GJKA = decltype(gjkA_tag)::value;
@@ -327,9 +310,7 @@ void CollisionDetectionModule<T, M>::detectCollisionsComponents(
                         i);
                 }
             });
-            if(timing)
-                GrainsParameters<T>::m_timer.narrowPhaseTime
-                    += std::chrono::duration<double>(GrainsClock::now() - t0).count();
+            gt.stop(CDMStage::NarrowPhase);
         };
 
         using OFFT = std::integral_constant<BoundingVolumeType, BoundingVolumeType::OFF>;
@@ -354,9 +335,7 @@ void CollisionDetectionModule<T, M>::detectCollisionsComponents(
                           m_contactInfoLocal,
                           bodyTags.getData(),
                           counts.numComposites);
-            GrainsClock::time_point t0;
-            if(timing)
-                t0 = GrainsClock::now();
+            gt.start(CDMStage::NarrowPhase);
             uint numThreads, numBlocks;
             computeOptimalThreadsAndBlocks((uint)m_bvPassPairCount,
                                            GrainsParameters<T>::m_GPU,
@@ -375,16 +354,12 @@ void CollisionDetectionModule<T, M>::detectCollisionsComponents(
                                                 (uint)m_bvPassPairCount);
             });
             cudaDeviceSynchronize();
-            if(timing)
-                GrainsParameters<T>::m_timer.narrowPhaseTime
-                    += std::chrono::duration<double>(GrainsClock::now() - t0).count();
+            gt.stop(CDMStage::NarrowPhase);
         }
         else
         {
             // BV-OFF, no composites: run GJK over all pairs without an index list.
-            GrainsClock::time_point t0;
-            if(timing)
-                t0 = GrainsClock::now();
+            gt.start(CDMStage::NarrowPhase);
             uint numThreads, numBlocks;
             computeOptimalThreadsAndBlocks(nPairs,
                                            GrainsParameters<T>::m_GPU,
@@ -403,9 +378,7 @@ void CollisionDetectionModule<T, M>::detectCollisionsComponents(
                                                 nPairs);
             });
             cudaDeviceSynchronize();
-            if(timing)
-                GrainsParameters<T>::m_timer.narrowPhaseTime
-                    += std::chrono::duration<double>(GrainsClock::now() - t0).count();
+            gt.stop(CDMStage::NarrowPhase);
         }
     }
 }
@@ -426,7 +399,7 @@ void CollisionDetectionModule<T, M>::detectCollisionsComponentsGlobal(
     const BoundingVolumeType bvType = GrainsParameters<T>::m_collisionDetection.boundingVolumeType;
     const NarrowPhaseType    npType = GrainsParameters<T>::m_collisionDetection.narrowPhaseType;
     const bool               gjkAcc = GrainsParameters<T>::m_collisionDetection.gjkAcceleration;
-    const bool               timing = GrainsParameters<T>::m_collisionDetection.timer;
+    auto&                    gt     = GrainsParameters<T>::m_cdmTimer;
 
     if constexpr(M == MemType::HOST)
     {
@@ -435,9 +408,7 @@ void CollisionDetectionModule<T, M>::detectCollisionsComponentsGlobal(
         // internally. Intra-composite pairs are skipped via an explicit guard before the call.
         auto run = [&](auto bvTypeTag) {
             constexpr BoundingVolumeType BVT = decltype(bvTypeTag)::value;
-            GrainsClock::time_point      t0;
-            if(timing)
-                t0 = GrainsClock::now();
+            gt.start(CDMStage::NarrowPhase);
             dispatchGJK(npType, gjkAcc, [&](auto gjkV_tag, auto gjkA_tag) {
                 constexpr GJKType GJKV = decltype(gjkV_tag)::value;
                 constexpr bool    GJKA = decltype(gjkA_tag)::value;
@@ -465,9 +436,7 @@ void CollisionDetectionModule<T, M>::detectCollisionsComponentsGlobal(
                         i);
                 }
             });
-            if(timing)
-                GrainsParameters<T>::m_timer.narrowPhaseTime
-                    += std::chrono::duration<double>(GrainsClock::now() - t0).count();
+            gt.stop(CDMStage::NarrowPhase);
         };
 
         using OFFT = std::integral_constant<BoundingVolumeType, BoundingVolumeType::OFF>;
@@ -512,9 +481,7 @@ void CollisionDetectionModule<T, M>::detectCollisionsComponentsGlobal(
                           counts.numComposites);
 
             // GJK on compacted pairs (world frame, no relPos/relQuat needed)
-            GrainsClock::time_point t0;
-            if(timing)
-                t0 = GrainsClock::now();
+            gt.start(CDMStage::NarrowPhase);
             computeOptimalThreadsAndBlocks((uint)m_bvPassPairCount,
                                            GrainsParameters<T>::m_GPU,
                                            numBlocks,
@@ -532,16 +499,12 @@ void CollisionDetectionModule<T, M>::detectCollisionsComponentsGlobal(
                                                 (uint)m_bvPassPairCount);
             });
             cudaDeviceSynchronize();
-            if(timing)
-                GrainsParameters<T>::m_timer.narrowPhaseTime
-                    += std::chrono::duration<double>(GrainsClock::now() - t0).count();
+            gt.stop(CDMStage::NarrowPhase);
         }
         else
         {
             // BV-OFF, no composites: run GJK over all pairs without an index list.
-            GrainsClock::time_point t0;
-            if(timing)
-                t0 = GrainsClock::now();
+            gt.start(CDMStage::NarrowPhase);
             uint numThreads, numBlocks;
             computeOptimalThreadsAndBlocks(nPairs,
                                            GrainsParameters<T>::m_GPU,
@@ -560,9 +523,7 @@ void CollisionDetectionModule<T, M>::detectCollisionsComponentsGlobal(
                                                 nPairs);
             });
             cudaDeviceSynchronize();
-            if(timing)
-                GrainsParameters<T>::m_timer.narrowPhaseTime
-                    += std::chrono::duration<double>(GrainsClock::now() - t0).count();
+            gt.stop(CDMStage::NarrowPhase);
         }
     }
 }
@@ -581,9 +542,8 @@ void CollisionDetectionModule<T, M>::filterPairsBV(
 {
     if constexpr(M == MemType::DEVICE)
     {
-        GrainsClock::time_point t0;
-        if(GrainsParameters<T>::m_collisionDetection.timer)
-            t0 = GrainsClock::now();
+        auto& gt = GrainsParameters<T>::m_cdmTimer;
+        gt.start(CDMStage::BVFilter);
 
         const uint nPairs = m_neighborList->getSize();
         uint       numThreads, numBlocks;
@@ -646,9 +606,7 @@ void CollisionDetectionModule<T, M>::filterPairsBV(
                    sizeof(int),
                    cudaMemcpyDeviceToHost);
 
-        if(GrainsParameters<T>::m_collisionDetection.timer)
-            GrainsParameters<T>::m_timer.bvFilterTime
-                += std::chrono::duration<double>(GrainsClock::now() - t0).count();
+        gt.stop(CDMStage::BVFilter);
     }
 }
 
@@ -662,11 +620,9 @@ void CollisionDetectionModule<T, M>::transformContactInfo(
     GrainsMemBuffer<ContactInfo<T>, M>&      contactInfo)
 {
     const uint nPairs = m_neighborList->getSize();
-    const bool timing = GrainsParameters<T>::m_collisionDetection.timer;
+    auto&      gt     = GrainsParameters<T>::m_cdmTimer;
 
-    GrainsClock::time_point t0;
-    if(timing)
-        t0 = GrainsClock::now();
+    gt.start(CDMStage::Transform);
 
     if constexpr(M == MemType::HOST)
     {
@@ -691,9 +647,7 @@ void CollisionDetectionModule<T, M>::transformContactInfo(
                                                                nPairs);
         cudaDeviceSynchronize();
     }
-    if(timing)
-        GrainsParameters<T>::m_timer.transformTime
-            += std::chrono::duration<double>(GrainsClock::now() - t0).count();
+    gt.stop(CDMStage::Transform);
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -715,10 +669,9 @@ void CollisionDetectionModule<T, M>::sortParticles(GrainsMemBuffer<Vector3<T>, M
     using GP                 = GrainsParameters<T>;
     auto& SS                 = GP::m_simulationState;
     auto& LC                 = GP::m_collisionDetection.linkedCellParameters;
+    auto& gt                 = GP::m_cdmTimer;
 
-    GrainsClock::time_point t0;
-    if(GP::m_collisionDetection.timer)
-        t0 = GrainsClock::now();
+    gt.start(CDMStage::Sort);
 
     if(LC.sortFrequency > 0 && SS.neighborListUpdateCount % LC.sortFrequency == 0)
     {
@@ -761,12 +714,7 @@ void CollisionDetectionModule<T, M>::sortParticles(GrainsMemBuffer<Vector3<T>, M
     else
         SS.particlesSorted = false;
 
-    if(GP::m_collisionDetection.timer)
-    {
-        if constexpr(M == MemType::DEVICE)
-            cudaDeviceSynchronize();
-        GP::m_timer.sortTime += std::chrono::duration<double>(GrainsClock::now() - t0).count();
-    }
+    gt.stop(CDMStage::Sort);
 }
 
 // -------------------------------------------------------------------------------------------------

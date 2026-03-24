@@ -230,7 +230,7 @@ void Grains<T>::Construction(DOMElement* rootElement)
     if(ReaderXML::getNodeAttr_String(collisionDetection, "EnableTimings") == "true")
     {
         GoutWI(9, "Collision detection timings enabled!");
-        CD.timer = true;
+        GP::m_cdmTimer.enable(GP::m_isGPU);
     }
     if(ReaderXML::getNodeAttr_String(collisionDetection, "UseRelativeTransformations") == "true")
     {
@@ -382,6 +382,8 @@ void Grains<T>::Construction(DOMElement* rootElement)
         GoutWI(6, "Reading contact force models ...");
         ContactForceModelFactory<T>::create(rootElement, m_contactForce);
         GoutWI(6, "Reading contact force models completed!");
+        if(ReaderXML::getNodeAttr_String(contacts, "EnableTimings") == "true")
+            GP::m_fmTimer.enable(GP::m_isGPU);
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -441,6 +443,15 @@ void Grains<T>::AdditionalFeatures(DOMElement* rootElement)
     {
         GP::m_verbosityFrequency = ReaderXML::getNodeAttr_Int(nVerbosity, "Frequency");
         GoutWI(6, "Verbosity frequency set to", GP::m_verbosityFrequency);
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // Simulation-level timings
+    DOMNode* nTimings = ReaderXML::getNode(root, "Timings");
+    if(nTimings && ReaderXML::getNodeAttr_String(nTimings, "Enable") == "true")
+    {
+        GP::m_simTimer.enable(GP::m_isGPU);
+        GoutWI(6, "Simulation timings enabled.");
     }
 
     // ---------------------------------------------------------------------------------------------

@@ -118,6 +118,7 @@ void ForceModule<T, M>::run(const GrainsMemBuffer<ContactForceModel<T>*, M>& CF,
     const uint numPairs     = counts.numPairs;
     const uint numObstacles = counts.numObstacles;
     const uint numParticles = counts.numParticles;
+    auto&      gt           = GrainsParameters<T>::m_fmTimer;
     // 1. Periodic cleanup of contact hash table
     cleanupContactTable();
 
@@ -125,6 +126,7 @@ void ForceModule<T, M>::run(const GrainsMemBuffer<ContactForceModel<T>*, M>& CF,
     {
         // 2. Compute contact forces (sequential per-pair)
         ContactMemoryView<T> contactMemory = m_contactTable.getView();
+        gt.start(FMStage::ComputeForces);
         for(uint i = 0; i < numPairs; ++i)
         {
             computeContactForces_common(CF.getData(),
@@ -136,8 +138,10 @@ void ForceModule<T, M>::run(const GrainsMemBuffer<ContactForceModel<T>*, M>& CF,
                                         contactMemory,
                                         i);
         }
+        gt.stop(FMStage::ComputeForces);
 
         // 3. Add external forces (gravity) to moving particles
+        gt.start(FMStage::ExternalForces);
         for(uint pID = numObstacles; pID < numObstacles + numParticles; ++pID)
         {
             addExternalForces_common(GrainsParameters<T>::m_gravity,
@@ -145,6 +149,7 @@ void ForceModule<T, M>::run(const GrainsMemBuffer<ContactForceModel<T>*, M>& CF,
                                      torce.getData(),
                                      pID);
         }
+        gt.stop(FMStage::ExternalForces);
     }
     else if constexpr(M == MemType::DEVICE)
     {
@@ -153,6 +158,7 @@ void ForceModule<T, M>::run(const GrainsMemBuffer<ContactForceModel<T>*, M>& CF,
         uint numThreads, numBlocks;
 
         // 2. Flag active pairs (overlap < 0)
+        gt.start(FMStage::FlagAndCompact);
         computeOptimalThreadsAndBlocks(numPairs, GP::m_GPU, numBlocks, numThreads);
         flagActivePairs_Kernel<<<numBlocks, numThreads>>>(contactInfo.getData(),
                                                           m_activeFlags.getData(),
@@ -165,6 +171,7 @@ void ForceModule<T, M>::run(const GrainsMemBuffer<ContactForceModel<T>*, M>& CF,
                                                      m_numActivePairs.getData(),
                                                      m_cubSelectTempStorage.getData(),
                                                      m_cubSelectTempStorage.getSize());
+        gt.stop(FMStage::FlagAndCompact);
 
         if(nActive > 0)
         {
@@ -175,6 +182,7 @@ void ForceModule<T, M>::run(const GrainsMemBuffer<ContactForceModel<T>*, M>& CF,
             // 5. Compute contact forces for active pairs only
             computeOptimalThreadsAndBlocks(nActive, GP::m_GPU, numBlocks, numThreads);
             ContactMemoryView<T> contactMemory = m_contactTable.getView();
+            gt.start(FMStage::ComputeForces);
             computeContactForces_Kernel<<<numBlocks, numThreads>>>(CF.getData(),
                                                                    pairList.getData(),
                                                                    contactInfo.getData(),
@@ -185,17 +193,21 @@ void ForceModule<T, M>::run(const GrainsMemBuffer<ContactForceModel<T>*, M>& CF,
                                                                    m_intermediateTorceB.getData(),
                                                                    contactMemory,
                                                                    nActive);
+            gt.stop(FMStage::ComputeForces);
 
             // 6. Reduce per-pair forces to per-particle torces using atomics
+            gt.start(FMStage::ReduceTorces);
             reduceTorces_Kernel<<<numBlocks, numThreads>>>(pairList.getData(),
                                                            m_activeIndex.getData(),
                                                            m_intermediateTorceA.getData(),
                                                            m_intermediateTorceB.getData(),
                                                            torce.getData(),
                                                            nActive);
+            gt.stop(FMStage::ReduceTorces);
         }
 
         // 7. Add external forces (gravity) to moving particles
+        gt.start(FMStage::ExternalForces);
         computeOptimalThreadsAndBlocks(numParticles, GP::m_GPU, numBlocks, numThreads);
         addExternalForces_Kernel<<<numBlocks, numThreads>>>(GP::m_gravity[X],
                                                             GP::m_gravity[Y],
@@ -204,10 +216,13 @@ void ForceModule<T, M>::run(const GrainsMemBuffer<ContactForceModel<T>*, M>& CF,
                                                             torce.getData(),
                                                             numObstacles,
                                                             numParticles);
+        gt.stop(FMStage::ExternalForces);
     }
 
     // 8. Accumulate sub-body torces into composite masters (no-op when no composites)
+    gt.start(FMStage::AssembleComposites);
     assembleCompositeTorces(torce, position, bodyTag, masterSlot, counts);
+    gt.stop(FMStage::AssembleComposites);
 }
 
 // -------------------------------------------------------------------------------------------------

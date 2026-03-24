@@ -1,18 +1,18 @@
-<Grains3D Type="Standard" Precision="Double">
+<Grains3D Type="GPU" Precision="Double">
 
 <Construction>
 	<Origin X="-0.03" Y="-0.03" Z="0.0"/>
 	<MaxCoordinate X="0.03" Y="0.03" Z="0.15"/>
 	<Periodicity PX="0" PY="0" PZ="0"/>
 
-	<CollisionDetection EnableTimings="false" UseRelativeTransformations="false">
-		<NeighborList Type="LinkedCell" UpdateFrequency="1"/>
+	<CollisionDetection EnableTimings="true" UseRelativeTransformations="false">
+		<NeighborList Type="BruteForce" UpdateFrequency="1"/>
 		<LinkedCell Type="Device_Atomic" CellSizeFactor="1.0" UpdatingFrequency="0" SortingFrequency="0"/>
 		<BoundingVolume Type="OFF"/>
 		<NarrowPhase Type="GJK" Acceleration="false"/>
 	</CollisionDetection>
 
-	<ContactForceModels>
+	<ContactForceModels EnableTimings="true">
 		<ContactForceModel Type='Hooke'>
 			<Material materialA="matP" materialB="matP"/>
 			<Parameters kn="1.2e6" en="0.6" etat="-1" muc="0.5" kr="0.0"/>
@@ -21,7 +21,7 @@
 
 	<TemporalSetting>
 		<TimeInterval Start="0." End="1.e-0" dt="1e-6"/>
-		<TimeIntegration Type="SecondOrderLeapFrog"/>
+		<TimeIntegration Type="FirstOrderExplicit"/>
 	</TemporalSetting>
 
 	<Particles>
@@ -95,6 +95,7 @@
 
 <Simulation>
 	<Verbosity Frequency="10000"/>
+	<Timings Enable="true"/>
 	<ParticleInsertion ForceInsertion="0">
 		<InitialPosition Type="Random" Seed="UserDefined" Value="1">
 			<Windows>
