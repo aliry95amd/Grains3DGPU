@@ -35,7 +35,7 @@ public:
     // void initialize( DOMElement* rootElement );
 
     /** @brief Runs the simulation over the prescribed time interval */
-    void simulate() final;
+    void simulate() override;
 
     // /** @brief Tasks to perform after time-stepping */
     // virtual void finalize();

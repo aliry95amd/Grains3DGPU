@@ -239,6 +239,27 @@ public:
     {
         return m_numObstacles;
     }
+
+    // ---------------------------------------------------------------------------------------------
+    /** @brief Sets the number of particles (used by multi-GPU to include/exclude ghosts). */
+    void setNumberOfParticles(uint n)
+    {
+        m_numParticles = n;
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    /** @brief Direct access to the position buffer (for ghost exchange / migration). */
+    GrainsMemBuffer<Vector3<T>, M>& getPositionBuffer() { return m_position; }
+    /** @brief Direct access to the quaternion buffer. */
+    GrainsMemBuffer<Quaternion<T>, M>& getQuaternionBuffer() { return m_quaternion; }
+    /** @brief Direct access to the velocity buffer. */
+    GrainsMemBuffer<Kinematics<T>, M>& getVelocityBuffer() { return m_velocity; }
+    /** @brief Direct access to the torce buffer. */
+    GrainsMemBuffer<Torce<T>, M>& getTorceBuffer() { return m_torce; }
+    /** @brief Direct access to the rigid body id buffer. */
+    GrainsMemBuffer<uint, M>& getRigidBodyIdBuffer() { return m_rigidBodyId; }
+    /** @brief Direct access to the component id buffer. */
+    GrainsMemBuffer<uint, M>& getComponentIdBuffer() { return m_componentId; }
     //@}
 
     /** @name Set methods */

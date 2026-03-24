@@ -35,6 +35,20 @@ export GRAINS_XERCES_LIBDIR="${GRAINS_XERCES_ROOT}/lib64-${GRAINS_CPP_COMPILER_D
 # End Xerces
 
 
+# MPI (set GRAINS_USE_MPI=1 to enable multi-GPU build)
+export GRAINS_USE_MPI=${GRAINS_USE_MPI:-0}
+if [ "$GRAINS_USE_MPI" = "1" ]; then
+    export GRAINS_MPI_FLAGS="-DGRAINS_USE_MPI"
+    export GRAINS_MPI_LINK_FLAGS="-lmpi"
+    echo -e '\033[31mGRAINS_USE_MPI\033[0m = ENABLED'
+else
+    export GRAINS_MPI_FLAGS=""
+    export GRAINS_MPI_LINK_FLAGS=""
+    echo -e '\033[31mGRAINS_USE_MPI\033[0m = DISABLED'
+fi
+# End MPI
+
+
 # Grains Test
 export GTEST_ROOT=/usr
 export GTEST_INCLUDE_DIR=/usr/include
@@ -76,12 +90,14 @@ export GRAINS_GPU_COMPILER_FLAGS_RELEASE="-t=8 -x cu -m64 \
     -use_fast_math -extra-device-vectorization -restrict \
     --extended-lambda --expt-relaxed-constexpr \
     -Xcompiler \"-rdynamic,-fPIC,-fopenmp\" \
+    ${GRAINS_MPI_FLAGS} \
     -g"
 export GRAINS_GPU_LINKER_FLAGS_RELEASE="-O3 -dlto \
     -arch=sm_75 -lcudart \
     -use_fast_math -extra-device-vectorization -restrict \
     -lcudart -lcudadevrt \
     -lgomp \
+    ${GRAINS_MPI_LINK_FLAGS} \
     -g"
 
 # Debug mode flags (full debug info, no optimization)
@@ -91,11 +107,13 @@ export GRAINS_GPU_COMPILER_FLAGS_DEBUG="-t=8 -x cu -m64 \
     -cudart static -cudadevrt static \
     --extended-lambda --expt-relaxed-constexpr \
     -Xcompiler "-rdynamic,-fPIC,-fopenmp" \
+    ${GRAINS_MPI_FLAGS} \
     -g -DDEBUG"
 export GRAINS_GPU_LINKER_FLAGS_DEBUG="-O0 -G \
     -arch=sm_75 -lcudart \
     -lcudart -lcudadevrt \
     -lgomp \
+    ${GRAINS_MPI_LINK_FLAGS} \
     -g"
 
 # Set active flags based on MODE (default: release)

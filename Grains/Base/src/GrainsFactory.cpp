@@ -3,6 +3,10 @@
 #include "GrainsCPU.hh"
 #include "GrainsGPU.hh"
 #include "GrainsTestDev.hh"
+#ifdef GRAINS_USE_MPI
+#include "GrainsMultiCPU.hh"
+#include "GrainsMultiGPU.hh"
+#endif
 
 // -------------------------------------------------------------------------------------------------
 // Adds the path to the dtd files using the GRAINS_HOME variable to
@@ -106,6 +110,12 @@ Grains<T>* GrainsFactory<T>::create(DOMElement* root)
         grains = new GrainsCPU<T>();
     else if(option == "GPU")
         grains = new GrainsGPU<T>();
+#ifdef GRAINS_USE_MPI
+    else if(option == "MPI" || option == "MPI_GPU")
+        grains = new GrainsMultiGPU<T>();
+    else if(option == "MPI_CPU")
+        grains = new GrainsMultiCPU<T>();
+#endif
     else if(option == "GrainsTestDev")
         grains = new GrainsTestDev<T>();
 

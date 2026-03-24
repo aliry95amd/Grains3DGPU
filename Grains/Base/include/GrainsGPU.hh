@@ -44,10 +44,10 @@ public:
 
     /** @brief Tasks to perform before time-stepping.
         @param rootElement XML root */
-    void initialize(DOMElement* rootElement) final;
+    void initialize(DOMElement* rootElement) override;
 
     /** @brief Runs the simulation over the prescribed time interval */
-    void simulate() final;
+    void simulate() override;
 
     // /** @brief Tasks to perform after time-stepping */
     // virtual void finalize();

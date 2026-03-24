@@ -5,6 +5,10 @@
 #include <cuda.h>
 #include <cuda_runtime.h>
 
+#ifdef GRAINS_USE_MPI
+#include <mpi.h>
+#endif
+
 #include "Grains.hh"
 #include "GrainsFactory.hh"
 #include "ReaderXML.hh"
@@ -55,10 +59,17 @@ int main(int argc, char* argv[])
     std::signal(SIGSEGV, signal_handler);
     std::signal(SIGFPE, signal_handler);
 
+#ifdef GRAINS_USE_MPI
+    MPI_Init(&argc, &argv);
+#endif
+
     // Input file
     if(argc < 2)
     {
         std::cerr << "Usage: " << argv[0] << " <input.xml>" << std::endl;
+#ifdef GRAINS_USE_MPI
+        MPI_Finalize();
+#endif
         return 1;
     }
     string filename = argv[1], filename_exe;
@@ -136,6 +147,10 @@ int main(int argc, char* argv[])
             delete grains;
         }
     }
+
+#ifdef GRAINS_USE_MPI
+    MPI_Finalize();
+#endif
 
     return (0);
 }
