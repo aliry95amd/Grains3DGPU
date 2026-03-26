@@ -1,4 +1,4 @@
-<Grains3D Type="Standard" Precision="Double">
+<Grains3D Type="GPU" Precision="Double">
 
 <Construction>
 	<Origin X="-0.03" Y="-0.03" Z="0.0"/>
@@ -35,7 +35,6 @@
 			</Transformation>
 		</Particle> -->
 	<Particles>
-		<!-- Example composite particle: two sub-bodies (LocalIdx 0 = master) -->
 		<Particle Type="Composite" Number="1" Density="1163.66" Material="matP">
 			<SubBody LocalIdx="0">
 				<Convex CrustThickness="1.e-5">
