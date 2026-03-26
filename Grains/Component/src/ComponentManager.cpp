@@ -21,7 +21,7 @@ ComponentManager<T, M>::ComponentManager(GrainsMemBuffer<RigidBody<T>*, M>* rigi
     , m_bodyTag(nParticles + nObstacles)
     , m_localPos(nParticles + nObstacles)
     , m_localQuat(nParticles + nObstacles)
-    , m_masterSlot(nComposites > 0 ? nComposites : 1)
+    , m_masterSlot(nComposites + 1)
     , m_counts{nObstacles, nParticles, 0u, nComposites, nSubBodies}
 {
     GAssert(m_rigidBody->getSize() == m_counts.numParticles + m_counts.numObstacles,
@@ -107,6 +107,20 @@ uint ComponentManager<T, M>::getNumberOfObstacles() const
 
 // -------------------------------------------------------------------------------------------------
 template <typename T, MemType M>
+uint ComponentManager<T, M>::getNumberOfComposites() const
+{
+    return m_counts.numComposites;
+}
+
+// -------------------------------------------------------------------------------------------------
+template <typename T, MemType M>
+uint ComponentManager<T, M>::getNumberOfSubBodies() const
+{
+    return m_counts.numSubBodies;
+}
+
+// -------------------------------------------------------------------------------------------------
+template <typename T, MemType M>
 void ComponentManager<T, M>::initialize()
 {
     m_collisionDetectionModule = std::make_unique<CollisionDetectionModule<T, M>>(
@@ -140,20 +154,33 @@ void ComponentManager<T, M>::copyTo_PostProcessing(
 template <typename T, MemType M>
 void ComponentManager<T, M>::initializeComponents(
     const GrainsMemBuffer<Vector3<T>, MemType::HOST>&    initPosition,
-    const GrainsMemBuffer<Quaternion<T>, MemType::HOST>& initOrientation)
+    const GrainsMemBuffer<Quaternion<T>, MemType::HOST>& initOrientation,
+    const GrainsMemBuffer<uint, MemType::HOST>&          initBodyTags,
+    const GrainsMemBuffer<Vector3<T>, MemType::HOST>&    initLocalPos,
+    const GrainsMemBuffer<Quaternion<T>, MemType::HOST>& initLocalQuat)
 {
     if constexpr(M == MemType::HOST)
     {
-        // Making sure that we have data for all components and the number of
-        // initial TR matches the number of RBs
         uint nComponents = m_counts.numParticles + m_counts.numObstacles;
-        assert(initPosition.getSize() == nComponents && initOrientation.getSize() == nComponents);
+        assert(initPosition.getSize() == nComponents && initOrientation.getSize() == nComponents
+               && initBodyTags.getSize() == nComponents && initLocalPos.getSize() == nComponents
+               && initLocalQuat.getSize() == nComponents);
 
-        // Assigning
         for(uint i = 0; i < nComponents; ++i)
         {
             m_position[i]   = initPosition[i];
             m_quaternion[i] = initOrientation[i];
+            m_bodyTag[i]    = initBodyTags[i];
+            m_localPos[i]   = initLocalPos[i];
+            m_localQuat[i]  = initLocalQuat[i];
+        }
+
+        // Populate masterSlot: sub-body with localIdx=0 is the master of each composite
+        for(uint i = 0; i < nComponents; ++i)
+        {
+            uint tag = m_bodyTag[i];
+            if(isSubBody(tag) && getSubBodyLocalIdx(tag) == 0u)
+                m_masterSlot[getCompositeIdx(tag)] = i;
         }
     }
 }
@@ -250,6 +277,7 @@ void ComponentManager<T, M>::moveParticles(const GrainsMemBuffer<TimeIntegrator<
                                                         m_counts.numObstacles,
                                                         m_counts.numParticles);
     }
+    updateSubBodyPositions();
 }
 
 // -------------------------------------------------------------------------------------------------

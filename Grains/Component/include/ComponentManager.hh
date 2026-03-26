@@ -195,6 +195,12 @@ public:
 
     /** @brief Gets the number of obstacles in manager */
     uint getNumberOfObstacles() const;
+
+    /** @brief Gets the number of composite bodies in manager */
+    uint getNumberOfComposites() const;
+
+    /** @brief Gets the number of sub-body slots across all composites */
+    uint getNumberOfSubBodies() const;
     //@}
 
     /** @name Set methods */
@@ -254,6 +260,13 @@ public:
     {
         m_torce.copyFrom(t);
     }
+    /** @brief Sets master slot lookup array
+        @param ms buffer containing the master slot indices */
+    template <MemType srcM>
+    void setMasterSlot(const GrainsMemBuffer<uint, srcM>& ms)
+    {
+        m_masterSlot.copyFrom(ms);
+    }
     //@}
 
     /** @name Manager methods */
@@ -269,6 +282,7 @@ public:
         other->setLocalPos(m_localPos);
         other->setLocalQuat(m_localQuat);
         other->setBodyTag(m_bodyTag);
+        other->setMasterSlot(m_masterSlot);
         other->setPosition(m_position);
         other->setQuaternion(m_quaternion);
         other->setVelocity(m_velocity);
@@ -284,9 +298,15 @@ public:
     //@{
     /** @brief Initializes transformations for components in the simulation
         @param initPosition initial position of components
-        @param initOrientation initial orientation of components */
+        @param initOrientation initial orientation of components
+        @param initBodyTags initial body tags for all components
+        @param initLocalPos initial local position offsets (zero for standalone/obstacles)
+        @param initLocalQuat initial local quaternion offsets (identity for standalone/obstacles) */
     void initializeComponents(const GrainsMemBuffer<Vector3<T>, MemType::HOST>&    initPosition,
-                              const GrainsMemBuffer<Quaternion<T>, MemType::HOST>& initOrientation);
+                              const GrainsMemBuffer<Quaternion<T>, MemType::HOST>& initOrientation,
+                              const GrainsMemBuffer<uint, MemType::HOST>&          initBodyTags,
+                              const GrainsMemBuffer<Vector3<T>, MemType::HOST>&    initLocalPos,
+                              const GrainsMemBuffer<Quaternion<T>, MemType::HOST>& initLocalQuat);
 
     /** @brief Inserts particles according to a given insertion policy
         @param ins insertion policy */

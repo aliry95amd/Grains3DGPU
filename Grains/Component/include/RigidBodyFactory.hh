@@ -4,6 +4,44 @@
 #include "GrainsMemBuffer.hh"
 #include "RigidBody.hh"
 
+/** @brief Unified input/output data for one category of rigid bodies (obstacles or particles).
+
+    For obstacle and standalone-particle templates:
+    - subBodiesPerTemplate = 1, isComposite = 0
+    - refLocalPos/refLocalQuat = zero / identity
+    - refRB, refLocalPos, refLocalQuat have size numTemplates
+
+    For composite-particle templates:
+    - subBodiesPerTemplate = S_i, isComposite = 1
+    - refRB, refLocalPos, refLocalQuat are laid out flat over all sub-body prototypes;
+      template i occupies indices [sum_{j<i} S_j, sum_{j<=i} S_j).
+
+    Per-template arrays (size = numTemplates): subBodiesPerTemplate, numEachRef, isComposite,
+    refInitialPos, refInitialOri.
+    Per-sub-body arrays (size = sum of S_i):   refRB, refLocalPos, refLocalQuat. */
+template <typename T>
+struct ParticleData
+{
+    /** \brief Flat array of prototype rigid bodies (one per sub-body prototype). */
+    GrainsMemBuffer<RigidBody<T>*> refRB;
+    /** \brief Number of sub-bodies per template (1 for standalone/obstacle). */
+    GrainsMemBuffer<uint> subBodiesPerTemplate;
+    /** \brief Number of instances to spawn per template (Number= XML attribute). */
+    GrainsMemBuffer<uint> numEachRef;
+    /** \brief 1 if composite template, 0 if standalone/obstacle. */
+    GrainsMemBuffer<uint> isComposite;
+    /** \brief Local position offset per sub-body prototype (zero for standalone/obstacle). */
+    GrainsMemBuffer<Vector3<T>> refLocalPos;
+    /** \brief Local quaternion offset per sub-body prototype (identity for standalone/obstacle). */
+    GrainsMemBuffer<Quaternion<T>> refLocalQuat;
+    /** \brief Initial world CoM position per template. */
+    GrainsMemBuffer<Vector3<T>> refInitialPos;
+    /** \brief Initial world orientation per template. */
+    GrainsMemBuffer<Quaternion<T>> refInitialOri;
+    /** \brief Number of templates (= size of per-template arrays). */
+    uint numTemplates = 0;
+};
+
 // =================================================================================================
 /** @brief The class RigidBodyFactory.
 
@@ -28,29 +66,18 @@ public:
     /**@name Methods */
     //@{
     /** @brief Creates and returns a buffer of reference rigid bodies given an XML node
-        @param root XML node
-        @param refObstacleRB Memory buffer for storing the reference obstacles
-        @param refParticleRB Memory buffer for storing the reference particles
-        @param refObstacleInitialPosition Memory buffer for the initial positions of obstacles
-        @param refParticleInitialPosition Memory buffer for the initial positions of particles
-        @param refObstacleInitialOrientation Memory buffer for the initial orientations of obstacles
-        @param refParticleInitialOrientation Memory buffer for the initial orientations of particles
-        @param numEachRefObstacle number of each reference obstacle
-        @param numEachRefParticle number of each reference particle
-        @param numObstacles Total number of obstacles in the simulation
-        @param numParticles Total number of particles in the simulation */
-    static void create(DOMNode*                        obstacles,
-                       DOMNode*                        particles,
-                       GrainsMemBuffer<RigidBody<T>*>& refObstacleRB,
-                       GrainsMemBuffer<RigidBody<T>*>& refParticleRB,
-                       GrainsMemBuffer<Vector3<T>>&    refObstacleInitialPosition,
-                       GrainsMemBuffer<Vector3<T>>&    refParticleInitialPosition,
-                       GrainsMemBuffer<Quaternion<T>>& refObstacleInitialOrientation,
-                       GrainsMemBuffer<Quaternion<T>>& refParticleInitialOrientation,
-                       GrainsMemBuffer<uint>&          numEachRefObstacle,
-                       GrainsMemBuffer<uint>&          numEachRefParticle,
-                       uint&                           numObstacles,
-                       uint&                           numParticles);
+        @param obstacles XML node containing obstacle definitions
+        @param particles XML node containing particle definitions
+        @param obstacleData output struct to hold parsed obstacle data
+        @param particleData output struct to hold parsed particle data
+        @param numObstacles output number of obstacles
+        @param numParticles output number of particles */
+    static void create(DOMNode*         obstacles,
+                       DOMNode*         particles,
+                       ParticleData<T>& obstacleData,
+                       ParticleData<T>& particleData,
+                       uint&            numObstacles,
+                       uint&            numParticles);
 
     /** @brief RigidBody objects must be instantiated on device, if we want to use them on device.
         Copying from host is not supported due to runtime polymorphism for this class. This

@@ -90,6 +90,130 @@ void Grains<T>::finalize()
 /* ============================================================================================== */
 /* Low-Level Methods                                                                              */
 /* ============================================================================================== */
+// Sets up rigid bodies, body tags, local transforms, and ComponentManager from XML
+template <typename T>
+void Grains<T>::setupComponents(DOMNode* root)
+{
+    using GP = GrainsParameters<T>;
+    auto& LC = GP::m_collisionDetection.linkedCellParameters;
+
+    DOMNode*        particles = ReaderXML::getNode(root, "Particles");
+    DOMNode*        obstacles = ReaderXML::getNode(root, "Obstacles");
+    ParticleData<T> obstacleData, particleData;
+    uint            numObstacles = 0, numParticles = 0;
+
+    GoutWI(6, "Reading rigid bodies ...");
+    RigidBodyFactory<T>::create(obstacles,
+                                particles,
+                                obstacleData,
+                                particleData,
+                                numObstacles,
+                                numParticles);
+    GoutWI(6, "Reading rigid bodies completed!");
+
+    // Count composites and sub-bodies
+    uint nComposites = 0;
+    uint nSubBodies  = 0;
+    for(uint i = 0; i < particleData.numTemplates; ++i)
+    {
+        if(particleData.isComposite[i])
+        {
+            nComposites += particleData.numEachRef[i];
+            nSubBodies += particleData.numEachRef[i] * particleData.subBodiesPerTemplate[i];
+        }
+    }
+
+    // Allocate rigid body list and per-component initial state buffers
+    const uint totalNumComponents = numObstacles + numParticles;
+    GAssert(totalNumComponents > 0, "No components found in the simulation!");
+    m_rigidBodyList.initialize(totalNumComponents);
+    GrainsMemBuffer<Vector3<T>>    initialPosition(totalNumComponents);
+    GrainsMemBuffer<Quaternion<T>> initialOrientation(totalNumComponents);
+    GrainsMemBuffer<uint>          initialBodyTags(totalNumComponents);
+    GrainsMemBuffer<Vector3<T>>    initialLocalPos(totalNumComponents);
+    GrainsMemBuffer<Quaternion<T>> initialLocalQuat(totalNumComponents);
+
+    uint offset = 0;
+
+    // Expand obstacles (subBodiesPerTemplate = 1, numEachRef = 1 always)
+    for(uint i = 0; i < obstacleData.numTemplates; ++i)
+    {
+        m_rigidBodyList[offset]    = new RigidBody<T>(*obstacleData.refRB[i]);
+        initialBodyTags[offset]    = makeStandaloneBodyTag(offset);
+        initialPosition[offset]    = obstacleData.refInitialPos[i];
+        initialOrientation[offset] = obstacleData.refInitialOri[i];
+        initialLocalPos[offset]    = Vector3<T>(T(0), T(0), T(0));
+        initialLocalQuat[offset]   = Quaternion<T>(T(0), T(0), T(0), T(1));
+        T r                        = obstacleData.refRB[i]->getCircumscribedRadius();
+        if(r > LC.maxObstacleRadius)
+            LC.maxObstacleRadius = r;
+        ++offset;
+    }
+
+    // Expand particles
+    T    maxParticleRadius = T(0);
+    uint compositeIdx      = 1;  // 1-based
+    uint protoBase         = 0;  // flat index into refRB/refLocalPos/refLocalQuat
+    for(uint i = 0; i < particleData.numTemplates; ++i)
+    {
+        uint S_i = particleData.subBodiesPerTemplate[i];
+        uint M_i = particleData.numEachRef[i];
+        bool isc = (particleData.isComposite[i] != 0u);
+
+        for(uint j = 0; j < M_i; ++j)
+        {
+            for(uint k = 0; k < S_i; ++k)
+            {
+                uint rbIdx                 = protoBase + k;
+                m_rigidBodyList[offset]    = new RigidBody<T>(*particleData.refRB[rbIdx]);
+                initialPosition[offset]    = particleData.refInitialPos[i];
+                initialOrientation[offset] = particleData.refInitialOri[i];
+                initialLocalPos[offset]    = particleData.refLocalPos[rbIdx];
+                initialLocalQuat[offset]   = particleData.refLocalQuat[rbIdx];
+                initialBodyTags[offset]
+                    = isc ? makeSubBodyTag(offset, compositeIdx, k) : makeStandaloneBodyTag(offset);
+                T r = particleData.refRB[rbIdx]->getCircumscribedRadius();
+                if(r > maxParticleRadius)
+                    maxParticleRadius = r;
+                ++offset;
+            }
+            if(isc)
+                ++compositeIdx;
+        }
+        protoBase += S_i;
+    }
+
+    // Store radii in LC params for use in Construction()
+    LC.minCellSize = T(2) * maxParticleRadius;
+
+    // Free prototype rigid bodies
+    for(uint i = 0; i < obstacleData.refRB.getSize(); ++i)
+    {
+        delete obstacleData.refRB[i];
+        obstacleData.refRB[i] = nullptr;
+    }
+    for(uint i = 0; i < particleData.refRB.getSize(); ++i)
+    {
+        delete particleData.refRB[i];
+        particleData.refRB[i] = nullptr;
+    }
+
+    // Construct ComponentManager
+    m_components = std::make_unique<ComponentManager<T, MemType::HOST>>(&m_rigidBodyList,
+                                                                        numObstacles,
+                                                                        numParticles,
+                                                                        nComposites,
+                                                                        nSubBodies);
+    m_components->initialize();
+    m_components->initializeComponents(initialPosition,
+                                       initialOrientation,
+                                       initialBodyTags,
+                                       initialLocalPos,
+                                       initialLocalQuat);
+    m_components->updateSubBodyPositions();
+}
+
+// -------------------------------------------------------------------------------------------------
 // Constructs the simulation -- Reads the Construction part of the XML input to
 // set the parameters
 template <typename T>
@@ -133,94 +257,8 @@ void Grains<T>::Construction(DOMElement* rootElement)
     }
 
     // ---------------------------------------------------------------------------------------------
-    // Components
-    // Particle variables
-    DOMNode*                       particles = ReaderXML::getNode(root, "Particles");
-    GrainsMemBuffer<RigidBody<T>*> refParticleRigidBodyList;
-    GrainsMemBuffer<Vector3<T>>    refParticleInitialPosition;
-    GrainsMemBuffer<Quaternion<T>> refParticleInitialOrientation;
-    GrainsMemBuffer<uint>          numEachRefParticle;
-    uint                           numParticles = 0;
-    // Obstacle variables
-    DOMNode*                       obstacles = ReaderXML::getNode(root, "Obstacles");
-    GrainsMemBuffer<RigidBody<T>*> refObstacleRigidBodyList;
-    GrainsMemBuffer<Vector3<T>>    refObstacleInitialPosition;
-    GrainsMemBuffer<Quaternion<T>> refObstacleInitialOrientation;
-    GrainsMemBuffer<uint>          numEachRefObstacle;
-    uint                           numObstacles = 0;
-    GoutWI(6, "Reading rigid bodies ...");
-    RigidBodyFactory<T>::create(obstacles,
-                                particles,
-                                refObstacleRigidBodyList,
-                                refParticleRigidBodyList,
-                                refObstacleInitialPosition,
-                                refParticleInitialPosition,
-                                refObstacleInitialOrientation,
-                                refParticleInitialOrientation,
-                                numEachRefObstacle,
-                                numEachRefParticle,
-                                numObstacles,
-                                numParticles);
-    GoutWI(6, "Reading rigid bodies completed!");
-
-    // Setting up rigid bodies buffer
-    const uint totalNumComponents = numObstacles + numParticles;
-    GAssert(totalNumComponents > 0, "No components found in the simulation!");
-    m_rigidBodyList.initialize(totalNumComponents);
-    GrainsMemBuffer<Vector3<T>>    initialPosition(totalNumComponents);
-    GrainsMemBuffer<Quaternion<T>> initialOrientation(totalNumComponents);
-    {
-        uint offset = 0;
-        for(uint i = 0; i < refObstacleRigidBodyList.getSize(); ++i)
-        {
-            for(uint j = 0; j < numEachRefObstacle[i]; j++)
-            {
-                // Deep copy of the rigid body
-                m_rigidBodyList[offset + j] = new RigidBody<T>(*refObstacleRigidBodyList[i]);
-                // Initial transformation of the rigid body
-                initialPosition[offset + j]    = refObstacleInitialPosition[i];
-                initialOrientation[offset + j] = refObstacleInitialOrientation[i];
-            }
-            // Increment the starting position
-            offset += numEachRefObstacle[i];
-        }
-
-        for(uint i = 0; i < refParticleRigidBodyList.getSize(); ++i)
-        {
-            for(uint j = 0; j < numEachRefParticle[i]; j++)
-            {
-                // Deep copy of the rigid body
-                m_rigidBodyList[offset + j] = new RigidBody<T>(*refParticleRigidBodyList[i]);
-                // Initial transformation of the rigid body
-                initialPosition[offset + j]    = refParticleInitialPosition[i];
-                initialOrientation[offset + j] = refParticleInitialOrientation[i];
-            }
-            // Increment the starting position
-            offset += numEachRefParticle[i];
-        }
-    }
-
-    // ---------------------------------------------------------------------------------------------
-
-    // Calculate minCellSize based on maximum particle radius (needed for insertion checks)
-    T maxParticleRadius = 0;
-    for(uint i = 0; i < refParticleRigidBodyList.getSize(); ++i)
-    {
-        auto refParticle = refParticleRigidBodyList[i];
-        T    radius      = refParticle->getCircumscribedRadius();
-        if(radius > maxParticleRadius)
-            maxParticleRadius = radius;
-    }
-
-    // Calculate maximum obstacle radius for cell occupancy
-    T maxObstacleRadius = 0;
-    for(uint i = 0; i < refObstacleRigidBodyList.getSize(); ++i)
-    {
-        auto refObstacle = refObstacleRigidBodyList[i];
-        T    radius      = refObstacle->getCircumscribedRadius();
-        if(radius > maxObstacleRadius)
-            maxObstacleRadius = radius;
-    }
+    // Components (rigid bodies, body tags, local transforms, ComponentManager)
+    setupComponents(root);
 
     // ---------------------------------------------------------------------------------------------
     // Setting up collision detection
@@ -267,15 +305,12 @@ void Grains<T>::Construction(DOMElement* rootElement)
         else
             GAbort("Unknown LinkedCell type! Aborting Grains!");
 
-        // Minimum cell size
-        LC.minCellSize = 2 * maxParticleRadius;
-
         // Cell size factor
         LC.cellSizeFactor = T(ReaderXML::getNodeAttr_Double(nLinkedCell, "CellSizeFactor"));
 
         // Adjusting maxNumCellsPerObstacle
         uint adjustedMaxNumCellsPerObstaclePerDim = static_cast<uint>(
-            std::ceil((2 * maxObstacleRadius) / (LC.cellSizeFactor * LC.minCellSize)));
+            std::ceil((2 * LC.maxObstacleRadius) / (LC.cellSizeFactor * LC.minCellSize)));
         LC.maxNumCellsPerObstacle = adjustedMaxNumCellsPerObstaclePerDim
                                     * adjustedMaxNumCellsPerObstaclePerDim
                                     * adjustedMaxNumCellsPerObstaclePerDim;
@@ -300,9 +335,8 @@ void Grains<T>::Construction(DOMElement* rootElement)
         LC.cellSizeFactor                         = T(1.0);
         LC.minCorner                              = GP::m_origin;
         LC.maxCorner                              = GP::m_maxCoordinate;
-        LC.minCellSize                            = 2 * maxParticleRadius;
         uint adjustedMaxNumCellsPerObstaclePerDim = static_cast<uint>(
-            std::ceil((2 * maxObstacleRadius) / (LC.cellSizeFactor * LC.minCellSize)));
+            std::ceil((2 * LC.maxObstacleRadius) / (LC.cellSizeFactor * LC.minCellSize)));
         LC.maxNumCellsPerObstacle = adjustedMaxNumCellsPerObstaclePerDim
                                     * adjustedMaxNumCellsPerObstaclePerDim
                                     * adjustedMaxNumCellsPerObstaclePerDim;
@@ -385,16 +419,6 @@ void Grains<T>::Construction(DOMElement* rootElement)
         if(ReaderXML::getNodeAttr_String(contacts, "EnableTimings") == "true")
             GP::m_fmTimer.enable(GP::m_isGPU);
     }
-
-    // ---------------------------------------------------------------------------------------------
-    // Setting up the component managers
-    m_components = std::make_unique<ComponentManager<T, MemType::HOST>>(&m_rigidBodyList,
-                                                                        numObstacles,
-                                                                        numParticles);
-    // Create the collision detection module, pair buffers, and force module
-    m_components->initialize();
-    // Initialize components
-    m_components->initializeComponents(initialPosition, initialOrientation);
 }
 
 // -------------------------------------------------------------------------------------------------

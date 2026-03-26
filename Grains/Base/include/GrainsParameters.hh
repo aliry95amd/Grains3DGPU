@@ -94,6 +94,8 @@ struct LinkedCellParameters
     LinkedCellType type = LinkedCellType::HOST;
     /** \brief Minimum linked cell size. */
     T minCellSize = 0;
+    /** \brief Maximum circumscribed radius among all obstacles (used for LC sizing). */
+    T maxObstacleRadius = 0;
     /** \brief Linked cell size factor. */
     T cellSizeFactor = 1;
     /** \brief Maximum number of cells that one obstacle can occupy. */
@@ -192,7 +194,6 @@ public:
     static std::queue<T> m_tSave;
     /** @brief Frequency of time output (print every N steps, 0=never, 1=every step) */
     static uint m_verbosityFrequency;
-    /* Simulation and CDM Timers */
     /** \brief Simulation-loop timer */
     static GrainsSimTimer m_simTimer;
     /** \brief CDM sub-stage timer */

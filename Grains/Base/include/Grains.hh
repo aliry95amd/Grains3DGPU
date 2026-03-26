@@ -72,6 +72,13 @@ public:
 
     /**@name Low-level methods */
     //@{
+    /** @brief Sets up rigid bodies, body tags, local transforms, and ComponentManager.
+        Reads rigid bodies from XML, expands all templates, assigns body tags (standalone
+        or composite sub-body), and creates and initializes ComponentManager.  Also sets
+        LC.minCellSize and LC.maxObstacleRadius for use by Construction().
+        @param root Construction XML node */
+    void setupComponents(DOMNode* root);
+
     /** @brief Construction of the simulation: linked cell, particles & obstacles, domain
         decomposition.
         @param rootElement XML root */

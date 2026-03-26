@@ -98,6 +98,7 @@ void GrainsGPU<T>::simulate()
     // Insertion: particle insertion on host + copy to device
     timer.start(SimStage::Insertion);
     Grains<T>::m_components->insertParticles(Grains<T>::m_insertion);
+    Grains<T>::m_components->updateSubBodyPositions();
     cout << "Copying the inserted particles to the device ..." << endl;
     Grains<T>::m_components->copyTo(m_d_components);
     cout << "Copying completed!" << endl;
@@ -225,7 +226,9 @@ void GrainsGPU<T>::Construction(DOMElement* rootElement)
     m_d_components = std::make_unique<ComponentManager<T, MemType::DEVICE>>(
         &m_d_rigidBodyList,
         Grains<T>::m_components->getNumberOfObstacles(),
-        Grains<T>::m_components->getNumberOfParticles());
+        Grains<T>::m_components->getNumberOfParticles(),
+        Grains<T>::m_components->getNumberOfComposites(),
+        Grains<T>::m_components->getNumberOfSubBodies());
     // Create the collision detection module, pair buffers, and force module
     m_d_components->initialize();
 }

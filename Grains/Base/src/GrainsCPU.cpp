@@ -36,6 +36,7 @@ void GrainsCPU<T>::simulate()
 
     timer.start(SimStage::Insertion);
     G::m_components->insertParticles(G::m_insertion);
+    G::m_components->updateSubBodyPositions();
     timer.stop(SimStage::Insertion);
 
     cout << "Time \t TO \tend \tParticles \tIn \tOut" << endl;
@@ -78,8 +79,8 @@ void GrainsCPU<T>::simulate()
             // KDK Step 1: half-kick + drift using f_n (from pre-loop or previous step).
             timer.start(SimStage::MoveParticles);
             G::m_components->moveParticles(G::m_timeIntegrator);
+            G::m_components->updateSubBodyPositions();
             timer.stop(SimStage::MoveParticles);
-            // Detect collisions and compute forces at x_{n+1}.
             timer.start(SimStage::DetectCollisions);
             G::m_components->detectCollisions();
             timer.stop(SimStage::DetectCollisions);
