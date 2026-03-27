@@ -270,10 +270,19 @@ void Grains<T>::Construction(DOMElement* rootElement)
         GoutWI(9, "Collision detection timings enabled!");
         GP::m_cdmTimer.enable(GP::m_isGPU);
     }
-    if(ReaderXML::getNodeAttr_String(collisionDetection, "UseRelativeTransformations") == "true")
     {
-        GoutWI(9, "Collision detection using relative transformations enabled!");
-        CD.useRelativeTransformations = true;
+        const std::string relTransVal
+            = ReaderXML::getNodeAttr_String(collisionDetection, "UseRelativeTransformations");
+        if(relTransVal == "true")
+        {
+            GoutWI(9, "Collision detection using relative transformations enabled!");
+            CD.useRelativeTransformations = true;
+        }
+        else if(relTransVal == "false")
+        {
+            GoutWI(9, "Collision detection using relative transformations disabled!");
+            CD.useRelativeTransformations = false;
+        }
     }
 
     // Neighbor list

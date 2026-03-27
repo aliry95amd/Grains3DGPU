@@ -66,13 +66,16 @@ INLINE size_t queryCubSelectTempStorageBytes(uint nPairs, uint* activeIdxDev, ui
     @param numSelectedDev  device pointer to receive the count of selected pairs
     @param tempStorage     preallocated CUB temporary storage
     @param tempStorageBytes size of tempStorage in bytes
-    @return number of active pairs (copied from device) */
+    @param pinnedCountHost pinned host pointer to receive the active pair count (avoids
+                           pageable staging on the device-to-host transfer)
+    @return number of active pairs */
 INLINE uint buildCompactActiveIndex(const uint* flagsDev,
                                     uint        nPairs,
                                     uint*       activeIdxDev,
                                     uint*       numSelectedDev,
                                     void*       tempStorage,
-                                    size_t      tempStorageBytes)
+                                    size_t      tempStorageBytes,
+                                    uint*       pinnedCountHost)
 {
     cub::CountingInputIterator<uint> countIter(0u);
     cudaErrCheck(cub::DeviceSelect::Flagged(tempStorage,
@@ -82,9 +85,8 @@ INLINE uint buildCompactActiveIndex(const uint* flagsDev,
                                             activeIdxDev,
                                             numSelectedDev,
                                             static_cast<int>(nPairs)));
-    uint nActive = 0u;
-    cudaErrCheck(cudaMemcpy(&nActive, numSelectedDev, sizeof(uint), cudaMemcpyDeviceToHost));
-    return nActive;
+    cudaErrCheck(cudaMemcpy(pinnedCountHost, numSelectedDev, sizeof(uint), cudaMemcpyDeviceToHost));
+    return *pinnedCountHost;
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -92,7 +94,7 @@ INLINE uint buildCompactActiveIndex(const uint* flagsDev,
     @param CF contact force models
     @param pairList list of rigid bodies pairs
     @param contactInfo contact information
-    @param activeIdx list of active pair indices (nullptr = process all pairs)
+    @param activeIdx list of active pair indices
     @param position position of the components
     @param velocity kinematics of the components
     @param intermediateTorceA intermediate torce storage for particle A in each pair
@@ -116,37 +118,22 @@ __GLOBAL__ void computeContactForces_Kernel(const ContactForceModel<T>* const* C
     if(tID >= nActive)
         return;
 
-    if(activeIdx == nullptr)
-    {
-        computeContactForces_common(CF,
-                                    pairList,
-                                    contactInfo,
-                                    position,
-                                    velocity,
-                                    intermediateTorceA,
-                                    intermediateTorceB,
-                                    contactMemory,
-                                    tID);
-    }
-    else
-    {
-        const uint i = activeIdx[tID];
-        computeContactForces_common(CF,
-                                    pairList,
-                                    contactInfo,
-                                    position,
-                                    velocity,
-                                    intermediateTorceA,
-                                    intermediateTorceB,
-                                    contactMemory,
-                                    i);
-    }
+    const uint i = activeIdx[tID];
+    computeContactForces_common(CF,
+                                pairList,
+                                contactInfo,
+                                position,
+                                velocity,
+                                intermediateTorceA,
+                                intermediateTorceB,
+                                contactMemory,
+                                i);
 }
 
 // -------------------------------------------------------------------------------------------------
 /** @brief Reduces per-pair intermediate torces to per-particle torces using atomics.
     @param pairList list of rigid bodies pairs
-    @param activeIdx list of active pair indices (nullptr = process all pairs)
+    @param activeIdx list of active pair indices
     @param intermediateTorceA intermediate torce storage for particle A in each pair
     @param intermediateTorceB intermediate torce storage for particle B in each pair
     @param torce final per-particle torce array (accumulated atomically)
@@ -164,15 +151,8 @@ __GLOBAL__ void reduceTorces_Kernel(const uint2*    pairList,
     if(tID >= nActive)
         return;
 
-    if(activeIdx == nullptr)
-    {
-        reduceTorces_common(pairList, intermediateTorceA, intermediateTorceB, torce, tID);
-    }
-    else
-    {
-        const uint i = activeIdx[tID];
-        reduceTorces_common(pairList, intermediateTorceA, intermediateTorceB, torce, i);
-    }
+    const uint i = activeIdx[tID];
+    reduceTorces_common(pairList, intermediateTorceA, intermediateTorceB, torce, i);
 }
 
 // -------------------------------------------------------------------------------------------------

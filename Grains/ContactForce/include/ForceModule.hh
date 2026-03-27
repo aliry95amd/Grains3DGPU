@@ -15,6 +15,17 @@
 #include "Vector3.hh"
 
 // =================================================================================================
+/** @brief Custom deleter for CUDA pinned host allocations (cudaMallocHost/cudaFreeHost). */
+struct CudaHostDeleter
+{
+    void operator()(void* p) const noexcept
+    {
+        if(p != nullptr)
+            cudaFreeHost(p);
+    }
+};
+
+// =================================================================================================
 /** @brief The class ForceModule.
 
     Encapsulates the full force computation pipeline:
@@ -40,6 +51,9 @@ private:
     GrainsMemBuffer<uint, M> m_numActivePairs;
     /** \brief CUB DeviceSelect::Flagged temporary storage (DEVICE path only) */
     GrainsMemBuffer<uint8_t, M> m_cubSelectTempStorage;
+    /** \brief Pinned host buffer receiving the CUB compaction count for fast D->H transfer
+        (DEVICE path only) */
+    std::unique_ptr<uint, CudaHostDeleter> m_numActivePairsPinned;
     /** \brief Per-pair intermediate torce for particle A (lazy resize; DEVICE path only) */
     GrainsMemBuffer<Torce<T>, M> m_intermediateTorceA;
     /** \brief Per-pair intermediate torce for particle B (lazy resize; DEVICE path only) */
@@ -51,7 +65,7 @@ private:
 public:
     /** @name Constructors */
     //@{
-    /** @brief Default constructor (forbidden; use ForceModuleFactory) */
+    /** @brief Default constructor (forbidden) */
     ForceModule() = delete;
 
     /** @brief Constructor

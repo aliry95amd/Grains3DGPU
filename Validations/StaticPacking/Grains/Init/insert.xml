@@ -24,7 +24,8 @@
 		<TimeIntegration Type="FirstOrderExplicit"/>
 	</TemporalSetting>
 
-		<!-- <Particle Number="1" Density="1163.66" Material="matP">
+	<Particles>
+		<Particle Number="1" Density="1163.66" Material="matP">
 				<Box LX="0.004" LY="0.004" LZ="0.0053"/>
 				<Superquadric a="0.004" b="0.004" c="0.00265" n1="32" n2="32"/>
 			<Convex CrustThickness="1.e-5">
@@ -33,9 +34,8 @@
 			<Transformation>
 				<AngularPosition Type="Angles" aX="30." aY="0." aZ="30."/>		
 			</Transformation>
-		</Particle> -->
-	<Particles>
-		<Particle Type="Composite" Number="1" Density="1163.66" Material="matP">
+		</Particle>
+		<!-- <Particle Type="Composite" Number="1" Density="1163.66" Material="matP">
 			<SubBody LocalIdx="0">
 				<Convex CrustThickness="1.e-5">
 					<Sphere Radius="0.003"/>
@@ -57,7 +57,7 @@
 			<Transformation>
 				<AngularPosition Type="Angles" aX="0." aY="0." aZ="0."/>
 			</Transformation>
-		</Particle>
+		</Particle> -->
 	</Particles>
 	<!-- <Cylinder Radius="0.004" Height="0.0053"/> -->
 
@@ -139,7 +139,7 @@
 		<InitialVelocity Type="Constant" X="0.0" Y="0.0" Z="0.0"/>
 	</ParticleInsertion>
 	<PostProcessing>
-		<TimeSave dt="1e-2"/>
+		<TimeSave dt="1e-1"/>
 		<Writers>
 			<Paraview Directory="./Grains/Init" RootName="S4_N2"/>
 			<RawData  Directory="./Grains/Init" RootName="S4_N2"/>

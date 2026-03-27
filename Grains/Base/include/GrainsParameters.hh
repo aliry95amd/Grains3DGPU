@@ -94,10 +94,10 @@ struct LinkedCellParameters
     LinkedCellType type = LinkedCellType::HOST;
     /** \brief Minimum linked cell size. */
     T minCellSize = 0;
-    /** \brief Maximum circumscribed radius among all obstacles (used for LC sizing). */
-    T maxObstacleRadius = 0;
     /** \brief Linked cell size factor. */
     T cellSizeFactor = 1;
+    /** \brief Maximum circumscribed radius among all obstacles (used for LC sizing). */
+    T maxObstacleRadius = 0;
     /** \brief Maximum number of cells that one obstacle can occupy. */
     uint maxNumCellsPerObstacle = 0;
     /** \brief Maximum number of particles per cell (used for ATOMICFIXED LinkedCell type). */

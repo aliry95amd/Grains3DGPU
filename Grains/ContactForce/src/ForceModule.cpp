@@ -20,6 +20,11 @@ ForceModule<T, M>::ForceModule(size_t pairCapacity, bool isContactWithMemory)
                                                                m_activeIndex.getData(),
                                                                m_numActivePairs.getData());
         m_cubSelectTempStorage.initialize(cubBytes);
+        // Pinned host buffer for fast device-to-host count transfer
+        uint* pinnedPtr = nullptr;
+        cudaErrCheck(cudaMallocHost(reinterpret_cast<void**>(&pinnedPtr), sizeof(uint)));
+        *pinnedPtr = 0u;
+        m_numActivePairsPinned.reset(pinnedPtr);
     }
 
     if(isContactWithMemory)
@@ -170,7 +175,8 @@ void ForceModule<T, M>::run(const GrainsMemBuffer<ContactForceModel<T>*, M>& CF,
                                                      m_activeIndex.getData(),
                                                      m_numActivePairs.getData(),
                                                      m_cubSelectTempStorage.getData(),
-                                                     m_cubSelectTempStorage.getSize());
+                                                     m_cubSelectTempStorage.getSize(),
+                                                     m_numActivePairsPinned.get());
         gt.stop(FMStage::FlagAndCompact);
 
         if(nActive > 0)

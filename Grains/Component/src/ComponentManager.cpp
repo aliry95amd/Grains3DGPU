@@ -2,7 +2,7 @@
 #include "BodyTag.hh"
 #include "ComponentManagerCommon.hh"
 #include "ComponentManagerGPU_Kernels.hh"
-#include "ForceModuleFactory.hh"
+#include "ForceModule.hh"
 #include "QuaternionMath.hh"
 #include "VectorMath.hh"
 
@@ -137,7 +137,8 @@ void ComponentManager<T, M>::initialize()
     m_pairList.initialize(pairCapacity);
 
     // Create ForceModule (owns contact table + GPU intermediate buffers)
-    m_forceModule = ForceModuleFactory<T, M>::create(pairCapacity);
+    m_forceModule = std::make_unique<ForceModule<T, M>>(pairCapacity,
+                                                        GrainsParameters<T>::m_isContactWithMemory);
 }
 
 // -------------------------------------------------------------------------------------------------
