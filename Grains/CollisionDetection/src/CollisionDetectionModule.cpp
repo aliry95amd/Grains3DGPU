@@ -671,10 +671,9 @@ void CollisionDetectionModule<T, M>::sortParticles(GrainsMemBuffer<Vector3<T>, M
     auto& LC                 = GP::m_collisionDetection.linkedCellParameters;
     auto& gt                 = GP::m_cdmTimer;
 
-    gt.start(CDMStage::Sort);
-
     if(LC.sortFrequency > 0 && SS.neighborListUpdateCount % LC.sortFrequency == 0)
     {
+        gt.start(CDMStage::Sort);
         m_particleSorter.sortParticles(positions,
                                        velocities,
                                        orientations,
@@ -710,11 +709,10 @@ void CollisionDetectionModule<T, M>::sortParticles(GrainsMemBuffer<Vector3<T>, M
                                                                     nTotal);
             }
         }
+        gt.stop(CDMStage::Sort);
     }
     else
         SS.particlesSorted = false;
-
-    gt.stop(CDMStage::Sort);
 }
 
 // -------------------------------------------------------------------------------------------------

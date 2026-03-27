@@ -64,7 +64,7 @@
 	<Obstacles>
 		<Obstacle Material="matP">
 			<Convex CrustThickness="1.e-5">
-				<Box LX="0.06" LY="0.06" LZ="0.001"/>
+				<Rectangle LX="0.06" LY="0.06" LZ="0.001"/>
 			</Convex>
 			<Transformation>
 				<Centre X="0" Y="0" Z="0"/>
