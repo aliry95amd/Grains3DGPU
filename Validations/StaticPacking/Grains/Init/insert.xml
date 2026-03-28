@@ -12,7 +12,7 @@
 		<NarrowPhase Type="GJK" Acceleration="false"/>
 	</CollisionDetection>
 
-	<ContactForceModels EnableTimings="true">
+	<ContactForceModels EnableTimings="true" Compaction="true">
 		<ContactForceModel Type='Hooke'>
 			<Material materialA="matP" materialB="matP"/>
 			<Parameters kn="1.2e6" en="0.6" etat="-1" muc="0.5" kr="0.0"/>
@@ -64,7 +64,7 @@
 	<Obstacles>
 		<Obstacle Material="matP">
 			<Convex CrustThickness="1.e-5">
-				<Rectangle LX="0.06" LY="0.06" LZ="0.001"/>
+				<Box LX="0.06" LY="0.06" LZ="0.001"/>
 			</Convex>
 			<Transformation>
 				<Centre X="0" Y="0" Z="0"/>

@@ -31,6 +31,8 @@ template <typename T>
 uint GrainsParameters<T>::m_numContactPairs = 0;
 template <typename T>
 bool GrainsParameters<T>::m_isContactWithMemory = false;
+template <typename T>
+bool GrainsParameters<T>::m_useCompaction = true;
 
 /* Temporal */
 template <typename T>

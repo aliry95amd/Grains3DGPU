@@ -31,6 +31,7 @@ enum class CDMStage : uint8_t
     BVFilter,           ///< CollisionDetectionModule::filterPairsBV()
     NarrowPhase,        ///< CollisionDetectionModule::detectCollisionsComponents*()
     Transform,          ///< CollisionDetectionModule::transformContactInfo()
+    Total,              ///< Full CollisionDetectionModule::run() wall-clock span
     COUNT
 };
 
@@ -43,6 +44,7 @@ enum class FMStage : uint8_t
     ReduceTorces,    ///< [GPU] reduceTorces_Kernel atomic per-particle accumulation; no-op on CPU
     ExternalForces,  ///< addExternalForces gravity application
     AssembleComposites,  ///< assembleCompositeTorces sub-body → master accumulation
+    Total,               ///< Full ForceModule::run() wall-clock span
     COUNT
 };
 //@}
@@ -217,10 +219,13 @@ public:
 
     void printSummary() const
     {
-        const double tot = (*this)[CDMStage::Sort] + (*this)[CDMStage::NeighborList]
-                           + (*this)[CDMStage::RelativeTransform] + (*this)[CDMStage::BVFilter]
-                           + (*this)[CDMStage::NarrowPhase] + (*this)[CDMStage::Transform];
-        const double denom = tot > 0.0 ? tot : 1e-12;
+        const double total       = (*this)[CDMStage::Total];
+        const double subStageSum = (*this)[CDMStage::Sort] + (*this)[CDMStage::NeighborList]
+                                   + (*this)[CDMStage::RelativeTransform]
+                                   + (*this)[CDMStage::BVFilter] + (*this)[CDMStage::NarrowPhase]
+                                   + (*this)[CDMStage::Transform];
+        const double denom = total > 0.0 ? total : (subStageSum > 0.0 ? subStageSum : 1e-12);
+        const double other = (total > subStageSum) ? (total - subStageSum) : 0.0;
         auto         row   = [&](const char* label, double t) {
             std::cout << "  " << std::left << std::setw(28) << label << std::right << std::setw(10)
                       << std::fixed << std::setprecision(4) << t << " s   (" << std::setw(6)
@@ -236,6 +241,9 @@ public:
         row("BV Filter:", (*this)[CDMStage::BVFilter]);
         row("GJK Narrow Phase:", (*this)[CDMStage::NarrowPhase]);
         row("Contact Transform:", (*this)[CDMStage::Transform]);
+        row("Other:", other);
+        std::cout << std::string(80, '-') << '\n';
+        row("Total:", total > 0.0 ? total : subStageSum);
         std::cout << std::string(80, '=') << "\n";
     }
 };
@@ -302,10 +310,13 @@ public:
 
     void printSummary() const
     {
-        const double tot = (*this)[FMStage::FlagAndCompact] + (*this)[FMStage::ComputeForces]
-                           + (*this)[FMStage::ReduceTorces] + (*this)[FMStage::ExternalForces]
-                           + (*this)[FMStage::AssembleComposites];
-        const double denom = tot > 0.0 ? tot : 1e-12;
+        const double total = (*this)[FMStage::Total];
+        const double subStageSum
+            = (*this)[FMStage::FlagAndCompact] + (*this)[FMStage::ComputeForces]
+              + (*this)[FMStage::ReduceTorces] + (*this)[FMStage::ExternalForces]
+              + (*this)[FMStage::AssembleComposites];
+        const double denom = total > 0.0 ? total : (subStageSum > 0.0 ? subStageSum : 1e-12);
+        const double other = (total > subStageSum) ? (total - subStageSum) : 0.0;
         auto         row   = [&](const char* label, double t) {
             std::cout << "  " << std::left << std::setw(28) << label << std::right << std::setw(10)
                       << std::fixed << std::setprecision(4) << t << " s   (" << std::setw(6)
@@ -320,6 +331,9 @@ public:
         row("Reduce Torces:", (*this)[FMStage::ReduceTorces]);
         row("External Forces:", (*this)[FMStage::ExternalForces]);
         row("Assemble Composites:", (*this)[FMStage::AssembleComposites]);
+        row("Other:", other);
+        std::cout << std::string(80, '-') << '\n';
+        row("Total:", total > 0.0 ? total : subStageSum);
         std::cout << std::string(80, '=') << "\n";
     }
 };

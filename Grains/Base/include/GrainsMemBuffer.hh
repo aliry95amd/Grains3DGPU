@@ -12,6 +12,7 @@ enum class MemType
     DEVICE,
     MANAGED,
     PINNED,
+    MAPPED,
     UNKNOWN
 };
 
@@ -181,11 +182,14 @@ public:
 
     // ---------------------------------------------------------------------------------------------
     /** @brief Returns the pointer to the data on device (for zero-copy) */
-    /** @note This is only valid for pinned memory */
+    /** @note For PINNED memory, returns m_d_ptr if set, otherwise m_ptr.
+              For MAPPED memory, always returns the mapped device alias m_d_ptr. */
     T* getDeviceData()
     {
         if constexpr(M == MemType::PINNED)
             return m_d_ptr ? m_d_ptr : m_ptr;
+        else if constexpr(M == MemType::MAPPED)
+            return m_d_ptr;
         else
             return m_ptr;
     }
@@ -223,6 +227,8 @@ public:
             return MemType::MANAGED;
         else if constexpr(M == MemType::PINNED)
             return MemType::PINNED;
+        else if constexpr(M == MemType::MAPPED)
+            return MemType::MAPPED;
         else
             return MemType::UNKNOWN;
     }
@@ -231,8 +237,9 @@ public:
     /** @brief Returns iterator to the beginning of the buffer */
     T* begin()
     {
-        static_assert(M == MemType::HOST || M == MemType::PINNED || M == MemType::MANAGED,
-                      "begin() only available for HOST, PINNED, or MANAGED memory");
+        static_assert(M == MemType::HOST || M == MemType::PINNED || M == MemType::MAPPED
+                          || M == MemType::MANAGED,
+                      "begin() only available for HOST, PINNED, MAPPED, or MANAGED memory");
         return m_ptr;
     }
 
@@ -240,8 +247,9 @@ public:
     /** @brief Returns const iterator to the beginning of the buffer */
     const T* begin() const
     {
-        static_assert(M == MemType::HOST || M == MemType::PINNED || M == MemType::MANAGED,
-                      "begin() only available for HOST, PINNED, or MANAGED memory");
+        static_assert(M == MemType::HOST || M == MemType::PINNED || M == MemType::MAPPED
+                          || M == MemType::MANAGED,
+                      "begin() only available for HOST, PINNED, MAPPED, or MANAGED memory");
         return m_ptr;
     }
 
@@ -249,8 +257,9 @@ public:
     /** @brief Returns iterator to the end of the buffer */
     T* end()
     {
-        static_assert(M == MemType::HOST || M == MemType::PINNED || M == MemType::MANAGED,
-                      "end() only available for HOST, PINNED, or MANAGED memory");
+        static_assert(M == MemType::HOST || M == MemType::PINNED || M == MemType::MAPPED
+                          || M == MemType::MANAGED,
+                      "end() only available for HOST, PINNED, MAPPED, or MANAGED memory");
         return m_ptr + m_size;
     }
 
@@ -258,8 +267,9 @@ public:
     /** @brief Returns const iterator to the end of the buffer */
     const T* end() const
     {
-        static_assert(M == MemType::HOST || M == MemType::PINNED || M == MemType::MANAGED,
-                      "end() only available for HOST, PINNED, or MANAGED memory");
+        static_assert(M == MemType::HOST || M == MemType::PINNED || M == MemType::MAPPED
+                          || M == MemType::MANAGED,
+                      "end() only available for HOST, PINNED, MAPPED, or MANAGED memory");
         return m_ptr + m_size;
     }
     //@}
@@ -296,7 +306,7 @@ public:
         // Copy existing data (only logical size worth of bytes)
         if(m_ptr && m_size)
         {
-            if constexpr(M == MemType::HOST || M == MemType::PINNED)
+            if constexpr(M == MemType::HOST || M == MemType::PINNED || M == MemType::MAPPED)
             {
                 std::memcpy(new_buf.getData(), m_ptr, m_size * sizeof(T));
             }
@@ -357,6 +367,11 @@ public:
         {
             cudaErrCheck(cudaMallocHost(&m_ptr, sizeof(T) * new_capacity));
         }
+        else if constexpr(M == MemType::MAPPED)
+        {
+            cudaErrCheck(cudaHostAlloc(&m_ptr, sizeof(T) * new_capacity, cudaHostAllocMapped));
+            cudaErrCheck(cudaHostGetDevicePointer(&m_d_ptr, m_ptr, 0));
+        }
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -397,7 +412,8 @@ public:
         @param value value to push */
     void push_back(const T& value)
     {
-        if constexpr(M == MemType::HOST || M == MemType::PINNED || M == MemType::MANAGED)
+        if constexpr(M == MemType::HOST || M == MemType::PINNED || M == MemType::MAPPED
+                     || M == MemType::MANAGED)
         {
             // Grow capacity if needed (like std::vector)
             if(m_size >= m_capacity)
@@ -418,7 +434,8 @@ public:
         @param count number of elements to push */
     void push_bulk(const T* values, size_t count)
     {
-        if constexpr(M == MemType::HOST || M == MemType::PINNED || M == MemType::MANAGED)
+        if constexpr(M == MemType::HOST || M == MemType::PINNED || M == MemType::MAPPED
+                     || M == MemType::MANAGED)
         {
             // Grow capacity if needed
             if(m_size + count > m_capacity)
@@ -447,7 +464,7 @@ public:
         GrainsMemBuffer<T, M> new_buf{};
         new_buf.initialize(m_size, m_size);
 
-        if constexpr(M == MemType::HOST || M == MemType::PINNED)
+        if constexpr(M == MemType::HOST || M == MemType::PINNED || M == MemType::MAPPED)
             std::memcpy(new_buf.m_ptr, m_ptr, m_size * sizeof(T));
         else if constexpr(M == MemType::DEVICE || M == MemType::MANAGED)
         {
@@ -496,6 +513,20 @@ public:
         else if constexpr(Src == MemType::DEVICE && Dst == MemType::PINNED)
             return cudaMemcpyDeviceToHost;
         else if constexpr(Src == MemType::PINNED && Dst == MemType::PINNED)
+            return cudaMemcpyHostToHost;
+        else if constexpr(Src == MemType::MAPPED && Dst == MemType::HOST)
+            return cudaMemcpyHostToHost;
+        else if constexpr(Src == MemType::HOST && Dst == MemType::MAPPED)
+            return cudaMemcpyHostToHost;
+        else if constexpr(Src == MemType::MAPPED && Dst == MemType::DEVICE)
+            return cudaMemcpyHostToDevice;
+        else if constexpr(Src == MemType::DEVICE && Dst == MemType::MAPPED)
+            return cudaMemcpyDeviceToHost;
+        else if constexpr(Src == MemType::MAPPED && Dst == MemType::MAPPED)
+            return cudaMemcpyHostToHost;
+        else if constexpr(Src == MemType::PINNED && Dst == MemType::MAPPED)
+            return cudaMemcpyHostToHost;
+        else if constexpr(Src == MemType::MAPPED && Dst == MemType::PINNED)
             return cudaMemcpyHostToHost;
         else
             return cudaMemcpyDefault;
@@ -560,8 +591,9 @@ public:
         @param index index of the element to access */
     const T& at(size_t index) const
     {
-        static_assert(M == MemType::HOST || M == MemType::PINNED || M == MemType::MANAGED,
-                      "at() only available for HOST, PINNED, or MANAGED memory");
+        static_assert(M == MemType::HOST || M == MemType::PINNED || M == MemType::MAPPED
+                          || M == MemType::MANAGED,
+                      "at() only available for HOST, PINNED, MAPPED, or MANAGED memory");
         GAssert(index < m_size, "Index", index, "out of bounds for size", m_size);
         return m_ptr[index];
     }
@@ -583,6 +615,11 @@ public:
             else if constexpr(M == MemType::PINNED)
             {
                 cudaErrCheck(cudaFreeHost(m_ptr));
+            }
+            else if constexpr(M == MemType::MAPPED)
+            {
+                cudaErrCheck(cudaFreeHost(m_ptr));
+                // m_d_ptr is a device alias into the same physical allocation
             }
             else if constexpr(M == MemType::MANAGED)
             {
@@ -615,7 +652,7 @@ public:
         if(m_size == 0 || !m_ptr)
             return;
 
-        if constexpr(M == MemType::HOST || M == MemType::PINNED)
+        if constexpr(M == MemType::HOST || M == MemType::PINNED || M == MemType::MAPPED)
         {
             // Host memory: directly iterate and delete
             for(size_t i = 0; i < m_size; ++i)
@@ -650,7 +687,7 @@ public:
         @param stream CUDA stream for asynchronous operations (default: 0) */
     void fill(cudaStream_t stream = 0)
     {
-        if constexpr(M == MemType::HOST || M == MemType::PINNED)
+        if constexpr(M == MemType::HOST || M == MemType::PINNED || M == MemType::MAPPED)
         {
             for(size_t i = 0; i < m_size; ++i)
             {
@@ -670,7 +707,7 @@ public:
         @param stream CUDA stream for asynchronous operations (default: 0) */
     void fill(const T& value, cudaStream_t stream = 0)
     {
-        if constexpr(M == MemType::HOST || M == MemType::PINNED)
+        if constexpr(M == MemType::HOST || M == MemType::PINNED || M == MemType::MAPPED)
         {
             for(size_t i = 0; i < m_size; ++i)
                 m_ptr[i] = value;
@@ -709,7 +746,7 @@ public:
         @param stream CUDA stream for asynchronous operations (default: 0) */
     void sequence(const T& start = T(0), cudaStream_t stream = 0)
     {
-        if constexpr(M == MemType::HOST || M == MemType::PINNED)
+        if constexpr(M == MemType::HOST || M == MemType::PINNED || M == MemType::MAPPED)
         {
             for(size_t i = 0; i < m_size; ++i)
                 m_ptr[i] = static_cast<T>(start + i);
@@ -728,7 +765,7 @@ public:
         @param stream CUDA stream for asynchronous operations (default: 0) */
     void print(const std::string& label = "", cudaStream_t stream = 0) const
     {
-        if constexpr(M == MemType::HOST || M == MemType::PINNED)
+        if constexpr(M == MemType::HOST || M == MemType::PINNED || M == MemType::MAPPED)
         {
             if(!label.empty())
                 std::cout << label << ": " << "\n";
@@ -763,8 +800,9 @@ public:
     @param i index of the element */
     T& operator[](size_t i)
     {
-        static_assert(M == MemType::HOST || M == MemType::PINNED || M == MemType::MANAGED,
-                      "operator[] only available for HOST, PINNED, or MANAGED memory");
+        static_assert(M == MemType::HOST || M == MemType::PINNED || M == MemType::MAPPED
+                          || M == MemType::MANAGED,
+                      "operator[] only available for HOST, PINNED, MAPPED, or MANAGED memory");
         GAssert(i < m_size, "Index", i, "out of bounds for size", m_size);
         return m_ptr[i];
     }
@@ -774,8 +812,9 @@ public:
         @param i index of the element */
     const T& operator[](size_t i) const
     {
-        static_assert(M == MemType::HOST || M == MemType::PINNED || M == MemType::MANAGED,
-                      "operator[] only available for HOST, PINNED, or MANAGED memory");
+        static_assert(M == MemType::HOST || M == MemType::PINNED || M == MemType::MAPPED
+                          || M == MemType::MANAGED,
+                      "operator[] only available for HOST, PINNED, MAPPED, or MANAGED memory");
         GAssert(i < m_size, "Index", i, "out of bounds for size", m_size);
         return m_ptr[i];
     }

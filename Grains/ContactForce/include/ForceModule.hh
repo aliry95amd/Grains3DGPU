@@ -1,8 +1,6 @@
 #ifndef _FORCEMODULE_HH_
 #define _FORCEMODULE_HH_
 
-#include <memory>
-
 #include "BodyTag.hh"
 #include "ContactForceModel.hh"
 #include "ContactInfo.hh"
@@ -13,17 +11,6 @@
 #include "RigidBody.hh"
 #include "Torce.hh"
 #include "Vector3.hh"
-
-// =================================================================================================
-/** @brief Custom deleter for CUDA pinned host allocations (cudaMallocHost/cudaFreeHost). */
-struct CudaHostDeleter
-{
-    void operator()(void* p) const noexcept
-    {
-        if(p != nullptr)
-            cudaFreeHost(p);
-    }
-};
 
 // =================================================================================================
 /** @brief The class ForceModule.
@@ -43,17 +30,13 @@ class ForceModule
 private:
     /** @name Owned resources */
     //@{
-    /** \brief Active-pair flags: 1 if overlap < 0, 0 otherwise (DEVICE path only) */
-    GrainsMemBuffer<uint, M> m_activeFlags;
     /** \brief Compact array of active pair indices (DEVICE path only) */
     GrainsMemBuffer<uint, M> m_activeIndex;
-    /** \brief Device-side output count from CUB compaction (DEVICE path only) */
-    GrainsMemBuffer<uint, M> m_numActivePairs;
-    /** \brief CUB DeviceSelect::Flagged temporary storage (DEVICE path only) */
+    /** \brief CUB DeviceSelect::If temporary storage (DEVICE path only) */
     GrainsMemBuffer<uint8_t, M> m_cubSelectTempStorage;
-    /** \brief Pinned host buffer receiving the CUB compaction count for fast D->H transfer
-        (DEVICE path only) */
-    std::unique_ptr<uint, CudaHostDeleter> m_numActivePairsPinned;
+    /** \brief Zero-copy mapped pinned buffer holding the CUB compaction count.
+        Device writes via getDeviceData() (mapped alias); host reads via getData(). */
+    GrainsMemBuffer<uint, MemType::MAPPED> m_numActivePairsMapped;
     /** \brief Per-pair intermediate torce for particle A (lazy resize; DEVICE path only) */
     GrainsMemBuffer<Torce<T>, M> m_intermediateTorceA;
     /** \brief Per-pair intermediate torce for particle B (lazy resize; DEVICE path only) */

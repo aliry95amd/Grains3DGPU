@@ -130,6 +130,8 @@ void CollisionDetectionModule<T, M>::run(const RigidBody<T>* const*          rig
                                          GrainsMemBuffer<uint2, M>&          pairList,
                                          ComponentCounts&                    counts)
 {
+    auto& gt = GrainsParameters<T>::m_cdmTimer;
+    gt.start(CDMStage::Total);
     sortParticles(positions,
                   orientations,
                   velocities,
@@ -154,6 +156,7 @@ void CollisionDetectionModule<T, M>::run(const RigidBody<T>* const*          rig
                                          contactInfo,
                                          bodyTags,
                                          counts);
+    gt.stop(CDMStage::Total);
 }
 
 // -------------------------------------------------------------------------------------------------

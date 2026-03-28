@@ -174,6 +174,9 @@ public:
     static uint m_numContactPairs;
     /** \brief Is contact with memory activated? */
     static bool m_isContactWithMemory;
+    /** \brief Use compaction to work only on active pairs on GPU.
+        When false the force kernel runs over all pairs. */
+    static bool m_useCompaction;
 
     /* Temporal */
     /** @brief Initial simulation time */

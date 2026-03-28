@@ -24,69 +24,87 @@
 // =================================================================================================
 /** @name ForceModule GPU kernels */
 //@{
-/** @brief Flags pairs that are in contact (overlap distance < 0).
-    @param contactInfo array of contact information
-    @param flags       output flag array (1 = in contact, 0 = not in contact)
-    @param nPairs      total number of pairs */
-template <typename T>
-__GLOBAL__ void
-    flagActivePairs_Kernel(const ContactInfo<T>* contactInfo, uint* flags, const uint nPairs)
-{
-    uint tID = blockIdx.x * blockDim.x + threadIdx.x;
-    if(tID >= nPairs)
-        return;
-    flags[tID] = (contactInfo[tID].getSnapshot().overlapDistance < T(0)) ? 1u : 0u;
-}
+// TODO: Fuse flagActivePairs_Kernel + DeviceSelect::Flagged into a single DeviceSelect::If pass
+//       using an OverlapNegativeSelector predicate. The predicate approach compiles and links
+//       correctly but contacts are not detected (nActive always 0).  Root cause not yet
+//       identified — likely related to ContactInfo device function visibility inside CUB's
+//       internally-instantiated kernel. Revisit when upgrading CUDA/CUB version.
+// NOTE: getOverlapDistance() and getSnapshot() are now inlined in ContactInfo.hh so the full
+//       body is visible to CUB's template instantiation in this TU.
 
 // -------------------------------------------------------------------------------------------------
-/** @brief Queries the temporary storage size required by CUB DeviceSelect::Flagged.
-    @param nPairs       total number of pairs
-    @param activeIdxDev device array receiving compact indices (used only for type deduction)
-    @param numSelectedDev device pointer receiving the count of selected items
+/** @brief Predicate for CUB DeviceSelect::If that selects pairs whose overlap distance < 0.
+    The counting input iterator feeds pair indices; this predicate reads the correspondng
+    ContactInfo slot and returns true only for true contacts. */
+template <typename T>
+struct OverlapNegativeSelector
+{
+    const ContactInfo<T>*    contactInfo;
+    __host__ __device__ bool operator()(uint pairIdx) const
+    {
+        return contactInfo[pairIdx].getOverlapDistance() < T(0);
+    }
+};
+
+// -------------------------------------------------------------------------------------------------
+/** @brief Queries the temporary storage size required by CUB DeviceSelect::If.
+    @param nPairs         total number of pairs
+    @param activeIdxDev   device array receiving compact indices (type deduction only)
+    @param numSelectedDev device pointer receiving the count of selected items (type deduction only)
     @return required temporary storage size in bytes */
-INLINE size_t queryCubSelectTempStorageBytes(uint nPairs, uint* activeIdxDev, uint* numSelectedDev)
+template <typename T>
+INLINE size_t queryCubSelectIfTempStorageBytes(uint  nPairs,
+                                               uint* activeIdxDev,
+                                               uint* numSelectedDev)
 {
     cub::CountingInputIterator<uint> countIter(0u);
+    OverlapNegativeSelector<T>       selector{nullptr};  // nullptr safe for size query
     size_t                           bytes = 0;
-    cudaErrCheck(cub::DeviceSelect::Flagged(nullptr,
-                                            bytes,
-                                            countIter,
-                                            (const uint*)nullptr,
-                                            activeIdxDev,
-                                            numSelectedDev,
-                                            static_cast<int>(nPairs)));
+    cudaErrCheck(cub::DeviceSelect::If(nullptr,
+                                       bytes,
+                                       countIter,
+                                       activeIdxDev,
+                                       numSelectedDev,
+                                       static_cast<int>(nPairs),
+                                       selector));
     return bytes;
 }
 
 // -------------------------------------------------------------------------------------------------
-/** @brief Build a compact list of active pair indices using CUB DeviceSelect::Flagged.
-    @param flagsDev        device array of uint flags (0/1) of length nPairs
+/** @brief Build a compact list of active pair indices using CUB DeviceSelect::If.
+    One CUB pass: the counting iterator feeds indices 0..nPairs-1; the OverlapNegativeSelector
+    predicate reads contactInfo on the device and filters in-contact pairs directly.
+    @param contactInfoDev  device array of ContactInfo (length >= nPairs)
     @param nPairs          total number of pairs
     @param activeIdxDev    device array with capacity >= nPairs to receive active indices
-    @param numSelectedDev  device pointer to receive the count of selected pairs
+    @param mappedCountDev  mapped-pinned device alias (getDeviceData()) to receive the count;
+                           CUB writes here directly into pinned host memory — no cudaMemcpy needed
     @param tempStorage     preallocated CUB temporary storage
     @param tempStorageBytes size of tempStorage in bytes
-    @param pinnedCountHost pinned host pointer to receive the active pair count (avoids
-                           pageable staging on the device-to-host transfer)
+    @param mappedCountHost mapped-pinned host pointer (getData()) read after synchronize
     @return number of active pairs */
-INLINE uint buildCompactActiveIndex(const uint* flagsDev,
-                                    uint        nPairs,
-                                    uint*       activeIdxDev,
-                                    uint*       numSelectedDev,
-                                    void*       tempStorage,
-                                    size_t      tempStorageBytes,
-                                    uint*       pinnedCountHost)
+template <typename T>
+INLINE uint buildCompactActiveIndexIf(const ContactInfo<T>* contactInfoDev,
+                                      uint                  nPairs,
+                                      uint*                 activeIdxDev,
+                                      uint*                 mappedCountDev,
+                                      void*                 tempStorage,
+                                      size_t                tempStorageBytes,
+                                      const uint*           mappedCountHost)
 {
     cub::CountingInputIterator<uint> countIter(0u);
-    cudaErrCheck(cub::DeviceSelect::Flagged(tempStorage,
-                                            tempStorageBytes,
-                                            countIter,
-                                            flagsDev,
-                                            activeIdxDev,
-                                            numSelectedDev,
-                                            static_cast<int>(nPairs)));
-    cudaErrCheck(cudaMemcpy(pinnedCountHost, numSelectedDev, sizeof(uint), cudaMemcpyDeviceToHost));
-    return *pinnedCountHost;
+    OverlapNegativeSelector<T>       selector{contactInfoDev};
+    cudaErrCheck(cub::DeviceSelect::If(tempStorage,
+                                       tempStorageBytes,
+                                       countIter,
+                                       activeIdxDev,
+                                       mappedCountDev,
+                                       static_cast<int>(nPairs),
+                                       selector));
+    // CUB wrote the count directly into pinned mapped memory via the device alias;
+    // synchronize so the host-side read below sees the completed value.
+    cudaErrCheck(cudaDeviceSynchronize());
+    return *mappedCountHost;
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -153,6 +171,73 @@ __GLOBAL__ void reduceTorces_Kernel(const uint2*    pairList,
 
     const uint i = activeIdx[tID];
     reduceTorces_common(pairList, intermediateTorceA, intermediateTorceB, torce, i);
+}
+
+// -------------------------------------------------------------------------------------------------
+/** @brief Computes contact forces for ALL pairs without prior compaction.
+    Each thread resets its intermediate torce slot unconditionally, then computes forces only if
+    the pair is actually in contact (checked inside computeContactForces_common).
+    @param CF contact force models
+    @param pairList list of rigid bodies pairs
+    @param contactInfo contact information
+    @param position position of the components
+    @param velocity kinematics of the components
+    @param intermediateTorceA intermediate torce storage for particle A (indexed by pair ID)
+    @param intermediateTorceB intermediate torce storage for particle B (indexed by pair ID)
+    @param contactMemory view of contact memory (hash table + history data)
+    @param nPairs total number of pairs */
+template <typename T>
+__GLOBAL__ void computeContactForces_AllPairs_Kernel(const ContactForceModel<T>* const* CF,
+                                                     const uint2*                       pairList,
+                                                     const ContactInfo<T>*              contactInfo,
+                                                     const Vector3<T>*                  position,
+                                                     const Kinematics<T>*               velocity,
+                                                     Torce<T>*            intermediateTorceA,
+                                                     Torce<T>*            intermediateTorceB,
+                                                     ContactMemoryView<T> contactMemory,
+                                                     const uint           nPairs)
+{
+    uint tID = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if(tID >= nPairs)
+        return;
+
+    // Always zero the intermediate slots so the reduce step can safely add all pairs.
+    intermediateTorceA[tID].reset();
+    intermediateTorceB[tID].reset();
+
+    computeContactForces_common(CF,
+                                pairList,
+                                contactInfo,
+                                position,
+                                velocity,
+                                intermediateTorceA,
+                                intermediateTorceB,
+                                contactMemory,
+                                tID);
+}
+
+// -------------------------------------------------------------------------------------------------
+/** @brief Reduces per-pair intermediate torces to per-particle torces (no-compaction variant).
+    Operates over ALL pairs without an activeIdx indirection.
+    @param pairList list of rigid bodies pairs
+    @param intermediateTorceA intermediate torce storage for particle A in each pair
+    @param intermediateTorceB intermediate torce storage for particle B in each pair
+    @param torce final per-particle torce array (accumulated atomically)
+    @param nPairs total number of pairs */
+template <typename T>
+__GLOBAL__ void reduceTorces_AllPairs_Kernel(const uint2*    pairList,
+                                             const Torce<T>* intermediateTorceA,
+                                             const Torce<T>* intermediateTorceB,
+                                             Torce<T>*       torce,
+                                             const uint      nPairs)
+{
+    uint tID = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if(tID >= nPairs)
+        return;
+
+    reduceTorces_common(pairList, intermediateTorceA, intermediateTorceB, torce, tID);
 }
 
 // -------------------------------------------------------------------------------------------------

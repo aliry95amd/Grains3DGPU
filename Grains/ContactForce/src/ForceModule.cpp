@@ -14,17 +14,13 @@ ForceModule<T, M>::ForceModule(size_t pairCapacity, bool isContactWithMemory)
     {
         // Compaction buffers sized to pair capacity
         m_activeIndex.initialize(pairCapacity);
-        m_activeFlags.initialize(pairCapacity);
-        m_numActivePairs.initialize(1);
-        const size_t cubBytes = queryCubSelectTempStorageBytes(static_cast<uint>(pairCapacity),
-                                                               m_activeIndex.getData(),
-                                                               m_numActivePairs.getData());
+        m_numActivePairsMapped.initialize(1);
+        *m_numActivePairsMapped.getData() = 0u;
+        const size_t cubBytes
+            = queryCubSelectIfTempStorageBytes<T>(static_cast<uint>(pairCapacity),
+                                                  m_activeIndex.getData(),
+                                                  m_numActivePairsMapped.getDeviceData());
         m_cubSelectTempStorage.initialize(cubBytes);
-        // Pinned host buffer for fast device-to-host count transfer
-        uint* pinnedPtr = nullptr;
-        cudaErrCheck(cudaMallocHost(reinterpret_cast<void**>(&pinnedPtr), sizeof(uint)));
-        *pinnedPtr = 0u;
-        m_numActivePairsPinned.reset(pinnedPtr);
     }
 
     if(isContactWithMemory)
@@ -42,10 +38,10 @@ void ForceModule<T, M>::resizeBuffers(size_t newPairCapacity)
     if constexpr(M == MemType::DEVICE)
     {
         m_activeIndex.resize(newPairCapacity);
-        m_activeFlags.resize(newPairCapacity);
-        const size_t cubBytes = queryCubSelectTempStorageBytes(static_cast<uint>(newPairCapacity),
-                                                               m_activeIndex.getData(),
-                                                               m_numActivePairs.getData());
+        const size_t cubBytes
+            = queryCubSelectIfTempStorageBytes<T>(static_cast<uint>(newPairCapacity),
+                                                  m_activeIndex.getData(),
+                                                  m_numActivePairsMapped.getDeviceData());
         m_cubSelectTempStorage.resize(cubBytes);
     }
 }
@@ -124,6 +120,8 @@ void ForceModule<T, M>::run(const GrainsMemBuffer<ContactForceModel<T>*, M>& CF,
     const uint numObstacles = counts.numObstacles;
     const uint numParticles = counts.numParticles;
     auto&      gt           = GrainsParameters<T>::m_fmTimer;
+    gt.start(FMStage::Total);
+
     // 1. Periodic cleanup of contact hash table
     cleanupContactTable();
 
@@ -162,54 +160,88 @@ void ForceModule<T, M>::run(const GrainsMemBuffer<ContactForceModel<T>*, M>& CF,
 
         uint numThreads, numBlocks;
 
-        // 2. Flag active pairs (overlap < 0)
-        gt.start(FMStage::FlagAndCompact);
-        computeOptimalThreadsAndBlocks(numPairs, GP::m_GPU, numBlocks, numThreads);
-        flagActivePairs_Kernel<<<numBlocks, numThreads>>>(contactInfo.getData(),
-                                                          m_activeFlags.getData(),
-                                                          numPairs);
-
-        // 3. Compact active pair indices using CUB DeviceSelect::Flagged
-        const uint nActive = buildCompactActiveIndex(m_activeFlags.getData(),
-                                                     numPairs,
-                                                     m_activeIndex.getData(),
-                                                     m_numActivePairs.getData(),
-                                                     m_cubSelectTempStorage.getData(),
-                                                     m_cubSelectTempStorage.getSize(),
-                                                     m_numActivePairsPinned.get());
-        gt.stop(FMStage::FlagAndCompact);
-
-        if(nActive > 0)
+        if(GP::m_useCompaction)
         {
-            // 4. Lazily resize per-pair intermediate buffers (indexed by original pair ID)
-            m_intermediateTorceA.resize(numPairs);
-            m_intermediateTorceB.resize(numPairs);
-
-            // 5. Compute contact forces for active pairs only
-            computeOptimalThreadsAndBlocks(nActive, GP::m_GPU, numBlocks, numThreads);
-            ContactMemoryView<T> contactMemory = m_contactTable.getView();
-            gt.start(FMStage::ComputeForces);
-            computeContactForces_Kernel<<<numBlocks, numThreads>>>(CF.getData(),
-                                                                   pairList.getData(),
-                                                                   contactInfo.getData(),
-                                                                   m_activeIndex.getData(),
-                                                                   position.getData(),
-                                                                   velocity.getData(),
-                                                                   m_intermediateTorceA.getData(),
-                                                                   m_intermediateTorceB.getData(),
-                                                                   contactMemory,
-                                                                   nActive);
-            gt.stop(FMStage::ComputeForces);
-
-            // 6. Reduce per-pair forces to per-particle torces using atomics
-            gt.start(FMStage::ReduceTorces);
-            reduceTorces_Kernel<<<numBlocks, numThreads>>>(pairList.getData(),
+            // 2. Compact active pair indices using CUB DeviceSelect::If
+            //    The OverlapNegativeSelector predicate filters pairs in a single CUB pass;
+            //    no separate flag kernel is needed.
+            gt.start(FMStage::FlagAndCompact);
+            const uint nActive = buildCompactActiveIndexIf(contactInfo.getData(),
+                                                           numPairs,
                                                            m_activeIndex.getData(),
-                                                           m_intermediateTorceA.getData(),
-                                                           m_intermediateTorceB.getData(),
-                                                           torce.getData(),
-                                                           nActive);
-            gt.stop(FMStage::ReduceTorces);
+                                                           m_numActivePairsMapped.getDeviceData(),
+                                                           m_cubSelectTempStorage.getData(),
+                                                           m_cubSelectTempStorage.getSize(),
+                                                           m_numActivePairsMapped.getData());
+            gt.stop(FMStage::FlagAndCompact);
+
+            if(nActive > 0)
+            {
+                // 4. Lazily resize per-pair intermediate buffers (indexed by original pair ID)
+                m_intermediateTorceA.resize(numPairs);
+                m_intermediateTorceB.resize(numPairs);
+
+                // 5. Compute contact forces for active pairs only
+                computeOptimalThreadsAndBlocks(nActive, GP::m_GPU, numBlocks, numThreads);
+                ContactMemoryView<T> contactMemory = m_contactTable.getView();
+                gt.start(FMStage::ComputeForces);
+                computeContactForces_Kernel<<<numBlocks, numThreads>>>(
+                    CF.getData(),
+                    pairList.getData(),
+                    contactInfo.getData(),
+                    m_activeIndex.getData(),
+                    position.getData(),
+                    velocity.getData(),
+                    m_intermediateTorceA.getData(),
+                    m_intermediateTorceB.getData(),
+                    contactMemory,
+                    nActive);
+                gt.stop(FMStage::ComputeForces);
+
+                // 6. Reduce per-pair forces to per-particle torces using atomics
+                gt.start(FMStage::ReduceTorces);
+                reduceTorces_Kernel<<<numBlocks, numThreads>>>(pairList.getData(),
+                                                               m_activeIndex.getData(),
+                                                               m_intermediateTorceA.getData(),
+                                                               m_intermediateTorceB.getData(),
+                                                               torce.getData(),
+                                                               nActive);
+                gt.stop(FMStage::ReduceTorces);
+            }
+        }
+        else
+        {
+            // No-compaction path: run force kernel over all pairs, let it check contacts internally
+            if(numPairs > 0)
+            {
+                m_intermediateTorceA.resize(numPairs);
+                m_intermediateTorceB.resize(numPairs);
+
+                computeOptimalThreadsAndBlocks(numPairs, GP::m_GPU, numBlocks, numThreads);
+                ContactMemoryView<T> contactMemory = m_contactTable.getView();
+
+                gt.start(FMStage::ComputeForces);
+                computeContactForces_AllPairs_Kernel<<<numBlocks, numThreads>>>(
+                    CF.getData(),
+                    pairList.getData(),
+                    contactInfo.getData(),
+                    position.getData(),
+                    velocity.getData(),
+                    m_intermediateTorceA.getData(),
+                    m_intermediateTorceB.getData(),
+                    contactMemory,
+                    numPairs);
+                gt.stop(FMStage::ComputeForces);
+
+                gt.start(FMStage::ReduceTorces);
+                reduceTorces_AllPairs_Kernel<<<numBlocks, numThreads>>>(
+                    pairList.getData(),
+                    m_intermediateTorceA.getData(),
+                    m_intermediateTorceB.getData(),
+                    torce.getData(),
+                    numPairs);
+                gt.stop(FMStage::ReduceTorces);
+            }
         }
 
         // 7. Add external forces (gravity) to moving particles
@@ -225,10 +257,14 @@ void ForceModule<T, M>::run(const GrainsMemBuffer<ContactForceModel<T>*, M>& CF,
         gt.stop(FMStage::ExternalForces);
     }
 
-    // 8. Accumulate sub-body torces into composite masters (no-op when no composites)
-    gt.start(FMStage::AssembleComposites);
-    assembleCompositeTorces(torce, position, bodyTag, masterSlot, counts);
-    gt.stop(FMStage::AssembleComposites);
+    // 8. Accumulate sub-body torces into composite masters only when needed.
+    if(counts.numSubBodies > 0)
+    {
+        gt.start(FMStage::AssembleComposites);
+        assembleCompositeTorces(torce, position, bodyTag, masterSlot, counts);
+        gt.stop(FMStage::AssembleComposites);
+    }
+    gt.stop(FMStage::Total);
 }
 
 // -------------------------------------------------------------------------------------------------

@@ -427,6 +427,11 @@ void Grains<T>::Construction(DOMElement* rootElement)
         GoutWI(6, "Reading contact force models completed!");
         if(ReaderXML::getNodeAttr_String(contacts, "EnableTimings") == "true")
             GP::m_fmTimer.enable(GP::m_isGPU);
+        if(ReaderXML::getNodeAttr_String(contacts, "Compaction") == "false")
+        {
+            GP::m_useCompaction = false;
+            GoutWI(9, "Compaction disabled!");
+        }
     }
 }
 
