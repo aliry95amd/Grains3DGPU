@@ -83,6 +83,14 @@ public:
     __HOSTDEVICE__
     virtual Vector3<T> support(const Vector3<T>& v) const = 0;
 
+    /** @brief Eroded convex support function, returns the support point of the
+        shape shrunk inward by crust along v: support(v) - crust/norm(v) * v
+        @param v direction vector
+        @param crust erosion thickness
+        @param invNorm precomputed 1/norm(v) to avoid redundant sqrt */
+    __HOSTDEVICE__
+    Vector3<T> support(const Vector3<T>& v, T crust, T invNorm) const;
+
     /** @brief Returns whether point p lies in the convex shape
         @param p point */
     __HOSTDEVICE__

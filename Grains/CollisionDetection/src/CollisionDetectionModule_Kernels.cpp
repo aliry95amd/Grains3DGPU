@@ -80,6 +80,61 @@ __GLOBAL__ void filterPairsBV_Kernel(const RigidBody<T>* const* rigidBodies,
 }
 
 // -------------------------------------------------------------------------------------------------
+// BV pre-filter using world-frame positions/quaternions; computes relative transforms per-pair
+// on-the-fly to avoid a separate computeRelativeTransformations_Kernel pre-pass.
+template <typename T, BoundingVolumeType BVType>
+__GLOBAL__ void filterPairsBV_Global_Kernel(const RigidBody<T>* const* rigidBodies,
+                                            const uint2*               pairList,
+                                            const uint*                bodyTags,
+                                            uint                       numComposites,
+                                            const Vector3<T>*          positions,
+                                            const Quaternion<T>*       quaternions,
+                                            ContactInfo<T>*            contactInfo,
+                                            uint8_t*                   bvPassFlags,
+                                            const uint                 nPairs)
+{
+    uint tID = blockIdx.x * blockDim.x + threadIdx.x;
+    if(tID >= nPairs)
+        return;
+
+    const uint2 pair = pairList[tID];
+
+    // Reject intra-composite pairs (same composite, different sub-bodies)
+    if(numComposites > 0)
+    {
+        const uint tagA = bodyTags[pair.x];
+        const uint tagB = bodyTags[pair.y];
+        if(isSubBody(tagA) && isSubBody(tagB) && getCompositeIdx(tagA) == getCompositeIdx(tagB))
+        {
+            bvPassFlags[tID] = 0;
+            contactInfo[tID].setOverlapDistance(T(1));
+            return;
+        }
+    }
+
+    if constexpr(BVType == BoundingVolumeType::OFF)
+    {
+        bvPassFlags[tID] = 1;
+    }
+    else
+    {
+        const RigidBody<T>& rbA   = *(rigidBodies[pair.x]);
+        const RigidBody<T>& rbB   = *(rigidBodies[pair.y]);
+        const Vector3<T>    v_b2a = quaternions[pair.x] << (positions[pair.y] - positions[pair.x]);
+        const Quaternion<T> q_b2a = inverse(quaternions[pair.x]) * quaternions[pair.y];
+        if(filterPairBV_common<T, BVType>(rbA, rbB, v_b2a, q_b2a))
+        {
+            bvPassFlags[tID] = 1;
+        }
+        else
+        {
+            bvPassFlags[tID] = 0;
+            contactInfo[tID].setOverlapDistance(T(1));
+        }
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
 // Narrow-phase GJK detection (relative vec/quat).
 // When activePairIndices is non-null each thread resolves its pair index through the indirection
 // table (BV-compacted path). When null the thread ID is used directly (BV-off path, all pairs).
@@ -250,6 +305,24 @@ X(double, GJKType::SIGNEDVOLUME, true, BoundingVolumeType::OBC)
                                                          ContactInfo<T>*,            \
                                                          uint8_t*,                   \
                                                          const uint);
+X(float, BoundingVolumeType::OBB)
+X(double, BoundingVolumeType::OBB)
+X(float, BoundingVolumeType::OBC)
+X(double, BoundingVolumeType::OBC)
+X(float, BoundingVolumeType::OFF)
+X(double, BoundingVolumeType::OFF)
+#undef X
+
+#define X(T, BV)                                                                            \
+    template __GLOBAL__ void filterPairsBV_Global_Kernel<T, BV>(const RigidBody<T>* const*, \
+                                                                const uint2*,               \
+                                                                const uint*,                \
+                                                                uint,                       \
+                                                                const Vector3<T>*,          \
+                                                                const Quaternion<T>*,       \
+                                                                ContactInfo<T>*,            \
+                                                                uint8_t*,                   \
+                                                                const uint);
 X(float, BoundingVolumeType::OBB)
 X(double, BoundingVolumeType::OBB)
 X(float, BoundingVolumeType::OBC)

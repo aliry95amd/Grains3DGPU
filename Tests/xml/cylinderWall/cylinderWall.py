@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 
 # Use non-interactive backend
 matplotlib.use("Agg")
-plt.rcParams.update({"text.usetex": True, "font.family": "Helvetica"})
+plt.rcParams.update({"text.usetex": True, "font.family": "Helvetica", "font.size": 16})
 
 
 def readResults(thetaArray, results_root):
@@ -109,7 +109,7 @@ def main():
 
     fig = plt.figure(figsize=(5, 5))
     ax1 = fig.add_subplot(111)
-    ax1.plot(theta / math.pi * 180, analResults, linewidth=1, linestyle="--", c="k", zorder=1, label="Analytical solution")
+    ax1.plot(theta / math.pi * 180, analResults, linewidth=1, linestyle="--", c="k", zorder=1, label="Analytical")
     ax1.plot(
         thetaArray,
         simResults.flatten(),
@@ -118,17 +118,19 @@ def main():
         marker="o",
         markerfacecolor="tab:blue",
         zorder=2,
-        label="Numerical solution",
+        label="Numerical",
     )
-    ax1.set_xlabel(r"$\theta$, Impact angle [deg]")
-    ax1.set_ylabel(r"$V^+_z/V^-_z$, Dimensionless rebound speed [-]")
+    ax1.set_xlabel(r"Impact angle, $\theta$ [deg]")
+    ax1.set_ylabel(r"Dimensionless rebound speed, $V^+_z/V^-_z$ [-]")
     ax1.set_xlim(-5, 95)
     ax1.set_xticks(np.arange(0, 91, step=10))
     ax1.set_ylim(-0.9, 0.9)
     ax1.set_box_aspect(1)
     handles, labels = ax1.get_legend_handles_labels()
     ax1.legend(handles[1:] + [handles[0]], labels[1:] + [labels[0]])
-    ax1.grid(color="lightgrey", linestyle="--", linewidth=0.5)
+    # Place grid lines beneath plot elements
+    ax1.set_axisbelow(True)
+    ax1.grid(color="lightgrey", linestyle="--", linewidth=0.5, zorder=0)
 
     out_dir = os.path.join(plots_root)
     os.makedirs(out_dir, exist_ok=True)

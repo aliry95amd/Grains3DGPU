@@ -79,8 +79,11 @@ protected:
     /** \brief Number of cells in the grid */
     uint m_numCells = 0;
     /** \brief Flag to indicate if adaptive skin is used */
-    bool m_useAdaptiveSkin = false;
-    //@}
+    bool m_useAdaptiveSkin
+        = false; /** rief Dedicated CUDA stream for asynchronous displacement reduction */
+    cudaStream_t m_reduceStream = nullptr;
+    /** rief Whether a valid async displacement result is available */
+    bool m_hasAsyncResult = false;  //@}
 
 public:
     /** @name Helper functors for CUB operations */
@@ -195,6 +198,7 @@ public:
                                                    cub::Max(),
                                                    T(0)));
             cudaErrCheck(cudaMalloc(&m_cubReduceTempStorage, m_cubReduceTempStorageBytes));
+            cudaErrCheck(cudaStreamCreate(&m_reduceStream));
         }
     }
 
@@ -205,13 +209,18 @@ public:
         // Clean up the Cells objects using GrainsMemBuffer helper method
         // m_cells.freePointedObjects();
 
-        // Free CUB workspace
+        // Free CUB workspace and reduce stream
         if constexpr(M == MemType::DEVICE)
         {
             if(m_cubReduceTempStorage != nullptr)
             {
                 cudaFree(m_cubReduceTempStorage);
                 m_cubReduceTempStorage = nullptr;
+            }
+            if(m_reduceStream != nullptr)
+            {
+                cudaStreamDestroy(m_reduceStream);
+                m_reduceStream = nullptr;
             }
         }
 
@@ -350,15 +359,26 @@ public:
         if(!m_useAdaptiveSkin)
             return true;  // Always update in non-adaptive mode
 
+        // Increment before any early return so computeSkinThickness() never divides by zero
+        ++m_numIterationsSinceLastUpdate;
+
         if(SS.particlesSorted)
             return true;  // Always update if particles were sorted
 
-        // Adaptive skin: check if update is needed
-        ++m_numIterationsSinceLastUpdate;
-        T maxDispSq = computeMaxDisplacement();
-
-        // Check if update is needed: d_max > skinThickness / 2
-        return (T(4) * maxDispSq > m_skinThickness * m_skinThickness);
+        if constexpr(M == MemType::HOST)
+        {
+            T maxDispSq = computeMaxDisplacement();
+            return (T(4) * maxDispSq > m_skinThickness * m_skinThickness);
+        }
+        else
+        {
+            // 1-lag async: reduce was launched at end of prior updateLinkedCells(); sync only
+            // the reduce stream (near-zero cost if physics integration has run since launch)
+            if(!m_hasAsyncResult)
+                return true;  // Conservative on first iteration: no result available yet
+            cudaStreamSynchronize(m_reduceStream);
+            return (T(4) * m_maxDisplacementSquared[0] > m_skinThickness * m_skinThickness);
+        }
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -382,7 +402,7 @@ public:
             generateNeighborCells_Device<<<numBlocks, numThreads>>>(m_cells.getData(),
                                                                     m_numCells,
                                                                     m_neighborCells.getData());
-            cudaDeviceSynchronize();
+            cudaErrCheck(cudaDeviceSynchronize());
         }
     }
 
@@ -435,12 +455,12 @@ public:
                 int  minZ      = std::max((int)minCell.z - 1, 0);
                 int  maxZ      = std::min((int)maxCell.z + 1, (int)numCells.z - 1);
 
-                // Nested loops with 1-ring expansion
-                for(int x = minX; x <= maxX; ++x)
+                // Nested loops with 1-ring expansion; guard against overflow
+                for(int x = minX; x <= maxX && cellCount < m_maxCellsPerObstacle; ++x)
                 {
-                    for(int y = minY; y <= maxY; ++y)
+                    for(int y = minY; y <= maxY && cellCount < m_maxCellsPerObstacle; ++y)
                     {
-                        for(int z = minZ; z <= maxZ; ++z)
+                        for(int z = minZ; z <= maxZ && cellCount < m_maxCellsPerObstacle; ++z)
                         {
                             uint cellHash = m_cells[0]->computeCellHash(
                                 make_uint3((uint)x, (uint)y, (uint)z));
@@ -468,8 +488,13 @@ public:
                                                                m_maxCellsPerObstacle,
                                                                m_obstacleID.getData(),
                                                                m_obstacleCellID.getData());
-            cudaDeviceSynchronize();
+            cudaErrCheck(cudaDeviceSynchronize());
         }
+
+        // Obstacles are now in sync; reset flag so we don't relink every iteration for
+        // static obstacles. Obstacle time integration must set this back to true when
+        // obstacles actually move.
+        GrainsParameters<T>::m_simulationState.obstaclesMoved = false;
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -511,12 +536,44 @@ public:
 
     // ---------------------------------------------------------------------------------------------
     /** @brief Computes the skin thickness based on the maximum displacement. */
+    // ---------------------------------------------------------------------------------------------
+    /** @brief Launches the displacement reduce asynchronously on the dedicated reduce stream.
+        Called at the end of each updateLinkedCells() so the result is ready for the next
+        iteration's needsUpdate() check with near-zero synchronization cost. */
+    void launchDisplacementReduceAsync()
+    {
+        if constexpr(M == MemType::DEVICE)
+        {
+            using CountingIt = cub::CountingInputIterator<int>;
+            using InputIt    = cub::TransformInputIterator<T, DiffNorm2, CountingIt>;
+            DiffNorm2  op{m_oldPosition.getData(), m_positions->getData()};
+            CountingIt count_it(0);
+            InputIt    input_it(count_it, op);
+            cub::DeviceReduce::Reduce(m_cubReduceTempStorage,
+                                      m_cubReduceTempStorageBytes,
+                                      input_it,
+                                      m_maxDisplacementSquared.getData(),
+                                      m_positions->getSize(),
+                                      cub::Max(),
+                                      T(0),
+                                      m_reduceStream);
+            m_hasAsyncResult = true;
+        }
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    /** @brief Computes the skin thickness based on the maximum displacement. */
     T computeSkinThickness() const
     {
         // Smoothing factor
         constexpr T mu = T(0.4);
         // Max Cap the skin thickness at 20% of the cell size
         constexpr T maxSkinThickness = T(0.2);
+
+        // Guard: if called before any iteration has elapsed (e.g. sort fires on iteration 0),
+        // keep the current skin to avoid division by zero producing NaN.
+        if(m_numIterationsSinceLastUpdate == 0)
+            return m_skinThickness;
 
         const T newThickness = T(2) * sqrt(m_maxDisplacementSquared[0]) * m_updateFrequency
                                / m_numIterationsSinceLastUpdate;

@@ -236,7 +236,16 @@ public:
         const Cells<T>* cells              = this->getLinkedCell()[0];
         const uint      candidateCellID    = cells->computeCellHash(candidate);
 
-        // Collect obstacles that might interact with this candidate position
+        // Build the 27-cell neighborhood of the candidate once (used for both obstacles and
+        // particles so that the search radius is symmetric in both cases)
+        const uint* allNeighbors  = this->getCellNeighborsList();
+        const uint* neighborCells = &allNeighbors[NUM_NEIGHBOR_CELLS * candidateCellID];
+
+        // Collect obstacles: check the candidate's own cell AND all 27 neighboring cells
+        // against each obstacle's registered cell list.  The particle-particle search below
+        // uses the same 27-cell radius, so the two searches are now symmetric — without this
+        // a candidate sitting in a cell adjacent to an obstacle boundary would miss the
+        // obstacle entirely and get inserted overlapping it.
         const uint2* obstacleIDs         = this->getObstacleIDs();
         const uint*  obstacleCellIDs     = this->getObstacleCellIDs();
         const uint   maxCellsPerObstacle = this->getMaxCellsPerObstacle();
@@ -247,15 +256,31 @@ public:
             const uint numCellsToTraverse = obstacleIDs[i].y;
             const uint offset             = i * maxCellsPerObstacle;
 
-            // Check if candidate cell intersects with any of obstacle's cells
-            for(uint c = 0; c < numCellsToTraverse; ++c)
+            bool found = false;
+
+            // Check candidate's own cell
+            for(uint c = 0; c < numCellsToTraverse && !found; ++c)
             {
-                const uint obstacleCell = obstacleCellIDs[offset + c];
-                if(obstacleCell == candidateCellID)
+                if(obstacleCellIDs[offset + c] == candidateCellID)
                 {
                     out.push_back(obstacleIndex);
-                    break;  // Found intersection, no need to check other cells
-                            // for this obstacle
+                    found = true;
+                }
+            }
+
+            // Check all 27 neighboring cells of the candidate
+            for(uint n = 0; n < NUM_NEIGHBOR_CELLS && !found; ++n)
+            {
+                const uint nc = neighborCells[n];
+                if(nc == UINT_MAX || nc == candidateCellID)
+                    continue;
+                for(uint c = 0; c < numCellsToTraverse && !found; ++c)
+                {
+                    if(obstacleCellIDs[offset + c] == nc)
+                    {
+                        out.push_back(obstacleIndex);
+                        found = true;
+                    }
                 }
             }
         }
@@ -270,8 +295,6 @@ public:
         }
 
         // Neighbor cells for particles
-        const uint* allNeighbors  = this->getCellNeighborsList();
-        const uint* neighborCells = &allNeighbors[NUM_NEIGHBOR_CELLS * candidateCellID];
         for(uint n = 0; n < NUM_NEIGHBOR_CELLS; ++n)
         {
             const uint c = neighborCells[n];

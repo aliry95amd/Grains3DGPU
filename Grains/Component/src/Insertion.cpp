@@ -1,6 +1,7 @@
 #include <cstdlib>
 #include <ctime>
 
+#include "BodyTag.hh"
 #include "GJK.hh"
 #include "GrainsMemBuffer.hh"
 #include "GrainsUtils.hh"
@@ -344,7 +345,10 @@ __HOST__ void Insertion<T>::insert(const GrainsMemBuffer<RigidBody<T>*>* rigidBo
                                    GrainsMemBuffer<Kinematics<T>>&       kinematics,
                                    const LinkedCellParameters<T>&        LCParameters,
                                    const uint                            numObstacles,
-                                   const uint                            numParticles)
+                                   const uint                            numParticles,
+                                   const GrainsMemBuffer<uint>&          bodyTag,
+                                   const GrainsMemBuffer<Vector3<T>>&    localPos,
+                                   const GrainsMemBuffer<Quaternion<T>>& localQuat)
 {
     GoutWI(3, "Inserting", numParticles, "particles ...");
 
@@ -353,7 +357,13 @@ __HOST__ void Insertion<T>::insert(const GrainsMemBuffer<RigidBody<T>*>* rigidBo
         for(uint i = 0; i < numParticles; ++i)
         {
             const uint insertID = i + numObstacles;
-            position[insertID]  = fetchInsertionData(m_positionType, m_positionInsertionInfo);
+
+            // Slave sub-bodies are positioned by updateSubBodyPositions() after the master is
+            // placed — skip them here to avoid consuming insertion data for non-master slots
+            if(isSubBody(bodyTag[insertID]) && getSubBodyLocalIdx(bodyTag[insertID]) > 0u)
+                continue;
+
+            position[insertID] = fetchInsertionData(m_positionType, m_positionInsertionInfo);
 
             // Orientation angles. These are not matrices, so we have to
             // compute the quaternions later.
@@ -380,33 +390,80 @@ __HOST__ void Insertion<T>::insert(const GrainsMemBuffer<RigidBody<T>*>* rigidBo
                               numObstacles,
                               numParticles);
 
-        // Overlap test lambda function
-        auto canInsert = [&](const uint           insertID,
-                             const Vector3<T>&    insertPosition,
-                             const Quaternion<T>& insertQuaternion) {
-            const Convex<T>& convexNew = *(*rigidBody)[insertID]->getConvex();
-
-            // Check against already-inserted components via LC
+        // Helper: test one body against all already-placed particles via the LC.
+        // Returns true if the body overlaps any existing particle.
+        auto overlapsLC = [&](const uint           bodyID,
+                              const Convex<T>&     convexTest,
+                              const T              crustTest,
+                              const Vector3<T>&    worldPos,
+                              const Quaternion<T>& worldQuat) -> bool {
             std::vector<uint> neighborList;
-            LC.collectPotentialNeighbors(insertPosition, insertID, neighborList);
+            LC.collectPotentialNeighbors(worldPos, bodyID, neighborList);
             for(uint j : neighborList)
             {
-                const Convex<T>& convexJ = *(*rigidBody)[j]->getConvex();
+                const RigidBody<T>* rbJ     = (*rigidBody)[j];
+                const Convex<T>&    convexJ = *rbJ->getConvex();
                 bool BVintersect = intersectOrientedBoundingBox(convexJ.computeBoundingBox(),
-                                                                convexNew.computeBoundingBox(),
+                                                                convexTest.computeBoundingBox(),
                                                                 position[j],
-                                                                insertPosition,
+                                                                worldPos,
                                                                 orientation[j],
-                                                                insertQuaternion);
-                // if(BVintersect
-                //    && intersectGJK<T>(convexJ,
-                //                       convexNew,
-                //                       position[j],
-                //                       insertPosition,
-                //                       orientation[j],
-                //                       insertQuaternion))
+                                                                worldQuat);
                 if(BVintersect)
-                    return false;
+                {
+                    Vector3<T> pa, pb;
+                    uint       nbIter = 0;
+                    const T    crustJ = rbJ->getCrustThickness();
+                    const T    gap    = computeClosestPoints_GJK<T, GJKType::JOHNSON>(convexJ,
+                                                                                convexTest,
+                                                                                position[j],
+                                                                                worldPos,
+                                                                                orientation[j],
+                                                                                worldQuat,
+                                                                                crustJ,
+                                                                                crustTest,
+                                                                                pa,
+                                                                                pb,
+                                                                                nbIter);
+                    // computeClosestPoints_GJK returns G + crustA + crustB where G is the
+                    // actual geometric gap.  Contact in the simulation is detected when
+                    // G <= 0, i.e. gap <= crustA + crustB.
+                    if(gap < crustJ + crustTest)
+                        return true;
+                }
+            }
+            return false;
+        };
+
+        // Overlap test: checks the master (or standalone) convex plus all slave sub-bodies
+        // at their rigid-body offsets from the candidate master pose.
+        auto canInsert = [&](const uint           insertID,
+                             const Vector3<T>&    insertPosition,
+                             const Quaternion<T>& insertQuaternion) -> bool {
+            // Check the master / standalone body itself
+            const RigidBody<T>* rbMaster     = (*rigidBody)[insertID];
+            const Convex<T>&    convexMaster = *rbMaster->getConvex();
+            const T             crustMaster  = rbMaster->getCrustThickness();
+            if(overlapsLC(insertID, convexMaster, crustMaster, insertPosition, insertQuaternion))
+                return false;
+
+            // For composite masters: check every slave sub-body at its world pose
+            const uint tag = bodyTag[insertID];
+            if(isSubBody(tag))
+            {
+                const uint cIdx = getCompositeIdx(tag);
+                for(uint k = insertID + 1;
+                    k < numObstacles + numParticles && isSubBody(bodyTag[k])
+                    && getCompositeIdx(bodyTag[k]) == cIdx && getSubBodyLocalIdx(bodyTag[k]) > 0u;
+                    ++k)
+                {
+                    const Vector3<T> slavePos = insertPosition + (insertQuaternion >> localPos[k]);
+                    const Quaternion<T> slaveQuat = insertQuaternion * localQuat[k];
+                    const RigidBody<T>* rbK       = (*rigidBody)[k];
+                    const Convex<T>&    convexK   = *rbK->getConvex();
+                    if(overlapsLC(k, convexK, rbK->getCrustThickness(), slavePos, slaveQuat))
+                        return false;
+                }
             }
             return true;
         };
@@ -415,7 +472,12 @@ __HOST__ void Insertion<T>::insert(const GrainsMemBuffer<RigidBody<T>*>* rigidBo
         for(uint i = 0; i < numParticles; ++i)
         {
             const uint insertID = i + numObstacles;
-            bool       placed   = false;
+
+            // Slave sub-bodies are positioned after their master is placed; skip them here
+            if(isSubBody(bodyTag[insertID]) && getSubBodyLocalIdx(bodyTag[insertID]) > 0u)
+                continue;
+
+            bool placed = false;
             for(uint attempt = 0; attempt < maxAttempts && !placed; ++attempt)
             {
                 const Vector3<T>& pCand
@@ -444,10 +506,27 @@ __HOST__ void Insertion<T>::insert(const GrainsMemBuffer<RigidBody<T>*>* rigidBo
                         = fetchInsertionData(m_angularVelType, m_angularVelInsertionInfo);
                     kinematics[insertID] = Kinematics<T>(vel, ang);
                     placed               = true;
-                    // Add new particle to linked cells for the next insert
-                    const Cells<T>* cells  = LC.getLinkedCell()[0];
-                    const uint      cellID = cells->computeCellHash(pCand);
-                    LC.addParticleToCell(insertID, cellID);
+                    // Add master to LC
+                    const Cells<T>* cells = LC.getLinkedCell()[0];
+                    LC.addParticleToCell(insertID, cells->computeCellHash(pCand));
+                    // For composite masters: write slave world poses and add them to LC
+                    const uint tag = bodyTag[insertID];
+                    if(isSubBody(tag))
+                    {
+                        const uint cIdx = getCompositeIdx(tag);
+                        for(uint k = insertID + 1;
+                            k < numObstacles + numParticles && isSubBody(bodyTag[k])
+                            && getCompositeIdx(bodyTag[k]) == cIdx
+                            && getSubBodyLocalIdx(bodyTag[k]) > 0u;
+                            ++k)
+                        {
+                            const Vector3<T>    slavePos  = pCand + (qCand >> localPos[k]);
+                            const Quaternion<T> slaveQuat = qCand * localQuat[k];
+                            position[k]                   = slavePos;
+                            orientation[k]                = slaveQuat;
+                            LC.addParticleToCell(k, cells->computeCellHash(slavePos));
+                        }
+                    }
                 }
             }
 

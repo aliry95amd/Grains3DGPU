@@ -2,10 +2,10 @@
 # This makefile orchestrates building all validation tools and tests
 
 # Default target
-.PHONY: all clean help collision-detection contact-forces convergence-analysis visualization
+.PHONY: all clean help collision-detection gjk-iterations contact-forces convergence-analysis visualization
 
 # Build all validation tools
-all: collision-detection
+all: collision-detection gjk-iterations
 	@echo "All validation tools built successfully!"
 
 # Build collision detection validation tools
@@ -18,6 +18,12 @@ collision-detection:
 		$(MAKE) -C CollisionDetection demo; \
 		echo "Simple collision detection demo built successfully!"; \
 	fi
+
+# Build GJK iterations vs distance validation tools
+gjk-iterations:
+	@echo "Building GJK iterations validation tools..."
+	@$(MAKE) -C GJKIterations all
+	@echo "GJK iterations validation tools built successfully!"
 
 # Build contact forces validation tools (placeholder for future implementation)
 contact-forces:
@@ -38,6 +44,8 @@ visualization:
 clean:
 	@echo "Cleaning collision detection validation tools..."
 	@$(MAKE) -C CollisionDetection clean
+	@echo "Cleaning GJK iterations validation tools..."
+	@$(MAKE) -C GJKIterations clean
 	@echo "All validation tools cleaned!"
 
 # Run collision detection tests
@@ -53,8 +61,13 @@ test-collision:
 		exit 1; \
 	fi
 
+# Run GJK iterations vs distance test
+test-gjk-iterations:
+	@echo "Running GJK iterations validation test..."
+	@$(MAKE) -C GJKIterations test
+
 # Run all available tests
-test: test-collision
+test: test-collision test-gjk-iterations
 	@echo "All validation tests completed!"
 
 # Install validation tools (copy executables to a common bin directory)
@@ -87,6 +100,7 @@ help:
 	@echo ""
 	@echo "Individual validation directories:"
 	@echo "  CollisionDetection/ - GJK performance comparison tools"
+	@echo "  GJKIterations/      - GJK iteration count vs distance study"
 	@echo "  ContactForces/      - Contact force model validation (future)"
 	@echo "  ConvergenceAnalysis/ - Numerical convergence studies (future)"
 	@echo "  Visualization/      - Plotting and analysis tools (future)"

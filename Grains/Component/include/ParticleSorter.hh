@@ -254,11 +254,11 @@ public:
                                                                           + numObstacles,
                                                                       m_mortonCodes.getData(),
                                                                       numParticles);
-            cudaDeviceSynchronize();
+            cudaErrCheck(cudaDeviceSynchronize());
 
             // Step 2: Initialize indices [0, 1, 2, ..., numParticles-1]
             m_sortedIndices.sequence();
-            cudaDeviceSynchronize();
+            cudaErrCheck(cudaDeviceSynchronize());
 
             // Step 3: Sort indices based on Morton codes using CUB.
             // keys_in/keys_out and values_in/values_out must be non-aliasing buffers.
@@ -271,7 +271,7 @@ public:
                                                          m_sortedIndices.getData(),
                                                          m_sortedIndicesOut.getData(),
                                                          numParticles));
-            cudaDeviceSynchronize();
+            cudaErrCheck(cudaDeviceSynchronize());
 
             // Step 4: Gather particle arrays according to sorted indices using
             // multiple streams (skip obstacles).

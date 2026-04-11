@@ -186,6 +186,17 @@ void Grains<T>::setupComponents(DOMNode* root)
     // Store radii in LC params for use in Construction()
     LC.minCellSize = T(2) * maxParticleRadius;
 
+    // Compute maxNumCellsPerObstacle now that minCellSize, maxObstacleRadius, and
+    // cellSizeFactor are all known (cellSizeFactor set by CD XML parsing before this call)
+    if(LC.minCellSize > T(0))
+    {
+        const uint adj            = (LC.maxObstacleRadius > T(0))
+                                        ? static_cast<uint>(std::ceil((T(2) * LC.maxObstacleRadius)
+                                                           / (LC.cellSizeFactor * LC.minCellSize)))
+                                        : 1u;
+        LC.maxNumCellsPerObstacle = adj * adj * adj;
+    }
+
     // Free prototype rigid bodies
     for(uint i = 0; i < obstacleData.refRB.getSize(); ++i)
     {
@@ -198,13 +209,13 @@ void Grains<T>::setupComponents(DOMNode* root)
         particleData.refRB[i] = nullptr;
     }
 
-    // Construct ComponentManager
+    // Construct ComponentManager (initialize() called after contact force models are read
+    // so that m_isContactWithMemory is set correctly before ForceModule is created).
     m_components = std::make_unique<ComponentManager<T, MemType::HOST>>(&m_rigidBodyList,
                                                                         numObstacles,
                                                                         numParticles,
                                                                         nComposites,
                                                                         nSubBodies);
-    m_components->initialize();
     m_components->initializeComponents(initialPosition,
                                        initialOrientation,
                                        initialBodyTags,
@@ -257,12 +268,10 @@ void Grains<T>::Construction(DOMElement* rootElement)
     }
 
     // ---------------------------------------------------------------------------------------------
-    // Components (rigid bodies, body tags, local transforms, ComponentManager)
-    setupComponents(root);
-
-    // ---------------------------------------------------------------------------------------------
     // Setting up collision detection
     GoutWI(6, "Reading collision detection ...");
+    LC.minCorner                = GP::m_origin;
+    LC.maxCorner                = GP::m_maxCoordinate;
     DOMNode* collisionDetection = ReaderXML::getNode(root, "CollisionDetection");
     GAssert(collisionDetection, "CollisionDetection node is mandatory!");
     if(ReaderXML::getNodeAttr_String(collisionDetection, "EnableTimings") == "true")
@@ -317,20 +326,9 @@ void Grains<T>::Construction(DOMElement* rootElement)
         // Cell size factor
         LC.cellSizeFactor = T(ReaderXML::getNodeAttr_Double(nLinkedCell, "CellSizeFactor"));
 
-        // Adjusting maxNumCellsPerObstacle
-        uint adjustedMaxNumCellsPerObstaclePerDim = static_cast<uint>(
-            std::ceil((2 * LC.maxObstacleRadius) / (LC.cellSizeFactor * LC.minCellSize)));
-        LC.maxNumCellsPerObstacle = adjustedMaxNumCellsPerObstaclePerDim
-                                    * adjustedMaxNumCellsPerObstaclePerDim
-                                    * adjustedMaxNumCellsPerObstaclePerDim;
-
         // Update and sort frequency
         LC.updateFrequency = ReaderXML::getNodeAttr_Int(nLinkedCell, "UpdatingFrequency");
         LC.sortFrequency   = ReaderXML::getNodeAttr_Int(nLinkedCell, "SortingFrequency");
-
-        // TODO: Take from the input file
-        LC.minCorner = GP::m_origin;
-        LC.maxCorner = GP::m_maxCoordinate;
 
         GoutWI(9,
                "LinkedCell: " + linkedCellType + +", cell size factor "
@@ -340,15 +338,8 @@ void Grains<T>::Construction(DOMElement* rootElement)
     }
     else  // BruteForce - still need basic LinkedCell params for insertion checks
     {
-        LC.type                                   = LinkedCellType::HOST;
-        LC.cellSizeFactor                         = T(1.0);
-        LC.minCorner                              = GP::m_origin;
-        LC.maxCorner                              = GP::m_maxCoordinate;
-        uint adjustedMaxNumCellsPerObstaclePerDim = static_cast<uint>(
-            std::ceil((2 * LC.maxObstacleRadius) / (LC.cellSizeFactor * LC.minCellSize)));
-        LC.maxNumCellsPerObstacle = adjustedMaxNumCellsPerObstaclePerDim
-                                    * adjustedMaxNumCellsPerObstaclePerDim
-                                    * adjustedMaxNumCellsPerObstaclePerDim;
+        LC.type           = LinkedCellType::HOST;
+        LC.cellSizeFactor = T(1.0);
     }
 
     // Bounding volume
@@ -382,11 +373,15 @@ void Grains<T>::Construction(DOMElement* rootElement)
         std::string gjkAcc = ReaderXML::getNodeAttr_String(nNarrowPhase, "Acceleration");
         CD.gjkAcceleration = (gjkAcc == "true");
         GoutWI(9,
-               "NarrowPhase: " + narrowPhaseType + ", Acceleration: "
-                   + (CD.gjkAcceleration ? "true" : "false") + ", UseRelativeTransformations: "
-                   + (CD.useRelativeTransformations ? "true" : "false"));
+               "NarrowPhase: " + narrowPhaseType
+                   + ", Acceleration: " + (CD.gjkAcceleration ? "true" : "false"));
     }
     GoutWI(6, "Reading collision detection completed!");
+
+    // ---------------------------------------------------------------------------------------------
+    // Components (rigid bodies, body tags, local transforms, ComponentManager)
+    // NOTE: after CD parsing so all LC params are set before LinkedCell construction
+    setupComponents(root);
 
     // ---------------------------------------------------------------------------------------------
     // Temporal setting and time integration
@@ -433,6 +428,10 @@ void Grains<T>::Construction(DOMElement* rootElement)
             GoutWI(9, "Compaction disabled!");
         }
     }
+
+    // Initialize ComponentManager AFTER contact force models are read so that
+    // m_isContactWithMemory is correctly set before ForceModule allocates the contact table.
+    m_components->initialize();
 }
 
 // -------------------------------------------------------------------------------------------------

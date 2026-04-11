@@ -77,12 +77,14 @@ __GLOBAL__ void generateObstacleParticlePairs_Device(const uint2*    obstacleIDs
     @param cellParticleIDs packed uint64 array (upper 32 bits = cellID, lower 32 bits = particleID)
     @param cellPrefixSums array of start IDs for each cell
     @param numParticles number of particles
+    @param numObstacles number of obstacles (subtracted from global ID to get local index)
     @param numCells number of cells
     @param neighborCounts output array of neighbor counts per particle */
 __GLOBAL__ void countNeighbors_Device(const uint*     cellNeighborsList,
                                       const uint64_t* cellParticleIDs,
                                       const uint*     cellPrefixSums,
                                       const uint      numParticles,
+                                      const uint      numObstacles,
                                       const uint      numCells,
                                       uint*           neighborCounts);
 
@@ -112,6 +114,7 @@ __GLOBAL__ void updateNeighborList_LC_Device(const uint*     cellNeighborsList,
     @param numParticlesPerCell array of particle counts per cell
     @param maxParticlesPerCell maximum particles per cell
     @param numParticles number of particles
+    @param numObstacles number of obstacles (subtracted from global ID to get local index)
     @param numCells number of cells
     @param neighborCounts output array of neighbor counts per particle */
 __GLOBAL__ void countNeighbors_AtomicFixed_Device(const uint*     cellNeighborsList,
@@ -120,6 +123,7 @@ __GLOBAL__ void countNeighbors_AtomicFixed_Device(const uint*     cellNeighborsL
                                                   const uint*     numParticlesPerCell,
                                                   const uint      maxParticlesPerCell,
                                                   const uint      numParticles,
+                                                  const uint      numObstacles,
                                                   const uint      numCells,
                                                   uint*           neighborCounts);
 

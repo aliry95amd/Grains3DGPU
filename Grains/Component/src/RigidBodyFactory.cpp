@@ -524,9 +524,9 @@ __HOST__ void
         else if(prop.type == RECTANGLE)
         {
             Rectangle<T>* r = dynamic_cast<Rectangle<T>*>(convex);
-            Vector3<T>    L = r->getExtent();
-            prop.params[0]  = L[X];
-            prop.params[1]  = L[Y];
+            Vector3<T>    L = r->getExtent();  // returns half-extents (m_LX, m_LY)
+            prop.params[0]  = T(2) * L[X];     // pass full extents; Rectangle ctor halves them
+            prop.params[1]  = T(2) * L[Y];
             prop.numParams  = 2;
         }
         else if(prop.type == SUPERQUADRIC)

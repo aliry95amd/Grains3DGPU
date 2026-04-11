@@ -43,7 +43,10 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "UpdateFrequency": 0,
         "SortingFrequency": 0,
         "BoundingVolumeType": "OBB",
-        "NarrowPhaseType": "GJK"
+        "NarrowPhaseType": "GJK",
+        "EnableTimings": "false",
+        "UseRelativeTransformations": "false",
+        "NarrowPhaseAcceleration": "false"
     },
 
     "ContactModel": {
@@ -54,6 +57,11 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "Parameters": 'kn="1.2e8" en="0.8" etat="100.0" muc="0.5" kr="0.0"'
     },
     "ContactModelsList": [],
+
+    "ContactForceModels": {
+        "EnableTimings": "false",
+        "Compaction": "false"
+    },
 
     "Temporal": {"TStart": 0.0, "TEnd": 1.0, "DT": 1e-3, "TimeIntegrationType": "FirstOrderExplicit"},
     
@@ -81,6 +89,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "SimulationSettings": {
         "ForceInsertion": "0",
         "VerbosityFrequency": 1000,
+        "TimingsEnable": "false",
         "OutputPrecision": 6,
         # The following sections may be strings or lists (lists become XML fragments)
         "PositionSection": "",
@@ -158,6 +167,14 @@ class TemplatePopulator:
         m["sorting_frequency"] = cd.get("SortingFrequency", "")
         m["bounding_volume_type"] = cd.get("BoundingVolumeType", "")
         m["narrow_phase_type"] = cd.get("NarrowPhaseType", "")
+        m["cd_enable_timings"] = cd.get("EnableTimings", "false")
+        m["cd_use_relative_transformations"] = cd.get("UseRelativeTransformations", "false")
+        m["narrow_phase_acceleration"] = cd.get("NarrowPhaseAcceleration", "false")
+
+        # Contact force models global settings
+        cfm_cfg = self.config.get("ContactForceModels", {})
+        m["cfm_enable_timings"] = cfm_cfg.get("EnableTimings", "false")
+        m["cfm_compaction"] = cfm_cfg.get("Compaction", "false")
 
         # Contact model
         cm = self.config.get("ContactModel", {})
@@ -207,6 +224,7 @@ class TemplatePopulator:
         ss = self.config.get("SimulationSettings", {})
         m["force_insertion"] = ss.get("ForceInsertion", "false")
         m["verbosity_frequency"] = ss.get("VerbosityFrequency", 1000)
+        m["simulation_timings_enable"] = ss.get("TimingsEnable", "false")
 
         # Sections: if the config provides lists, assemble XML lines; if strings, use as-is.
         def build_section(key: str, tag: str) -> str:
@@ -294,10 +312,17 @@ class TemplatePopulator:
         if not lst:
             return rendered
         block = builder_func(lst)
-        start_tag = f"<{tag}>"
+        # Search by tag prefix so we match even when the opening tag has attributes
+        # (e.g. <ContactForceModels EnableTimings="false" ...>)
+        start_tag_prefix = f"<{tag}"
         end_tag = f"</{tag}>"
-        start_idx = rendered.find(start_tag)
-        end_idx = rendered.find(end_tag, start_idx)
+        start_idx = rendered.find(start_tag_prefix)
+        if start_idx != -1:
+            # Advance past the full opening tag (find the closing '>')
+            open_end_idx = rendered.find(">", start_idx)
+            end_idx = rendered.find(end_tag, open_end_idx) if open_end_idx != -1 else -1
+        else:
+            end_idx = -1
         if start_idx != -1 and end_idx != -1:
             # detect indentation at the start tag (chars between previous newline and start_idx)
             line_start = rendered.rfind("\n", 0, start_idx) + 1
@@ -397,7 +422,10 @@ class TemplatePopulator:
         
         Each model may contain: Type, materialA, materialB, parameters.
         """
-        parts = ["<ContactForceModels>"]
+        cfm_cfg = self.config.get("ContactForceModels", {})
+        enable_timings = cfm_cfg.get("EnableTimings", "false")
+        compaction = cfm_cfg.get("Compaction", "false")
+        parts = [f'<ContactForceModels EnableTimings="{enable_timings}" Compaction="{compaction}">']
         for m in models_list:
             typ = m.get("Type", m.get("ContactModelType", ""))
             matA = m.get("MaterialA", "")

@@ -7,7 +7,7 @@ import scipy.special as sc
 import numpy as np
 import matplotlib.pyplot as plt
 
-plt.rcParams.update({"text.usetex": True, "font.family": "Helvetica"})
+plt.rcParams.update({"text.usetex": True, "font.family": "Helvetica", "font.size": 16})
 
 
 def analyticalSolution(v0, w0, gamma, tList):
@@ -45,20 +45,24 @@ def main():
 
     fig = plt.figure(figsize=(5, 5))
     ax1 = fig.add_subplot(111)
-    ax1.plot(data[:, 0], analSolution,
+    # Plot analytical and numerical results (convert overlap to mm)
+    ax1.plot(data[:, 0], analSolution * 1000.0,
              linewidth=1, linestyle='--', c="k",
-             zorder=1, label="Analytical solution")
-    ax1.plot(data[::8, 0], numSolution[::8],
+             zorder=1, label="Analytical")
+    ax1.plot(data[::8, 0], numSolution[::8] * 1000.0,
              linewidth=0, c="tab:blue", marker='o', markerfacecolor="tab:blue",
-             zorder=2, label="Numerical solution")
-    ax1.set_xlabel(r"Time [s]")
-    ax1.set_ylabel(r"Overlap [m]")
+             zorder=2, label="Numerical")
+    ax1.set_xlabel(r"Time, $t$ [s]")
+    ax1.set_ylabel(r"Overlap, $\delta$ [mm]")
     ax1.set_xlim(0, contactTime)
-    # ax1.set_ylim( 0, 0.04 )
+    # y-range in mm
+    ax1.set_ylim(-0.25, 1.5)
     ax1.set_box_aspect(1)
     handles, labels = ax1.get_legend_handles_labels()
     ax1.legend(handles[1:] + [handles[0]], labels[1:] + [labels[0]])
-    ax1.grid(color='lightgrey', linestyle='--', linewidth=0.5)
+    # Place grid lines beneath plot elements and draw with low zorder
+    ax1.set_axisbelow(True)
+    ax1.grid(color='lightgrey', linestyle='--', linewidth=0.5, zorder=0)
 
     out_plot = os.path.join(plots_root, 'CollidingSpheresOverlap.eps')
     os.makedirs(os.path.dirname(out_plot), exist_ok=True)

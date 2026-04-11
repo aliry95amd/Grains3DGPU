@@ -405,7 +405,7 @@ __HOSTDEVICE__ inline void closestPointsRigidBodies(const RigidBody<T>&  rbA,
         const Matrix3<T>& m = a2w.getBasis();
         // rectangle normal is a2w.getBasis() * [0, 0, 1] which is the last column of the transform
         Vector3<T> r(m(XZ), m(YZ), m(ZZ));
-        r.normalized();
+        r.normalize();
         r *= copysign(T(1), r * (b2w.getOrigin() - c));
         ptB = (b2w)(convexB.support((-r) * b2w.getBasis()));
         if(r * (ptB - c) < T(0))
@@ -719,9 +719,9 @@ __HOSTDEVICE__ inline void closestPointsRigidBodies(const RigidBody<T>&  rbA,
     {
         // ptA is the point on rectangle and ptB is the point on particle
         Vector3<T> r = q_a2w >> Vector3<T>(0, 0, 1);
-        r.normalized();
+        r.normalize();
         r *= copysign(T(1), r * (v_b2w - v_a2w));
-        ptB = (q_b2w >> convexB.support(q_b2w << r)) + v_b2w;
+        ptB = (q_b2w >> convexB.support(q_b2w << (-r))) + v_b2w;
         if(r * (ptB - v_a2w) < T(0))
         {
             ptA = ((v_a2w - ptB) * r) * r + ptB;

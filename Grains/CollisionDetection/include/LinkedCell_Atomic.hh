@@ -268,7 +268,9 @@ public:
             // Only relink obstacles if they moved
             if(SS.obstaclesMoved)
                 this->linkObstacles();
-            return true;
+            if(m_useAdaptiveSkin)
+                this->launchDisplacementReduceAsync();
+            return false;
         }
 
         // Prefix sum to find the start index of each cell in the particleIDArray
@@ -289,6 +291,10 @@ public:
                                                                m_numParticles,
                                                                m_cellParticleIDs.getData(),
                                                                m_cellCounters.getData());
+
+        // Launch displacement reduce async so next iteration's check costs almost nothing
+        if(m_useAdaptiveSkin)
+            this->launchDisplacementReduceAsync();
 
         return true;
     }

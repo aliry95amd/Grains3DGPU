@@ -154,11 +154,11 @@ public:
                                          maxCoordinate[Z],
                                          size,
                                          d_numCells);
-            cudaMemcpy(&h_numCells, d_numCells, sizeof(uint), cudaMemcpyDeviceToHost);
+            cudaErrCheck(cudaMemcpy(&h_numCells, d_numCells, sizeof(uint), cudaMemcpyDeviceToHost));
             // GoutWI(9, "LinkedCell with", h_numCells, "cells is created on device.");
         }
-        cudaDeviceSynchronize();
-        cudaFree(d_numCells);
+        cudaErrCheck(cudaDeviceSynchronize());
+        cudaErrCheck(cudaFree(d_numCells));
     }
     //@}
 };

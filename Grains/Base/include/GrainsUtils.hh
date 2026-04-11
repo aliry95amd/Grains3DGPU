@@ -62,6 +62,11 @@ __HOST__ static INLINE void computeOptimalThreadsAndBlocks(const uint           
                                                            uint&                 numBlocks,
                                                            uint&                 numThreads)
 {
+    if(numElements == 0)
+    {
+        fprintf(stderr, "[FATAL] computeOptimalThreadsAndBlocks called with numElements=0\n");
+        abort();
+    }
     constexpr uint maxThreads = 256;  // Avoid 1024 unless necessary
     constexpr uint minThreads = 32;
     const uint     minBlocks  = 2 * prop.multiProcessorCount;

@@ -83,7 +83,7 @@ __HOSTDEVICE__ void Rectangle<T>::computeInertia(T (&inertia)[3]) const
     // Diagonal components: Ixx, Iyy, Izz
     inertia[0] = T(4) / T(3) * m_LX * m_LY * m_LY * m_LY;
     inertia[1] = T(4) / T(3) * m_LX * m_LX * m_LX * m_LY;
-    inertia[2] = T(2) / T(3) * m_LX * m_LY * (m_LX * m_LX + m_LY * m_LY);
+    inertia[2] = T(4) / T(3) * m_LX * m_LY * (m_LX * m_LX + m_LY * m_LY);
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -113,8 +113,8 @@ __HOSTDEVICE__ Vector3<T> Rectangle<T>::computeBoundingCylinder() const
 }
 
 // -------------------------------------------------------------------------------------------------
-// Box support function, returns the support point P, i.e. the point on the
-// surface of the box that satisfies max(P.v)
+// Rectangle support function, returns the support point P, i.e. the point on the
+// surface of the rectangle that satisfies max(P.v)
 template <typename T>
 __HOSTDEVICE__ Vector3<T> Rectangle<T>::support(const Vector3<T>& v) const
 {

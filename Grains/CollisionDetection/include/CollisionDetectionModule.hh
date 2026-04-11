@@ -55,10 +55,9 @@ private:
     GrainsMemBuffer<uint8_t, M> m_bvPassFlags;
     /** \brief Compacted list of original pair indices that passed the BV filter */
     GrainsMemBuffer<uint, M> m_bvPassPairIndices;
-    /** \brief Size-1 device buffer; CUB writes the passing-pair count here */
-    GrainsMemBuffer<int, M> m_bvPassPairCountDevice;
-    /** \brief Host-side copy of the passing-pair count after CUB compaction */
-    int m_bvPassPairCount = 0;
+    /** \brief Size-1 zero-copy mapped pinned buffer; CUB writes the passing-pair count directly
+        into this via the device alias; host reads it without any cudaMemcpy */
+    GrainsMemBuffer<int, MemType::MAPPED> m_bvPassPairCountMapped;
     /** \ brief Scratch space for CUB DeviceSelect::Flagged */
     GrainsMemBuffer<uint8_t, M> m_cubTempStorage;
     /** \brief Byte size of the CUB scratch buffer */
@@ -187,7 +186,7 @@ private:
         Also used as the composite-only filter when BV is OFF but composites exist.
         Writes per-pair pass/fail flags, writes no-contact sentinels for rejected pairs, then
         uses CUB DeviceSelect::Flagged to compact the passing pair indices into m_bvPassPairIndices
-        and copies the result count to m_bvPassPairCount.
+        and writes the result count into m_bvPassPairCountMapped.
         @param rigidBodies      Raw pointer array of RigidBody*
         @param pairList         Pair list buffer
         @param contactInfoLocal Per-pair local ContactInfo buffer
@@ -198,6 +197,24 @@ private:
                        GrainsMemBuffer<ContactInfo<T>, M>& contactInfoLocal,
                        const uint*                         bodyTags,
                        uint                                numComposites);
+
+    /** @brief BV pre-filter using world-frame positions/quaternions directly, bypassing the
+        computeRelativeTransformations pre-pass. Used when UseRelativeTransformations=false with
+        BV enabled.
+        @param rigidBodies      Raw pointer array of RigidBody*
+        @param positions        World position buffer
+        @param orientations     World quaternion buffer
+        @param pairList         Pair list buffer
+        @param contactInfoLocal Per-pair local ContactInfo buffer
+        @param bodyTags         Raw device pointer to per-component body tags
+        @param numComposites    Number of composites (0 = skip composite check) */
+    void filterPairsBV_global(const RigidBody<T>* const*               rigidBodies,
+                              const GrainsMemBuffer<Vector3<T>, M>&    positions,
+                              const GrainsMemBuffer<Quaternion<T>, M>& orientations,
+                              const GrainsMemBuffer<uint2, M>&         pairList,
+                              GrainsMemBuffer<ContactInfo<T>, M>&      contactInfoLocal,
+                              const uint*                              bodyTags,
+                              uint                                     numComposites);
 
     /** @brief Runs narrow-phase GJK and writes ContactInfo in A-local frame.
         On DEVICE with BV-ON or composites, uses the compacted m_bvPassPairIndices index list.

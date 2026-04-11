@@ -63,6 +63,29 @@ __GLOBAL__ void filterPairsBV_Kernel(const RigidBody<T>* const* rigidBodies,
                                      uint8_t*                   bvPassFlags,
                                      const uint                 nPairs);
 
+/** @brief BV pre-filter kernel using world-frame positions/quaternions directly.
+    Computes relative transforms per-pair on-the-fly, eliminating the separate
+    computeRelativeTransformations_Kernel pre-pass. Used when UseRelativeTransformations=false.
+    @param rigidBodies   Rigid body array
+    @param pairList      List of pairs
+    @param bodyTags      Per-component body tags (composite membership test)
+    @param numComposites Number of composite bodies (0 = no composites, skip the check)
+    @param positions     World-frame particle positions
+    @param quaternions   World-frame particle quaternions
+    @param contactInfo   Per-pair contact info buffer; sentinel written for rejected pairs
+    @param bvPassFlags   Output pass/fail flags (0 = reject, 1 = pass)
+    @param nPairs        Number of pairs */
+template <typename T, BoundingVolumeType BVType = BoundingVolumeType::OBB>
+__GLOBAL__ void filterPairsBV_Global_Kernel(const RigidBody<T>* const* rigidBodies,
+                                            const uint2*               pairList,
+                                            const uint*                bodyTags,
+                                            uint                       numComposites,
+                                            const Vector3<T>*          positions,
+                                            const Quaternion<T>*       quaternions,
+                                            ContactInfo<T>*            contactInfo,
+                                            uint8_t*                   bvPassFlags,
+                                            const uint                 nPairs);
+
 /** @brief Narrow-phase GJK detection (relative vec/quat).
     When activePairIndices is non-null each thread resolves its original pair index through the
     indirection table; when null the thread ID is used directly.

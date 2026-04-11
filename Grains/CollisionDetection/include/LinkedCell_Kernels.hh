@@ -131,12 +131,13 @@ static __GLOBAL__ void linkObstacles_Device(const RigidBody<T>* const* rb,
     uint cellCount = 0;
     // Offset in the obstacleCellID buffer
     const uint offset = obstacleIdx * maxPerObstacle;
-    // Nested loops with 1-ring expansion
-    for(int x = minX; x <= maxX; ++x)
+    // Nested loops with 1-ring expansion; guard against cellCount >= maxPerObstacle
+    // (can happen when numCells > 3375 and the cap reduces maxPerObstacle below the AABB size)
+    for(int x = minX; x <= maxX && cellCount < maxPerObstacle; ++x)
     {
-        for(int y = minY; y <= maxY; ++y)
+        for(int y = minY; y <= maxY && cellCount < maxPerObstacle; ++y)
         {
-            for(int z = minZ; z <= maxZ; ++z)
+            for(int z = minZ; z <= maxZ && cellCount < maxPerObstacle; ++z)
             {
                 uint cellHash = cells[0]->computeCellHash(make_uint3((uint)x, (uint)y, (uint)z));
                 obstacleCellID[offset + cellCount] = cellHash;
@@ -169,7 +170,11 @@ __GLOBAL__ void computeCellID_Device(const Cells<T>* const* cells,
     if(tID >= numParticles)
         return;
 
-    uint c       = cells[0]->computeCellHash(positions[tID]);
+    // Use computeDenseIndex with checkIfValid=false to avoid GAssert/__trap() on
+    // out-of-grid particles. Returns UINT_MAX if position is outside the grid.
+    uint c = cells[0]->computeDenseIndex(positions[tID], false);
+    if(c == UINT_MAX)
+        return;  // Particle is outside the grid; skip silently
     cellIDs[tID] = c;
     atomicAdd(&numParticlesPerCell[c], 1);
 }
@@ -192,7 +197,15 @@ __GLOBAL__ void computeCellParticleIDs_Device(const Cells<T>* const* cells,
     if(tID >= numParticles)
         return;
 
-    uint cellID     = cells[0]->computeCellHash(positions[tID]);
+    // Use computeDenseIndex with checkIfValid=false to avoid GAssert/__trap() on
+    // out-of-grid particles. Returns UINT_MAX if position is outside the grid.
+    uint cellID = cells[0]->computeDenseIndex(positions[tID], false);
+    if(cellID == UINT_MAX)
+    {
+        // Mark as invalid: store UINT64_MAX so downstream kernels can detect and skip
+        cellParticleIDs[tID] = UINT64_MAX;
+        return;
+    }
     uint particleID = tID + particleOffset;
 
     // Pack: upper 32 bits = cellID, lower 32 bits = particleID
@@ -219,7 +232,14 @@ __GLOBAL__ void computeCellParticleIDs_Device(const Cells<T>* const* cells,
     if(tID >= numParticles)
         return;
 
-    uint cellID     = cells[0]->computeCellHash(positions[tID]);
+    // Use computeDenseIndex with checkIfValid=false to avoid GAssert/__trap() on
+    // out-of-grid particles. Returns UINT_MAX if position is outside the grid.
+    uint cellID = cells[0]->computeDenseIndex(positions[tID], false);
+    if(cellID == UINT_MAX)
+    {
+        cellParticleIDs[tID] = UINT64_MAX;
+        return;
+    }
     uint particleID = tID + particleOffset;
 
     // Pack data
@@ -251,8 +271,12 @@ __GLOBAL__ void computeCellParticleIDs_Device(const Cells<T>* const* cells,
     if(tID >= numParticles)
         return;
 
+    // Use computeDenseIndex with checkIfValid=false to avoid GAssert/__trap() on
+    // out-of-grid particles. Returns UINT_MAX if position is outside the grid.
+    uint cellID = cells[0]->computeDenseIndex(positions[tID], false);
+    if(cellID == UINT_MAX)
+        return;  // Particle is outside the grid; skip silently
     uint particleID = tID + particleOffset;
-    uint cellID     = cells[0]->computeCellHash(positions[tID]);
 
     // Single atomic: get slot AND increment count
     uint slot = atomicAdd(&numParticlesPerCell[cellID], 1);

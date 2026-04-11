@@ -795,10 +795,12 @@ __HOSTDEVICE__ T computeClosestPoints_GJK_Johnson(const Convex<T>&     a,
             last_bit <<= 1;
         }
 
-        // Support points
-        p[last] = a.support((-v));
-        q[last] = b.support((v)*b2a.getBasis());
-        w       = p[last] - b2a(q[last]) - (crustA + crustB) / dist * v;
+        // Support points (eroded by crust in local frame, reusing local dir)
+        const T          invDist = T(1) / dist;
+        const Vector3<T> vB      = v * b2a.getBasis();
+        p[last]                  = a.support(-v, crustA, invDist);
+        q[last]                  = b.support(vB, crustB, invDist);
+        w                        = p[last] - b2a(q[last]);
 
         // termination criteria -- optimality gap
         mu = dist - v * w / dist;
@@ -879,10 +881,12 @@ __HOSTDEVICE__ T computeClosestPoints_GJK_SignedVolume(const Convex<T>&     a,
             }
         }
 
-        // Support points
-        p[last] = a.support((-v));
-        q[last] = b.support((v)*b2a.getBasis());
-        w       = p[last] - b2a(q[last]) - (crustA + crustB) / dist * v;
+        // Support points (eroded by crust in local frame, reusing local dir)
+        const T          invDist = T(1) / dist;
+        const Vector3<T> vB      = v * b2a.getBasis();
+        p[last]                  = a.support(-v, crustA, invDist);
+        q[last]                  = b.support(vB, crustB, invDist);
+        w                        = p[last] - b2a(q[last]);
 
         // termination criteria -- optimality gap
         mu = dist - v * w / dist;
@@ -1002,10 +1006,13 @@ __HOSTDEVICE__ T computeClosestPoints_GJK_Johnson(const Convex<T>&     a,
             last_bit <<= 1;
         }
 
-        // Support points
-        p[last] = a.support((-v) * a2w.getBasis());
-        q[last] = b.support(v * b2w.getBasis());
-        w       = a2w(p[last]) - b2w(q[last]) - (crustA + crustB) / dist * v;
+        // Support points (eroded by crust in local frame, reusing local dirs)
+        const T          invDist = T(1) / dist;
+        const Vector3<T> vA      = (-v) * a2w.getBasis();
+        const Vector3<T> vB      = v * b2w.getBasis();
+        p[last]                  = a.support(vA, crustA, invDist);
+        q[last]                  = b.support(vB, crustB, invDist);
+        w                        = a2w(p[last]) - b2w(q[last]);
 
         // termination criteria -- optimality gap
         mu = dist - v * w / dist;
@@ -1086,10 +1093,13 @@ __HOSTDEVICE__ T computeClosestPoints_GJK_SignedVolume(const Convex<T>&     a,
             }
         }
 
-        // Support points
-        p[last] = a.support((-v) * a2w.getBasis());
-        q[last] = b.support(v * b2w.getBasis());
-        w       = a2w(p[last]) - b2w(q[last]) - (crustA + crustB) / dist * v;
+        // Support points (eroded by crust in local frame, reusing local dirs)
+        const T          invDist = T(1) / dist;
+        const Vector3<T> vA      = (-v) * a2w.getBasis();
+        const Vector3<T> vB      = v * b2w.getBasis();
+        p[last]                  = a.support(vA, crustA, invDist);
+        q[last]                  = b.support(vB, crustB, invDist);
+        w                        = a2w(p[last]) - b2w(q[last]);
 
         // termination criteria -- optimality gap
         mu = dist - v * w / dist;
@@ -1212,11 +1222,12 @@ __HOSTDEVICE__ T computeClosestPoints_GJK_Johnson(const Convex<T>&     a,
             last_bit <<= 1;
         }
 
-        // Support points
-        p[last] = a.support(-v);
-        q[last] = b.support(q_b2a << v);
+        // Support points (eroded by crust in local frame, reusing local dirs)
+        const T          invDist = T(1) / dist;
+        const Vector3<T> vB      = q_b2a << v;
+        p[last]                  = a.support(-v, crustA, invDist);
+        q[last]                  = b.support(vB, crustB, invDist);
         FusedMinkowskiDifference(p[last], q[last], v_b2a, q_b2a, w);
-        w -= (crustA + crustB) / dist * v;
 
         // termination criteria -- optimality gap
         mu = dist - v * w / dist;
@@ -1297,11 +1308,12 @@ __HOSTDEVICE__ T computeClosestPoints_GJK_SignedVolume(const Convex<T>&     a,
             }
         }
 
-        // Support points
-        p[last] = a.support(-v);
-        q[last] = b.support(q_b2a << v);
+        // Support points (eroded by crust in local frame, reusing local dirs)
+        const T          invDist = T(1) / dist;
+        const Vector3<T> vB      = q_b2a << v;
+        p[last]                  = a.support(-v, crustA, invDist);
+        q[last]                  = b.support(vB, crustB, invDist);
         FusedMinkowskiDifference(p[last], q[last], v_b2a, q_b2a, w);
-        w -= (crustA + crustB) / dist * v;
 
         // termination criteria -- optimality gap
         mu = dist - v * w / dist;
@@ -1426,11 +1438,13 @@ __HOSTDEVICE__ T computeClosestPoints_GJK_Johnson(const Convex<T>&     a,
             last_bit <<= 1;
         }
 
-        // Support points
-        p[last] = a.support(q_a2w << (-v));
-        q[last] = b.support(q_b2w << v);
+        // Support points (eroded by crust in local frame, reusing local dirs)
+        const T          invDist = T(1) / dist;
+        const Vector3<T> vA      = q_a2w << (-v);
+        const Vector3<T> vB      = q_b2w << v;
+        p[last]                  = a.support(vA, crustA, invDist);
+        q[last]                  = b.support(vB, crustB, invDist);
         FusedMinkowskiDifference(p[last], q[last], v_a2w, v_b2w, q_a2w, q_b2w, w);
-        w -= (crustA + crustB) / dist * v;
 
         // termination criteria -- optimality gap
         mu = dist - v * w / dist;
@@ -1513,11 +1527,13 @@ __HOSTDEVICE__ T computeClosestPoints_GJK_SignedVolume(const Convex<T>&     a,
             }
         }
 
-        // Support points
-        p[last] = a.support(q_a2w << (-v));
-        q[last] = b.support(q_b2w << v);
+        // Support points (eroded by crust in local frame, reusing local dirs)
+        const T          invDist = T(1) / dist;
+        const Vector3<T> vA      = q_a2w << (-v);
+        const Vector3<T> vB      = q_b2w << v;
+        p[last]                  = a.support(vA, crustA, invDist);
+        q[last]                  = b.support(vB, crustB, invDist);
         FusedMinkowskiDifference(p[last], q[last], v_a2w, v_b2w, q_a2w, q_b2w, w);
-        w -= (crustA + crustB) / dist * v;
 
         // termination criteria -- optimality gap
         mu = dist - v * w / dist;

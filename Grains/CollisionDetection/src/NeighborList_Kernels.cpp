@@ -146,11 +146,6 @@ __GLOBAL__ void generateObstacleParticlePairs_Device(const uint2*    obstacleIDs
     if(obstacleIdx >= numObstacles)
         return;
 
-    // Initialize pair count to zero by the first thread
-    if(obstacleIdx == 0 && threadIdx.x == 0)
-        *pairCount = 0;
-    __syncthreads();
-
     const uint offset             = obstacleIdx * maxCellsPerObstacle;
     const uint obstacleIndex      = obstacleIDs[obstacleIdx].x;
     const uint numCellsToTraverse = obstacleIDs[obstacleIdx].y;
@@ -177,9 +172,15 @@ __GLOBAL__ void generateObstacleParticlePairs_Device(const uint2*    obstacleIDs
         for(uint p = cellStart; p < cellEnd; ++p)
         {
             // Unpack particleID from lower 32 bits
-            uint64_t packed       = packedCellParticleIDs[p];
-            uint     particleID   = static_cast<uint>(packed & 0xFFFFFFFF);
-            uint     globalIndex  = atomicAdd(pairCount, 1);
+            uint64_t packed = packedCellParticleIDs[p];
+            // Skip empty slots: AtomicFixed layout fills unused entries with UINT64_MAX.
+            // Without this check, all maxParticlesPerCell slots are written as pairs
+            // (most with particleID = UINT_MAX), causing a massive OOB overwrite of the
+            // pair list buffer.
+            if(packed == UINT64_MAX)
+                continue;
+            uint particleID       = static_cast<uint>(packed & 0xFFFFFFFF);
+            uint globalIndex      = atomicAdd(pairCount, 1);
             pairList[globalIndex] = make_uint2(obstacleIndex, particleID);
         }
     }
@@ -191,6 +192,7 @@ __GLOBAL__ void countNeighbors_Device(const uint*     cellNeighborsList,
                                       const uint64_t* cellParticleIDs,
                                       const uint*     cellPrefixSums,
                                       const uint      numParticles,
+                                      const uint      numObstacles,
                                       const uint      numCells,
                                       uint*           neighborCounts)
 {
@@ -203,13 +205,10 @@ __GLOBAL__ void countNeighbors_Device(const uint*     cellNeighborsList,
     // Unpack cellID and particleID from uint64
     const uint64_t packed = cellParticleIDs[tID];
     const uint     cell   = (uint)(packed >> 32);
-    const uint     i      = (uint)(packed & 0xFFFFFFFF);
+    const uint     i      = (uint)(packed & 0xFFFFFFFF);  // global particle ID
 
     if(cell == UINT_MAX)
-    {
-        neighborCounts[i] = 0;
-        return;
-    }
+        return;  // neighborCounts pre-filled with 0; no write needed
 
     const uint* neighborCells  = &cellNeighborsList[NUM_NEIGHBOR_CELLS * cell];
     uint        totalNeighbors = 0;
@@ -254,7 +253,7 @@ __GLOBAL__ void countNeighbors_Device(const uint*     cellNeighborsList,
         }
     }
 
-    neighborCounts[i] = totalNeighbors;
+    neighborCounts[i - numObstacles] = totalNeighbors;
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -284,7 +283,7 @@ __GLOBAL__ void updateNeighborList_LC_Device(const uint*     cellNeighborsList,
         return;
 
     const uint* neighborCells = &cellNeighborsList[NUM_NEIGHBOR_CELLS * cell];
-    uint        insertIndex   = pairListOffset + numNeighborsPrefixSums[i];
+    uint        insertIndex   = pairListOffset + numNeighborsPrefixSums[i - numObstacles];
 
     // Loop over all neighboring cells
     for(uint cID = 0; cID < NUM_NEIGHBOR_CELLS; ++cID)
@@ -336,6 +335,7 @@ __GLOBAL__ void countNeighbors_AtomicFixed_Device(const uint*     cellNeighborsL
                                                   const uint*     numParticlesPerCell,
                                                   const uint      maxParticlesPerCell,
                                                   const uint      numParticles,
+                                                  const uint      numObstacles,
                                                   const uint      numCells,
                                                   uint*           neighborCounts)
 {
@@ -384,7 +384,7 @@ __GLOBAL__ void countNeighbors_AtomicFixed_Device(const uint*     cellNeighborsL
         }
     }
 
-    neighborCounts[i] = count;
+    neighborCounts[i - numObstacles] = count;
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -417,7 +417,7 @@ __GLOBAL__ void updateNeighborList_LC_AtomicFixed_Device(const uint*     cellNei
         return;
 
     const uint* neighborCells = &cellNeighborsList[NUM_NEIGHBOR_CELLS * cell];
-    uint        insertIndex   = pairListOffset + numNeighborsPrefixSums[i];
+    uint        insertIndex   = pairListOffset + numNeighborsPrefixSums[i - numObstacles];
 
     // Loop over all neighboring cells
     for(uint cID = 0; cID < NUM_NEIGHBOR_CELLS; ++cID)

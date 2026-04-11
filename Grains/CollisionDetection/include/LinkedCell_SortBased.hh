@@ -241,7 +241,9 @@ public:
             // Relink obstacles if they moved
             if(SS.obstaclesMoved)
                 this->linkObstacles();
-            return true;
+            if(m_useAdaptiveSkin)
+                this->launchDisplacementReduceAsync();
+            return false;
         }
 
         // Sort packed uint64 keys using CUB with pre-allocated workspace
@@ -262,6 +264,10 @@ public:
                                                                      m_cellPrefixSums.getData());
         // Sync default stream
         cudaStreamSynchronize(0);
+
+        // Launch displacement reduce async so next iteration's check costs almost nothing
+        if(m_useAdaptiveSkin)
+            this->launchDisplacementReduceAsync();
 
         return true;
     }

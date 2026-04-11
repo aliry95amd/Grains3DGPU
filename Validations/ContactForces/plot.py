@@ -4,12 +4,19 @@ Visualize Contact Table Benchmark Results
 Plots capacity vs latency (CPU and GPU) with speedup on secondary y-axis
 """
 
+import os
 import pandas as pd
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 
-# Configure plot style
-plt.rcParams.update({"text.usetex": True, "font.family": "Helvetica", "font.size": 16})
+# Use non-interactive backend and consistent style
+matplotlib.use("Agg")
+plt.rcParams.update({
+    "text.usetex": True,
+    "font.family": "Helvetica",
+    "font.size": 16,
+})
 
 # Configurable colors
 SPEEDUP_COLOR = 'tab:blue'  # Change this to customize speedup line color
@@ -27,8 +34,7 @@ def plot_benchmarks(csv_file='data/contact_table_bench.csv', output_file='data/c
     # Get unique load factors and sort them
     load_factors = sorted(df['loadFactor'].unique())
     
-    # Create figure with 3 subplots
-    fig, axes = plt.subplots(1, 3, figsize=(18, 5))    
+    # Create separate figures (one per load factor)
     
     # Precompute global speedup limits to use a consistent secondary y-axis
     all_speedups = []
@@ -45,7 +51,8 @@ def plot_benchmarks(csv_file='data/contact_table_bench.csv', output_file='data/c
         global_speed_max = float(np.max(all_speedups)) + 1
 
     for idx, lf in enumerate(load_factors):
-        ax1 = axes[idx]
+        # Create a new figure for this load factor
+        fig, ax1 = plt.subplots(figsize=(6, 5))
         
         # Filter data for this load factor
         df_lf = df[df['loadFactor'] == lf].sort_values('capacity')
@@ -54,33 +61,39 @@ def plot_benchmarks(csv_file='data/contact_table_bench.csv', output_file='data/c
         ax1.set_xscale('log', base=2)
         ax1.set_yscale('log', base=2)
 
-        ax1.plot(df_lf['capacity'], df_lf['host_ms'], 
-             marker='o', linestyle='-', label='CPU', color='black', linewidth=1, markersize=6, markerfacecolor='black')
-        ax1.plot(df_lf['capacity'], df_lf['kernel_ms'], 
-             marker='o', linestyle='--', label='GPU', color='black', linewidth=1, markersize=6, markerfacecolor='black')
+        ax1.plot(df_lf['capacity'], df_lf['host_ms'],
+                 marker='o', linestyle='-', label='CPU', color='black', linewidth=1, markersize=6, markerfacecolor='black')
+        # GPU: use square marker and tab:blue color
+        ax1.plot(df_lf['capacity'], df_lf['kernel_ms'],
+                 marker='s', linestyle='--', label='GPU', color='black', linewidth=1, markersize=6, markerfacecolor='black')
         
-        ax1.set_xlabel(r'Capacity [-]', fontweight='bold')
-        ax1.set_ylabel(r'Latency [ms]', fontweight='bold')
-        ax1.set_title(f'Load Factor = {lf}', fontweight='bold')
-        ax1.grid(color='lightgrey', linestyle='--', linewidth=0.5, which='both')
+        ax1.set_xlabel(r'Capacity [-]')
+        ax1.set_ylabel(r'Latency [ms]')
+        # Drop title (will include in filename)
+        ax1.set_axisbelow(True)
+        ax1.grid(color='lightgrey', linestyle='--', linewidth=0.5, which='both', zorder=0)
         ax1.legend(loc='upper left')
         
         # Secondary y-axis: Speedup
         ax2 = ax1.twinx()
         speedup = df_lf['host_ms'] / df_lf['kernel_ms']
-        ax2.plot(df_lf['capacity'], speedup, 
+        ax2.plot(df_lf['capacity'], speedup,
             marker='o', linestyle='-', color=SPEEDUP_COLOR, linewidth=1, markersize=4, markerfacecolor=SPEEDUP_COLOR)
-        ax2.set_ylabel(r'Speedup [-]', fontweight='bold', color=SPEEDUP_COLOR)
+        ax2.set_ylabel(r'Speedup [-]', color=SPEEDUP_COLOR)
         ax2.tick_params(axis='y', labelcolor=SPEEDUP_COLOR)
         # Use linear scale for secondary y-axis and set consistent limits across subplots
         ax2.set_ylim(global_speed_min, global_speed_max)
         # Ensure secondary x-axis matches primary (base 2)
         ax2.set_xscale('log', base=2)
-        
-    plt.tight_layout()
-    plt.savefig(output_file, format='eps', bbox_inches='tight')
-    print(f"Plot saved to: {output_file}")
-    plt.show()
+
+        # Save figure with load factor in filename (drop title)
+        out_file = output_file
+        base, ext = os.path.splitext(output_file)
+        out_file = f"{base}_LF{lf}{ext}"
+        fig.tight_layout()
+        plt.savefig(out_file, format='eps', bbox_inches='tight')
+        plt.close(fig)
+        print(f"Plot saved to: {out_file}")
 
 if __name__ == '__main__':
     import sys

@@ -192,6 +192,10 @@ public:
                 // Stream 0: Generate obstacle-particle pairs (concurrent with particle processing)
                 if(nObstacles > 0)
                 {
+                    // Reset on host BEFORE kernel to avoid inter-block race: block 0's
+                    // __syncthreads() is intra-block only and cannot guarantee other blocks
+                    // see the zero before they call atomicAdd.
+                    *m_obstacleParticlePairCount = 0;
                     // Unified obstacle-particle pair generation for all LinkedCell variants
                     generateObstacleParticlePairs_Device<<<nObstacles, 64, 0, m_stream0>>>(
                         m_LinkedCell->getObstacleIDs(),
@@ -204,6 +208,7 @@ public:
                         numCells,
                         m_pairList.getData(),
                         m_obstacleParticlePairCount);
+                    cudaStreamSynchronize(m_stream0);
                 }
                 else
                 {
@@ -218,6 +223,7 @@ public:
                                                numThreads);
 
                 // Phase 1: Count neighbors per particle (on stream 1)
+                m_numNeighbors.fill(0u, m_stream1);
                 if(LC.type == LinkedCellType::ATOMICFIXED)
                 {
                     auto* LC_atomicFixed
@@ -229,6 +235,7 @@ public:
                         LC_atomicFixed->getNumParticlesPerCell(),
                         LC_atomicFixed->getMaxParticlesPerCell(),
                         nParticles,
+                        nObstacles,
                         numCells,
                         m_numNeighbors.getData());
                 }
@@ -239,6 +246,7 @@ public:
                         cellParticleIDs,
                         cellPrefixSums,
                         nParticles,
+                        nObstacles,
                         numCells,
                         m_numNeighbors.getData());
                 }

@@ -154,7 +154,10 @@ public:
                 GrainsMemBuffer<Kinematics<T>>&       velocity,
                 const LinkedCellParameters<T>&        LCParameters,
                 const uint                            numObstacles,
-                const uint                            numParticles);
+                const uint                            numParticles,
+                const GrainsMemBuffer<uint>&          bodyTag,
+                const GrainsMemBuffer<Vector3<T>>&    localPos,
+                const GrainsMemBuffer<Quaternion<T>>& localQuat);
     //@}
 };
 

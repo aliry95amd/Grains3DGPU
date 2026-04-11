@@ -200,7 +200,10 @@ void ComponentManager<T, M>::insertParticles(const std::unique_ptr<Insertion<T>>
                                 m_velocity,
                                 GrainsParameters<T>::m_collisionDetection.linkedCellParameters,
                                 m_counts.numObstacles,
-                                m_counts.numParticles);
+                                m_counts.numParticles,
+                                m_bodyTag,
+                                m_localPos,
+                                m_localQuat);
     }
 }
 

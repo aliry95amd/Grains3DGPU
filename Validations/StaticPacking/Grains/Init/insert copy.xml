@@ -2,17 +2,17 @@
 
 <Construction>
 	<Origin X="-0.03" Y="-0.03" Z="0.0"/>
-	<MaxCoordinate X="0.03" Y="0.03" Z="0.10"/>
+	<MaxCoordinate X="0.03" Y="0.03" Z="0.15"/>
 	<Periodicity PX="0" PY="0" PZ="0"/>
 
 	<CollisionDetection EnableTimings="true" UseRelativeTransformations="false">
-		<NeighborList Type="LinkedCell"/>
-		<LinkedCell Type="Device_Atomic" CellSizeFactor="1.0" UpdatingFrequency="1000" SortingFrequency="10"/>
+		<NeighborList Type="LinkedCell" UpdateFrequency="1"/>
+		<LinkedCell Type="Device_Atomic" CellSizeFactor="1.0" UpdatingFrequency="0" SortingFrequency="0"/>
 		<BoundingVolume Type="OBC"/>
 		<NarrowPhase Type="GJK" Acceleration="false"/>
 	</CollisionDetection>
 
-	<ContactForceModels EnableTimings="true" Compaction="false">
+	<ContactForceModels EnableTimings="true" Compaction="true">
 		<ContactForceModel Type='Hooke'>
 			<Material materialA="matP" materialB="matP"/>
 			<Parameters kn="1.2e6" en="0.6" etat="-1" muc="0.5" kr="0.0"/>
@@ -25,16 +25,16 @@
 	</TemporalSetting>
 
 	<Particles>
-		<Particle Number="250" Density="1163.66" Material="matP">
-				<Superquadric a="0.004" b="0.004" c="0.00265" n1="32" n2="32"/>
+		<Particle Number="1" Density="1163.66" Material="matP">
 				<Box LX="0.004" LY="0.004" LZ="0.0053"/>
+				<Superquadric a="0.004" b="0.004" c="0.00265" n1="32" n2="32"/>
 			<Convex CrustThickness="1.e-5">
 				<Cylinder Radius="0.004" Height="0.0053"/>
 			</Convex>
-		</Particle>
-			<!-- <Transformation>
+			<Transformation>
 				<AngularPosition Type="Angles" aX="30." aY="0." aZ="30."/>		
-			</Transformation> -->
+			</Transformation>
+		</Particle>
 		<!-- <Particle Type="Composite" Number="1" Density="1163.66" Material="matP">
 			<SubBody LocalIdx="0">
 				<Convex CrustThickness="1.e-5">
@@ -73,37 +73,37 @@
 		</Obstacle>
 		<Obstacle Material="matP">
 			<Convex CrustThickness="1.e-4">
-				<Rectangle LX="0.10" LY="0.06" LZ="0.001"/>
+				<Rectangle LX="0.15" LY="0.06" LZ="0.001"/>
 			</Convex>
 			<Transformation>
-				<Centre X="0.03" Y="0.0" Z="0.05"/>
+				<Centre X="0.03" Y="0.0" Z="0.075"/>
 				<AngularPosition Type="Angles" aX="0." aY="-90." aZ="0."/>
 			</Transformation>
 		</Obstacle>
 		<Obstacle Material="matP">
 			<Convex CrustThickness="1.e-4">
-				<Rectangle LX="0.10" LY="0.06" LZ="0.001"/>
+				<Rectangle LX="0.15" LY="0.06" LZ="0.001"/>
 			</Convex>
 			<Transformation>
-				<Centre X="-0.03" Y="0.0" Z="0.05"/>
+				<Centre X="-0.03" Y="0.0" Z="0.075"/>
 				<AngularPosition Type="Angles" aX="0." aY="90." aZ="0."/>
 			</Transformation>
 		</Obstacle>
 		<Obstacle Material="matP">
 			<Convex CrustThickness="1.e-4">
-				<Rectangle LX="0.06" LY="0.10" LZ="0.001"/>
+				<Rectangle LX="0.06" LY="0.15" LZ="0.001"/>
 			</Convex>
 			<Transformation>
-				<Centre X="0.0" Y="0.03" Z="0.05"/>
+				<Centre X="0.0" Y="0.03" Z="0.075"/>
 				<AngularPosition Type="Angles" aX="90." aY="0." aZ="0."/>
 			</Transformation>
 		</Obstacle>
 		<Obstacle Material="matP">
 			<Convex CrustThickness="1.e-4">
-				<Rectangle LX="0.06" LY="0.10" LZ="0.001"/>
+				<Rectangle LX="0.06" LY="0.15" LZ="0.001"/>
 			</Convex>
 			<Transformation>
-				<Centre X="0.0" Y="-0.03" Z="0.05"/>
+				<Centre X="0.0" Y="-0.03" Z="0.075"/>
 				<AngularPosition Type="Angles" aX="-90." aY="0." aZ="0."/>
 			</Transformation>
 		</Obstacle>
@@ -115,18 +115,18 @@
 </Forces>
 
 <Simulation>
-	<Verbosity Frequency="1000"/>
+	<Verbosity Frequency="10000"/>
 	<Timings Enable="true"/>
-	<ParticleInsertion ForceInsertion="0">
+	<ParticleInsertion ForceInsertion="1">
 		<InitialPosition Type="Random" Seed="UserDefined" Value="1">
 			<Windows>
 				<Window Type="Box">
-					<MinPoint X="-0.03" Y="-0.03" Z="0.00"/>
-					<MaxPoint X="0.03" Y="0.03" Z="0.1"/>
+					<MinPoint X="-0.00" Y="-0.00" Z="0.01"/>
+					<MaxPoint X="-0.00" Y="-0.00" Z="0.01"/>
 				</Window>
 			</Windows>
 		</InitialPosition>
-        <InitialOrientation Type="Random" Seed="UserDefined" Value="1">
+        <InitialOrientation Type="Zero" Seed="UserDefined" Value="1">
 			<Windows>
 				<Window Type="Box">
 					<MinPoint X="0" Y="0" Z="0"/>

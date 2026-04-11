@@ -1,4 +1,5 @@
 #include "Convex.hh"
+#include "VectorMath.hh"
 
 // -------------------------------------------------------------------------------------------------
 // Default constructor
@@ -12,6 +13,14 @@ __HOSTDEVICE__ Convex<T>::Convex()
 template <typename T>
 __HOSTDEVICE__ Convex<T>::~Convex()
 {
+}
+
+// -------------------------------------------------------------------------------------------------
+// Eroded convex support function
+template <typename T>
+__HOSTDEVICE__ Vector3<T> Convex<T>::support(const Vector3<T>& v, T crust, T invNorm) const
+{
+    return support(v) - (crust * invNorm) * v;
 }
 
 // -------------------------------------------------------------------------------------------------

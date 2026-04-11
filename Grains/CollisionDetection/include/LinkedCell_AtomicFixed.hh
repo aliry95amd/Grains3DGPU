@@ -286,18 +286,18 @@ public:
         {
             // Complete preparation: resize, insert particles, generate neighbors, link obstacles
             this->prepareLinkedCellUpdate();
-            // relink obstacles
             this->linkObstacles();
-        }
-        else
-        {
-            // Only relink obstacles if they moved
-            if(SS.obstaclesMoved)
-                this->linkObstacles();
+            if(m_useAdaptiveSkin)
+                this->launchDisplacementReduceAsync();
             return true;
         }
 
-        return true;
+        // No LC rebuild needed: only relink obstacles if they moved
+        if(SS.obstaclesMoved)
+            this->linkObstacles();
+        if(m_useAdaptiveSkin)
+            this->launchDisplacementReduceAsync();
+        return false;
     }
     //@}
 };
