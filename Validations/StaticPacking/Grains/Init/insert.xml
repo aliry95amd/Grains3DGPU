@@ -1,4 +1,4 @@
-<Grains3D Type="GPU" Precision="Double">
+<Grains3D Type="Standard" Precision="Double">
 
 <Construction>
 	<Origin X="-0.03" Y="-0.03" Z="0.0"/>
@@ -7,21 +7,21 @@
 
 	<CollisionDetection EnableTimings="true" UseRelativeTransformations="false">
 		<NeighborList Type="LinkedCell"/>
-		<LinkedCell Type="Device_Atomic" CellSizeFactor="1.0" UpdatingFrequency="1000" SortingFrequency="10"/>
+		<LinkedCell Type="Device_Atomic" CellSizeFactor="1.0" UpdatingFrequency="0" SortingFrequency="0"/>
 		<BoundingVolume Type="OBC"/>
-		<NarrowPhase Type="GJK" Acceleration="false"/>
+		<NarrowPhase Type="GJK" Acceleration="false" PrebuiltShapes="true"/>
 	</CollisionDetection>
 
 	<ContactForceModels EnableTimings="true" Compaction="false">
-		<ContactForceModel Type='Hooke'>
+		<ContactForceModel Type='HookeMemory'>
 			<Material materialA="matP" materialB="matP"/>
-			<Parameters kn="1.2e6" en="0.6" etat="-1" muc="0.5" kr="0.0"/>
+			<Parameters kn="1.2e6" en="0.6" kt="1.2e6" etat="-1" muc="0.5" kr="0.0"/>
 		</ContactForceModel>
 	</ContactForceModels>
 
 	<TemporalSetting>
 		<TimeInterval Start="0." End="1.e-0" dt="1e-6"/>
-		<TimeIntegration Type="FirstOrderExplicit"/>
+		<TimeIntegration Type="SecondOrderLeapFrog"/>
 	</TemporalSetting>
 
 	<Particles>

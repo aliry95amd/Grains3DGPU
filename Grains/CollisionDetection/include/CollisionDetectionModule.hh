@@ -7,6 +7,7 @@
 #include "BodyTag.hh"
 #include "CollisionDetectionCommon.hh"
 #include "ContactInfo.hh"
+#include "GJK_ShapeData.hh"
 #include "GrainsMemBuffer.hh"
 #include "GrainsParameters.hh"
 #include "GrainsUtils.hh"
@@ -62,6 +63,14 @@ private:
     GrainsMemBuffer<uint8_t, M> m_cubTempStorage;
     /** \brief Byte size of the CUB scratch buffer */
     size_t m_cubTempStorageBytes = 0;
+    /** \brief Pre-built ShapeData array for vtable-free GJK support evaluation.
+        ShapeId-indexed (one entry per unique shape, size = nUniqueShapes). */
+    GrainsMemBuffer<ShapeData<T>, M> m_shapeData;
+    /** \brief Pre-built BVData array for vtable-free bounding-volume queries.
+        ShapeId-indexed (one entry per unique shape, size = nUniqueShapes). */
+    GrainsMemBuffer<BVData<T>, M> m_bvData;
+    /** \brief Number of unique shapes (= max shapeId+1 from bodyTags). */
+    uint m_nUniqueShapes = 0;
     //@}
 
 public:
@@ -74,12 +83,15 @@ public:
         @param rigidBody    Pointer to the rigid body buffer
         @param positions    Position buffer (used for initial cell assignment)
         @param orientations Quaternion buffer
+        @param bodyTags     Body-tag buffer (encodes shapeId; used to build compact shape tables)
         @param CD           Collision detection parameters
         @param nObstacles   Number of obstacles
         @param nParticles   Number of moving particles */
     CollisionDetectionModule(const GrainsMemBuffer<RigidBody<T>*, M>* rigidBody,
                              const GrainsMemBuffer<Vector3<T>, M>&    positions,
                              const GrainsMemBuffer<Quaternion<T>, M>& orientations,
+                             const GrainsMemBuffer<uint, M>&          bodyTags,
+                             const uint*                              hostBodyTags,
                              const CollisionDetectionParameters<T>&   CD,
                              uint                                     nObstacles,
                              uint                                     nParticles);
@@ -276,6 +288,18 @@ private:
                        GrainsMemBuffer<Quaternion<T>, M>& localQuat,
                        GrainsMemBuffer<uint, M>&          masterSlot,
                        const ComponentCounts&             counts);
+
+    /** @brief Builds (or rebuilds) the compact m_shapeData and m_bvData arrays.
+        Scans bodyTags to identify unique shapes (by shapeId), builds a representative-slot
+        table, then fills one ShapeData and one BVData entry per unique shape.
+        On DEVICE: downloads bodyTags, builds repSlots on CPU, uploads, launches kernels.
+        On HOST: scans directly and calls buildShapeAndBVData (CPU loop).
+        @param rigidBodies   Raw pointer array of RigidBody* (slot-indexed)
+        @param bodyTagsData  Raw pointer to per-component body tags (host-accessible)
+        @param nComponents   Total number of component slots (obstacles + particles) */
+    void buildShapeAndBVData(const RigidBody<T>* const* rigidBodies,
+                             const uint*                bodyTagsData,
+                             uint                       nComponents);
     //@}
 };
 

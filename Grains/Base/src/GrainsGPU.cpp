@@ -223,14 +223,31 @@ void GrainsGPU<T>::Construction(DOMElement* rootElement)
 
     // ---------------------------------------------------------------------------------------------
     // Setting up the component managers
-    m_d_components = std::make_unique<ComponentManager<T, MemType::DEVICE>>(
-        &m_d_rigidBodyList,
-        Grains<T>::m_components->getNumberOfObstacles(),
-        Grains<T>::m_components->getNumberOfParticles(),
-        Grains<T>::m_components->getNumberOfComposites(),
-        Grains<T>::m_components->getNumberOfSubBodies());
-    // Create the collision detection module, pair buffers, and force module
-    m_d_components->initialize();
+    // Collect all initial state from the CPU manager as HOST buffers.
+    // The DEVICE constructor uploads them to device and creates CDM + ForceModule.
+    auto&                                         hm = *Grains<T>::m_components;
+    GrainsMemBuffer<uint, MemType::HOST>          hostBodyTags;
+    GrainsMemBuffer<Vector3<T>, MemType::HOST>    hostPos;
+    GrainsMemBuffer<Quaternion<T>, MemType::HOST> hostOri;
+    GrainsMemBuffer<Vector3<T>, MemType::HOST>    hostLocalPos;
+    GrainsMemBuffer<Quaternion<T>, MemType::HOST> hostLocalQuat;
+    hm.getBodyTag(hostBodyTags);
+    hm.getPosition(hostPos);
+    hm.getQuaternion(hostOri);
+    hm.getLocalPos(hostLocalPos);
+    hm.getLocalQuat(hostLocalQuat);
+
+    m_d_components
+        = std::make_unique<ComponentManager<T, MemType::DEVICE>>(&m_d_rigidBodyList,
+                                                                 std::move(hostBodyTags),
+                                                                 std::move(hostPos),
+                                                                 std::move(hostOri),
+                                                                 std::move(hostLocalPos),
+                                                                 std::move(hostLocalQuat),
+                                                                 hm.getNumberOfObstacles(),
+                                                                 hm.getNumberOfParticles(),
+                                                                 hm.getNumberOfComposites(),
+                                                                 hm.getNumberOfSubBodies());
 }
 
 // -------------------------------------------------------------------------------------------------

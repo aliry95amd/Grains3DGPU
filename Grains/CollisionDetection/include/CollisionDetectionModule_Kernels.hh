@@ -7,6 +7,7 @@
 #include "BodyTag.hh"
 #include "ContactInfo.hh"
 #include "GJK.hh"
+#include "GJK_ShapeData.hh"
 #include "GrainsParameters.hh"
 #include "Quaternion.hh"
 #include "RigidBody.hh"
@@ -86,6 +87,50 @@ __GLOBAL__ void filterPairsBV_Global_Kernel(const RigidBody<T>* const* rigidBodi
                                             uint8_t*                   bvPassFlags,
                                             const uint                 nPairs);
 
+/** @brief BV pre-filter kernel using pre-built BVData (circumscribed radius stored inline).
+    Uses per-pair relative transforms (pre-computed by computeRelativeTransformations_Kernel).
+    @param bvData        Pre-built BVData array (shapeId-indexed, size = nUniqueShapes)
+    @param pairList      List of pairs
+    @param bodyTags      Per-component body tags (shapeId + composite membership)
+    @param numComposites Number of composite bodies
+    @param relPosition   Per-pair relative positions (B in A-local)
+    @param relQuaternion Per-pair relative quaternions (B in A-local)
+    @param contactInfo   Per-pair contact info buffer; sentinel written for rejected pairs
+    @param bvPassFlags   Output pass/fail flags (0 = reject, 1 = pass)
+    @param nPairs        Number of pairs */
+template <typename T, BoundingVolumeType BVType = BoundingVolumeType::OBB>
+__GLOBAL__ void filterPairsBV_Kernel(const BVData<T>*     bvData,
+                                     const uint2*         pairList,
+                                     const uint*          bodyTags,
+                                     uint                 numComposites,
+                                     const Vector3<T>*    relPosition,
+                                     const Quaternion<T>* relQuaternion,
+                                     ContactInfo<T>*      contactInfo,
+                                     uint8_t*             bvPassFlags,
+                                     const uint           nPairs);
+
+/** @brief BV pre-filter kernel using pre-built BVData and world-frame positions/quaternions.
+    Circumscribed radii are stored in BVData; no RigidBody pointer needed.
+    @param bvData        Pre-built BVData array (shapeId-indexed, size = nUniqueShapes)
+    @param pairList      List of pairs
+    @param bodyTags      Per-component body tags (shapeId + composite membership)
+    @param numComposites Number of composite bodies
+    @param positions     World-frame positions
+    @param quaternions   World-frame quaternions
+    @param contactInfo   Per-pair contact info buffer; sentinel written for rejected pairs
+    @param bvPassFlags   Output pass/fail flags
+    @param nPairs        Number of pairs */
+template <typename T, BoundingVolumeType BVType = BoundingVolumeType::OBB>
+__GLOBAL__ void filterPairsBV_Global_Kernel(const BVData<T>*     bvData,
+                                            const uint2*         pairList,
+                                            const uint*          bodyTags,
+                                            uint                 numComposites,
+                                            const Vector3<T>*    positions,
+                                            const Quaternion<T>* quaternions,
+                                            ContactInfo<T>*      contactInfo,
+                                            uint8_t*             bvPassFlags,
+                                            const uint           nPairs);
+
 /** @brief Narrow-phase GJK detection (relative vec/quat).
     When activePairIndices is non-null each thread resolves its original pair index through the
     indirection table; when null the thread ID is used directly.
@@ -150,6 +195,75 @@ __GLOBAL__ void transformContactInfo_Kernel(const Vector3<T>*    position,
     @param nComponents Total number of components (obstacles + particles) */
 __GLOBAL__ void
     rebuildMasterSlot_Kernel(uint* masterSlot, const uint* bodyTag, const uint nComponents);
+
+/** @brief Fills the compact ShapeData table from the rigid body pointer array on the GPU.
+    One thread per unique shape; repSlots[k] gives the representative component slot for shape k.
+    @param shapeData      Output ShapeData array (size = nUniqueShapes)
+    @param rigidBody      Rigid body pointer array (slot-indexed, size >= nComponents)
+    @param repSlots       Representative slot for each unique shape (size = nUniqueShapes)
+    @param nUniqueShapes  Number of unique shapes (table size) */
+template <typename T>
+__GLOBAL__ void fillShapeData_Kernel(ShapeData<T>*              shapeData,
+                                     const RigidBody<T>* const* rigidBody,
+                                     const uint*                repSlots,
+                                     const uint                 nUniqueShapes);
+
+/** @brief Fills the compact BVData table from the rigid body pointer array on the GPU.
+    One thread per unique shape; repSlots[k] gives the representative component slot for shape k.
+    @param bvData         Output BVData array (size = nUniqueShapes)
+    @param rigidBody      Rigid body pointer array (slot-indexed, size >= nComponents)
+    @param repSlots       Representative slot for each unique shape (size = nUniqueShapes)
+    @param nUniqueShapes  Number of unique shapes (table size) */
+template <typename T>
+__GLOBAL__ void fillBVData_Kernel(BVData<T>*                 bvData,
+                                  const RigidBody<T>* const* rigidBody,
+                                  const uint*                repSlots,
+                                  const uint                 nUniqueShapes);
+
+/** @brief Narrow-phase GJK detection with vtable-free support evaluation via ShapeData.
+    ShapeData indexed by shapeId (via bodyTags) for deduplication — no RigidBody needed.
+    When activePairIndices is non-null each thread resolves its original pair index via the
+    indirection table; when null the thread ID maps directly to the pair.
+    @param shapeData         Pre-built ShapeData array (shapeId-indexed, size = nUniqueShapes)
+    @param pairList          Full pair list
+    @param bodyTags          Per-component body tags (encodes shapeId)
+    @param activePairIndices Compacted index table from CUB, or nullptr to process all pairs
+    @param relPosition       Per-pair relative positions (B in A-local)
+    @param relQuaternion     Per-pair relative quaternions (B in A-local)
+    @param contactInfo       Output contact information (A-local frame)
+    @param nPairs            Number of pairs to process (active or total) */
+template <typename T, GJKType GJKVARIANT = GJKType::JOHNSON, bool GJKACC = false>
+__GLOBAL__ void detectCollisionsComponents_Kernel(const ShapeData<T>*  shapeData,
+                                                  const uint2*         pairList,
+                                                  const uint*          bodyTags,
+                                                  const uint*          activePairIndices,
+                                                  const Vector3<T>*    relPosition,
+                                                  const Quaternion<T>* relQuaternion,
+                                                  ContactInfo<T>*      contactInfo,
+                                                  const uint           nPairs);
+
+/** @brief Narrow-phase GJK detection with vtable-free support evaluation via ShapeData,
+    using absolute world-frame positions and quaternions.
+    ShapeData indexed by shapeId (via bodyTags) for deduplication — no RigidBody needed.
+    When activePairIndices is non-null each thread resolves its original pair index via the
+    indirection table; when null the thread ID maps directly to the pair.
+    @param shapeData         Pre-built ShapeData array (shapeId-indexed, size = nUniqueShapes)
+    @param pairList          Full pair list
+    @param bodyTags          Per-component body tags (encodes shapeId)
+    @param activePairIndices Compacted index table from CUB, or nullptr to process all pairs
+    @param position          World-frame positions
+    @param quaternion        World-frame quaternions
+    @param contactInfo       Output contact information
+    @param nPairs            Number of pairs to process (active or total) */
+template <typename T, GJKType GJKVARIANT = GJKType::JOHNSON, bool GJKACC = false>
+__GLOBAL__ void detectCollisionsComponentsGlobal_Kernel(const ShapeData<T>*  shapeData,
+                                                        const uint2*         pairList,
+                                                        const uint*          bodyTags,
+                                                        const uint*          activePairIndices,
+                                                        const Vector3<T>*    position,
+                                                        const Quaternion<T>* quaternion,
+                                                        ContactInfo<T>*      contactInfo,
+                                                        const uint           nPairs);
 //@}
 
 #endif

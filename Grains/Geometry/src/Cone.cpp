@@ -66,6 +66,14 @@ __HOSTDEVICE__ T Cone<T>::getHeight() const
 }
 
 // -------------------------------------------------------------------------------------------------
+// Returns the sine of the half-angle
+template <typename T>
+__HOSTDEVICE__ T Cone<T>::getSinAngle() const
+{
+    return (m_sinAngle);
+}
+
+// -------------------------------------------------------------------------------------------------
 // Returns a clone of the cone
 template <typename T>
 __HOSTDEVICE__ Convex<T>* Cone<T>::clone() const

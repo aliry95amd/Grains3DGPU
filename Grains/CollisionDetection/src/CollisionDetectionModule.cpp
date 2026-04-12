@@ -36,6 +36,8 @@ CollisionDetectionModule<T, M>::CollisionDetectionModule(
     const GrainsMemBuffer<RigidBody<T>*, M>* rigidBody,
     const GrainsMemBuffer<Vector3<T>, M>&    positions,
     const GrainsMemBuffer<Quaternion<T>, M>& orientations,
+    const GrainsMemBuffer<uint, M>&          bodyTags,
+    const uint*                              hostBodyTags,
     const CollisionDetectionParameters<T>&   CD,
     uint                                     nObstacles,
     uint                                     nParticles)
@@ -80,6 +82,11 @@ CollisionDetectionModule<T, M>::CollisionDetectionModule(
                                    (int*)nullptr,
                                    (int)estimatedPairs);
         m_cubTempStorage.initialize(m_cubTempStorageBytes);
+    }
+    if(CD.usePrebuiltShapes)
+    {
+        const uint nComponents = nObstacles + nParticles;
+        buildShapeAndBVData(rigidBody->getData(), hostBodyTags, nComponents);
     }
 }
 
@@ -269,6 +276,76 @@ void CollisionDetectionModule<T, M>::computeRelativeTransformations(
 }
 
 // -------------------------------------------------------------------------------------------------
+// Builds compact ShapeData and BVData tables indexed by shapeId (not component slot).
+// Scans bodyTagsData to find nUniqueShapes and the representative slot for each shapeId.
+// DEVICE: uploads repSlots to GPU, launches two fill kernels (one thread per unique shape).
+// HOST:   calls buildShapeAndBVData (CPU loop over unique shapes).
+template <typename T, MemType M>
+void CollisionDetectionModule<T, M>::buildShapeAndBVData(const RigidBody<T>* const* rigidBodies,
+                                                         const uint*                bodyTagsData,
+                                                         uint                       nComponents)
+{
+    // Pass 1: scan bodyTags on CPU (bodyTagsData is always host-accessible here)
+    constexpr uint   MAX_SHAPES = 1024u;  // 10-bit shapeId field
+    std::vector<int> repSlotsV(MAX_SHAPES, -1);
+    uint             nUniqueShapes = 0;
+    for(uint i = 0; i < nComponents; ++i)
+    {
+        const uint shapeId = getShapeId(bodyTagsData[i]);
+        if(repSlotsV[shapeId] < 0)
+        {
+            repSlotsV[shapeId] = static_cast<int>(i);
+            if(shapeId + 1 > nUniqueShapes)
+                nUniqueShapes = shapeId + 1;
+        }
+    }
+    m_nUniqueShapes = nUniqueShapes;
+
+    // Build compact repSlots array (size = nUniqueShapes)
+    std::vector<uint> repSlots(nUniqueShapes);
+    for(uint k = 0; k < nUniqueShapes; ++k)
+        repSlots[k] = (repSlotsV[k] >= 0) ? static_cast<uint>(repSlotsV[k]) : 0u;
+
+    // Pass 2: fill tables
+    m_shapeData.initialize(nUniqueShapes);
+    m_bvData.initialize(nUniqueShapes);
+
+    if constexpr(M == MemType::DEVICE)
+    {
+        // Upload repSlots to device
+        GrainsMemBuffer<uint, MemType::DEVICE> d_repSlots;
+        d_repSlots.initialize(nUniqueShapes);
+        cudaMemcpy(d_repSlots.getData(),
+                   repSlots.data(),
+                   nUniqueShapes * sizeof(uint),
+                   cudaMemcpyHostToDevice);
+
+        uint numThreads, numBlocks;
+        computeOptimalThreadsAndBlocks(nUniqueShapes,
+                                       GrainsParameters<T>::m_GPU,
+                                       numBlocks,
+                                       numThreads);
+        fillShapeData_Kernel<T><<<numBlocks, numThreads>>>(m_shapeData.getData(),
+                                                           rigidBodies,
+                                                           d_repSlots.getData(),
+                                                           nUniqueShapes);
+        fillBVData_Kernel<T><<<numBlocks, numThreads>>>(m_bvData.getData(),
+                                                        rigidBodies,
+                                                        d_repSlots.getData(),
+                                                        nUniqueShapes);
+        cudaDeviceSynchronize();
+    }
+    else
+    {
+        ::buildShapeAndBVData(m_shapeData.getData(),
+                              m_bvData.getData(),
+                              rigidBodies,
+                              repSlots.data(),
+                              nUniqueShapes);
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
 // Performs a narrow-phase GJK-based collision detection for each pair and writes contact info in
 // A-local frame. DEVICE BV-ON and composite paths use the compacted m_bvPassPairIndices list.
 template <typename T, MemType M>
@@ -352,17 +429,30 @@ void CollisionDetectionModule<T, M>::detectCollisionsComponents(
                                                GrainsParameters<T>::m_GPU,
                                                numBlocks,
                                                numThreads);
+                const bool usePrebuilt
+                    = GrainsParameters<T>::m_collisionDetection.usePrebuiltShapes;
                 dispatchGJK(npType, gjkAcc, [&](auto gjkV_tag, auto gjkA_tag) {
                     constexpr GJKType GJKV = decltype(gjkV_tag)::value;
                     constexpr bool    GJKA = decltype(gjkA_tag)::value;
-                    detectCollisionsComponents_Kernel<T, GJKV, GJKA>
-                        <<<numBlocks, numThreads>>>(rigidBodies,
-                                                    pairList.getData(),
-                                                    m_bvPassPairIndices.getData(),
-                                                    m_relPosition.getData(),
-                                                    m_relQuaternion.getData(),
-                                                    m_contactInfoLocal.getData(),
-                                                    (uint)*m_bvPassPairCountMapped.getData());
+                    if(usePrebuilt)
+                        detectCollisionsComponents_Kernel<T, GJKV, GJKA>
+                            <<<numBlocks, numThreads>>>(m_shapeData.getData(),
+                                                        pairList.getData(),
+                                                        bodyTags.getData(),
+                                                        m_bvPassPairIndices.getData(),
+                                                        m_relPosition.getData(),
+                                                        m_relQuaternion.getData(),
+                                                        m_contactInfoLocal.getData(),
+                                                        (uint)*m_bvPassPairCountMapped.getData());
+                    else
+                        detectCollisionsComponents_Kernel<T, GJKV, GJKA>
+                            <<<numBlocks, numThreads>>>(rigidBodies,
+                                                        pairList.getData(),
+                                                        m_bvPassPairIndices.getData(),
+                                                        m_relPosition.getData(),
+                                                        m_relQuaternion.getData(),
+                                                        m_contactInfoLocal.getData(),
+                                                        (uint)*m_bvPassPairCountMapped.getData());
                 });
                 cudaDeviceSynchronize();
             }
@@ -379,17 +469,30 @@ void CollisionDetectionModule<T, M>::detectCollisionsComponents(
                                                GrainsParameters<T>::m_GPU,
                                                numBlocks,
                                                numThreads);
+                const bool usePrebuilt
+                    = GrainsParameters<T>::m_collisionDetection.usePrebuiltShapes;
                 dispatchGJK(npType, gjkAcc, [&](auto gjkV_tag, auto gjkA_tag) {
                     constexpr GJKType GJKV = decltype(gjkV_tag)::value;
                     constexpr bool    GJKA = decltype(gjkA_tag)::value;
-                    detectCollisionsComponents_Kernel<T, GJKV, GJKA>
-                        <<<numBlocks, numThreads>>>(rigidBodies,
-                                                    pairList.getData(),
-                                                    nullptr,
-                                                    m_relPosition.getData(),
-                                                    m_relQuaternion.getData(),
-                                                    m_contactInfoLocal.getData(),
-                                                    nPairs);
+                    if(usePrebuilt)
+                        detectCollisionsComponents_Kernel<T, GJKV, GJKA>
+                            <<<numBlocks, numThreads>>>(m_shapeData.getData(),
+                                                        pairList.getData(),
+                                                        bodyTags.getData(),
+                                                        nullptr,
+                                                        m_relPosition.getData(),
+                                                        m_relQuaternion.getData(),
+                                                        m_contactInfoLocal.getData(),
+                                                        nPairs);
+                    else
+                        detectCollisionsComponents_Kernel<T, GJKV, GJKA>
+                            <<<numBlocks, numThreads>>>(rigidBodies,
+                                                        pairList.getData(),
+                                                        nullptr,
+                                                        m_relPosition.getData(),
+                                                        m_relQuaternion.getData(),
+                                                        m_contactInfoLocal.getData(),
+                                                        nPairs);
                 });
                 cudaDeviceSynchronize();
             }
@@ -421,7 +524,8 @@ void CollisionDetectionModule<T, M>::detectCollisionsComponentsGlobal(
         // BVType is passed directly to detectCollisionsComponentsGlobal_common, which forwards
         // it to closestPointsRigidBodies. The BV early-out and no-contact sentinel are handled
         // internally. Intra-composite pairs are skipped via an explicit guard before the call.
-        auto run = [&](auto bvTypeTag) {
+        const bool usePrebuilt = GrainsParameters<T>::m_collisionDetection.usePrebuiltShapes;
+        auto       run         = [&](auto bvTypeTag) {
             constexpr BoundingVolumeType BVT = decltype(bvTypeTag)::value;
             gt.start(CDMStage::NarrowPhase);
             dispatchGJK(npType, gjkAcc, [&](auto gjkV_tag, auto gjkA_tag) {
@@ -442,13 +546,23 @@ void CollisionDetectionModule<T, M>::detectCollisionsComponentsGlobal(
                             continue;
                         }
                     }
-                    detectCollisionsComponentsGlobal_common<T, GJKV, GJKA, BVT>(
-                        pairList.getData(),
-                        rigidBodies,
-                        positions.getData(),
-                        orientations.getData(),
-                        contactInfo.getData(),
-                        i);
+                    if(usePrebuilt)
+                        detectCollisionsComponentsGlobal_common<T, GJKV, GJKA, BVT>(
+                            pairList.getData(),
+                            m_shapeData.getData(),
+                            bt,
+                            positions.getData(),
+                            orientations.getData(),
+                            contactInfo.getData(),
+                            i);
+                    else
+                        detectCollisionsComponentsGlobal_common<T, GJKV, GJKA, BVT>(
+                            pairList.getData(),
+                            rigidBodies,
+                            positions.getData(),
+                            orientations.getData(),
+                            contactInfo.getData(),
+                            i);
                 }
             });
             gt.stop(CDMStage::NarrowPhase);
@@ -524,17 +638,33 @@ void CollisionDetectionModule<T, M>::detectCollisionsComponentsGlobal(
                                                GrainsParameters<T>::m_GPU,
                                                numBlocks,
                                                numThreads);
+                const bool usePrebuilt
+                    = GrainsParameters<T>::m_collisionDetection.usePrebuiltShapes;
                 dispatchGJK(npType, gjkAcc, [&](auto gjkV_tag, auto gjkA_tag) {
                     constexpr GJKType GJKV = decltype(gjkV_tag)::value;
                     constexpr bool    GJKA = decltype(gjkA_tag)::value;
-                    detectCollisionsComponentsGlobal_Kernel<T, GJKV, GJKA, BoundingVolumeType::OFF>
-                        <<<numBlocks, numThreads>>>(rigidBodies,
-                                                    pairList.getData(),
-                                                    m_bvPassPairIndices.getData(),
-                                                    positions.getData(),
-                                                    orientations.getData(),
-                                                    contactInfo.getData(),
-                                                    (uint)*m_bvPassPairCountMapped.getData());
+                    if(usePrebuilt)
+                        detectCollisionsComponentsGlobal_Kernel<T, GJKV, GJKA>
+                            <<<numBlocks, numThreads>>>(m_shapeData.getData(),
+                                                        pairList.getData(),
+                                                        bodyTags.getData(),
+                                                        m_bvPassPairIndices.getData(),
+                                                        positions.getData(),
+                                                        orientations.getData(),
+                                                        contactInfo.getData(),
+                                                        (uint)*m_bvPassPairCountMapped.getData());
+                    else
+                        detectCollisionsComponentsGlobal_Kernel<T,
+                                                                GJKV,
+                                                                GJKA,
+                                                                BoundingVolumeType::OFF>
+                            <<<numBlocks, numThreads>>>(rigidBodies,
+                                                        pairList.getData(),
+                                                        m_bvPassPairIndices.getData(),
+                                                        positions.getData(),
+                                                        orientations.getData(),
+                                                        contactInfo.getData(),
+                                                        (uint)*m_bvPassPairCountMapped.getData());
                 });
                 cudaDeviceSynchronize();
             }
@@ -551,17 +681,33 @@ void CollisionDetectionModule<T, M>::detectCollisionsComponentsGlobal(
                                                GrainsParameters<T>::m_GPU,
                                                numBlocks,
                                                numThreads);
+                const bool usePrebuilt
+                    = GrainsParameters<T>::m_collisionDetection.usePrebuiltShapes;
                 dispatchGJK(npType, gjkAcc, [&](auto gjkV_tag, auto gjkA_tag) {
                     constexpr GJKType GJKV = decltype(gjkV_tag)::value;
                     constexpr bool    GJKA = decltype(gjkA_tag)::value;
-                    detectCollisionsComponentsGlobal_Kernel<T, GJKV, GJKA, BoundingVolumeType::OFF>
-                        <<<numBlocks, numThreads>>>(rigidBodies,
-                                                    pairList.getData(),
-                                                    nullptr,
-                                                    positions.getData(),
-                                                    orientations.getData(),
-                                                    contactInfo.getData(),
-                                                    nPairs);
+                    if(usePrebuilt)
+                        detectCollisionsComponentsGlobal_Kernel<T, GJKV, GJKA>
+                            <<<numBlocks, numThreads>>>(m_shapeData.getData(),
+                                                        pairList.getData(),
+                                                        bodyTags.getData(),
+                                                        nullptr,
+                                                        positions.getData(),
+                                                        orientations.getData(),
+                                                        contactInfo.getData(),
+                                                        nPairs);
+                    else
+                        detectCollisionsComponentsGlobal_Kernel<T,
+                                                                GJKV,
+                                                                GJKA,
+                                                                BoundingVolumeType::OFF>
+                            <<<numBlocks, numThreads>>>(rigidBodies,
+                                                        pairList.getData(),
+                                                        nullptr,
+                                                        positions.getData(),
+                                                        orientations.getData(),
+                                                        contactInfo.getData(),
+                                                        nPairs);
                 });
                 cudaDeviceSynchronize();
             }
@@ -600,31 +746,61 @@ void CollisionDetectionModule<T, M>::filterPairsBV(
         // Step 1: BV pass/fail flags + no-contact sentinels for rejected pairs
         const BoundingVolumeType bvType
             = GrainsParameters<T>::m_collisionDetection.boundingVolumeType;
+        const bool usePrebuilt = GrainsParameters<T>::m_collisionDetection.usePrebuiltShapes;
         if(bvType == BoundingVolumeType::OBC)
-            filterPairsBV_Kernel<T, BoundingVolumeType::OBC>
-                <<<numBlocks, numThreads>>>(rigidBodies,
-                                            pairList.getData(),
-                                            bodyTags,
-                                            numComposites,
-                                            m_relPosition.getData(),
-                                            m_relQuaternion.getData(),
-                                            contactInfoLocal.getData(),
-                                            m_bvPassFlags.getData(),
-                                            nPairs);
+        {
+            if(usePrebuilt)
+                filterPairsBV_Kernel<T, BoundingVolumeType::OBC>
+                    <<<numBlocks, numThreads>>>(m_bvData.getData(),
+                                                pairList.getData(),
+                                                bodyTags,
+                                                numComposites,
+                                                m_relPosition.getData(),
+                                                m_relQuaternion.getData(),
+                                                contactInfoLocal.getData(),
+                                                m_bvPassFlags.getData(),
+                                                nPairs);
+            else
+                filterPairsBV_Kernel<T, BoundingVolumeType::OBC>
+                    <<<numBlocks, numThreads>>>(rigidBodies,
+                                                pairList.getData(),
+                                                bodyTags,
+                                                numComposites,
+                                                m_relPosition.getData(),
+                                                m_relQuaternion.getData(),
+                                                contactInfoLocal.getData(),
+                                                m_bvPassFlags.getData(),
+                                                nPairs);
+        }
         else if(bvType == BoundingVolumeType::OBB)
-            filterPairsBV_Kernel<T, BoundingVolumeType::OBB>
-                <<<numBlocks, numThreads>>>(rigidBodies,
-                                            pairList.getData(),
-                                            bodyTags,
-                                            numComposites,
-                                            m_relPosition.getData(),
-                                            m_relQuaternion.getData(),
-                                            contactInfoLocal.getData(),
-                                            m_bvPassFlags.getData(),
-                                            nPairs);
+        {
+            if(usePrebuilt)
+                filterPairsBV_Kernel<T, BoundingVolumeType::OBB>
+                    <<<numBlocks, numThreads>>>(m_bvData.getData(),
+                                                pairList.getData(),
+                                                bodyTags,
+                                                numComposites,
+                                                m_relPosition.getData(),
+                                                m_relQuaternion.getData(),
+                                                contactInfoLocal.getData(),
+                                                m_bvPassFlags.getData(),
+                                                nPairs);
+            else
+                filterPairsBV_Kernel<T, BoundingVolumeType::OBB>
+                    <<<numBlocks, numThreads>>>(rigidBodies,
+                                                pairList.getData(),
+                                                bodyTags,
+                                                numComposites,
+                                                m_relPosition.getData(),
+                                                m_relQuaternion.getData(),
+                                                contactInfoLocal.getData(),
+                                                m_bvPassFlags.getData(),
+                                                nPairs);
+        }
         else
+        {
             // BV is OFF: composite-only filter — relPosition/relQuaternion not used by the
-            // kernel
+            // kernel. Prebuilt is identical for OFF, use regular kernel.
             filterPairsBV_Kernel<T, BoundingVolumeType::OFF>
                 <<<numBlocks, numThreads>>>(rigidBodies,
                                             pairList.getData(),
@@ -635,6 +811,7 @@ void CollisionDetectionModule<T, M>::filterPairsBV(
                                             contactInfoLocal.getData(),
                                             m_bvPassFlags.getData(),
                                             nPairs);
+        }
         cudaDeviceSynchronize();
 
         // Step 2: CUB compaction - select original pair indices where flag == 1
@@ -684,29 +861,59 @@ void CollisionDetectionModule<T, M>::filterPairsBV_global(
 
         const BoundingVolumeType bvType
             = GrainsParameters<T>::m_collisionDetection.boundingVolumeType;
+        const bool usePrebuilt = GrainsParameters<T>::m_collisionDetection.usePrebuiltShapes;
         if(bvType == BoundingVolumeType::OBC)
-            filterPairsBV_Global_Kernel<T, BoundingVolumeType::OBC>
-                <<<numBlocks, numThreads>>>(rigidBodies,
-                                            pairList.getData(),
-                                            bodyTags,
-                                            numComposites,
-                                            positions.getData(),
-                                            orientations.getData(),
-                                            contactInfoLocal.getData(),
-                                            m_bvPassFlags.getData(),
-                                            nPairs);
+        {
+            if(usePrebuilt)
+                filterPairsBV_Global_Kernel<T, BoundingVolumeType::OBC>
+                    <<<numBlocks, numThreads>>>(m_bvData.getData(),
+                                                pairList.getData(),
+                                                bodyTags,
+                                                numComposites,
+                                                positions.getData(),
+                                                orientations.getData(),
+                                                contactInfoLocal.getData(),
+                                                m_bvPassFlags.getData(),
+                                                nPairs);
+            else
+                filterPairsBV_Global_Kernel<T, BoundingVolumeType::OBC>
+                    <<<numBlocks, numThreads>>>(rigidBodies,
+                                                pairList.getData(),
+                                                bodyTags,
+                                                numComposites,
+                                                positions.getData(),
+                                                orientations.getData(),
+                                                contactInfoLocal.getData(),
+                                                m_bvPassFlags.getData(),
+                                                nPairs);
+        }
         else if(bvType == BoundingVolumeType::OBB)
-            filterPairsBV_Global_Kernel<T, BoundingVolumeType::OBB>
-                <<<numBlocks, numThreads>>>(rigidBodies,
-                                            pairList.getData(),
-                                            bodyTags,
-                                            numComposites,
-                                            positions.getData(),
-                                            orientations.getData(),
-                                            contactInfoLocal.getData(),
-                                            m_bvPassFlags.getData(),
-                                            nPairs);
+        {
+            if(usePrebuilt)
+                filterPairsBV_Global_Kernel<T, BoundingVolumeType::OBB>
+                    <<<numBlocks, numThreads>>>(m_bvData.getData(),
+                                                pairList.getData(),
+                                                bodyTags,
+                                                numComposites,
+                                                positions.getData(),
+                                                orientations.getData(),
+                                                contactInfoLocal.getData(),
+                                                m_bvPassFlags.getData(),
+                                                nPairs);
+            else
+                filterPairsBV_Global_Kernel<T, BoundingVolumeType::OBB>
+                    <<<numBlocks, numThreads>>>(rigidBodies,
+                                                pairList.getData(),
+                                                bodyTags,
+                                                numComposites,
+                                                positions.getData(),
+                                                orientations.getData(),
+                                                contactInfoLocal.getData(),
+                                                m_bvPassFlags.getData(),
+                                                nPairs);
+        }
         else
+        {
             filterPairsBV_Global_Kernel<T, BoundingVolumeType::OFF>
                 <<<numBlocks, numThreads>>>(rigidBodies,
                                             pairList.getData(),
@@ -717,6 +924,7 @@ void CollisionDetectionModule<T, M>::filterPairsBV_global(
                                             contactInfoLocal.getData(),
                                             m_bvPassFlags.getData(),
                                             nPairs);
+        }
         cudaDeviceSynchronize();
 
         cub::CountingInputIterator<uint> countIter(0);

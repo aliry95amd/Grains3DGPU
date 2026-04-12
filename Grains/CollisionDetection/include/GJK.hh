@@ -2,6 +2,7 @@
 #define _GJK_JH_HH_
 
 #include "Convex.hh"
+#include "GJK_ShapeData.hh"
 #include "Quaternion.hh"
 #include "Transform3.hh"
 
@@ -147,6 +148,54 @@ __HOSTDEVICE__ T computeClosestPoints_GJK(const Convex<T>&     a,
 template <typename T, GJKType GJKType, bool Acceleration = false, T Tolerance = EPS<T>>
 __HOSTDEVICE__ T computeClosestPoints_GJK(const Convex<T>&     a,
                                           const Convex<T>&     b,
+                                          const Vector3<T>&    v_a2w,
+                                          const Vector3<T>&    v_b2w,
+                                          const Quaternion<T>& q_a2w,
+                                          const Quaternion<T>& q_b2w,
+                                          const T              crustA,
+                                          const T              crustB,
+                                          Vector3<T>&          pa,
+                                          Vector3<T>&          pb,
+                                          uint&                nbIter);
+
+/** @brief Returns the minimal distance between 2 convex shapes using pre-built ShapeData for
+    vtable-free support evaluation -- relative transformation (vec/quat).
+    @param sdA ShapeData for shape A
+    @param sdB ShapeData for shape B
+    @param v_b2a position describing convex B in the A's reference frame
+    @param q_b2a rotation describing convex B in the A's reference frame
+    @param crustA crust thickness on A
+    @param crustB crust thickness on B
+    @param pa point representing one tip of the minimal distance segment on A
+    @param pb point representing the tip of the minimal distance segment on B
+    @param nbIter number of iterations of GJK for convergence */
+template <typename T, GJKType GJKType, bool Acceleration = false, T Tolerance = EPS<T>>
+__HOSTDEVICE__ T computeClosestPoints_GJK(const ShapeData<T>&  sdA,
+                                          const ShapeData<T>&  sdB,
+                                          const Vector3<T>&    v_b2a,
+                                          const Quaternion<T>& q_b2a,
+                                          const T              crustA,
+                                          const T              crustB,
+                                          Vector3<T>&          pa,
+                                          Vector3<T>&          pb,
+                                          uint&                nbIter);
+
+/** @brief Returns the minimal distance between 2 convex shapes using pre-built ShapeData for
+    vtable-free support evaluation -- world-frame (vec/quat).
+    @param sdA ShapeData for shape A
+    @param sdB ShapeData for shape B
+    @param v_a2w position describing convex A in the world reference frame
+    @param v_b2w position describing convex B in the world reference frame
+    @param q_a2w rotation describing convex A in the world reference frame
+    @param q_b2w rotation describing convex B in the world reference frame
+    @param crustA crust thickness on A
+    @param crustB crust thickness on B
+    @param pa point representing one tip of the minimal distance segment on A
+    @param pb point representing the tip of the minimal distance segment on B
+    @param nbIter number of iterations of GJK for convergence */
+template <typename T, GJKType GJKType, bool Acceleration = false, T Tolerance = EPS<T>>
+__HOSTDEVICE__ T computeClosestPoints_GJK(const ShapeData<T>&  sdA,
+                                          const ShapeData<T>&  sdB,
                                           const Vector3<T>&    v_a2w,
                                           const Vector3<T>&    v_b2w,
                                           const Quaternion<T>& q_a2w,

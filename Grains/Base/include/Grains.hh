@@ -77,7 +77,7 @@ public:
         or composite sub-body), and creates and initializes ComponentManager.  Also sets
         LC.minCellSize and LC.maxObstacleRadius for use by Construction().
         @param root Construction XML node */
-    void setupComponents(DOMNode* root);
+    void setupComponents(DOMNode* root, DOMElement* rootElement);
 
     /** @brief Construction of the simulation: linked cell, particles & obstacles, domain
         decomposition.

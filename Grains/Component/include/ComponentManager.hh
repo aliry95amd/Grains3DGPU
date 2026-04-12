@@ -81,17 +81,29 @@ public:
     /** @brief Default constructor (forbidden except in derived classes) */
     ComponentManager() = default;
 
-    /** @brief Constructor with the number of particles, and obstacles
-        @param rigidBody Pointer to the components rigid body buffer
-        @param nObstacles Number of obstacles
-        @param nParticles Number of particles
-        @param nComposites Number of composites
-        @param nSubBodies Number of sub-bodies */
-    ComponentManager(GrainsMemBuffer<RigidBody<T>*, M>* rigidBody,
-                     uint                               nObstacles,
-                     uint                               nParticles,
-                     uint                               nComposites = 0,
-                     uint                               nSubBodies  = 0);
+    /** @brief Constructor — fully initialises all component state and creates CDM + ForceModule.
+        For HOST managers the five HOST buffers are moved (O(1) pointer swap).
+        For DEVICE managers they are uploaded via cudaMemcpy.
+        @param rigidBody   Pointer to the M-typed rigid body buffer
+        @param bodyTags    HOST body-tag buffer (encodes shapeId); moved for HOST managers
+        @param position    HOST initial position buffer; moved for HOST managers
+        @param orientation HOST initial orientation buffer; moved for HOST managers
+        @param localPos    HOST local-position offset buffer; moved for HOST managers
+        @param localQuat   HOST local-quaternion offset buffer; moved for HOST managers
+        @param nObstacles  Number of obstacles
+        @param nParticles  Number of moving particles
+        @param nComposites Number of composite bodies (default 0)
+        @param nSubBodies  Number of sub-body slots (default 0) */
+    ComponentManager(GrainsMemBuffer<RigidBody<T>*, M>*              rigidBody,
+                     GrainsMemBuffer<uint, MemType::HOST>&&          bodyTags,
+                     GrainsMemBuffer<Vector3<T>, MemType::HOST>&&    position,
+                     GrainsMemBuffer<Quaternion<T>, MemType::HOST>&& orientation,
+                     GrainsMemBuffer<Vector3<T>, MemType::HOST>&&    localPos,
+                     GrainsMemBuffer<Quaternion<T>, MemType::HOST>&& localQuat,
+                     uint                                            nObstacles,
+                     uint                                            nParticles,
+                     uint                                            nComposites = 0,
+                     uint                                            nSubBodies  = 0);
 
     /** @brief Destructor */
     virtual ~ComponentManager() = default;
@@ -104,7 +116,7 @@ public:
     template <MemType destM>
     void getLocalPos(GrainsMemBuffer<Vector3<T>, destM>& buffer) const
     {
-        m_localPos.copyTo(buffer);
+        buffer.copyFrom(m_localPos);
     }
 
     /** @brief Gets component local quaternion offsets
@@ -112,7 +124,7 @@ public:
     template <MemType destM>
     void getLocalQuat(GrainsMemBuffer<Quaternion<T>, destM>& buffer) const
     {
-        m_localQuat.copyTo(buffer);
+        buffer.copyFrom(m_localQuat);
     }
 
     /** @brief Gets body tags
@@ -120,7 +132,7 @@ public:
     template <MemType destM>
     void getBodyTag(GrainsMemBuffer<uint, destM>& buffer) const
     {
-        m_bodyTag.copyTo(buffer);
+        buffer.copyFrom(m_bodyTag);
     }
 
     /** @brief Gets components positions
@@ -128,7 +140,7 @@ public:
     template <MemType destM>
     void getPosition(GrainsMemBuffer<Vector3<T>, destM>& buffer) const
     {
-        m_position.copyTo(buffer);
+        buffer.copyFrom(m_position);
     }
 
     /** @brief Gets components quaternions
@@ -136,7 +148,7 @@ public:
     template <MemType destM>
     void getQuaternion(GrainsMemBuffer<Quaternion<T>, destM>& buffer) const
     {
-        m_quaternion.copyTo(buffer);
+        buffer.copyFrom(m_quaternion);
     }
 
     /** @brief Gets components velocities
@@ -271,9 +283,6 @@ public:
 
     /** @name Manager methods */
     //@{
-    /** @brief Initializes the CollisionDetectionModule and the contact hash table */
-    void initialize();
-
     /** @brief Copies particle state from this manager to another.
         @param other destination component manager */
     template <MemType srcM>
@@ -296,18 +305,6 @@ public:
 
     /** @name Methods */
     //@{
-    /** @brief Initializes transformations for components in the simulation
-        @param initPosition initial position of components
-        @param initOrientation initial orientation of components
-        @param initBodyTags initial body tags for all components
-        @param initLocalPos initial local position offsets (zero for standalone/obstacles)
-        @param initLocalQuat initial local quaternion offsets (identity for standalone/obstacles) */
-    void initializeComponents(const GrainsMemBuffer<Vector3<T>, MemType::HOST>&    initPosition,
-                              const GrainsMemBuffer<Quaternion<T>, MemType::HOST>& initOrientation,
-                              const GrainsMemBuffer<uint, MemType::HOST>&          initBodyTags,
-                              const GrainsMemBuffer<Vector3<T>, MemType::HOST>&    initLocalPos,
-                              const GrainsMemBuffer<Quaternion<T>, MemType::HOST>& initLocalQuat);
-
     /** @brief Inserts particles according to a given insertion policy
         @param ins insertion policy */
     void insertParticles(const std::unique_ptr<Insertion<T>>& insertionPolicy);

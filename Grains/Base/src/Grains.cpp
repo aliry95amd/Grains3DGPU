@@ -92,7 +92,7 @@ void Grains<T>::finalize()
 /* ============================================================================================== */
 // Sets up rigid bodies, body tags, local transforms, and ComponentManager from XML
 template <typename T>
-void Grains<T>::setupComponents(DOMNode* root)
+void Grains<T>::setupComponents(DOMNode* root, DOMElement* rootElement)
 {
     using GP = GrainsParameters<T>;
     auto& LC = GP::m_collisionDetection.linkedCellParameters;
@@ -209,19 +209,40 @@ void Grains<T>::setupComponents(DOMNode* root)
         particleData.refRB[i] = nullptr;
     }
 
-    // Construct ComponentManager (initialize() called after contact force models are read
-    // so that m_isContactWithMemory is set correctly before ForceModule is created).
-    m_components = std::make_unique<ComponentManager<T, MemType::HOST>>(&m_rigidBodyList,
-                                                                        numObstacles,
-                                                                        numParticles,
-                                                                        nComposites,
-                                                                        nSubBodies);
-    m_components->initializeComponents(initialPosition,
-                                       initialOrientation,
-                                       initialBodyTags,
-                                       initialLocalPos,
-                                       initialLocalQuat);
-    m_components->updateSubBodyPositions();
+    // Contact Force Models
+    // NOTE: Read after rigid bodies so that m_materialMap (populated by RigidBodyFactory)
+    // is available to compute m_numContactPairs and resolve material IDs.
+    {
+        uint numMaterials     = GP::m_materialMap.size();
+        GP::m_numContactPairs = numMaterials * (numMaterials + 1) / 2;
+        DOMNode* contacts     = ReaderXML::getNode(root, "ContactForceModels");
+        if(contacts)
+        {
+            GoutWI(6, "Reading contact force models ...");
+            ContactForceModelFactory<T>::create(rootElement, m_contactForce);
+            GoutWI(6, "Reading contact force models completed!");
+            if(ReaderXML::getNodeAttr_String(contacts, "EnableTimings") == "true")
+                GP::m_fmTimer.enable(GP::m_isGPU);
+            if(ReaderXML::getNodeAttr_String(contacts, "Compaction") == "false")
+            {
+                GP::m_useCompaction = false;
+                GoutWI(9, "Compaction disabled!");
+            }
+        }
+    }
+
+    // Construct ComponentManager. Contact forces MUST be parsed before this call.
+    m_components
+        = std::make_unique<ComponentManager<T, MemType::HOST>>(&m_rigidBodyList,
+                                                               std::move(initialBodyTags),
+                                                               std::move(initialPosition),
+                                                               std::move(initialOrientation),
+                                                               std::move(initialLocalPos),
+                                                               std::move(initialLocalQuat),
+                                                               numObstacles,
+                                                               numParticles,
+                                                               nComposites,
+                                                               nSubBodies);
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -372,16 +393,15 @@ void Grains<T>::Construction(DOMElement* rootElement)
         // GJK warm-start acceleration: "true" to enable (default: false)
         std::string gjkAcc = ReaderXML::getNodeAttr_String(nNarrowPhase, "Acceleration");
         CD.gjkAcceleration = (gjkAcc == "true");
+        // Pre-built ShapeData for vtable-free GJK support evaluation
+        std::string prebuilt = ReaderXML::getNodeAttr_String(nNarrowPhase, "PrebuiltShapes");
+        CD.usePrebuiltShapes = (prebuilt == "true");
         GoutWI(9,
                "NarrowPhase: " + narrowPhaseType
-                   + ", Acceleration: " + (CD.gjkAcceleration ? "true" : "false"));
+                   + ", Acceleration: " + (CD.gjkAcceleration ? "true" : "false")
+                   + ", PrebuiltShapes: " + (CD.usePrebuiltShapes ? "true" : "false"));
     }
     GoutWI(6, "Reading collision detection completed!");
-
-    // ---------------------------------------------------------------------------------------------
-    // Components (rigid bodies, body tags, local transforms, ComponentManager)
-    // NOTE: after CD parsing so all LC params are set before LinkedCell construction
-    setupComponents(root);
 
     // ---------------------------------------------------------------------------------------------
     // Temporal setting and time integration
@@ -407,31 +427,8 @@ void Grains<T>::Construction(DOMElement* rootElement)
     }
 
     // ---------------------------------------------------------------------------------------------
-    // Contact Force Models
-    // NOTE: Read contact force models after time integrator, as some models might need dt
-    // Calculating the proper array size for the contact force array
-    // We might need to reduce it by removing the obstacle-obstacle pairs, but it should be fine by
-    // now
-    uint numMaterials     = GP::m_materialMap.size();
-    GP::m_numContactPairs = numMaterials * (numMaterials + 1) / 2;
-    DOMNode* contacts     = ReaderXML::getNode(root, "ContactForceModels");
-    if(contacts)
-    {
-        GoutWI(6, "Reading contact force models ...");
-        ContactForceModelFactory<T>::create(rootElement, m_contactForce);
-        GoutWI(6, "Reading contact force models completed!");
-        if(ReaderXML::getNodeAttr_String(contacts, "EnableTimings") == "true")
-            GP::m_fmTimer.enable(GP::m_isGPU);
-        if(ReaderXML::getNodeAttr_String(contacts, "Compaction") == "false")
-        {
-            GP::m_useCompaction = false;
-            GoutWI(9, "Compaction disabled!");
-        }
-    }
-
-    // Initialize ComponentManager AFTER contact force models are read so that
-    // m_isContactWithMemory is correctly set before ForceModule allocates the contact table.
-    m_components->initialize();
+    // Components setup (reads rigid bodies, then contact forces, then builds ComponentManager)
+    setupComponents(root, rootElement);
 }
 
 // -------------------------------------------------------------------------------------------------

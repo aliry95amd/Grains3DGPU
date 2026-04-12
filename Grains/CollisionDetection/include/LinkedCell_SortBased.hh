@@ -191,23 +191,27 @@ public:
                             (m_numObstacles + m_numParticles) * sizeof(Vector3<T>),
                             cudaMemcpyDeviceToDevice,
                             m_stream1);
+
+            // Stream 0: Generate neighbor cells (waits for resize)
+            uint numBlocksCells, numThreadsCells;
+            computeOptimalThreadsAndBlocks(m_numCells,
+                                           GrainsParameters<T>::m_GPU,
+                                           numBlocksCells,
+                                           numThreadsCells);
+            cudaStreamWaitEvent(m_stream0, m_resizeComplete, 0);
+            m_neighborCells.fill(UINT_MAX, m_stream0);
+            generateNeighborCells_Device<<<numBlocksCells, numThreadsCells, 0, m_stream0>>>(
+                m_cells.getData(),
+                m_numCells,
+                m_neighborCells.getData());
+        }
+        else
+        {
+            // Non-adaptive: cell geometry is fixed, no need to regenerate neighbor cells.
+            cudaStreamSynchronize(0);
         }
 
         /* Launch concurrent operations */
-        // Stream 0: Generate neighbor cells (waits for resize if needed)
-        if(m_useAdaptiveSkin)
-            cudaStreamWaitEvent(m_stream0, m_resizeComplete, 0);
-
-        uint numBlocksCells, numThreadsCells;
-        computeOptimalThreadsAndBlocks(m_numCells,
-                                       GrainsParameters<T>::m_GPU,
-                                       numBlocksCells,
-                                       numThreadsCells);
-        m_neighborCells.fill(UINT_MAX, m_stream0);
-        generateNeighborCells_Device<<<numBlocksCells, numThreadsCells, 0, m_stream0>>>(
-            m_cells.getData(),
-            m_numCells,
-            m_neighborCells.getData());
 
         // Stream 2: Initialize cell start + pack particles (both independent)
         m_cellPrefixSums.fill(UINT_MAX, m_stream2);
@@ -219,9 +223,12 @@ public:
             m_cellParticleIDs.getData());
 
         // Synchronize all streams before returning
-        cudaStreamSynchronize(m_stream0);
-        cudaStreamSynchronize(m_stream1);
-        cudaStreamSynchronize(m_stream2);
+        if(m_useAdaptiveSkin)
+        {
+            cudaStreamSynchronize(m_stream0);  // Neighbor generation
+            cudaStreamSynchronize(m_stream1);  // Old position copy
+        }
+        cudaStreamSynchronize(m_stream2);  // Particle packing
     }
 
     // ---------------------------------------------------------------------------------------------

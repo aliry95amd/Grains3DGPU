@@ -36,8 +36,8 @@ __HOSTDEVICE__ static INLINE auto getPropertiesForContact(const RigidBody<T>& rb
 
     const Convex<T>* convexA     = sa.convex;
     const Convex<T>* convexB     = sb.convex;
-    T                crustA      = sa.crustThickness * T(0.5);
-    T                crustB      = sb.crustThickness * T(0.5);
+    T                crustA      = sa.crustThickness;
+    T                crustB      = sb.crustThickness;
     T                circRadiusA = sa.circumscribedRadius;
     T                circRadiusB = sb.circumscribedRadius;
 
@@ -56,6 +56,33 @@ __HOSTDEVICE__ static INLINE auto getPropertiesForContact(const RigidBody<T>& rb
                            crustA,
                            circRadiusA,
                            convexB,
+                           crustB,
+                           circRadiusB,
+                           invReducedMass,
+                           averageRadius,
+                           materialHash);
+}
+
+// -------------------------------------------------------------------------------------------------
+/** @brief ShapeData-only variant of getPropertiesForContact. Reads all needed scalar data
+    directly from ShapeData fields — no RigidBody or virtual dispatch required.
+    @param sdA pre-built ShapeData for body A
+    @param sdB pre-built ShapeData for body B */
+template <typename T>
+__HOSTDEVICE__ static INLINE auto getPropertiesForContact(const ShapeData<T>& sdA,
+                                                          const ShapeData<T>& sdB)
+{
+    const T    crustA         = sdA.crust;
+    const T    crustB         = sdB.crust;
+    const T    circRadiusA    = sdA.circumscribedRadius;
+    const T    circRadiusB    = sdB.circumscribedRadius;
+    const T    invReducedMass = T(1) / (sdA.invMass + sdB.invMass);
+    const T    invRadA        = (circRadiusA == T(0)) ? T(0) : T(1) / circRadiusA;
+    const T    invRadB        = (circRadiusB == T(0)) ? T(0) : T(1) / circRadiusB;
+    const T    averageRadius  = T(1) / (invRadA + invRadB);
+    const uint materialHash   = triangularHash(sdA.material, sdB.material);
+    return std::make_tuple(crustA,
+                           circRadiusA,
                            crustB,
                            circRadiusB,
                            invReducedMass,
@@ -253,35 +280,20 @@ __HOSTDEVICE__ inline void closestPointsRigidBodies(const RigidBody<T>&  rbA,
     // General Case
     else
     {
-        Vector3<T>     ptA, ptB;
-        uint           nbIterGJK          = 0;
-        const T        crustA_orig        = crustA;
-        const T        crustB_orig        = crustB;
-        constexpr T    CRUST_MULTIPLIER   = T(2);
-        constexpr uint maxCrustIterations = 4;
-        uint           crustIteration     = 0;
-        do
-        {
-            snapshot.overlapDistance = computeClosestPoints_GJK<T, GJKVARIANT, GJKACC>(convexA,
-                                                                                       convexB,
-                                                                                       b2a,
-                                                                                       crustA,
-                                                                                       crustB,
-                                                                                       ptA,
-                                                                                       ptB,
-                                                                                       nbIterGJK);
-            if(fabs(snapshot.overlapDistance) >= HIGHEPS<T>)
-                break;
-            Gout("Warning: GJK too close bodies, increasing crust thicknesses ...");
-            crustA *= CRUST_MULTIPLIER;
-            crustB *= CRUST_MULTIPLIER;
-            crustIteration++;
-        } while(crustIteration < maxCrustIterations);
-
-        if(crustIteration == maxCrustIterations)
-            snapshot.overlapDistance = -(crustA_orig + crustB_orig);
+        Vector3<T> ptA, ptB;
+        uint       nbIterGJK     = 0;
+        snapshot.overlapDistance = computeClosestPoints_GJK<T, GJKVARIANT, GJKACC>(convexA,
+                                                                                   convexB,
+                                                                                   b2a,
+                                                                                   crustA,
+                                                                                   crustB,
+                                                                                   ptA,
+                                                                                   ptB,
+                                                                                   nbIterGJK);
+        if(fabs(snapshot.overlapDistance) < HIGHEPS<T>)
+            snapshot.overlapDistance = -(crustA + crustB);
         else
-            snapshot.overlapDistance -= crustA_orig + crustB_orig;
+            snapshot.overlapDistance -= crustA + crustB;
         // ptA = (a2a)(ptA);
         ptB                    = (b2a)(ptB);
         snapshot.contactPoint  = T(0.5) * (ptA + ptB);
@@ -427,35 +439,20 @@ __HOSTDEVICE__ inline void closestPointsRigidBodies(const RigidBody<T>&  rbA,
     // General Case
     else
     {
-        uint           nbIterGJK          = 0;
-        const T        crustA_orig        = crustA;
-        const T        crustB_orig        = crustB;
-        constexpr T    CRUST_MULTIPLIER   = T(2);
-        constexpr uint maxCrustIterations = 4;
-        uint           crustIteration     = 0;
-        do
-        {
-            snapshot.overlapDistance = computeClosestPoints_GJK<T, GJKVARIANT, GJKACC>(convexA,
-                                                                                       convexB,
-                                                                                       a2w,
-                                                                                       b2w,
-                                                                                       crustA,
-                                                                                       crustB,
-                                                                                       ptA,
-                                                                                       ptB,
-                                                                                       nbIterGJK);
-            if(fabs(snapshot.overlapDistance) >= HIGHEPS<T>)
-                break;
-            Gout("Warning: GJK too close bodies, increasing crust thicknesses ...");
-            crustA *= CRUST_MULTIPLIER;
-            crustB *= CRUST_MULTIPLIER;
-            crustIteration++;
-        } while(crustIteration < maxCrustIterations);
-
-        if(crustIteration == maxCrustIterations)
-            snapshot.overlapDistance = -(crustA_orig + crustB_orig);
+        uint nbIterGJK           = 0;
+        snapshot.overlapDistance = computeClosestPoints_GJK<T, GJKVARIANT, GJKACC>(convexA,
+                                                                                   convexB,
+                                                                                   a2w,
+                                                                                   b2w,
+                                                                                   crustA,
+                                                                                   crustB,
+                                                                                   ptA,
+                                                                                   ptB,
+                                                                                   nbIterGJK);
+        if(fabs(snapshot.overlapDistance) < HIGHEPS<T>)
+            snapshot.overlapDistance = -(crustA + crustB);
         else
-            snapshot.overlapDistance -= crustA_orig + crustB_orig;
+            snapshot.overlapDistance -= crustA + crustB;
         ptA                    = (a2w)(ptA);
         ptB                    = (b2w)(ptB);
         snapshot.contactPoint  = T(0.5) * (ptA + ptB);
@@ -561,36 +558,21 @@ __HOSTDEVICE__ inline void closestPointsRigidBodies(const RigidBody<T>&  rbA,
     // General Case
     else
     {
-        Vector3<T>     ptA, ptB;
-        uint           nbIterGJK          = 0;
-        const T        crustA_orig        = crustA;
-        const T        crustB_orig        = crustB;
-        constexpr T    CRUST_MULTIPLIER   = T(2);
-        constexpr uint maxCrustIterations = 4;
-        uint           crustIteration     = 0;
-        do
-        {
-            snapshot.overlapDistance = computeClosestPoints_GJK<T, GJKVARIANT, GJKACC>(convexA,
-                                                                                       convexB,
-                                                                                       v_b2a,
-                                                                                       q_b2a,
-                                                                                       crustA,
-                                                                                       crustB,
-                                                                                       ptA,
-                                                                                       ptB,
-                                                                                       nbIterGJK);
-            if(fabs(snapshot.overlapDistance) >= HIGHEPS<T>)
-                break;
-            Gout("Warning: GJK too close bodies, increasing crust thicknesses ...");
-            crustA *= CRUST_MULTIPLIER;
-            crustB *= CRUST_MULTIPLIER;
-            crustIteration++;
-        } while(crustIteration < maxCrustIterations);
-
-        if(crustIteration == maxCrustIterations)
-            snapshot.overlapDistance = -(crustA_orig + crustB_orig);
+        Vector3<T> ptA, ptB;
+        uint       nbIterGJK     = 0;
+        snapshot.overlapDistance = computeClosestPoints_GJK<T, GJKVARIANT, GJKACC>(convexA,
+                                                                                   convexB,
+                                                                                   v_b2a,
+                                                                                   q_b2a,
+                                                                                   crustA,
+                                                                                   crustB,
+                                                                                   ptA,
+                                                                                   ptB,
+                                                                                   nbIterGJK);
+        if(fabs(snapshot.overlapDistance) < HIGHEPS<T>)
+            snapshot.overlapDistance = -(crustA + crustB);
         else
-            snapshot.overlapDistance -= crustA_orig + crustB_orig;
+            snapshot.overlapDistance -= crustA + crustB;
         // transform(q_a2a, v_a2a, ptA);
         transform(q_b2a, v_b2a, ptB);
         snapshot.contactPoint  = T(0.5) * (ptA + ptB);
@@ -741,37 +723,22 @@ __HOSTDEVICE__ inline void closestPointsRigidBodies(const RigidBody<T>&  rbA,
     // General Case
     else
     {
-        uint           nbIterGJK          = 0;
-        const T        crustA_orig        = crustA;
-        const T        crustB_orig        = crustB;
-        constexpr T    CRUST_MULTIPLIER   = T(2);
-        constexpr uint maxCrustIterations = 4;
-        uint           crustIteration     = 0;
-        do
-        {
-            snapshot.overlapDistance = computeClosestPoints_GJK<T, GJKVARIANT, GJKACC>(convexA,
-                                                                                       convexB,
-                                                                                       v_a2w,
-                                                                                       v_b2w,
-                                                                                       q_a2w,
-                                                                                       q_b2w,
-                                                                                       crustA,
-                                                                                       crustB,
-                                                                                       ptA,
-                                                                                       ptB,
-                                                                                       nbIterGJK);
-            if(fabs(snapshot.overlapDistance) >= HIGHEPS<T>)
-                break;
-            Gout("Warning: GJK too close bodies, increasing crust thicknesses ...");
-            crustA *= CRUST_MULTIPLIER;
-            crustB *= CRUST_MULTIPLIER;
-            crustIteration++;
-        } while(crustIteration < maxCrustIterations);
-
-        if(crustIteration == maxCrustIterations)
-            snapshot.overlapDistance = -(crustA_orig + crustB_orig);
+        uint nbIterGJK           = 0;
+        snapshot.overlapDistance = computeClosestPoints_GJK<T, GJKVARIANT, GJKACC>(convexA,
+                                                                                   convexB,
+                                                                                   v_a2w,
+                                                                                   v_b2w,
+                                                                                   q_a2w,
+                                                                                   q_b2w,
+                                                                                   crustA,
+                                                                                   crustB,
+                                                                                   ptA,
+                                                                                   ptB,
+                                                                                   nbIterGJK);
+        if(fabs(snapshot.overlapDistance) < HIGHEPS<T>)
+            snapshot.overlapDistance = -(crustA + crustB);
         else
-            snapshot.overlapDistance -= crustA_orig + crustB_orig;
+            snapshot.overlapDistance -= crustA + crustB;
         transform(q_a2w, v_a2w, ptA);
         transform(q_b2w, v_b2w, ptB);
         snapshot.contactPoint  = T(0.5) * (ptA + ptB);
@@ -812,6 +779,491 @@ __HOSTDEVICE__ inline T distanceRigidBodies(const RigidBody<T>&  rbA,
                                                                ptB,
                                                                nbIterGJK);
     return (distance);
+}
+
+// -------------------------------------------------------------------------------------------------
+/** @brief RigidBody-free version: all contact properties read from ShapeData directly.
+    Used by the prebuilt GPU path (BVType always OFF; BV filter ran separately).
+    Rectangle-Particle: replaces virtual convexB.support with device_support_raw and
+    isInside with direct params[] bounds check.
+    @param sdA pre-built ShapeData for body A (shapeId-indexed)
+    @param sdB pre-built ShapeData for body B (shapeId-indexed)
+    @param v_b2a position of B in A-local frame
+    @param q_b2a rotation of B in A-local frame
+    @param contactInfo output contact information */
+template <typename T, GJKType GJKVARIANT, bool GJKACC>
+__HOSTDEVICE__ inline void closestPointsRigidBodies(const ShapeData<T>&  sdA,
+                                                    const ShapeData<T>&  sdB,
+                                                    const Vector3<T>&    v_b2a,
+                                                    const Quaternion<T>& q_b2a,
+                                                    ContactInfo<T>&      contactInfo)
+{
+    auto [crustA, circRadiusA, crustB, circRadiusB, averageMass, averageRadius, contactHash]
+        = getPropertiesForContact(sdA, sdB);
+
+    typename ContactInfo<T>::Snapshot snapshot;
+    snapshot.averageMass     = averageMass;
+    snapshot.averageRadius   = averageRadius;
+    snapshot.contactHash     = contactHash;
+    snapshot.overlapDistance = std::numeric_limits<T>::max();
+
+    const ConvexType typeA = sdA.type;
+    const ConvexType typeB = sdB.type;
+
+    // Sphere-Sphere Case
+    if(typeA == ConvexType::SPHERE && typeB == ConvexType::SPHERE)
+    {
+        snapshot.contactVector   = v_b2a;
+        snapshot.overlapDistance = norm(snapshot.contactVector) - circRadiusA - circRadiusB;
+        snapshot.contactPoint
+            = (circRadiusA + T(.5) * snapshot.overlapDistance) * snapshot.contactVector;
+        snapshot.contactVector.normalize();
+    }
+    // Rectangle-Particle Case (vtable-free via device_support_raw + params[] bounds check)
+    else if(typeA == ConvexType::RECTANGLE)
+    {
+        Vector3<T>       ptA, ptB;
+        const Vector3<T> r = v_b2a[Z] > 0 ? Vector3<T>(0, 0, -1) : Vector3<T>(0, 0, 1);
+        ptB                = device_support_raw(sdB, q_b2a << r);
+        transform(q_b2a, v_b2a, ptB);
+        if(ptB[Z] < T(0))
+        {
+            ptA = Vector3<T>(ptB[X], ptB[Y], T(0));
+            if(ptA[X] >= -sdA.params[0] && ptA[X] <= sdA.params[0] && ptA[Y] >= -sdA.params[1]
+               && ptA[Y] <= sdA.params[1])
+            {
+                snapshot.contactPoint = T(0.5) * (ptA + ptB);
+                ptB -= ptA;
+                snapshot.overlapDistance = -norm(ptB);
+                snapshot.contactVector   = ptB / snapshot.overlapDistance;
+            }
+        }
+    }
+    else if(typeB == ConvexType::RECTANGLE)
+    {
+        GAbort("General-Rectangle collision detection is not implemented yet.");
+    }
+    // General Case: vtable-free GJK via ShapeData
+    else
+    {
+        Vector3<T> ptA, ptB;
+        uint       nbIterGJK     = 0;
+        snapshot.overlapDistance = computeClosestPoints_GJK<T, GJKVARIANT, GJKACC>(sdA,
+                                                                                   sdB,
+                                                                                   v_b2a,
+                                                                                   q_b2a,
+                                                                                   crustA,
+                                                                                   crustB,
+                                                                                   ptA,
+                                                                                   ptB,
+                                                                                   nbIterGJK);
+        if(fabs(snapshot.overlapDistance) < HIGHEPS<T>)
+            snapshot.overlapDistance = -(crustA + crustB);
+        else
+            snapshot.overlapDistance -= crustA + crustB;
+        transform(q_b2a, v_b2a, ptB);
+        snapshot.contactPoint  = T(0.5) * (ptA + ptB);
+        snapshot.contactVector = (ptB - ptA).normalized();
+    }
+
+    contactInfo.setSnapshot(snapshot);
+}
+
+// -------------------------------------------------------------------------------------------------
+/** @brief Returns the contact information (if any) for 2 rigid bodies using pre-built ShapeData
+    for vtable-free GJK support evaluation -- relative transformation (vec/quat).
+    The General Case replaces virtual dispatch with device_support() over ShapeData.
+    Sphere-Sphere and Rectangle-Particle paths fall through to the standard virtual variants.
+    @param rbA first rigid body
+    @param rbB second rigid body
+    @param sdA pre-built ShapeData for rbA (slot-indexed)
+    @param sdB pre-built ShapeData for rbB (slot-indexed)
+    @param v_b2a position describing convex B in the A's reference frame
+    @param q_b2a rotation describing convex B in the A's reference frame
+    @param contactInfo output contact information */
+template <typename T,
+          GJKType            GJKVARIANT,
+          bool               GJKACC,
+          BoundingVolumeType BVType = BoundingVolumeType::OFF>
+__HOSTDEVICE__ inline void closestPointsRigidBodies(const RigidBody<T>&  rbA,
+                                                    const RigidBody<T>&  rbB,
+                                                    const ShapeData<T>&  sdA,
+                                                    const ShapeData<T>&  sdB,
+                                                    const Vector3<T>&    v_b2a,
+                                                    const Quaternion<T>& q_b2a,
+                                                    ContactInfo<T>&      contactInfo)
+{
+    // BV pre-filter: sphere reject then OBB SAT before entering GJK
+    if constexpr(BVType == BoundingVolumeType::OBB)
+    {
+        const T radiiSum = rbA.getCircumscribedRadius() + rbB.getCircumscribedRadius();
+        if(norm2(v_b2a) >= radiiSum * radiiSum)
+        {
+            contactInfo.setOverlapDistance(T(1));
+            return;
+        }
+        if(!intersectOrientedBoundingBox(rbA.getConvex()->computeBoundingBox(),
+                                         rbB.getConvex()->computeBoundingBox(),
+                                         v_b2a,
+                                         q_b2a))
+        {
+            contactInfo.setOverlapDistance(T(1));
+            return;
+        }
+    }
+    // Extract properties for contact and populate snapshot
+    auto [convexA_ptr,
+          crustA,
+          circRadiusA,
+          convexB_ptr,
+          crustB,
+          circRadiusB,
+          averageMass,
+          averageRadius,
+          contactHash]
+        = getPropertiesForContact(rbA, rbB);
+    typename ContactInfo<T>::Snapshot snapshot;
+    snapshot.averageMass     = averageMass;
+    snapshot.averageRadius   = averageRadius;
+    snapshot.contactHash     = contactHash;
+    snapshot.overlapDistance = std::numeric_limits<T>::max();
+
+    // Get convexes and their types
+    const Convex<T>& convexA = *(convexA_ptr);
+    const Convex<T>& convexB = *(convexB_ptr);
+    const ConvexType typeA   = convexA.getConvexType();
+    const ConvexType typeB   = convexB.getConvexType();
+
+    // Sphere-Sphere Case
+    if(typeA == ConvexType::SPHERE && typeB == ConvexType::SPHERE)
+    {
+        T rA                     = rbA.getCircumscribedRadius();
+        T rB                     = rbB.getCircumscribedRadius();
+        snapshot.contactVector   = v_b2a;
+        snapshot.overlapDistance = norm(snapshot.contactVector) - rA - rB;
+        snapshot.contactPoint    = (rA + T(.5) * snapshot.overlapDistance) * snapshot.contactVector;
+        snapshot.contactVector.normalize();
+    }
+    // Rectangle-Particle Case (falls through to virtual supporting convex)
+    else if(typeA == ConvexType::RECTANGLE)
+    {
+        // ptA is the point on rectangle and ptB is the point on particle
+        Vector3<T>       ptA, ptB;
+        const Vector3<T> r = v_b2a[Z] > 0 ? Vector3<T>(0, 0, -1) : Vector3<T>(0, 0, 1);
+        ptB                = convexB.support(q_b2a << r);
+        transform(q_b2a, v_b2a, ptB);
+        if(ptB[Z] < T(0))
+        {
+            ptA = Vector3<T>(ptB[X], ptB[Y], T(0));
+            if(convexA.isInside(ptA))
+            {
+                snapshot.contactPoint = T(0.5) * (ptA + ptB);
+                ptB -= ptA;
+                snapshot.overlapDistance = -norm(ptB);
+                snapshot.contactVector   = ptB / snapshot.overlapDistance;
+            }
+        }
+    }
+    else if(typeB == ConvexType::RECTANGLE)
+    {
+        GAbort("General-Rectangle collision detection is not implemented yet.");
+    }
+    // General Case: vtable-free via ShapeData
+    else
+    {
+        Vector3<T> ptA, ptB;
+        uint       nbIterGJK     = 0;
+        snapshot.overlapDistance = computeClosestPoints_GJK<T, GJKVARIANT, GJKACC>(sdA,
+                                                                                   sdB,
+                                                                                   v_b2a,
+                                                                                   q_b2a,
+                                                                                   crustA,
+                                                                                   crustB,
+                                                                                   ptA,
+                                                                                   ptB,
+                                                                                   nbIterGJK);
+        if(fabs(snapshot.overlapDistance) < HIGHEPS<T>)
+            snapshot.overlapDistance = -(crustA + crustB);
+        else
+            snapshot.overlapDistance -= crustA + crustB;
+        // transform(q_a2a, v_a2a, ptA);
+        transform(q_b2a, v_b2a, ptB);
+        snapshot.contactPoint  = T(0.5) * (ptA + ptB);
+        snapshot.contactVector = (ptB - ptA).normalized();
+    }
+
+    // Set contact information
+    contactInfo.setSnapshot(snapshot);
+    return;
+}
+
+// -------------------------------------------------------------------------------------------------
+/** @brief RigidBody-free world-frame version: all contact properties from ShapeData.
+    Used by the prebuilt GPU path (BVType always OFF; BV filter ran separately).
+    @param sdA pre-built ShapeData for body A (shapeId-indexed)
+    @param sdB pre-built ShapeData for body B (shapeId-indexed)
+    @param v_a2w world-frame position of A
+    @param v_b2w world-frame position of B
+    @param q_a2w world-frame orientation of A
+    @param q_b2w world-frame orientation of B
+    @param contactInfo output contact information */
+template <typename T, GJKType GJKVARIANT, bool GJKACC>
+__HOSTDEVICE__ inline void closestPointsRigidBodies(const ShapeData<T>&  sdA,
+                                                    const ShapeData<T>&  sdB,
+                                                    const Vector3<T>&    v_a2w,
+                                                    const Vector3<T>&    v_b2w,
+                                                    const Quaternion<T>& q_a2w,
+                                                    const Quaternion<T>& q_b2w,
+                                                    ContactInfo<T>&      contactInfo)
+{
+    auto [crustA, circRadiusA, crustB, circRadiusB, averageMass, averageRadius, contactHash]
+        = getPropertiesForContact(sdA, sdB);
+
+    typename ContactInfo<T>::Snapshot snapshot;
+    snapshot.averageMass     = averageMass;
+    snapshot.averageRadius   = averageRadius;
+    snapshot.contactHash     = contactHash;
+    snapshot.overlapDistance = std::numeric_limits<T>::max();
+
+    const ConvexType typeA = sdA.type;
+    const ConvexType typeB = sdB.type;
+    Vector3<T>       ptA, ptB;
+
+    // Sphere-Sphere Case
+    if(typeA == ConvexType::SPHERE && typeB == ConvexType::SPHERE)
+    {
+        ptA                      = v_a2w;
+        ptB                      = v_b2w - ptA;
+        snapshot.overlapDistance = norm(ptB) - circRadiusA - circRadiusB;
+        {
+            Vector3<T> d_hat       = ptB.normalized();
+            snapshot.contactPoint  = ptA + (circRadiusA + T(.5) * snapshot.overlapDistance) * d_hat;
+            snapshot.contactVector = d_hat;
+        }
+    }
+    // Rectangle-Particle Case (vtable-free via device_support_raw + params[] bounds check)
+    else if(typeA == ConvexType::RECTANGLE)
+    {
+        Vector3<T> r = q_a2w >> Vector3<T>(0, 0, 1);
+        r.normalize();
+        r *= copysign(T(1), r * (v_b2w - v_a2w));
+        ptB = (q_b2w >> device_support_raw(sdB, q_b2w << (-r))) + v_b2w;
+        if(r * (ptB - v_a2w) < T(0))
+        {
+            ptA                  = ((v_a2w - ptB) * r) * r + ptB;
+            const Vector3<T> loc = q_a2w << (ptA - v_a2w);
+            if(loc[X] >= -sdA.params[0] && loc[X] <= sdA.params[0] && loc[Y] >= -sdA.params[1]
+               && loc[Y] <= sdA.params[1])
+            {
+                snapshot.contactPoint = T(0.5) * (ptA + ptB);
+                ptB -= ptA;
+                snapshot.overlapDistance = -norm(ptB);
+                snapshot.contactVector   = ptB / snapshot.overlapDistance;
+            }
+        }
+    }
+    else if(typeB == ConvexType::RECTANGLE)
+    {
+        GAbort("General-Rectangle collision detection is not implemented yet.");
+    }
+    // General Case: vtable-free GJK via ShapeData
+    else
+    {
+        uint nbIterGJK           = 0;
+        snapshot.overlapDistance = computeClosestPoints_GJK<T, GJKVARIANT, GJKACC>(sdA,
+                                                                                   sdB,
+                                                                                   v_a2w,
+                                                                                   v_b2w,
+                                                                                   q_a2w,
+                                                                                   q_b2w,
+                                                                                   crustA,
+                                                                                   crustB,
+                                                                                   ptA,
+                                                                                   ptB,
+                                                                                   nbIterGJK);
+        if(fabs(snapshot.overlapDistance) < HIGHEPS<T>)
+            snapshot.overlapDistance = -(crustA + crustB);
+        else
+            snapshot.overlapDistance -= crustA + crustB;
+        transform(q_a2w, v_a2w, ptA);
+        transform(q_b2w, v_b2w, ptB);
+        snapshot.contactPoint  = T(0.5) * (ptA + ptB);
+        snapshot.contactVector = (ptB - ptA).normalized();
+    }
+
+    contactInfo.setSnapshot(snapshot);
+}
+
+// -------------------------------------------------------------------------------------------------
+/** @brief Returns the contact information (if any) for 2 rigid bodies using pre-built ShapeData
+    for vtable-free GJK support evaluation -- world-frame (vec/quat).
+    The General Case replaces virtual dispatch with device_support() over ShapeData.
+    Sphere-Sphere and Rectangle-Particle paths fall through to the standard virtual variants.
+    @param rbA first rigid body
+    @param rbB second rigid body
+    @param sdA pre-built ShapeData for rbA (slot-indexed)
+    @param sdB pre-built ShapeData for rbB (slot-indexed)
+    @param v_a2w position describing convex A in the world reference frame
+    @param v_b2w position describing convex B in the world reference frame
+    @param q_a2w rotation describing convex A in the world reference frame
+    @param q_b2w rotation describing convex B in the world reference frame
+    @param contactInfo output contact information */
+template <typename T,
+          GJKType            GJKVARIANT,
+          bool               GJKACC,
+          BoundingVolumeType BVType = BoundingVolumeType::OFF>
+__HOSTDEVICE__ inline void closestPointsRigidBodies(const RigidBody<T>&  rbA,
+                                                    const RigidBody<T>&  rbB,
+                                                    const ShapeData<T>&  sdA,
+                                                    const ShapeData<T>&  sdB,
+                                                    const Vector3<T>&    v_a2w,
+                                                    const Vector3<T>&    v_b2w,
+                                                    const Quaternion<T>& q_a2w,
+                                                    const Quaternion<T>& q_b2w,
+                                                    ContactInfo<T>&      contactInfo)
+{
+    // BV pre-filter: sphere reject then OBB or OBC SAT before entering GJK
+    if constexpr(BVType == BoundingVolumeType::OBB)
+    {
+        const T radiiSum = rbA.getCircumscribedRadius() + rbB.getCircumscribedRadius();
+        if(norm2(v_b2w - v_a2w) >= radiiSum * radiiSum)
+        {
+            contactInfo.setOverlapDistance(T(1));
+            return;
+        }
+        if(!intersectOrientedBoundingBox(rbA.getConvex()->computeBoundingBox(),
+                                         rbB.getConvex()->computeBoundingBox(),
+                                         v_a2w,
+                                         v_b2w,
+                                         q_a2w,
+                                         q_b2w))
+        {
+            contactInfo.setOverlapDistance(T(1));
+            return;
+        }
+    }
+    if constexpr(BVType == BoundingVolumeType::OBC)
+    {
+        const T radiiSum = rbA.getCircumscribedRadius() + rbB.getCircumscribedRadius();
+        if(norm2(v_b2w - v_a2w) >= radiiSum * radiiSum)
+        {
+            contactInfo.setOverlapDistance(T(1));
+            return;
+        }
+        auto axisFromIndex = [](T idx) -> Vector3<T> {
+            if(idx == T(0))
+                return Vector3<T>(T(1), T(0), T(0));
+            if(idx == T(1))
+                return Vector3<T>(T(0), T(1), T(0));
+            return Vector3<T>(T(0), T(0), T(1));
+        };
+        const Vector3<T> bcA = rbA.getConvex()->computeBoundingCylinder();
+        const Vector3<T> bcB = rbB.getConvex()->computeBoundingCylinder();
+        if(!intersectOrientedBoundingCylinder(bcA[X],
+                                              bcA[Y],
+                                              axisFromIndex(bcA[Z]),
+                                              bcB[X],
+                                              bcB[Y],
+                                              axisFromIndex(bcB[Z]),
+                                              v_a2w,
+                                              v_b2w,
+                                              q_a2w,
+                                              q_b2w))
+        {
+            contactInfo.setOverlapDistance(T(1));
+            return;
+        }
+    }
+    // Extract properties for contact and populate snapshot
+    auto [convexA_ptr,
+          crustA,
+          circRadiusA,
+          convexB_ptr,
+          crustB,
+          circRadiusB,
+          averageMass,
+          averageRadius,
+          contactHash]
+        = getPropertiesForContact(rbA, rbB);
+    typename ContactInfo<T>::Snapshot snapshot;
+    snapshot.averageMass     = averageMass;
+    snapshot.averageRadius   = averageRadius;
+    snapshot.contactHash     = contactHash;
+    snapshot.overlapDistance = std::numeric_limits<T>::max();
+
+    // Get convexes and their types
+    const Convex<T>& convexA = *(convexA_ptr);
+    const Convex<T>& convexB = *(convexB_ptr);
+    const ConvexType typeA   = convexA.getConvexType();
+    const ConvexType typeB   = convexB.getConvexType();
+
+    Vector3<T> ptA, ptB;
+
+    // Sphere-Sphere Case
+    if(typeA == ConvexType::SPHERE && typeB == ConvexType::SPHERE)
+    {
+        T rA                     = rbA.getCircumscribedRadius();
+        T rB                     = rbB.getCircumscribedRadius();
+        ptA                      = v_a2w;
+        ptB                      = v_b2w - ptA;
+        snapshot.overlapDistance = norm(ptB) - rA - rB;
+        {
+            Vector3<T> d_hat       = ptB.normalized();
+            snapshot.contactPoint  = ptA + (rA + T(.5) * snapshot.overlapDistance) * d_hat;
+            snapshot.contactVector = d_hat;
+        }
+    }
+    // Rectangle-Particle Case
+    else if(typeA == ConvexType::RECTANGLE)
+    {
+        // ptA is the point on rectangle and ptB is the point on particle
+        Vector3<T> r = q_a2w >> Vector3<T>(0, 0, 1);
+        r.normalize();
+        r *= copysign(T(1), r * (v_b2w - v_a2w));
+        ptB = (q_b2w >> convexB.support(q_b2w << (-r))) + v_b2w;
+        if(r * (ptB - v_a2w) < T(0))
+        {
+            ptA = ((v_a2w - ptB) * r) * r + ptB;
+            if(convexA.isInside(q_a2w << (ptA - v_a2w)))
+            {
+                snapshot.contactPoint = T(0.5) * (ptA + ptB);
+                ptB -= ptA;
+                snapshot.overlapDistance = -norm(ptB);
+                snapshot.contactVector   = ptB / snapshot.overlapDistance;
+            }
+        }
+    }
+    else if(typeB == ConvexType::RECTANGLE)
+    {
+        GAbort("General-Rectangle collision detection is not implemented yet.");
+    }
+    // General Case: vtable-free via ShapeData
+    else
+    {
+        uint nbIterGJK           = 0;
+        snapshot.overlapDistance = computeClosestPoints_GJK<T, GJKVARIANT, GJKACC>(sdA,
+                                                                                   sdB,
+                                                                                   v_a2w,
+                                                                                   v_b2w,
+                                                                                   q_a2w,
+                                                                                   q_b2w,
+                                                                                   crustA,
+                                                                                   crustB,
+                                                                                   ptA,
+                                                                                   ptB,
+                                                                                   nbIterGJK);
+        if(fabs(snapshot.overlapDistance) < HIGHEPS<T>)
+            snapshot.overlapDistance = -(crustA + crustB);
+        else
+            snapshot.overlapDistance -= crustA + crustB;
+        transform(q_a2w, v_a2w, ptA);
+        transform(q_b2w, v_b2w, ptB);
+        snapshot.contactPoint  = T(0.5) * (ptA + ptB);
+        snapshot.contactVector = (ptB - ptA).normalized();
+    }
+
+    // Set contact information
+    contactInfo.setSnapshot(snapshot);
 }
 //@}
 

@@ -59,6 +59,10 @@ public:
     /** @brief Gets the height */
     __HOSTDEVICE__
     T getHeight() const;
+
+    /** @brief Gets the sine of the half-angle */
+    __HOSTDEVICE__
+    T getSinAngle() const;
     //@}
 
     /** @name Methods */

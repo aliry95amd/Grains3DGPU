@@ -131,6 +131,8 @@ struct CollisionDetectionParameters
         narrow-phase detection and cached; set to false (e.g. for spheres) to skip that step and
         call the GJK overload that works directly in world frame instead. */
     bool useRelativeTransformations = true;
+    /** \brief Use pre-built ShapeData array for vtable-free GJK support evaluation. */
+    bool usePrebuiltShapes = false;
 };
 //@}
 

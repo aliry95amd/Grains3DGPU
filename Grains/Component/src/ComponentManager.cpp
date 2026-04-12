@@ -8,24 +8,91 @@
 
 // -------------------------------------------------------------------------------------------------
 template <typename T, MemType M>
-ComponentManager<T, M>::ComponentManager(GrainsMemBuffer<RigidBody<T>*, M>* rigidBody,
-                                         uint                               nObstacles,
-                                         uint                               nParticles,
-                                         uint                               nComposites,
-                                         uint                               nSubBodies)
+ComponentManager<T, M>::ComponentManager(
+    GrainsMemBuffer<RigidBody<T>*, M>*              rigidBody,
+    GrainsMemBuffer<uint, MemType::HOST>&&          bodyTags,
+    GrainsMemBuffer<Vector3<T>, MemType::HOST>&&    position,
+    GrainsMemBuffer<Quaternion<T>, MemType::HOST>&& orientation,
+    GrainsMemBuffer<Vector3<T>, MemType::HOST>&&    localPos,
+    GrainsMemBuffer<Quaternion<T>, MemType::HOST>&& localQuat,
+    uint                                            nObstacles,
+    uint                                            nParticles,
+    uint                                            nComposites,
+    uint                                            nSubBodies)
     : m_rigidBody(rigidBody)
-    , m_position(nParticles + nObstacles)
-    , m_quaternion(nParticles + nObstacles)
     , m_velocity(nParticles + nObstacles)
     , m_torce(nParticles + nObstacles)
-    , m_bodyTag(nParticles + nObstacles)
-    , m_localPos(nParticles + nObstacles)
-    , m_localQuat(nParticles + nObstacles)
     , m_masterSlot(nComposites + 1)
     , m_counts{nObstacles, nParticles, 0u, nComposites, nSubBodies}
 {
-    GAssert(m_rigidBody->getSize() == m_counts.numParticles + m_counts.numObstacles,
-            "Rigid body size mismatch");
+    const uint nComp = nParticles + nObstacles;
+    GAssert(rigidBody->getSize() == nComp, "Rigid body size mismatch");
+    const uint* hbtPtr = bodyTags.getData();  // capture before potential move
+
+    if constexpr(M == MemType::HOST)
+    {
+        // pointer transfer
+        m_bodyTag    = std::move(bodyTags);
+        m_position   = std::move(position);
+        m_quaternion = std::move(orientation);
+        m_localPos   = std::move(localPos);
+        m_localQuat  = std::move(localQuat);
+
+        // Populate masterSlot (m_bodyTag is HOST-accessible)
+        for(uint i = 0; i < nComp; ++i)
+        {
+            const uint tag = m_bodyTag[i];
+            if(isSubBody(tag) && getSubBodyLocalIdx(tag) == 0u)
+                m_masterSlot[getCompositeIdx(tag)] = i;
+        }
+
+        // Derive sub-body world transforms from master positions
+        updateSubBodyPositions();
+    }
+    else
+    {
+        // Upload all HOST buffers to device
+        m_bodyTag.initialize(nComp);
+        m_bodyTag.copyFrom(bodyTags);
+        m_position.initialize(nComp);
+        m_position.copyFrom(position);
+        m_quaternion.initialize(nComp);
+        m_quaternion.copyFrom(orientation);
+        m_localPos.initialize(nComp);
+        m_localPos.copyFrom(localPos);
+        m_localQuat.initialize(nComp);
+        m_localQuat.copyFrom(localQuat);
+
+        // Build masterSlot on host (bodyTags still HOST-accessible; not moved), then upload
+        GrainsMemBuffer<uint, MemType::HOST> hMasterSlot(nComposites + 1);
+        for(uint i = 0; i < nComp; ++i)
+        {
+            const uint tag = bodyTags[i];
+            if(isSubBody(tag) && getSubBodyLocalIdx(tag) == 0u)
+                hMasterSlot[getCompositeIdx(tag)] = i;
+        }
+        m_masterSlot.copyFrom(hMasterSlot);
+    }
+
+    // Create CollisionDetectionModule
+    m_collisionDetectionModule = std::make_unique<CollisionDetectionModule<T, M>>(
+        m_rigidBody,
+        m_position,
+        m_quaternion,
+        m_bodyTag,
+        hbtPtr,
+        GrainsParameters<T>::m_collisionDetection,
+        m_counts.numObstacles,
+        m_counts.numParticles);
+
+    // Size pair-indexed buffers to CDM's initial pair capacity
+    const size_t pairCapacity = m_collisionDetectionModule->getPairBufferSize();
+    m_contactInfo.initialize(pairCapacity);
+    m_pairList.initialize(pairCapacity);
+
+    // Create ForceModule
+    m_forceModule = std::make_unique<ForceModule<T, M>>(pairCapacity,
+                                                        GrainsParameters<T>::m_isContactWithMemory);
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -121,69 +188,12 @@ uint ComponentManager<T, M>::getNumberOfSubBodies() const
 
 // -------------------------------------------------------------------------------------------------
 template <typename T, MemType M>
-void ComponentManager<T, M>::initialize()
-{
-    m_collisionDetectionModule = std::make_unique<CollisionDetectionModule<T, M>>(
-        m_rigidBody,
-        m_position,
-        m_quaternion,
-        GrainsParameters<T>::m_collisionDetection,
-        m_counts.numObstacles,
-        m_counts.numParticles);
-
-    // Size m_contactInfo and m_pairList to match the module's initial pair buffer capacity
-    size_t pairCapacity = m_collisionDetectionModule->getPairBufferSize();
-    m_contactInfo.initialize(pairCapacity);
-    m_pairList.initialize(pairCapacity);
-
-    // Create ForceModule (owns contact table + GPU intermediate buffers)
-    m_forceModule = std::make_unique<ForceModule<T, M>>(pairCapacity,
-                                                        GrainsParameters<T>::m_isContactWithMemory);
-}
-
-// -------------------------------------------------------------------------------------------------
-template <typename T, MemType M>
 void ComponentManager<T, M>::copyTo_PostProcessing(
     const std::unique_ptr<ComponentManager<T, MemType::HOST>>& other)
 {
     other->setPosition(m_position);
     other->setQuaternion(m_quaternion);
     other->setVelocity(m_velocity);
-}
-
-// -------------------------------------------------------------------------------------------------
-template <typename T, MemType M>
-void ComponentManager<T, M>::initializeComponents(
-    const GrainsMemBuffer<Vector3<T>, MemType::HOST>&    initPosition,
-    const GrainsMemBuffer<Quaternion<T>, MemType::HOST>& initOrientation,
-    const GrainsMemBuffer<uint, MemType::HOST>&          initBodyTags,
-    const GrainsMemBuffer<Vector3<T>, MemType::HOST>&    initLocalPos,
-    const GrainsMemBuffer<Quaternion<T>, MemType::HOST>& initLocalQuat)
-{
-    if constexpr(M == MemType::HOST)
-    {
-        uint nComponents = m_counts.numParticles + m_counts.numObstacles;
-        assert(initPosition.getSize() == nComponents && initOrientation.getSize() == nComponents
-               && initBodyTags.getSize() == nComponents && initLocalPos.getSize() == nComponents
-               && initLocalQuat.getSize() == nComponents);
-
-        for(uint i = 0; i < nComponents; ++i)
-        {
-            m_position[i]   = initPosition[i];
-            m_quaternion[i] = initOrientation[i];
-            m_bodyTag[i]    = initBodyTags[i];
-            m_localPos[i]   = initLocalPos[i];
-            m_localQuat[i]  = initLocalQuat[i];
-        }
-
-        // Populate masterSlot: sub-body with localIdx=0 is the master of each composite
-        for(uint i = 0; i < nComponents; ++i)
-        {
-            uint tag = m_bodyTag[i];
-            if(isSubBody(tag) && getSubBodyLocalIdx(tag) == 0u)
-                m_masterSlot[getCompositeIdx(tag)] = i;
-        }
-    }
 }
 
 // -------------------------------------------------------------------------------------------------

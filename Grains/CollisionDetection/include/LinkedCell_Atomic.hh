@@ -214,24 +214,31 @@ public:
                             (m_numObstacles + m_numParticles) * sizeof(Vector3<T>),
                             cudaMemcpyDeviceToDevice,
                             m_stream0);
+
+            // Stream 1: Generate neighbor cells (waits for resize)
+            uint numBlocksCells, numThreadsCells;
+            computeOptimalThreadsAndBlocks(m_numCells,
+                                           GrainsParameters<T>::m_GPU,
+                                           numBlocksCells,
+                                           numThreadsCells);
+            cudaStreamWaitEvent(m_stream1, m_resizeComplete, 0);
+            m_neighborCells.fill(UINT_MAX, m_stream1);
+            generateNeighborCells_Device<<<numBlocksCells, numThreadsCells, 0, m_stream1>>>(
+                m_cells.getData(),
+                m_numCells,
+                m_neighborCells.getData());
+        }
+        else
+        {
+            // Non-adaptive: cell geometry is fixed, no need to regenerate neighbor cells.
+            // Explicitly synchronize the null stream before launching on non-null streams to
+            // ensure any prior default-stream work (GJK kernels, timer syncs, etc.) has
+            // completed — this mirrors the cudaStreamSynchronize(0) that the adaptive path
+            // performs inside the resize block above.
+            cudaStreamSynchronize(0);
         }
 
         /* Launch concurrent operations */
-
-        // Stream 1: Generate neighbor cells (waits for resize if needed)
-        if(m_useAdaptiveSkin)
-            cudaStreamWaitEvent(m_stream1, m_resizeComplete, 0);
-
-        uint numBlocksCells, numThreadsCells;
-        computeOptimalThreadsAndBlocks(m_numCells,
-                                       GrainsParameters<T>::m_GPU,
-                                       numBlocksCells,
-                                       numThreadsCells);
-        m_neighborCells.fill(UINT_MAX, m_stream1);
-        generateNeighborCells_Device<<<numBlocksCells, numThreadsCells, 0, m_stream1>>>(
-            m_cells.getData(),
-            m_numCells,
-            m_neighborCells.getData());
 
         // Stream 2: Reset particle counts + cell counters, then pack IDs (sequential within stream)
         m_numParticlesPerCell.fill(0u, m_stream2);
@@ -245,8 +252,11 @@ public:
             m_numParticlesPerCell.getData());
 
         // Synchronize all streams before returning
-        cudaStreamSynchronize(m_stream0);  // Old position copy
-        cudaStreamSynchronize(m_stream1);  // Neighbor generation
+        if(m_useAdaptiveSkin)
+        {
+            cudaStreamSynchronize(m_stream0);  // Old position copy
+            cudaStreamSynchronize(m_stream1);  // Neighbor generation
+        }
         cudaStreamSynchronize(m_stream2);  // Particle packing
     }
 

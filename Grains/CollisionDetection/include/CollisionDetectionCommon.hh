@@ -3,6 +3,7 @@
 
 #include "CollisionDetection.hh"
 #include "ContactInfo.hh"
+#include "GJK_ShapeData.hh"
 #include "GrainsParameters.hh"
 #include "OBB.hh"
 #include "OBC.hh"
@@ -271,6 +272,128 @@ __HOSTDEVICE__ static INLINE bool filterPairBV_common(const RigidBody<T>&  rbA,
             return false;
     }
     return true;
+}
+
+// -------------------------------------------------------------------------------------------------
+/** @brief BV-only test for a single pair using pre-built BVData (vtable-free bounding volume
+    queries). Functionally identical to filterPairBV_common but replaces
+    getConvex()->computeBoundingBox() / computeBoundingCylinder() with stored BVData fields.
+    Circumscribed radii are read from BVData instead of RigidBody.
+    @param bvA  pre-built BVData for body A (shapeId-indexed)
+    @param bvB  pre-built BVData for body B (shapeId-indexed)
+    @param v_b2a relative position of B in A-local frame
+    @param q_b2a relative quaternion of B w.r.t. A */
+template <typename T, BoundingVolumeType BVType = BoundingVolumeType::OBB>
+__HOSTDEVICE__ static INLINE bool filterPairBV_common(const BVData<T>&     bvA,
+                                                      const BVData<T>&     bvB,
+                                                      const Vector3<T>&    v_b2a,
+                                                      const Quaternion<T>& q_b2a)
+{
+    const T radiiSum = bvA.circumscribedRadius + bvB.circumscribedRadius;
+    if(norm2(v_b2a) >= radiiSum * radiiSum)
+        return false;
+    if constexpr(BVType == BoundingVolumeType::OBB)
+    {
+        if(!intersectOrientedBoundingBox(bvA.boundingBox, bvB.boundingBox, v_b2a, q_b2a))
+            return false;
+    }
+    if constexpr(BVType == BoundingVolumeType::OBC)
+    {
+        // bc = {radius, halfHeight, axisIndex(0=X,1=Y,2=Z)}
+        const Vector3<T>& bcA           = bvA.boundingCylinder;
+        const Vector3<T>& bcB           = bvB.boundingCylinder;
+        auto              axisFromIndex = [](T idx) -> Vector3<T> {
+            if(idx == T(0))
+                return Vector3<T>(T(1), T(0), T(0));
+            if(idx == T(1))
+                return Vector3<T>(T(0), T(1), T(0));
+            return Vector3<T>(T(0), T(0), T(1));
+        };
+        if(!intersectOrientedBoundingCylinder(bcA[X],
+                                              bcA[Y],
+                                              axisFromIndex(bcA[Z]),
+                                              bcB[X],
+                                              bcB[Y],
+                                              axisFromIndex(bcB[Z]),
+                                              v_b2a,
+                                              q_b2a))
+            return false;
+    }
+    return true;
+}
+
+// -------------------------------------------------------------------------------------------------
+/** @brief Detects collisions between components using pre-built ShapeData (vtable-free GJK).
+    ShapeData is indexed by shapeId (from bodyTags) for deduplication across identical shapes.
+    @param pairList list of contact pairs (slot indices)
+    @param shapeData pre-built ShapeData array (shapeId-indexed, size = nUniqueShapes)
+    @param bodyTags body-tag array (slot-indexed); encodes shapeId via getShapeId()
+    @param relPosition relative position of B in A-local frame (pre-cached)
+    @param relQuaternion relative quaternion of B w.r.t. A (pre-cached)
+    @param contactInfo output contact information (A-local frame)
+    @param pairID ID of the pair */
+template <typename T,
+          GJKType            GJKVARIANT = GJKType::JOHNSON,
+          bool               GJKACC     = false,
+          BoundingVolumeType BVType     = BoundingVolumeType::OFF>
+__HOSTDEVICE__ static INLINE void
+    detectCollisionsComponents_common(const uint2*         pairList,
+                                      const ShapeData<T>*  shapeData,
+                                      const uint*          bodyTags,
+                                      const Vector3<T>*    relPosition,
+                                      const Quaternion<T>* relQuaternion,
+                                      ContactInfo<T>*      contactInfo,
+                                      const uint           pairID)
+{
+    const uint2          pair  = pairList[pairID];
+    const ShapeData<T>&  sdA   = shapeData[getShapeId(bodyTags[pair.x])];
+    const ShapeData<T>&  sdB   = shapeData[getShapeId(bodyTags[pair.y])];
+    const Vector3<T>&    v_b2a = relPosition[pairID];
+    const Quaternion<T>& q_b2a = relQuaternion[pairID];
+
+    closestPointsRigidBodies<T, GJKVARIANT, GJKACC>(sdA, sdB, v_b2a, q_b2a, contactInfo[pairID]);
+}
+
+// -------------------------------------------------------------------------------------------------
+/** @brief Detects collisions between components using pre-built ShapeData and global coords.
+    ShapeData is indexed by shapeId (from bodyTags) for deduplication across identical shapes.
+    @param pairList list of contact pairs
+    @param shapeData pre-built ShapeData array (shapeId-indexed, size = nUniqueShapes)
+    @param bodyTags body-tag array (slot-indexed); encodes shapeId via getShapeId()
+    @param position global position of the components
+    @param quaternion global quaternion of the components
+    @param contactInfo output contact information
+    @param pairID ID of the pair */
+template <typename T,
+          GJKType            GJKVARIANT = GJKType::JOHNSON,
+          bool               GJKACC     = false,
+          BoundingVolumeType BVType     = BoundingVolumeType::OFF>
+__HOSTDEVICE__ static INLINE void
+    detectCollisionsComponentsGlobal_common(const uint2*         pairList,
+                                            const ShapeData<T>*  shapeData,
+                                            const uint*          bodyTags,
+                                            const Vector3<T>*    position,
+                                            const Quaternion<T>* quaternion,
+                                            ContactInfo<T>*      contactInfo,
+                                            const uint           pairID)
+{
+    const uint2          pair  = pairList[pairID];
+    const uint           idA   = pair.x;
+    const uint           idB   = pair.y;
+    const ShapeData<T>&  sdA   = shapeData[getShapeId(bodyTags[idA])];
+    const ShapeData<T>&  sdB   = shapeData[getShapeId(bodyTags[idB])];
+    const Vector3<T>&    v_a2w = position[idA];
+    const Vector3<T>&    v_b2w = position[idB];
+    const Quaternion<T>& q_a2w = quaternion[idA];
+    const Quaternion<T>& q_b2w = quaternion[idB];
+
+    closestPointsRigidBodies<T, GJKVARIANT, GJKACC>(sdA,
+                                                    sdB,
+                                                    v_a2w,
+                                                    v_b2w,
+                                                    q_a2w,
+                                                    q_b2w,
+                                                    contactInfo[pairID]);
 }
 //@}
 
