@@ -40,7 +40,7 @@
 /** @name Macros */
 //@{
 /** @brief Compiler macros */
-#if defined(__NVCC__)
+#if defined(__NVCC__) || defined(__CUDACC__)
 #define __HOST__ __host__
 #define __DEVICE__ __device__
 #define __HOSTDEVICE__ __host__ __device__

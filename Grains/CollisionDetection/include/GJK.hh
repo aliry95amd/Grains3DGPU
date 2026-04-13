@@ -78,7 +78,7 @@ __HOSTDEVICE__ bool intersectGJK(const Convex<T>&     a,
     @param pa point representing one tip of the minimal distance segment on A
     @param pb point representing the other tip of the minimal distance segment on B
     @param nbIter number of iterations of GJK for convergence */
-template <typename T, GJKType GJKType, bool Acceleration = false, T Tolerance = EPS<T>>
+template <typename T, GJKType GJKType, bool Acceleration = false>
 __HOSTDEVICE__ T computeClosestPoints_GJK(const Convex<T>&     a,
                                           const Convex<T>&     b,
                                           const Transform3<T>& b2a,
@@ -99,7 +99,7 @@ __HOSTDEVICE__ T computeClosestPoints_GJK(const Convex<T>&     a,
     @param pa point representing one tip of the minimal distance segment on A
     @param pb point representing the tip of the minimal distance segment on B
     @param nbIter number of iterations of GJK for convergence */
-template <typename T, GJKType GJKType, bool Acceleration = false, T Tolerance = EPS<T>>
+template <typename T, GJKType GJKType, bool Acceleration = false>
 __HOSTDEVICE__ T computeClosestPoints_GJK(const Convex<T>&     a,
                                           const Convex<T>&     b,
                                           const Transform3<T>& a2w,
@@ -121,7 +121,7 @@ __HOSTDEVICE__ T computeClosestPoints_GJK(const Convex<T>&     a,
     @param pa point representing one tip of the minimal distance segment on A
     @param pb point representing the tip of the minimal distance segment on B
     @param nbIter number of iterations of GJK for convergence */
-template <typename T, GJKType GJKType, bool Acceleration = false, T Tolerance = EPS<T>>
+template <typename T, GJKType GJKType, bool Acceleration = false>
 __HOSTDEVICE__ T computeClosestPoints_GJK(const Convex<T>&     a,
                                           const Convex<T>&     b,
                                           const Vector3<T>&    v_b2a,
@@ -145,7 +145,7 @@ __HOSTDEVICE__ T computeClosestPoints_GJK(const Convex<T>&     a,
     @param pa point representing one tip of the minimal distance segment on A
     @param pb point representing the tip of the minimal distance segment on B
     @param nbIter number of iterations of GJK for convergence */
-template <typename T, GJKType GJKType, bool Acceleration = false, T Tolerance = EPS<T>>
+template <typename T, GJKType GJKType, bool Acceleration = false>
 __HOSTDEVICE__ T computeClosestPoints_GJK(const Convex<T>&     a,
                                           const Convex<T>&     b,
                                           const Vector3<T>&    v_a2w,
@@ -169,7 +169,7 @@ __HOSTDEVICE__ T computeClosestPoints_GJK(const Convex<T>&     a,
     @param pa point representing one tip of the minimal distance segment on A
     @param pb point representing the tip of the minimal distance segment on B
     @param nbIter number of iterations of GJK for convergence */
-template <typename T, GJKType GJKType, bool Acceleration = false, T Tolerance = EPS<T>>
+template <typename T, GJKType GJKType, bool Acceleration = false>
 __HOSTDEVICE__ T computeClosestPoints_GJK(const ShapeData<T>&  sdA,
                                           const ShapeData<T>&  sdB,
                                           const Vector3<T>&    v_b2a,
@@ -193,7 +193,7 @@ __HOSTDEVICE__ T computeClosestPoints_GJK(const ShapeData<T>&  sdA,
     @param pa point representing one tip of the minimal distance segment on A
     @param pb point representing the tip of the minimal distance segment on B
     @param nbIter number of iterations of GJK for convergence */
-template <typename T, GJKType GJKType, bool Acceleration = false, T Tolerance = EPS<T>>
+template <typename T, GJKType GJKType, bool Acceleration = false>
 __HOSTDEVICE__ T computeClosestPoints_GJK(const ShapeData<T>&  sdA,
                                           const ShapeData<T>&  sdB,
                                           const Vector3<T>&    v_a2w,

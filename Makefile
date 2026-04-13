@@ -58,14 +58,18 @@ install-githook:
 	echo "Pre-commit hook installed successfully."; \
 
 apply-clang-format:
-	@echo "Formatting all source files according to .clang-format ..."
-	@find ./Grains/ -name "*.cpp" -o -name "*.hh" | \
-	xargs clang-format -i --style=file:./.clang-format;
-	@find ./Tests/ -name "*.cpp" -o -name "*.hh" | \
-	xargs clang-format -i --style=file:./.clang-format;
-	@find ./Validations/ -name "*.cpp" -o -name "*.hh" | \
-	xargs clang-format -i --style=file:./.clang-format; \
-	echo 'Formatting complete!';
+	@if ! command -v clang-format >/dev/null 2>&1; then \
+	  echo "clang-format not found — skipping formatting."; \
+	else \
+	  echo "Formatting all source files according to .clang-format ..."; \
+	  find ./Grains/ -name "*.cpp" -o -name "*.hh" | \
+	  xargs clang-format -i --style=file:./.clang-format; \
+	  find ./Tests/ -name "*.cpp" -o -name "*.hh" | \
+	  xargs clang-format -i --style=file:./.clang-format; \
+	  find ./Validations/ -name "*.cpp" -o -name "*.hh" | \
+	  xargs clang-format -i --style=file:./.clang-format; \
+	  echo 'Formatting complete!'; \
+	fi
 	@echo
 
 githook:

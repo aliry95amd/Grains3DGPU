@@ -104,7 +104,7 @@ __HOST__ static INLINE std::ostream& operator<<(std::ostream& os, const uint2& v
     @param figure the float number
     @param size number of digits */
 template <typename T>
-__HOST__ static constexpr INLINE std::string realToString(const T& figure, const int size)
+__HOST__ static INLINE std::string realToString(const T& figure, const int size)
 {
     std::ostringstream oss;
     oss.width(size);
@@ -119,7 +119,7 @@ __HOST__ static constexpr INLINE std::string realToString(const T& figure, const
     @param digits number of digits after the decimal point
     @param number the float number */
 template <typename T>
-__HOST__ static constexpr INLINE std::string
+__HOST__ static INLINE std::string
     realToString(std::ios_base::fmtflags format, const int digits, const T& number)
 {
     std::ostringstream oss;
@@ -136,7 +136,7 @@ __HOST__ static constexpr INLINE std::string
 /** @brief Writes a vector3 object in a string
     @param vec the vector3 object */
 template <typename T>
-__HOST__ static constexpr INLINE std::string Vector3ToString(const Vector3<T>& vec)
+__HOST__ static INLINE std::string Vector3ToString(const Vector3<T>& vec)
 {
     std::ostringstream oss;
     oss << vec;
@@ -205,7 +205,7 @@ __DEVICE__ INLINE void print_device_arg(double arg)
 {
     printf("%f ", arg);
 }
-__DEVICE__ INLINE void print_device_arg(const std::string& arg)
+__HOST__ INLINE void print_device_arg(const std::string& arg)
 {
     printf("%s ", arg.c_str());
 }

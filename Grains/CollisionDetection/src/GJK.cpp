@@ -768,7 +768,7 @@ __HOSTDEVICE__ bool intersectGJK(const Convex<T>&     a,
 
 // -------------------------------------------------------------------------------------------------
 // Johnson implementation of closest points algorithm
-template <typename T, bool Acceleration, T Tolerance>
+template <typename T, bool Acceleration>
 __HOSTDEVICE__ T computeClosestPoints_GJK_Johnson(const Convex<T>&     a,
                                                   const Convex<T>&     b,
                                                   const Transform3<T>& b2a,
@@ -779,7 +779,7 @@ __HOSTDEVICE__ T computeClosestPoints_GJK_Johnson(const Convex<T>&     a,
                                                   uint&                nbIter)
 {
     // Constants
-    constexpr T    relError = Tolerance;            // relative tolerance
+    constexpr T    relError = EPS<T>;               // relative tolerance
     constexpr T    absError = T(1.e-4 * relError);  // absolute tolerance
     constexpr uint MAXITERS = 1000;
 
@@ -856,7 +856,7 @@ __HOSTDEVICE__ T computeClosestPoints_GJK_Johnson(const Convex<T>&     a,
 
 // -------------------------------------------------------------------------------------------------
 // SignedVolume implementation of closest points algorithm
-template <typename T, bool Acceleration, T Tolerance>
+template <typename T, bool Acceleration>
 __HOSTDEVICE__ T computeClosestPoints_GJK_SignedVolume(const Convex<T>&     a,
                                                        const Convex<T>&     b,
                                                        const Transform3<T>& b2a,
@@ -867,7 +867,7 @@ __HOSTDEVICE__ T computeClosestPoints_GJK_SignedVolume(const Convex<T>&     a,
                                                        uint&                nbIter)
 {
     // Constants
-    constexpr T    relError = Tolerance;            // relative tolerance
+    constexpr T    relError = EPS<T>;               // relative tolerance
     constexpr T    absError = T(1.e-4 * relError);  // absolute tolerance
     constexpr uint MAXITERS = 1000;                 // Maximum iterations
 
@@ -944,7 +944,7 @@ __HOSTDEVICE__ T computeClosestPoints_GJK_SignedVolume(const Convex<T>&     a,
 
 // -------------------------------------------------------------------------------------------------
 // Dispatcher function that routes to the appropriate implementation
-template <typename T, GJKType GJKType, bool Acceleration, T Tolerance>
+template <typename T, GJKType GJKType, bool Acceleration>
 __HOSTDEVICE__ T computeClosestPoints_GJK(const Convex<T>&     a,
                                           const Convex<T>&     b,
                                           const Transform3<T>& b2a,
@@ -959,31 +959,31 @@ __HOSTDEVICE__ T computeClosestPoints_GJK(const Convex<T>&     a,
 
     if constexpr(GJKType == GJKType::JOHNSON)
     {
-        return computeClosestPoints_GJK_Johnson<T, Acceleration, Tolerance>(a,
-                                                                            b,
-                                                                            b2a,
-                                                                            crustA,
-                                                                            crustB,
-                                                                            pa,
-                                                                            pb,
-                                                                            nbIter);
+        return computeClosestPoints_GJK_Johnson<T, Acceleration>(a,
+                                                                 b,
+                                                                 b2a,
+                                                                 crustA,
+                                                                 crustB,
+                                                                 pa,
+                                                                 pb,
+                                                                 nbIter);
     }
     else
     {
-        return computeClosestPoints_GJK_SignedVolume<T, Acceleration, Tolerance>(a,
-                                                                                 b,
-                                                                                 b2a,
-                                                                                 crustA,
-                                                                                 crustB,
-                                                                                 pa,
-                                                                                 pb,
-                                                                                 nbIter);
+        return computeClosestPoints_GJK_SignedVolume<T, Acceleration>(a,
+                                                                      b,
+                                                                      b2a,
+                                                                      crustA,
+                                                                      crustB,
+                                                                      pa,
+                                                                      pb,
+                                                                      nbIter);
     }
 }
 
 // -------------------------------------------------------------------------------------------------
 // Johnson implementation for two transforms
-template <typename T, bool Acceleration, T Tolerance>
+template <typename T, bool Acceleration>
 __HOSTDEVICE__ T computeClosestPoints_GJK_Johnson(const Convex<T>&     a,
                                                   const Convex<T>&     b,
                                                   const Transform3<T>& a2w,
@@ -995,7 +995,7 @@ __HOSTDEVICE__ T computeClosestPoints_GJK_Johnson(const Convex<T>&     a,
                                                   uint&                nbIter)
 {
     // Constants
-    constexpr T relError = Tolerance;            // relative tolerance
+    constexpr T relError = EPS<T>;               // relative tolerance
     constexpr T absError = T(1.e-4 * relError);  // absolute tolerance
 
     // Johnson-specific variables
@@ -1074,7 +1074,7 @@ __HOSTDEVICE__ T computeClosestPoints_GJK_Johnson(const Convex<T>&     a,
 
 // -------------------------------------------------------------------------------------------------
 // SignedVolume implementation for two transforms
-template <typename T, bool Acceleration, T Tolerance>
+template <typename T, bool Acceleration>
 __HOSTDEVICE__ T computeClosestPoints_GJK_SignedVolume(const Convex<T>&     a,
                                                        const Convex<T>&     b,
                                                        const Transform3<T>& a2w,
@@ -1086,7 +1086,7 @@ __HOSTDEVICE__ T computeClosestPoints_GJK_SignedVolume(const Convex<T>&     a,
                                                        uint&                nbIter)
 {
     // Constants
-    constexpr T relError = Tolerance;            // relative tolerance
+    constexpr T relError = EPS<T>;               // relative tolerance
     constexpr T absError = T(1.e-4 * relError);  // absolute tolerance
 
     // SignedVolume-specific variables
@@ -1163,7 +1163,7 @@ __HOSTDEVICE__ T computeClosestPoints_GJK_SignedVolume(const Convex<T>&     a,
 
 // -------------------------------------------------------------------------------------------------
 // Dispatcher function for two transforms
-template <typename T, GJKType GJKType, bool Acceleration, T Tolerance>
+template <typename T, GJKType GJKType, bool Acceleration>
 __HOSTDEVICE__ T computeClosestPoints_GJK(const Convex<T>&     a,
                                           const Convex<T>&     b,
                                           const Transform3<T>& a2w,
@@ -1179,33 +1179,33 @@ __HOSTDEVICE__ T computeClosestPoints_GJK(const Convex<T>&     a,
 
     if constexpr(GJKType == GJKType::JOHNSON)
     {
-        return computeClosestPoints_GJK_Johnson<T, Acceleration, Tolerance>(a,
-                                                                            b,
-                                                                            a2w,
-                                                                            b2w,
-                                                                            crustA,
-                                                                            crustB,
-                                                                            pa,
-                                                                            pb,
-                                                                            nbIter);
+        return computeClosestPoints_GJK_Johnson<T, Acceleration>(a,
+                                                                 b,
+                                                                 a2w,
+                                                                 b2w,
+                                                                 crustA,
+                                                                 crustB,
+                                                                 pa,
+                                                                 pb,
+                                                                 nbIter);
     }
     else
     {
-        return computeClosestPoints_GJK_SignedVolume<T, Acceleration, Tolerance>(a,
-                                                                                 b,
-                                                                                 a2w,
-                                                                                 b2w,
-                                                                                 crustA,
-                                                                                 crustB,
-                                                                                 pa,
-                                                                                 pb,
-                                                                                 nbIter);
+        return computeClosestPoints_GJK_SignedVolume<T, Acceleration>(a,
+                                                                      b,
+                                                                      a2w,
+                                                                      b2w,
+                                                                      crustA,
+                                                                      crustB,
+                                                                      pa,
+                                                                      pb,
+                                                                      nbIter);
     }
 }
 
 // -------------------------------------------------------------------------------------------------
 // Johnson implementation for Vector/Quaternion
-template <typename T, bool Acceleration, T Tolerance>
+template <typename T, bool Acceleration>
 __HOSTDEVICE__ T computeClosestPoints_GJK_Johnson(const Convex<T>&     a,
                                                   const Convex<T>&     b,
                                                   const Vector3<T>&    v_b2a,
@@ -1217,7 +1217,7 @@ __HOSTDEVICE__ T computeClosestPoints_GJK_Johnson(const Convex<T>&     a,
                                                   uint&                nbIter)
 {
     // Constants
-    constexpr T relError = Tolerance;            // relative tolerance
+    constexpr T relError = EPS<T>;               // relative tolerance
     constexpr T absError = T(1.e-4 * relError);  // absolute tolerance
 
     // Johnson-specific variables
@@ -1295,7 +1295,7 @@ __HOSTDEVICE__ T computeClosestPoints_GJK_Johnson(const Convex<T>&     a,
 
 // -------------------------------------------------------------------------------------------------
 // SignedVolume implementation for Vector/Quaternion
-template <typename T, bool Acceleration, T Tolerance>
+template <typename T, bool Acceleration>
 __HOSTDEVICE__ T computeClosestPoints_GJK_SignedVolume(const Convex<T>&     a,
                                                        const Convex<T>&     b,
                                                        const Vector3<T>&    v_b2a,
@@ -1307,7 +1307,7 @@ __HOSTDEVICE__ T computeClosestPoints_GJK_SignedVolume(const Convex<T>&     a,
                                                        uint&                nbIter)
 {
     // Constants
-    constexpr T relError = Tolerance;            // relative tolerance
+    constexpr T relError = EPS<T>;               // relative tolerance
     constexpr T absError = T(1.e-4 * relError);  // absolute tolerance
 
     // SignedVolume-specific variables
@@ -1383,7 +1383,7 @@ __HOSTDEVICE__ T computeClosestPoints_GJK_SignedVolume(const Convex<T>&     a,
 
 // -------------------------------------------------------------------------------------------------
 // Dispatcher function for Vector/Quaternion
-template <typename T, GJKType GJKType, bool Acceleration, T Tolerance>
+template <typename T, GJKType GJKType, bool Acceleration>
 __HOSTDEVICE__ T computeClosestPoints_GJK(const Convex<T>&     a,
                                           const Convex<T>&     b,
                                           const Vector3<T>&    v_b2a,
@@ -1399,33 +1399,33 @@ __HOSTDEVICE__ T computeClosestPoints_GJK(const Convex<T>&     a,
 
     if constexpr(GJKType == GJKType::JOHNSON)
     {
-        return computeClosestPoints_GJK_Johnson<T, Acceleration, Tolerance>(a,
-                                                                            b,
-                                                                            v_b2a,
-                                                                            q_b2a,
-                                                                            crustA,
-                                                                            crustB,
-                                                                            pa,
-                                                                            pb,
-                                                                            nbIter);
+        return computeClosestPoints_GJK_Johnson<T, Acceleration>(a,
+                                                                 b,
+                                                                 v_b2a,
+                                                                 q_b2a,
+                                                                 crustA,
+                                                                 crustB,
+                                                                 pa,
+                                                                 pb,
+                                                                 nbIter);
     }
     else
     {
-        return computeClosestPoints_GJK_SignedVolume<T, Acceleration, Tolerance>(a,
-                                                                                 b,
-                                                                                 v_b2a,
-                                                                                 q_b2a,
-                                                                                 crustA,
-                                                                                 crustB,
-                                                                                 pa,
-                                                                                 pb,
-                                                                                 nbIter);
+        return computeClosestPoints_GJK_SignedVolume<T, Acceleration>(a,
+                                                                      b,
+                                                                      v_b2a,
+                                                                      q_b2a,
+                                                                      crustA,
+                                                                      crustB,
+                                                                      pa,
+                                                                      pb,
+                                                                      nbIter);
     }
 }
 
 // -------------------------------------------------------------------------------------------------
 // Johnson implementation for Vector/Vector/Quaternion/Quaternion
-template <typename T, bool Acceleration, T Tolerance>
+template <typename T, bool Acceleration>
 __HOSTDEVICE__ T computeClosestPoints_GJK_Johnson(const Convex<T>&     a,
                                                   const Convex<T>&     b,
                                                   const Vector3<T>&    v_a2w,
@@ -1439,7 +1439,7 @@ __HOSTDEVICE__ T computeClosestPoints_GJK_Johnson(const Convex<T>&     a,
                                                   uint&                nbIter)
 {
     // Constants
-    constexpr T relError = Tolerance;            // relative tolerance
+    constexpr T relError = EPS<T>;               // relative tolerance
     constexpr T absError = T(1.e-4 * relError);  // absolute tolerance
 
     // Johnson-specific variables
@@ -1518,7 +1518,7 @@ __HOSTDEVICE__ T computeClosestPoints_GJK_Johnson(const Convex<T>&     a,
 
 // -------------------------------------------------------------------------------------------------
 // SignedVolume implementation for Vector/Vector/Quaternion/Quaternion
-template <typename T, bool Acceleration, T Tolerance>
+template <typename T, bool Acceleration>
 __HOSTDEVICE__ T computeClosestPoints_GJK_SignedVolume(const Convex<T>&     a,
                                                        const Convex<T>&     b,
                                                        const Vector3<T>&    v_a2w,
@@ -1532,7 +1532,7 @@ __HOSTDEVICE__ T computeClosestPoints_GJK_SignedVolume(const Convex<T>&     a,
                                                        uint&                nbIter)
 {
     // Constants
-    constexpr T relError = Tolerance;            // relative tolerance
+    constexpr T relError = EPS<T>;               // relative tolerance
     constexpr T absError = T(1.e-4 * relError);  // absolute tolerance
 
     // SignedVolume-specific variables
@@ -1609,7 +1609,7 @@ __HOSTDEVICE__ T computeClosestPoints_GJK_SignedVolume(const Convex<T>&     a,
 
 // -------------------------------------------------------------------------------------------------
 // Dispatcher function for Vector/Vector/Quaternion/Quaternion
-template <typename T, GJKType GJKType, bool Acceleration, T Tolerance>
+template <typename T, GJKType GJKType, bool Acceleration>
 __HOSTDEVICE__ T computeClosestPoints_GJK(const Convex<T>&     a,
                                           const Convex<T>&     b,
                                           const Vector3<T>&    v_a2w,
@@ -1627,37 +1627,37 @@ __HOSTDEVICE__ T computeClosestPoints_GJK(const Convex<T>&     a,
 
     if constexpr(GJKType == GJKType::JOHNSON)
     {
-        return computeClosestPoints_GJK_Johnson<T, Acceleration, Tolerance>(a,
-                                                                            b,
-                                                                            v_a2w,
-                                                                            v_b2w,
-                                                                            q_a2w,
-                                                                            q_b2w,
-                                                                            crustA,
-                                                                            crustB,
-                                                                            pa,
-                                                                            pb,
-                                                                            nbIter);
+        return computeClosestPoints_GJK_Johnson<T, Acceleration>(a,
+                                                                 b,
+                                                                 v_a2w,
+                                                                 v_b2w,
+                                                                 q_a2w,
+                                                                 q_b2w,
+                                                                 crustA,
+                                                                 crustB,
+                                                                 pa,
+                                                                 pb,
+                                                                 nbIter);
     }
     else
     {
-        return computeClosestPoints_GJK_SignedVolume<T, Acceleration, Tolerance>(a,
-                                                                                 b,
-                                                                                 v_a2w,
-                                                                                 v_b2w,
-                                                                                 q_a2w,
-                                                                                 q_b2w,
-                                                                                 crustA,
-                                                                                 crustB,
-                                                                                 pa,
-                                                                                 pb,
-                                                                                 nbIter);
+        return computeClosestPoints_GJK_SignedVolume<T, Acceleration>(a,
+                                                                      b,
+                                                                      v_a2w,
+                                                                      v_b2w,
+                                                                      q_a2w,
+                                                                      q_b2w,
+                                                                      crustA,
+                                                                      crustB,
+                                                                      pa,
+                                                                      pb,
+                                                                      nbIter);
     }
 }
 
 // -------------------------------------------------------------------------------------------------
 // Johnson implementation for vec/quat
-template <typename T, bool Acceleration, T Tolerance>
+template <typename T, bool Acceleration>
 __HOSTDEVICE__ T computeClosestPoints_GJK_Johnson(const ShapeData<T>&  sdA,
                                                   const ShapeData<T>&  sdB,
                                                   const Vector3<T>&    v_b2a,
@@ -1669,7 +1669,7 @@ __HOSTDEVICE__ T computeClosestPoints_GJK_Johnson(const ShapeData<T>&  sdA,
                                                   uint&                nbIter)
 {
     // Constants
-    constexpr T relError = Tolerance;            // relative tolerance
+    constexpr T relError = EPS<T>;               // relative tolerance
     constexpr T absError = T(1.e-4 * relError);  // absolute tolerance
 
     // Johnson-specific variables
@@ -1747,7 +1747,7 @@ __HOSTDEVICE__ T computeClosestPoints_GJK_Johnson(const ShapeData<T>&  sdA,
 
 // -------------------------------------------------------------------------------------------------
 // SignedVolume implementation for vec/quat
-template <typename T, bool Acceleration, T Tolerance>
+template <typename T, bool Acceleration>
 __HOSTDEVICE__ T computeClosestPoints_GJK_SignedVolume(const ShapeData<T>&  sdA,
                                                        const ShapeData<T>&  sdB,
                                                        const Vector3<T>&    v_b2a,
@@ -1759,7 +1759,7 @@ __HOSTDEVICE__ T computeClosestPoints_GJK_SignedVolume(const ShapeData<T>&  sdA,
                                                        uint&                nbIter)
 {
     // Constants
-    constexpr T relError = Tolerance;            // relative tolerance
+    constexpr T relError = EPS<T>;               // relative tolerance
     constexpr T absError = T(1.e-4 * relError);  // absolute tolerance
 
     // SignedVolume-specific variables
@@ -1835,7 +1835,7 @@ __HOSTDEVICE__ T computeClosestPoints_GJK_SignedVolume(const ShapeData<T>&  sdA,
 
 // -------------------------------------------------------------------------------------------------
 // Dispatcher function for vec/quat
-template <typename T, GJKType GJKType, bool Acceleration, T Tolerance>
+template <typename T, GJKType GJKType, bool Acceleration>
 __HOSTDEVICE__ T computeClosestPoints_GJK(const ShapeData<T>&  sdA,
                                           const ShapeData<T>&  sdB,
                                           const Vector3<T>&    v_b2a,
@@ -1851,33 +1851,33 @@ __HOSTDEVICE__ T computeClosestPoints_GJK(const ShapeData<T>&  sdA,
 
     if constexpr(GJKType == GJKType::JOHNSON)
     {
-        return computeClosestPoints_GJK_Johnson<T, Acceleration, Tolerance>(sdA,
-                                                                            sdB,
-                                                                            v_b2a,
-                                                                            q_b2a,
-                                                                            crustA,
-                                                                            crustB,
-                                                                            pa,
-                                                                            pb,
-                                                                            nbIter);
+        return computeClosestPoints_GJK_Johnson<T, Acceleration>(sdA,
+                                                                 sdB,
+                                                                 v_b2a,
+                                                                 q_b2a,
+                                                                 crustA,
+                                                                 crustB,
+                                                                 pa,
+                                                                 pb,
+                                                                 nbIter);
     }
     else
     {
-        return computeClosestPoints_GJK_SignedVolume<T, Acceleration, Tolerance>(sdA,
-                                                                                 sdB,
-                                                                                 v_b2a,
-                                                                                 q_b2a,
-                                                                                 crustA,
-                                                                                 crustB,
-                                                                                 pa,
-                                                                                 pb,
-                                                                                 nbIter);
+        return computeClosestPoints_GJK_SignedVolume<T, Acceleration>(sdA,
+                                                                      sdB,
+                                                                      v_b2a,
+                                                                      q_b2a,
+                                                                      crustA,
+                                                                      crustB,
+                                                                      pa,
+                                                                      pb,
+                                                                      nbIter);
     }
 }
 
 // -------------------------------------------------------------------------------------------------
 // Johnson sub-algorithm, world frame, vtable-free via ShapeData
-template <typename T, bool Acceleration, T Tolerance>
+template <typename T, bool Acceleration>
 __HOSTDEVICE__ T computeClosestPoints_GJK_Johnson(const ShapeData<T>&  sdA,
                                                   const ShapeData<T>&  sdB,
                                                   const Vector3<T>&    v_a2w,
@@ -1891,7 +1891,7 @@ __HOSTDEVICE__ T computeClosestPoints_GJK_Johnson(const ShapeData<T>&  sdA,
                                                   uint&                nbIter)
 {
     // Constants
-    constexpr T relError = Tolerance;            // relative tolerance
+    constexpr T relError = EPS<T>;               // relative tolerance
     constexpr T absError = T(1.e-4 * relError);  // absolute tolerance
 
     // Johnson-specific variables
@@ -1970,7 +1970,7 @@ __HOSTDEVICE__ T computeClosestPoints_GJK_Johnson(const ShapeData<T>&  sdA,
 
 // -------------------------------------------------------------------------------------------------
 // SignedVolume sub-algorithm, world frame, vtable-free via ShapeData
-template <typename T, bool Acceleration, T Tolerance>
+template <typename T, bool Acceleration>
 __HOSTDEVICE__ T computeClosestPoints_GJK_SignedVolume(const ShapeData<T>&  sdA,
                                                        const ShapeData<T>&  sdB,
                                                        const Vector3<T>&    v_a2w,
@@ -1984,7 +1984,7 @@ __HOSTDEVICE__ T computeClosestPoints_GJK_SignedVolume(const ShapeData<T>&  sdA,
                                                        uint&                nbIter)
 {
     // Constants
-    constexpr T relError = Tolerance;            // relative tolerance
+    constexpr T relError = EPS<T>;               // relative tolerance
     constexpr T absError = T(1.e-4 * relError);  // absolute tolerance
 
     // SignedVolume-specific variables
@@ -2061,7 +2061,7 @@ __HOSTDEVICE__ T computeClosestPoints_GJK_SignedVolume(const ShapeData<T>&  sdA,
 
 // -------------------------------------------------------------------------------------------------
 // Dispatcher world frame
-template <typename T, GJKType GJKType, bool Acceleration, T Tolerance>
+template <typename T, GJKType GJKType, bool Acceleration>
 __HOSTDEVICE__ T computeClosestPoints_GJK(const ShapeData<T>&  sdA,
                                           const ShapeData<T>&  sdB,
                                           const Vector3<T>&    v_a2w,
@@ -2079,31 +2079,31 @@ __HOSTDEVICE__ T computeClosestPoints_GJK(const ShapeData<T>&  sdA,
 
     if constexpr(GJKType == GJKType::JOHNSON)
     {
-        return computeClosestPoints_GJK_Johnson<T, Acceleration, Tolerance>(sdA,
-                                                                            sdB,
-                                                                            v_a2w,
-                                                                            v_b2w,
-                                                                            q_a2w,
-                                                                            q_b2w,
-                                                                            crustA,
-                                                                            crustB,
-                                                                            pa,
-                                                                            pb,
-                                                                            nbIter);
+        return computeClosestPoints_GJK_Johnson<T, Acceleration>(sdA,
+                                                                 sdB,
+                                                                 v_a2w,
+                                                                 v_b2w,
+                                                                 q_a2w,
+                                                                 q_b2w,
+                                                                 crustA,
+                                                                 crustB,
+                                                                 pa,
+                                                                 pb,
+                                                                 nbIter);
     }
     else
     {
-        return computeClosestPoints_GJK_SignedVolume<T, Acceleration, Tolerance>(sdA,
-                                                                                 sdB,
-                                                                                 v_a2w,
-                                                                                 v_b2w,
-                                                                                 q_a2w,
-                                                                                 q_b2w,
-                                                                                 crustA,
-                                                                                 crustB,
-                                                                                 pa,
-                                                                                 pb,
-                                                                                 nbIter);
+        return computeClosestPoints_GJK_SignedVolume<T, Acceleration>(sdA,
+                                                                      sdB,
+                                                                      v_a2w,
+                                                                      v_b2w,
+                                                                      q_a2w,
+                                                                      q_b2w,
+                                                                      crustA,
+                                                                      crustB,
+                                                                      pa,
+                                                                      pb,
+                                                                      nbIter);
     }
 }
 
@@ -2131,74 +2131,70 @@ X(float)
 X(double)
 #undef X
 
-#define X(T, GJK, ACC, TOL)                                                                        \
-    template __HOSTDEVICE__ T computeClosestPoints_GJK<T, GJK, ACC, TOL>(const Convex<T>&     a,   \
-                                                                         const Convex<T>&     b,   \
-                                                                         const Transform3<T>& b2a, \
-                                                                         const T     crustA,       \
-                                                                         const T     crustB,       \
-                                                                         Vector3<T>& pa,           \
-                                                                         Vector3<T>& pb,           \
-                                                                         uint&       nbIter);            \
-    template __HOSTDEVICE__ T computeClosestPoints_GJK<T, GJK, ACC, TOL>(const Convex<T>&     a,   \
-                                                                         const Convex<T>&     b,   \
-                                                                         const Transform3<T>& a2w, \
-                                                                         const Transform3<T>& b2w, \
-                                                                         const T     crustA,       \
-                                                                         const T     crustB,       \
-                                                                         Vector3<T>& pa,           \
-                                                                         Vector3<T>& pb,           \
-                                                                         uint&       nbIter);            \
-    template __HOSTDEVICE__ T computeClosestPoints_GJK<T, GJK, ACC, TOL>(                          \
-        const Convex<T>&     a,                                                                    \
-        const Convex<T>&     b,                                                                    \
-        const Vector3<T>&    v_b2a,                                                                \
-        const Quaternion<T>& q_b2a,                                                                \
-        const T              crustA,                                                               \
-        const T              crustB,                                                               \
-        Vector3<T>&          pa,                                                                   \
-        Vector3<T>&          pb,                                                                   \
-        uint&                nbIter);                                                                             \
-    template __HOSTDEVICE__ T computeClosestPoints_GJK<T, GJK, ACC, TOL>(                          \
-        const Convex<T>&     a,                                                                    \
-        const Convex<T>&     b,                                                                    \
-        const Vector3<T>&    v_a2w,                                                                \
-        const Vector3<T>&    v_b2w,                                                                \
-        const Quaternion<T>& q_a2w,                                                                \
-        const Quaternion<T>& q_b2w,                                                                \
-        const T              crustA,                                                               \
-        const T              crustB,                                                               \
-        Vector3<T>&          pa,                                                                   \
-        Vector3<T>&          pb,                                                                   \
-        uint&                nbIter);                                                                             \
-    template __HOSTDEVICE__ T computeClosestPoints_GJK<T, GJK, ACC, TOL>(                          \
-        const ShapeData<T>&  sdA,                                                                  \
-        const ShapeData<T>&  sdB,                                                                  \
-        const Vector3<T>&    v_b2a,                                                                \
-        const Quaternion<T>& q_b2a,                                                                \
-        const T              crustA,                                                               \
-        const T              crustB,                                                               \
-        Vector3<T>&          pa,                                                                   \
-        Vector3<T>&          pb,                                                                   \
-        uint&                nbIter);                                                                             \
-    template __HOSTDEVICE__ T computeClosestPoints_GJK<T, GJK, ACC, TOL>(                          \
-        const ShapeData<T>&  sdA,                                                                  \
-        const ShapeData<T>&  sdB,                                                                  \
-        const Vector3<T>&    v_a2w,                                                                \
-        const Vector3<T>&    v_b2w,                                                                \
-        const Quaternion<T>& q_a2w,                                                                \
-        const Quaternion<T>& q_b2w,                                                                \
-        const T              crustA,                                                               \
-        const T              crustB,                                                               \
-        Vector3<T>&          pa,                                                                   \
-        Vector3<T>&          pb,                                                                   \
-        uint&                nbIter);
-X(float, GJKType::JOHNSON, false, EPS<float>)
-X(double, GJKType::JOHNSON, false, EPS<double>)
-X(float, GJKType::JOHNSON, true, EPS<float>)
-X(double, GJKType::JOHNSON, true, EPS<double>)
-X(float, GJKType::SIGNEDVOLUME, false, EPS<float>)
-X(double, GJKType::SIGNEDVOLUME, false, EPS<double>)
-X(float, GJKType::SIGNEDVOLUME, true, EPS<float>)
-X(double, GJKType::SIGNEDVOLUME, true, EPS<double>)
+#define X(T, GJK, ACC)                                                                           \
+    template __HOSTDEVICE__ T computeClosestPoints_GJK<T, GJK, ACC>(const Convex<T>&     a,      \
+                                                                    const Convex<T>&     b,      \
+                                                                    const Transform3<T>& b2a,    \
+                                                                    const T              crustA, \
+                                                                    const T              crustB, \
+                                                                    Vector3<T>&          pa,     \
+                                                                    Vector3<T>&          pb,     \
+                                                                    uint&                nbIter);               \
+    template __HOSTDEVICE__ T computeClosestPoints_GJK<T, GJK, ACC>(const Convex<T>&     a,      \
+                                                                    const Convex<T>&     b,      \
+                                                                    const Transform3<T>& a2w,    \
+                                                                    const Transform3<T>& b2w,    \
+                                                                    const T              crustA, \
+                                                                    const T              crustB, \
+                                                                    Vector3<T>&          pa,     \
+                                                                    Vector3<T>&          pb,     \
+                                                                    uint&                nbIter);               \
+    template __HOSTDEVICE__ T computeClosestPoints_GJK<T, GJK, ACC>(const Convex<T>&     a,      \
+                                                                    const Convex<T>&     b,      \
+                                                                    const Vector3<T>&    v_b2a,  \
+                                                                    const Quaternion<T>& q_b2a,  \
+                                                                    const T              crustA, \
+                                                                    const T              crustB, \
+                                                                    Vector3<T>&          pa,     \
+                                                                    Vector3<T>&          pb,     \
+                                                                    uint&                nbIter);               \
+    template __HOSTDEVICE__ T computeClosestPoints_GJK<T, GJK, ACC>(const Convex<T>&     a,      \
+                                                                    const Convex<T>&     b,      \
+                                                                    const Vector3<T>&    v_a2w,  \
+                                                                    const Vector3<T>&    v_b2w,  \
+                                                                    const Quaternion<T>& q_a2w,  \
+                                                                    const Quaternion<T>& q_b2w,  \
+                                                                    const T              crustA, \
+                                                                    const T              crustB, \
+                                                                    Vector3<T>&          pa,     \
+                                                                    Vector3<T>&          pb,     \
+                                                                    uint&                nbIter);               \
+    template __HOSTDEVICE__ T computeClosestPoints_GJK<T, GJK, ACC>(const ShapeData<T>&  sdA,    \
+                                                                    const ShapeData<T>&  sdB,    \
+                                                                    const Vector3<T>&    v_b2a,  \
+                                                                    const Quaternion<T>& q_b2a,  \
+                                                                    const T              crustA, \
+                                                                    const T              crustB, \
+                                                                    Vector3<T>&          pa,     \
+                                                                    Vector3<T>&          pb,     \
+                                                                    uint&                nbIter);               \
+    template __HOSTDEVICE__ T computeClosestPoints_GJK<T, GJK, ACC>(const ShapeData<T>&  sdA,    \
+                                                                    const ShapeData<T>&  sdB,    \
+                                                                    const Vector3<T>&    v_a2w,  \
+                                                                    const Vector3<T>&    v_b2w,  \
+                                                                    const Quaternion<T>& q_a2w,  \
+                                                                    const Quaternion<T>& q_b2w,  \
+                                                                    const T              crustA, \
+                                                                    const T              crustB, \
+                                                                    Vector3<T>&          pa,     \
+                                                                    Vector3<T>&          pb,     \
+                                                                    uint&                nbIter);
+X(float, GJKType::JOHNSON, false)
+X(double, GJKType::JOHNSON, false)
+X(float, GJKType::JOHNSON, true)
+X(double, GJKType::JOHNSON, true)
+X(float, GJKType::SIGNEDVOLUME, false)
+X(double, GJKType::SIGNEDVOLUME, false)
+X(float, GJKType::SIGNEDVOLUME, true)
+X(double, GJKType::SIGNEDVOLUME, true)
 #undef X
