@@ -24,6 +24,7 @@ static void dispatchPlatform(const BenchmarkScenario&               s,
                              const std::vector<bool>&               gjkAccels,
                              const std::vector<BoundingVolumeType>& bvTypes,
                              const std::vector<bool>&               relTransforms,
+                             const std::vector<bool>&               prebuiltShapes,
                              const std::vector<LinkedCellType>&     cpuLcTypes,
                              const std::vector<LinkedCellType>&     gpuLcTypes,
                              const std::vector<uint>&               sortFreqs)
@@ -57,6 +58,7 @@ static void dispatchPlatform(const BenchmarkScenario&               s,
                                      gjkAccels,
                                      bvTypes,
                                      relTransforms,
+                                     prebuiltShapes,
                                      {NeighborListType::NSQ},
                                      {cpuLcTypes[0]},
                                      sortFreqs);
@@ -74,6 +76,7 @@ static void dispatchPlatform(const BenchmarkScenario&               s,
                                      gjkAccels,
                                      bvTypes,
                                      relTransforms,
+                                     prebuiltShapes,
                                      {NeighborListType::LINKEDCELL},
                                      {lct},
                                      sortFreqs);
@@ -97,6 +100,7 @@ static void dispatchPlatform(const BenchmarkScenario&               s,
                                      gjkAccels,
                                      bvTypes,
                                      relTransforms,
+                                     prebuiltShapes,
                                      {NeighborListType::NSQ},
                                      {gpuLcTypes[0]},
                                      sortFreqs);
@@ -114,6 +118,7 @@ static void dispatchPlatform(const BenchmarkScenario&               s,
                                      gjkAccels,
                                      bvTypes,
                                      relTransforms,
+                                     prebuiltShapes,
                                      {NeighborListType::LINKEDCELL},
                                      {lct},
                                      sortFreqs);
@@ -144,6 +149,7 @@ static void printUsage(const char* prog)
         << "\nPrecision / platform:\n"
         << "  --precision single|double|both  (default: both)\n"
         << "  --platform cpu|gpu|both         (default: both)\n"
+        << "  --prebuilt on|off|both          PrebuiltShapes vtable-free path (default: both)\n"
         << "\nRun control:\n"
         << "  --warmup N               Warmup calls before timing (default: 1)\n"
         << "  --measure N              Timed calls per scenario (default: 10)\n"
@@ -176,6 +182,7 @@ int main(int argc, char* argv[])
 
     std::string precStr      = "both";
     std::string platStr      = "both";
+    std::string prebuiltStr  = "both";
     std::string csvFile      = "data/benchmark.csv";
     bool        appendCSV    = false;
     bool        hasParticles = false;
@@ -270,6 +277,10 @@ int main(int argc, char* argv[])
         {
             platStr = argv[++i];
         }
+        else if(a == "--prebuilt" && i + 1 < argc)
+        {
+            prebuiltStr = argv[++i];
+        }
         else if(a == "--csv" && i + 1 < argc)
         {
             csvFile = argv[++i];
@@ -309,8 +320,12 @@ int main(int argc, char* argv[])
     const std::vector<bool>            gjkAccels = {false, true};
     const std::vector<BoundingVolumeType> bvTypes
         = {BoundingVolumeType::OFF, BoundingVolumeType::OBB, BoundingVolumeType::OBC};
-    const std::vector<bool>           relTransforms = {false, true};
-    const std::vector<LinkedCellType> cpuLcTypes    = {LinkedCellType::HOST};
+    const std::vector<bool> relTransforms        = {false, true};
+    const std::vector<bool> prebuiltShapes       = (prebuiltStr == "on") ? std::vector<bool>{true}
+                                                   : (prebuiltStr == "off")
+                                                       ? std::vector<bool>{false}
+                                                       : std::vector<bool>{false, true};
+    const std::vector<LinkedCellType> cpuLcTypes = {LinkedCellType::HOST};
     const std::vector<LinkedCellType> gpuLcTypes
         = {LinkedCellType::SORTBASED, LinkedCellType::ATOMIC, LinkedCellType::ATOMICFIXED};
     const std::vector<uint> sortFreqs = {0};
@@ -350,6 +365,7 @@ int main(int argc, char* argv[])
                                 gjkAccels,
                                 bvTypes,
                                 relTransforms,
+                                prebuiltShapes,
                                 cpuLcTypes,
                                 gpuLcTypes,
                                 sortFreqs);
@@ -363,6 +379,7 @@ int main(int argc, char* argv[])
                                  gjkAccels,
                                  bvTypes,
                                  relTransforms,
+                                 prebuiltShapes,
                                  cpuLcTypes,
                                  gpuLcTypes,
                                  sortFreqs);

@@ -1,13 +1,12 @@
 #!/bin/bash
 export GRAINS_BITS_DEFAULT=64
-# Prefer a standard g++ for Xerces (Xerces 2.8.0 configure scripts were written
-# for GCC;
-# If g++ is in PATH (e.g. added manually in the ARC env file), use it and derive
-# SERCOMPIL from it.  Fall back to GRAINS_CPP_COMPILER otherwise.
+# Prefer a standard g++ for Xerces (Xerces 2.8.0 configure scripts were written for GCC);
+# If g++ is in PATH (e.g. added manually in the ARC env file), use it and derive SERCOMPIL from it.
+# Fall back to GRAINS_CPP_COMPILER otherwise.
 if command -v g++ >/dev/null 2>&1; then
     _XERCES_CXX=$(command -v g++)
     _XERCES_ENV=GNU
-    _XERCES_VER=$(g++ -dumpversion 2>/dev/null)
+    _XERCES_VER=$(g++ -dumpfullversion 2>/dev/null)
 else
     _XERCES_CXX=${GRAINS_CPP_COMPILER}
     _XERCES_ENV=${GRAINS_CPP_COMPILER_DIST}

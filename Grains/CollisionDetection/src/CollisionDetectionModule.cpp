@@ -83,7 +83,9 @@ CollisionDetectionModule<T, M>::CollisionDetectionModule(
                                    (int)estimatedPairs);
         m_cubTempStorage.initialize(m_cubTempStorageBytes);
     }
-    if(CD.usePrebuiltShapes)
+    // Always build the compact shape/BV tables so that toggling usePrebuiltShapes at
+    // runtime (e.g. across benchmark iterations) never reads an uninitialized m_shapeData.
+    // Cost is O(nUniqueShapes) — dominated by every other init step.
     {
         const uint nComponents = nObstacles + nParticles;
         buildShapeAndBVData(rigidBody->getData(), hostBodyTags, nComponents);
@@ -366,7 +368,8 @@ void CollisionDetectionModule<T, M>::detectCollisionsComponents(
         // BVType is passed directly to detectCollisionsComponents_common, which forwards it to
         // closestPointsRigidBodies. The BV early-out and no-contact sentinel are handled
         // internally. Intra-composite pairs are skipped via an explicit guard before the call.
-        auto run = [&](auto bvTypeTag) {
+        const bool usePrebuilt = GrainsParameters<T>::m_collisionDetection.usePrebuiltShapes;
+        auto       run         = [&](auto bvTypeTag) {
             constexpr BoundingVolumeType BVT = decltype(bvTypeTag)::value;
             gt.start(CDMStage::NarrowPhase);
             dispatchGJK(npType, gjkAcc, [&](auto gjkV_tag, auto gjkA_tag) {
@@ -387,13 +390,23 @@ void CollisionDetectionModule<T, M>::detectCollisionsComponents(
                             continue;
                         }
                     }
-                    detectCollisionsComponents_common<T, GJKV, GJKA, BVT>(
-                        pairList.getData(),
-                        rigidBodies,
-                        m_relPosition.getData(),
-                        m_relQuaternion.getData(),
-                        m_contactInfoLocal.getData(),
-                        i);
+                    if(usePrebuilt)
+                        detectCollisionsComponents_common<T, GJKV, GJKA, BVT>(
+                            pairList.getData(),
+                            m_shapeData.getData(),
+                            bt,
+                            m_relPosition.getData(),
+                            m_relQuaternion.getData(),
+                            m_contactInfoLocal.getData(),
+                            i);
+                    else
+                        detectCollisionsComponents_common<T, GJKV, GJKA, BVT>(
+                            pairList.getData(),
+                            rigidBodies,
+                            m_relPosition.getData(),
+                            m_relQuaternion.getData(),
+                            m_contactInfoLocal.getData(),
+                            i);
                 }
             });
             gt.stop(CDMStage::NarrowPhase);

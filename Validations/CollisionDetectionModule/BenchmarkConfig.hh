@@ -72,6 +72,9 @@ struct BenchmarkScenario
     /** true  = compute per-pair relative pos/quat, then run GJK in local frame
         false = feed world-frame pos/quat directly to GJK (no pre-transform step) */
     bool useRelativeTransformations = true;
+    /** true  = pre-build ShapeData arrays (vtable-free GPU path)
+        false = use Convex<T> virtual dispatch (CPU default path) */
+    bool usePrebuiltShapes = false;
 
     // ---- Neighbor list ------------------------------------------------------
     NeighborListType neighborListType = NeighborListType::LINKEDCELL;

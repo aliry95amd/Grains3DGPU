@@ -243,7 +243,19 @@ public:
         auto ins = std::make_unique<Insertion<T>>();
         ins->setPositionInsertionInfo(posWin);
         ins->setOrientationInsertionInfo(oriWin);
-        ins->insert(&h_rb, pd.pos, pd.quat, pd.kin, lcp, 0u, N);
+        GrainsMemBuffer<uint, MemType::HOST>          bodyTag;
+        GrainsMemBuffer<Vector3<T>, MemType::HOST>    localPos;
+        GrainsMemBuffer<Quaternion<T>, MemType::HOST> localQuat;
+        bodyTag.initialize(N);
+        localPos.initialize(N);
+        localQuat.initialize(N);
+        for(uint i = 0; i < N; ++i)
+        {
+            bodyTag[i]   = 0u;
+            localPos[i]  = Vector3<T>();
+            localQuat[i] = Quaternion<T>(T(1), T(0), T(0), T(0));
+        }
+        ins->insert(&h_rb, pd.pos, pd.quat, pd.kin, lcp, 0u, N, bodyTag, localPos, localQuat);
 
         for(uint i = 0; i < N; ++i)
             delete h_rb[i];
@@ -267,8 +279,7 @@ public:
         @param runID  Row identifier written to the CSV */
     void run(uint runID)
     {
-        using GP     = GrainsParameters<T>;
-        const uint N = m_scenario.numParticles;
+        using GP = GrainsParameters<T>;
 
         // Re-apply the full CD params each call (in case multiple runners share the process)
         GP::m_collisionDetection = buildCDParams();
@@ -345,6 +356,7 @@ public:
                        m_scenario.gjkAcceleration ? 1 : 0,
                        bvStr(),
                        m_scenario.useRelativeTransformations ? 1 : 0,
+                       m_scenario.usePrebuiltShapes ? 1 : 0,
                        nlStr(),
                        lcStr(),
                        m_scenario.sortFrequency,
@@ -372,6 +384,7 @@ public:
                              const std::vector<bool>&               gjkAccels,
                              const std::vector<BoundingVolumeType>& bvs,
                              const std::vector<bool>&               relTransforms,
+                             const std::vector<bool>&               prebuiltShapes,
                              const std::vector<NeighborListType>&   nls,
                              const std::vector<LinkedCellType>&     lcts,
                              const std::vector<uint>&               sortFreqs)
@@ -380,20 +393,22 @@ public:
             for(auto accel : gjkAccels)
                 for(auto bv : bvs)
                     for(auto rel : relTransforms)
-                        for(auto nl : nls)
-                            for(auto lc : lcts)
-                                for(auto sf : sortFreqs)
-                                {
-                                    m_scenario.narrowPhaseType            = np;
-                                    m_scenario.gjkAcceleration            = accel;
-                                    m_scenario.boundingVolumeType         = bv;
-                                    m_scenario.useRelativeTransformations = rel;
-                                    m_scenario.neighborListType           = nl;
-                                    m_scenario.linkedCellType             = lc;
-                                    m_scenario.sortFrequency              = sf;
+                        for(auto prebuilt : prebuiltShapes)
+                            for(auto nl : nls)
+                                for(auto lc : lcts)
+                                    for(auto sf : sortFreqs)
+                                    {
+                                        m_scenario.narrowPhaseType            = np;
+                                        m_scenario.gjkAcceleration            = accel;
+                                        m_scenario.boundingVolumeType         = bv;
+                                        m_scenario.useRelativeTransformations = rel;
+                                        m_scenario.usePrebuiltShapes          = prebuilt;
+                                        m_scenario.neighborListType           = nl;
+                                        m_scenario.linkedCellType             = lc;
+                                        m_scenario.sortFrequency              = sf;
 
-                                    run(runID++);
-                                }
+                                        run(runID++);
+                                    }
     }
 
     // -------------------------------------------------------------------------
@@ -413,6 +428,7 @@ public:
                          "GJKAccel",
                          "BoundingVolume",
                          "UseRelTransform",
+                         "UsePrebuiltShapes",
                          "NeighborListType",
                          "LinkedCellType",
                          "SortFrequency",
@@ -468,11 +484,17 @@ private:
         m_h_pos.initialize(N);
         m_h_quat.initialize(N);
         m_h_kin.initialize(N);
+        m_h_bodyTags.initialize(N);
+        m_h_localPos.initialize(N);
+        m_h_localQuat.initialize(N);
         for(uint i = 0; i < N; ++i)
         {
-            m_h_rb[i]   = new RigidBody<T>(m_shape->clone(), T(0), 0, 1);
-            m_h_pos[i]  = {};
-            m_h_quat[i] = Quaternion<T>(T(1), T(0), T(0), T(0));
+            m_h_rb[i]        = new RigidBody<T>(m_shape->clone(), T(0), 0, 1);
+            m_h_pos[i]       = {};
+            m_h_quat[i]      = Quaternion<T>(T(1), T(0), T(0), T(0));
+            m_h_bodyTags[i]  = 0u;
+            m_h_localPos[i]  = Vector3<T>();
+            m_h_localQuat[i] = Quaternion<T>(T(1), T(0), T(0), T(0));
         }
     }
 
@@ -500,7 +522,7 @@ private:
                 m_pos[i]        = m_h_pos[i];
                 m_quat[i]       = m_h_quat[i];
                 m_kin[i]        = m_h_kin[i];
-                m_rbIds[i]      = i;
+                m_rbIds[i]      = 0u;
                 m_localPos[i]   = Vector3<T>();
                 m_localQuat[i]  = Quaternion<T>(T(1), T(0), T(0), T(0));
                 m_masterSlot[i] = 0u;
@@ -518,7 +540,7 @@ private:
             h_masterSlot.initialize(N);
             for(uint i = 0; i < N; ++i)
             {
-                h_rbIds[i]      = i;
+                h_rbIds[i]      = 0u;
                 h_localPos[i]   = Vector3<T>();
                 h_localQuat[i]  = Quaternion<T>(T(1), T(0), T(0), T(0));
                 h_masterSlot[i] = 0u;
@@ -538,7 +560,14 @@ private:
         m_pairList.initialize(estPairs);
         m_counts.numParticles = N;
 
-        m_cdm = std::make_unique<CollisionDetectionModule<T, M>>(&m_rb, m_pos, m_quat, cdp, 0u, N);
+        m_cdm = std::make_unique<CollisionDetectionModule<T, M>>(&m_rb,
+                                                                 m_pos,
+                                                                 m_quat,
+                                                                 m_rbIds,
+                                                                 m_h_bodyTags.getData(),
+                                                                 cdp,
+                                                                 0u,
+                                                                 N);
     }
 
     /** @brief Variant of buildDeviceData that borrows the device RB pointer array from dpd
@@ -579,7 +608,7 @@ private:
         h_masterSlot.initialize(N);
         for(uint i = 0; i < N; ++i)
         {
-            h_rbIds[i]      = i;
+            h_rbIds[i]      = 0u;
             h_localPos[i]   = Vector3<T>();
             h_localQuat[i]  = Quaternion<T>(T(1), T(0), T(0), T(0));
             h_masterSlot[i] = 0u;
@@ -597,7 +626,14 @@ private:
         m_pairList.initialize(estPairs);
         m_counts.numParticles = N;
 
-        m_cdm = std::make_unique<CollisionDetectionModule<T, M>>(&m_rb, m_pos, m_quat, cdp, 0u, N);
+        m_cdm = std::make_unique<CollisionDetectionModule<T, M>>(&m_rb,
+                                                                 m_pos,
+                                                                 m_quat,
+                                                                 m_rbIds,
+                                                                 m_h_bodyTags.getData(),
+                                                                 cdp,
+                                                                 0u,
+                                                                 N);
     }
 
     /** @brief Build a CollisionDetectionParameters from the current scenario. */
@@ -609,7 +645,7 @@ private:
         cdp.narrowPhaseType            = m_scenario.narrowPhaseType;
         cdp.gjkAcceleration            = m_scenario.gjkAcceleration;
         cdp.useRelativeTransformations = m_scenario.useRelativeTransformations;
-        cdp.timer                      = false;
+        cdp.usePrebuiltShapes          = m_scenario.usePrebuiltShapes;
 
         LinkedCellParameters<T>& lcp = cdp.linkedCellParameters;
         lcp.type                     = m_scenario.linkedCellType;
@@ -660,7 +696,16 @@ private:
         auto ins = std::make_unique<Insertion<T>>();
         ins->setPositionInsertionInfo(posWin);
         ins->setOrientationInsertionInfo(oriWin);
-        ins->insert(&m_h_rb, m_h_pos, m_h_quat, m_h_kin, lcp, 0u, N);
+        ins->insert(&m_h_rb,
+                    m_h_pos,
+                    m_h_quat,
+                    m_h_kin,
+                    lcp,
+                    0u,
+                    N,
+                    m_h_bodyTags,
+                    m_h_localPos,
+                    m_h_localQuat);
     }
 
     // -- Label helpers for CSV strings ----------------------------------------
@@ -726,6 +771,9 @@ private:
     GrainsMemBuffer<Vector3<T>, MemType::HOST>    m_h_pos;
     GrainsMemBuffer<Quaternion<T>, MemType::HOST> m_h_quat;
     GrainsMemBuffer<Kinematics<T>, MemType::HOST> m_h_kin;
+    GrainsMemBuffer<uint, MemType::HOST>          m_h_bodyTags;   ///< shape-ID 0 for all particles
+    GrainsMemBuffer<Vector3<T>, MemType::HOST>    m_h_localPos;   ///< local pos offsets (zero)
+    GrainsMemBuffer<Quaternion<T>, MemType::HOST> m_h_localQuat;  ///< local quat offsets (identity)
 
     // M-typed arrays passed to CDM at construction and at every run() call
     GrainsMemBuffer<RigidBody<T>*, M> m_rb;
