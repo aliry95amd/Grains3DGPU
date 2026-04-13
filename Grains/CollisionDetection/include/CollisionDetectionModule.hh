@@ -42,6 +42,12 @@ class CollisionDetectionModule
 private:
     /** @name Parameters */
     //@{
+    /** \brief Pre-built ShapeData array for vtable-free GJK support evaluation.
+        ShapeId-indexed (one entry per unique shape, size = nUniqueShapes). */
+    GrainsMemBuffer<ShapeData<T>, M> m_shapeData;
+    /** \brief Pre-built BVData array for vtable-free bounding-volume queries.
+        ShapeId-indexed (one entry per unique shape, size = nUniqueShapes). */
+    GrainsMemBuffer<BVData<T>, M> m_bvData;
     /** \brief Particle sorter for Morton code-based reordering of particle arrays */
     ParticleSorter<T, M> m_particleSorter;
     /** \brief Neighbor list (broad phase) */
@@ -59,16 +65,10 @@ private:
     /** \brief Size-1 zero-copy mapped pinned buffer; CUB writes the passing-pair count directly
         into this via the device alias; host reads it without any cudaMemcpy */
     GrainsMemBuffer<int, MemType::MAPPED> m_bvPassPairCountMapped;
-    /** \ brief Scratch space for CUB DeviceSelect::Flagged */
+    /** \brief Scratch space for CUB DeviceSelect::Flagged */
     GrainsMemBuffer<uint8_t, M> m_cubTempStorage;
     /** \brief Byte size of the CUB scratch buffer */
     size_t m_cubTempStorageBytes = 0;
-    /** \brief Pre-built ShapeData array for vtable-free GJK support evaluation.
-        ShapeId-indexed (one entry per unique shape, size = nUniqueShapes). */
-    GrainsMemBuffer<ShapeData<T>, M> m_shapeData;
-    /** \brief Pre-built BVData array for vtable-free bounding-volume queries.
-        ShapeId-indexed (one entry per unique shape, size = nUniqueShapes). */
-    GrainsMemBuffer<BVData<T>, M> m_bvData;
     /** \brief Number of unique shapes (= max shapeId+1 from bodyTags). */
     uint m_nUniqueShapes = 0;
     //@}

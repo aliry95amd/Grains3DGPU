@@ -1,4 +1,4 @@
-<Grains3D Type="Standard" Precision="Double">
+<Grains3D Type="GPU" Precision="Double">
 
 <Construction>
 	<Origin X="-0.03" Y="-0.03" Z="0.0"/>
@@ -7,7 +7,7 @@
 
 	<CollisionDetection EnableTimings="true" UseRelativeTransformations="false">
 		<NeighborList Type="LinkedCell"/>
-		<LinkedCell Type="Device_Atomic" CellSizeFactor="1.0" UpdatingFrequency="0" SortingFrequency="0"/>
+		<LinkedCell Type="Device_Atomic" CellSizeFactor="1.0" UpdatingFrequency="10000" SortingFrequency="0"/>
 		<BoundingVolume Type="OBC"/>
 		<NarrowPhase Type="GJK" Acceleration="false" PrebuiltShapes="true"/>
 	</CollisionDetection>
