@@ -55,16 +55,16 @@ fi
 echo "Verifying Google Test installation..."
 
 if [ -f "/usr/local/include/gtest/gtest.h" ] || [ -f "/usr/include/gtest/gtest.h" ]; then
-    echo "✓ Google Test headers found"
+    echo "Google Test headers found"
 else
-    echo "✗ Google Test headers not found"
+    echo "Google Test headers not found"
     exit 1
 fi
 
 if ldconfig -p | grep -q "libgtest" && ldconfig -p | grep -q "libgtest_main"; then
-    echo "✓ Google Test libraries found"
+    echo "Google Test libraries found"
 else
-    echo "✗ Google Test libraries not found"
+    echo "Google Test libraries not found"
     echo "Available gtest libraries:"
     ldconfig -p | grep gtest || echo "None found"
     exit 1

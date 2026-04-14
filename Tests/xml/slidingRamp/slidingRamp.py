@@ -157,7 +157,7 @@ def main() -> None:
     print(f"  Coulomb   = muc*F_n = {_coulomb:.4f} N")
     print(f"  x_eq      = {X_EQ*1e3:.4f} mm  (HookeMemory spring equilibrium)")
     print(f"  omega_t   = {OMEGA_T:.4f} rad/s  =>  T_osc = {T_OSC*1e3:.2f} ms")
-    print(f"  x_peak    = {2*X_EQ*1e3:.4f} mm  (max spring force = {_ft_peak:.2f} N < {_coulomb:.2f} N ✓)")
+    print(f"  x_peak    = {2*X_EQ*1e3:.4f} mm  (max spring force = {_ft_peak:.2f} N < {_coulomb:.2f} N)")
     print(f"  Hooke x(T_END) = {0.5*G_TAN*T_END**2*100:.2f} cm  (slides {0.5*G_TAN*T_END**2*100:.1f} cm)")
     print()
 
