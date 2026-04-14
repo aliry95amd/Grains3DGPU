@@ -173,7 +173,7 @@ TEST_F(OBCSimpleTest, PerpendicularAxes_RadiallySeparated)
 
 // -------------------------------------------------------------------------------------------------
 // Clearly overlapping: B is X-aligned with the same center as A.
-// Axes are perpendicular and centers coincide → deep intersection.
+// Axes are perpendicular and centers coincide -> deep intersection.
 // Expected: true
 // -------------------------------------------------------------------------------------------------
 TEST_F(OBCSimpleTest, PerpendicularAxes_SameCenter)
@@ -286,7 +286,7 @@ TEST_F(OBCSimpleTest, FortyFiveDegreeAxes_ClearSeparation)
 // -------------------------------------------------------------------------------------------------
 TEST_F(OBCSimpleTest, PerpendicularAxes_Rotated90X_SameCenter)
 {
-    // A: Z-aligned at origin  B: rotated 90° around X → world axis = (0, -1, 0)
+    // A: Z-aligned at origin  B: rotated 90° around X -> world axis = (0, -1, 0)
     checkAllOBCOverloads(1.0,
                          2.0,
                          ori_z,
@@ -329,7 +329,7 @@ TEST_F(OBCSimpleTest, PerpendicularAxes_Rotated90X_AxiallySeparated)
 
 // -------------------------------------------------------------------------------------------------
 // A is -Y-aligned at (1,2,3); B is Z-aligned at (1,2,3.5).
-// Physically: B's center is close to A's center, well inside both hulls → intersect.
+// Physically: B's center is close to A's center, well inside both hulls -> intersect.
 // Expected: true
 // -------------------------------------------------------------------------------------------------
 TEST_F(OBCSimpleTest, NonIdentityA_BClose_Intersecting)
@@ -352,7 +352,7 @@ TEST_F(OBCSimpleTest, NonIdentityA_BClose_Intersecting)
 
 // -------------------------------------------------------------------------------------------------
 // A is -Y-aligned at (1,2,3); B is Z-aligned at (1,2,7).
-// B is 4 units above A's center in Z. A's half-height is 1 → axes are far apart.
+// B is 4 units above A's center in Z. A's half-height is 1 -> axes are far apart.
 // Expected: false
 // -------------------------------------------------------------------------------------------------
 TEST_F(OBCSimpleTest, NonIdentityA_BFar_Separated)
@@ -404,7 +404,7 @@ TEST_F(OBCSimpleTest, BothRotated_SameCenter_MustIntersect)
 
 // -------------------------------------------------------------------------------------------------
 // Both cylinders rotated, but B is far from A along the world X axis.
-// The separation (20 units) dwarfs any cylinder dimension → always false.
+// The separation (20 units) dwarfs any cylinder dimension -> always false.
 // Expected: false
 // -------------------------------------------------------------------------------------------------
 TEST_F(OBCSimpleTest, BothRotated_FarApart_MustNotIntersect)
@@ -585,7 +585,7 @@ TEST_F(OBCSimpleTest, SymmetryAB_Separated)
 // -------------------------------------------------------------------------------------------------
 // Non-Z local axis: both cylinders lie along their local X-axis (ori = (1,0,0)).
 // A stays at identity (so world axis = X), B is rotated 90° around Z
-// (world axis = Y).  They share the same center → must intersect.
+// (world axis = Y).  They share the same center -> must intersect.
 // Expected: true
 // -------------------------------------------------------------------------------------------------
 TEST_F(OBCSimpleTest, NonZLocalAxis_SameCenter)
@@ -594,7 +594,7 @@ TEST_F(OBCSimpleTest, NonZLocalAxis_SameCenter)
 
     // 90° rotation around Z maps local +X to world +... let's use the identity
     // quaternion so A's world axis stays +X.
-    // B is rotated 90° around Z: Rz(90°) maps +X → +Y.
+    // B is rotated 90° around Z: Rz(90°) maps +X -> +Y.
     const Quaternion<double> q_rot90Z = makeQuat(0.0, 0.0, 1.0, M_PI / 2.0);
 
     checkAllOBCOverloads(1.0,

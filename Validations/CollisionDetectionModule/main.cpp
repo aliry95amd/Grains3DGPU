@@ -123,7 +123,7 @@ static void dispatchPlatform(const BenchmarkScenario&               s,
                                      {lct},
                                      sortFreqs);
         }
-        // dpd goes out of scope here → frees device RigidBody objects once
+        // dpd goes out of scope here -> frees device RigidBody objects once
     }
 }
 

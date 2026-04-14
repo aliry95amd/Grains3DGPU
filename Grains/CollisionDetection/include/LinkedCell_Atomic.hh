@@ -158,12 +158,12 @@ public:
 
         Timeline (adaptive skin mode):
         ┌─────────────────────────────────────────────────────────────────────────┐
-        │ Default Stream: resizeCells_Device → cudaMemcpyAsync (D2H) → [event]    │
+        │ Default Stream: resizeCells_Device -> cudaMemcpyAsync (D2H) -> [event]    │
         └──────────────────────────────────────┬──────────────────────────────────┘
                                                │ (resize complete event)
                                                │
         ┌──────────────────────────────────────▼──────────────────────────────────┐
-        │ Stream 1: [wait event] → memset(neighbors) → generateNeighborCells      │
+        │ Stream 1: [wait event] -> memset(neighbors) -> generateNeighborCells      │
         └─────────────────────────────────────────────────────────────────────────┘
 
         ┌─────────────────────────────────────────────────────────────────────────┐
@@ -171,7 +171,7 @@ public:
         └─────────────────────────────────────────────────────────────────────────┘
 
         ┌─────────────────────────────────────────────────────────────────────────┐
-        │ Stream 2: memset(particleCounts) → computeCellParticleIDs               │
+        │ Stream 2: memset(particleCounts) -> computeCellParticleIDs               │
         └─────────────────────────────────────────────────────────────────────────┘
 
         Dependencies:

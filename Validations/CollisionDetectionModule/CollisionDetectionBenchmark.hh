@@ -69,7 +69,7 @@ struct DeviceParticleData
       5. Construct CollisionDetectionModule<T, M>.
       6. Warmup: call run() numWarmupCalls times (timer disabled).
       7. Measure: enable CDM timer, reset it, call run() numMeasureCalls times.
-      8. Divide accumulated stage times by numMeasureCalls → per-call averages.
+      8. Divide accumulated stage times by numMeasureCalls -> per-call averages.
       9. Write one CSV row.
 
     @author A.Yazdani - 2026 - Construction */
@@ -327,7 +327,7 @@ public:
             cudaDeviceSynchronize();
 
         // ------------------------------------------------------------------
-        // Compute per-call averages (seconds → milliseconds)
+        // Compute per-call averages (seconds -> milliseconds)
         // ------------------------------------------------------------------
         const double inv = 1000.0 / static_cast<double>(m_scenario.numMeasureCalls);
 

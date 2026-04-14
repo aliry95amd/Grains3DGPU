@@ -158,7 +158,7 @@ protected:
     GrainsMemBuffer<Quaternion<double>, MemType::DEVICE> quat_gpu;
 
     /** LinkedCell parameters with ONE BIG CELL covering the whole domain
-     *  → every particle is in the same cell neighbourhood → all C(5,2)=10 pairs found */
+     *  -> every particle is in the same cell neighbourhood -> all C(5,2)=10 pairs found */
     LinkedCellParameters<double> lcParamsLarge;
 
     void SetUp() override
@@ -179,7 +179,7 @@ protected:
 
         buildBuffers(pos, nTotal, rbVec, rb_cpu, pos_cpu, quat_cpu, rb_gpu, pos_gpu, quat_gpu);
 
-        // One big cell (size = 10) → no pair is filtered out
+        // One big cell (size = 10) -> no pair is filtered out
         lcParamsLarge.minCorner              = Vector3<double>(-1.0, -1.0, -1.0);
         lcParamsLarge.maxCorner              = Vector3<double>(5.0, 5.0, 5.0);
         lcParamsLarge.minCellSize            = 10.0;
@@ -247,7 +247,7 @@ TEST_F(NeighborListSimpleTest, NSQ_GPU_KnownGroundTruth)
 }
 
 // ------------------------------------------------------------------------------------------------
-// Test 3: LinkedCell CPU (HOST) — large cell covering whole domain → all 10 pairs found.
+// Test 3: LinkedCell CPU (HOST) — large cell covering whole domain -> all 10 pairs found.
 // ------------------------------------------------------------------------------------------------
 TEST_F(NeighborListSimpleTest, LinkedCell_HOST_KnownGroundTruth)
 {
@@ -272,7 +272,7 @@ TEST_F(NeighborListSimpleTest, LinkedCell_HOST_KnownGroundTruth)
 }
 
 // ------------------------------------------------------------------------------------------------
-// Test 4: LinkedCell SORTBASED GPU — large cell → all 10 pairs found.
+// Test 4: LinkedCell SORTBASED GPU — large cell -> all 10 pairs found.
 // ------------------------------------------------------------------------------------------------
 TEST_F(NeighborListSimpleTest, LinkedCell_SortBased_GPU_KnownGroundTruth)
 {
@@ -298,7 +298,7 @@ TEST_F(NeighborListSimpleTest, LinkedCell_SortBased_GPU_KnownGroundTruth)
 }
 
 // ------------------------------------------------------------------------------------------------
-// Test 5: LinkedCell ATOMIC GPU — large cell → all 10 pairs found.
+// Test 5: LinkedCell ATOMIC GPU — large cell -> all 10 pairs found.
 // ------------------------------------------------------------------------------------------------
 TEST_F(NeighborListSimpleTest, LinkedCell_Atomic_GPU_KnownGroundTruth)
 {
@@ -323,7 +323,7 @@ TEST_F(NeighborListSimpleTest, LinkedCell_Atomic_GPU_KnownGroundTruth)
 }
 
 // ------------------------------------------------------------------------------------------------
-// Test 6: LinkedCell ATOMICFIXED GPU — large cell → all 10 pairs found.
+// Test 6: LinkedCell ATOMICFIXED GPU — large cell -> all 10 pairs found.
 // ------------------------------------------------------------------------------------------------
 TEST_F(NeighborListSimpleTest, LinkedCell_AtomicFixed_GPU_KnownGroundTruth)
 {
@@ -430,9 +430,9 @@ TEST_F(NeighborListSimpleTest, AllAlgorithms_Match_KnownGroundTruth)
 //      P4 = (10.5, 0.0, 0.0)
 //      P5 = (10.0, 0.5, 0.0)
 //
-//  With cellSize=2.5 and domain (-1,-1,-1)→(12,2,2):
-//    Cluster A → x-cell 0,  Cluster B → x-cell 4  (separation > 1 cell → not adjacent)
-//    → cross-cluster pairs are excluded from the LinkedCell neighbor list.
+//  With cellSize=2.5 and domain (-1,-1,-1)->(12,2,2):
+//    Cluster A -> x-cell 0,  Cluster B -> x-cell 4  (separation > 1 cell -> not adjacent)
+//    -> cross-cluster pairs are excluded from the LinkedCell neighbor list.
 // ================================================================================================
 class NeighborListSpatialFilterTest : public ::testing::Test
 {
@@ -478,7 +478,7 @@ protected:
 
         buildBuffers(pos, nTotal, rbVec, rb_cpu, pos_cpu, quat_cpu, rb_gpu, pos_gpu, quat_gpu);
 
-        // cellSize=2.5 → clusters are 4 cells apart along x
+        // cellSize=2.5 -> clusters are 4 cells apart along x
         lcParams.minCorner              = Vector3<double>(-1.0, -1.0, -1.0);
         lcParams.maxCorner              = Vector3<double>(12.0, 2.0, 2.0);
         lcParams.minCellSize            = 2.5;
@@ -666,7 +666,7 @@ protected:
 
         buildBuffers(pos, nTotal, rbVec, rb_cpu, pos_cpu, quat_cpu, rb_gpu, pos_gpu, quat_gpu);
 
-        // One big cell → every particle is in same neighbourhood
+        // One big cell -> every particle is in same neighbourhood
         lcParamsLarge.minCorner                       = Vector3<double>(-1.0, -1.0, -1.0);
         lcParamsLarge.maxCorner                       = Vector3<double>(5.0, 5.0, 5.0);
         lcParamsLarge.minCellSize                     = 20.0;
@@ -1124,17 +1124,17 @@ TEST_F(NeighborListPairValidityTest, AllAlgorithms_RawPairBuffer_Valid)
 //  Particles occupy (0..7, 0..7, 0..7).  Two LinkedCell configs are used:
 //
 //  (A) ONE BIG CELL (cellSize=20) — every particle sees every other particle.
-//      → All 6 algorithms must agree on exactly C(512,2) = 130,816 pairs.
+//      -> All 6 algorithms must agree on exactly C(512,2) = 130,816 pairs.
 //
-//  (B) REALISTIC CELLS (cellSize=2.0) — domain [-0.5,7.5]^3 → 4 cells per axis.
+//  (B) REALISTIC CELLS (cellSize=2.0) — domain [-0.5,7.5]^3 -> 4 cells per axis.
 //      Each cell holds a 2×2×2=8-particle sub-cube; adjacent cells share a face/edge/corner.
-//      → All LinkedCell variants (CPU+GPU) must agree on the same pair set.
-//      → NSQ returns strictly MORE pairs (it has no spatial filter), confirming LC IS filtering.
-//      → Pair validity (no self-pairs, no duplicates, valid indices) is checked for all variants.
+//      -> All LinkedCell variants (CPU+GPU) must agree on the same pair set.
+//      -> NSQ returns strictly MORE pairs (it has no spatial filter), confirming LC IS filtering.
+//      -> Pair validity (no self-pairs, no duplicates, valid indices) is checked for all variants.
 //
 //  This fixture is the primary regression harness for catching bugs that only manifest at scale:
 //   - Buffer overflow / under-allocation  (all pairs present)
-//   - atomic collision → missed pairs     (all variants agree)
+//   - atomic collision -> missed pairs     (all variants agree)
 //   - ATOMICFIXED maxParticlesPerCell overflow  (same count as ATOMIC)
 //   - Sort-based index remapping errors   (same pairs after sorting)
 // ================================================================================================
@@ -1186,12 +1186,12 @@ protected:
         lcParamsLarge.cellSizeFactor         = 1.0;
         lcParamsLarge.maxNumCellsPerObstacle = 8;
         lcParamsLarge.maxParticlesPerCell    = 512;
-        // Must pre-allocate enough: C(512,2)=130816 → 130816/512 ≈ 256 pairs/particle minimum
+        // Must pre-allocate enough: C(512,2)=130816 -> 130816/512 ≈ 256 pairs/particle minimum
         lcParamsLarge.initialNumberOfPairsPerParticle = 512;
         lcParamsLarge.updateFrequency                 = 0;
         lcParamsLarge.sortFrequency                   = 0;
 
-        // (B) Realistic config: domain [-0.5,7.5]^3 → cellSize=2.0 → 4×4×4 cells
+        // (B) Realistic config: domain [-0.5,7.5]^3 -> cellSize=2.0 -> 4×4×4 cells
         //     Each cell contains 2×2×2=8 particles; 27-cell stencil neighbourhood
         lcParamsRealist.minCorner              = Vector3<double>(-0.5, -0.5, -0.5);
         lcParamsRealist.maxCorner              = Vector3<double>(7.5, 7.5, 7.5);

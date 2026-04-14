@@ -7,12 +7,12 @@
 # Two contact models are compared:
 #
 #  Hooke (no tangential memory, etat=0):
-#    F_t = etat * v_t = 0  →  zero tangential resistance
+#    F_t = etat * v_t = 0  ->  zero tangential resistance
 #    The sphere slides freely:  x(t) = 0.5 * g*sin(20°) * t²
 #
 #  HookeMemory (tangential spring, kt=2e4, etat=0, muc=0.8, mur=5.0):
-#    F_t = -kt * x_rel  →  static friction possible when tan(theta) ≤ muc
-#    tan(20°) ≈ 0.364 < 0.8 = muc  →  sphere held near x=0
+#    F_t = -kt * x_rel  ->  static friction possible when tan(theta) ≤ muc
+#    tan(20°) ≈ 0.364 < 0.8 = muc  ->  sphere held near x=0
 #    Analytical:  x(t) = x_eq * (1 - cos(ω_t * t))
 #    where  x_eq = m*g*sin(20°)/kt ≈ 0.703 mm,  ω_t = sqrt(kt/m) ≈ 69.1 rad/s
 #    (sub-mm oscillation; Coulomb limit is never exceeded because
@@ -20,7 +20,7 @@
 #    Note: mur=5.0 rolling resistance prevents the sphere from rolling.
 #    Without it the tangential spring torques the sphere into rolling
 #    (5/7 effect), so the CM drifts instead of oscillating.
-#    mur=5 → omega_y_max < 3e-5 rad/s (omega_y ∝ 1/mur² with kr=3*kn*mur²),
+#    mur=5 -> omega_y_max < 3e-5 rad/s (omega_y ∝ 1/mur² with kr=3*kn*mur²),
 #    so the spring tracks x_CM to better than 0.1% and the simulation
 #    matches the analytical solution to within 0.1%.
 #
@@ -102,7 +102,7 @@ Constant:
     OutputPrecision: 15
 
 Fork:
-  # ─── Hooke: no tangential memory → particle slides freely ─────────────────
+  # ─── Hooke: no tangential memory -> particle slides freely ─────────────────
   - name: Hooke
     overrides:
       ContactModelsList:
@@ -116,7 +116,7 @@ Fork:
             Directory: ./results/slidingRamp
             RootName: slidingRamp_Hooke
 
-  # ─── HookeMemory: tangential spring → static friction holds ───────────────
+  # ─── HookeMemory: tangential spring -> static friction holds ───────────────
   - name: HookeMemory
     overrides:
       ContactModelsList:

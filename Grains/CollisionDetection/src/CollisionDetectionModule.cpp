@@ -626,8 +626,8 @@ void CollisionDetectionModule<T, M>::detectCollisionsComponentsGlobal(
                 }
             }
             // BV filter:
-            //   useRelT=true  → filterPairsBV  (reads pre-computed relPos/relQuat arrays)
-            //   useRelT=false → filterPairsBV_global (computes rel transforms on-the-fly)
+            //   useRelT=true  -> filterPairsBV  (reads pre-computed relPos/relQuat arrays)
+            //   useRelT=false -> filterPairsBV_global (computes rel transforms on-the-fly)
             if(useRelT)
                 filterPairsBV(rigidBodies,
                               pairList,

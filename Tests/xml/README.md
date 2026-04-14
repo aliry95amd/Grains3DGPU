@@ -7,7 +7,7 @@ End-to-end validation tests that run the `grains` binary and check physics again
 ```
 xml/
 ├── template.xml          # XML template populated by generate_tests.py
-├── generate_tests.py     # YAML → XML generator
+├── generate_tests.py     # YAML -> XML generator
 ├── run_tests.py          # Orchestrates generation, simulation, and plotting
 ├── collidingSpheres/     # Two spheres colliding head-on
 ├── cylinderWall/         # Cylinder bouncing off a wall at varying angles

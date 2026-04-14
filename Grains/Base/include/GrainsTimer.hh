@@ -43,7 +43,7 @@ enum class FMStage : uint8_t
     ComputeForces,       ///< computeContactForces_Kernel / sequential per-pair loop
     ReduceTorces,    ///< [GPU] reduceTorces_Kernel atomic per-particle accumulation; no-op on CPU
     ExternalForces,  ///< addExternalForces gravity application
-    AssembleComposites,  ///< assembleCompositeTorces sub-body → master accumulation
+    AssembleComposites,  ///< assembleCompositeTorces sub-body -> master accumulation
     Total,               ///< Full ForceModule::run() wall-clock span
     COUNT
 };

@@ -197,7 +197,7 @@ protected:
 };
 
 // -------------------------------------------------------------------------------------------------
-// Both boxes at the same origin with identity orientation → always intersect.
+// Both boxes at the same origin with identity orientation -> always intersect.
 // Expected: true
 // -------------------------------------------------------------------------------------------------
 TEST_F(OBBIntersectionTest, SamePosition_IdentityOrientation)
@@ -271,7 +271,7 @@ TEST_F(OBBIntersectionTest, JustSeparatedAlongX)
 }
 
 // -------------------------------------------------------------------------------------------------
-// B rotated 90° around Y but placed at same center → still intersecting.
+// B rotated 90° around Y but placed at same center -> still intersecting.
 // Expected: true
 // -------------------------------------------------------------------------------------------------
 TEST_F(OBBIntersectionTest, Rotated90Y_SameCenter)
