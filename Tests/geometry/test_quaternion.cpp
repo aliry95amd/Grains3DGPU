@@ -24,26 +24,21 @@ protected:
         test_vec3 = Vector3<double>(1.0, 2.0, 3.0);
     }
 
-    void TearDown() override {}
-
     Quaternion<double> identity, unit_i, unit_j, unit_k;
     Quaternion<double> test_q1, test_q2, zero_q, normalized_q;
     Vector3<double>    test_vec1, test_vec2, test_vec3;
     const double       EPSILON = 1e-10;
 };
 
-// Test basic quaternion creation and element access
 TEST_F(QuaternionTest, BasicQuaternionCreation)
 {
     Quaternion<double> q(1.0, 2.0, 3.0, 4.0);
 
-    // Test element access using operator[]
     EXPECT_NEAR(q[0], 1.0, 1e-10);
     EXPECT_NEAR(q[1], 2.0, 1e-10);
     EXPECT_NEAR(q[2], 3.0, 1e-10);
     EXPECT_NEAR(q[3], 4.0, 1e-10);
 
-    // Test getter methods
     EXPECT_NEAR(q.getScalar(), 4.0, 1e-10);
     Vector3<double> vec = q.getVector();
     EXPECT_NEAR(vec[0], 1.0, 1e-10);
@@ -51,7 +46,6 @@ TEST_F(QuaternionTest, BasicQuaternionCreation)
     EXPECT_NEAR(vec[2], 3.0, 1e-10);
 }
 
-// Test quaternion norm calculation
 TEST_F(QuaternionTest, QuaternionNorm)
 {
     Quaternion<double> q(1.0, 2.0, 3.0, 4.0);
@@ -65,7 +59,6 @@ TEST_F(QuaternionTest, QuaternionNorm)
     EXPECT_NEAR(n2, expected * expected, 1e-10);
 }
 
-// Test quaternion multiplication
 TEST_F(QuaternionTest, QuaternionMultiplication)
 {
     Quaternion<double> q1(1.0, 0.0, 0.0, 0.0);
@@ -78,7 +71,6 @@ TEST_F(QuaternionTest, QuaternionMultiplication)
     EXPECT_NO_THROW(q1 * q2);
 }
 
-// Test quaternion-vector operations
 TEST_F(QuaternionTest, QuaternionVectorOperations)
 {
     Quaternion<double> q(0.0, 0.0, 0.0, 1.0);
@@ -90,7 +82,6 @@ TEST_F(QuaternionTest, QuaternionVectorOperations)
     EXPECT_GT(n, 0.0);
 }
 
-// Test setter methods
 TEST_F(QuaternionTest, QuaternionSetters)
 {
     Quaternion<double> q;
@@ -104,7 +95,6 @@ TEST_F(QuaternionTest, QuaternionSetters)
     EXPECT_NEAR(vec_result[1], 2.0, 1e-10);
     EXPECT_NEAR(vec_result[2], 3.0, 1e-10);
 
-    // Test setQuaternion
     q.setQuaternion(2.0, 3.0, 4.0, 6.0);
     EXPECT_NEAR(q[0], 2.0, 1e-10);
     EXPECT_NEAR(q[1], 3.0, 1e-10);
@@ -112,7 +102,6 @@ TEST_F(QuaternionTest, QuaternionSetters)
     EXPECT_NEAR(q[3], 6.0, 1e-10);
 }
 
-// Test norm and norm2 functions comprehensively
 TEST_F(QuaternionTest, NormFunctions)
 {
     EXPECT_NEAR(norm(identity), 1.0, EPSILON);
@@ -132,7 +121,6 @@ TEST_F(QuaternionTest, NormFunctions)
     EXPECT_NEAR(norm(normalized_q), 1.0, EPSILON);
 }
 
-// Test conjugate function
 TEST_F(QuaternionTest, ConjugateFunction)
 {
     const Quaternion<double> const_identity = identity;
@@ -165,7 +153,6 @@ TEST_F(QuaternionTest, ConjugateFunction)
     EXPECT_NEAR(double_conj[3], test_q1[3], EPSILON);
 }
 
-// Test inverse function
 TEST_F(QuaternionTest, InverseFunction)
 {
     const Quaternion<double> const_identity = identity;
@@ -195,7 +182,6 @@ TEST_F(QuaternionTest, InverseFunction)
     EXPECT_NEAR(test_copy[3], conj_normalized[3], EPSILON);
 }
 
-// Test addition operators
 TEST_F(QuaternionTest, AdditionOperators)
 {
     Quaternion<double> sum = test_q1 + test_q2;
@@ -218,7 +204,6 @@ TEST_F(QuaternionTest, AdditionOperators)
     EXPECT_NEAR(test_copy[3], 6.5, EPSILON);
 }
 
-// Test subtraction operators
 TEST_F(QuaternionTest, SubtractionOperators)
 {
     Quaternion<double> diff = test_q1 - test_q2;
@@ -241,7 +226,6 @@ TEST_F(QuaternionTest, SubtractionOperators)
     EXPECT_NEAR(test_copy[3], 1.5, EPSILON);
 }
 
-// Test scalar multiplication
 TEST_F(QuaternionTest, ScalarMultiplication)
 {
     Quaternion<double> scaled = 2.0 * test_q1;
@@ -264,7 +248,6 @@ TEST_F(QuaternionTest, ScalarMultiplication)
     EXPECT_NEAR(test_copy[3], 12.0, EPSILON);
 }
 
-// Test quaternion multiplication
 TEST_F(QuaternionTest, QuaternionMultiplicationComprehensive)
 {
     Quaternion<double> result_left  = identity * test_q1;
@@ -307,7 +290,6 @@ TEST_F(QuaternionTest, QuaternionMultiplicationComprehensive)
     EXPECT_NEAR(test_copy[3], test_q1[3], EPSILON);
 }
 
-// Test quaternion-vector multiplication
 TEST_F(QuaternionTest, QuaternionVectorMultiplication)
 {
     Quaternion<double> result1 = identity * test_vec1;
@@ -316,19 +298,16 @@ TEST_F(QuaternionTest, QuaternionVectorMultiplication)
     EXPECT_NEAR(result1[2], 0.0, EPSILON);
     EXPECT_NEAR(result1[3], 0.0, EPSILON);
 
-    // Test with different vector
     Quaternion<double> result2 = identity * test_vec3;
     EXPECT_NEAR(result2[0], 1.0, EPSILON);
     EXPECT_NEAR(result2[1], 2.0, EPSILON);
     EXPECT_NEAR(result2[2], 3.0, EPSILON);
     EXPECT_NEAR(result2[3], 0.0, EPSILON);
 
-    // Test compound assignment with vector
     Vector3<double> vec_copy = test_vec1;
     vec_copy *= identity;
 }
 
-// Test vector rotation operators (<< and >>)
 TEST_F(QuaternionTest, VectorRotationOperators)
 {
     Vector3<double> rotated_left  = identity << test_vec1;
@@ -353,7 +332,6 @@ TEST_F(QuaternionTest, VectorRotationOperators)
     EXPECT_NEAR(vec_copy[2], test_vec1[2], EPSILON);
 }
 
-// Test comparison operators
 TEST_F(QuaternionTest, ComparisonOperators)
 {
     Quaternion<double> q_copy = test_q1;
@@ -374,7 +352,6 @@ TEST_F(QuaternionTest, ComparisonOperators)
     EXPECT_FALSE(zero_q == identity);
 }
 
-// Test edge cases and special properties
 TEST_F(QuaternionTest, EdgeCasesAndProperties)
 {
     Quaternion<double> product = normalized_q * normalized_q;

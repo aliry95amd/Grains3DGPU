@@ -31,20 +31,16 @@ protected:
     const double       EPSILON = HIGHEPS<double>;
 };
 
-// Test if quat <-> matrix conversions are consistent
 TEST_F(RotationMathTest, QuatAndMatrixConversions)
 {
-    // Convert quaternions to matrices
     Matrix3<double> mat_from_quat1 = quat1.toMatrix();
     Matrix3<double> mat_from_quat2 = quat2.toMatrix();
     Matrix3<double> mat_from_quat3 = quat3.toMatrix();
 
-    // Verify Matrix3 and Quaternion give the same result
     EXPECT_TRUE(mat1 == mat_from_quat1);
     EXPECT_TRUE(mat2 == mat_from_quat2);
     EXPECT_TRUE(mat3 == mat_from_quat3);
 
-    // Convert matrices to quaternions
     Quaternion<double> quat_from_mat1;
     quat_from_mat1.setQuaternion(mat1);
     Quaternion<double> quat_from_mat2;
@@ -52,13 +48,11 @@ TEST_F(RotationMathTest, QuatAndMatrixConversions)
     Quaternion<double> quat_from_mat3;
     quat_from_mat3.setQuaternion(mat3);
 
-    // Verify Matrix3 and Quaternion give the same result
     EXPECT_TRUE(quat1 == quat_from_mat1);
     EXPECT_TRUE(quat2 == quat_from_mat2);
     EXPECT_TRUE(quat3 == quat_from_mat3);
 }
 
-// Test Matrix3 and Quaternion rotation for principal axes
 TEST_F(RotationMathTest, PrincipalAxesRotations)
 {
     std::vector<std::pair<Quaternion<double>, Matrix3<double>>> test_rotations
@@ -80,7 +74,6 @@ TEST_F(RotationMathTest, PrincipalAxesRotations)
     }
 }
 
-// Test Matrix3 and Quaternion inverse rotation for principal axes
 TEST_F(RotationMathTest, PrincipalAxesInverseRotations)
 {
     std::vector<std::pair<Quaternion<double>, Matrix3<double>>> test_rotations
@@ -102,7 +95,6 @@ TEST_F(RotationMathTest, PrincipalAxesInverseRotations)
     }
 }
 
-// Test Matrix3 and Quaternion rotation for arbitrary axes
 TEST_F(RotationMathTest, ArbitraryAxesRotations)
 {
     std::vector<std::pair<Quaternion<double>, Matrix3<double>>> test_rotations
@@ -122,7 +114,6 @@ TEST_F(RotationMathTest, ArbitraryAxesRotations)
     }
 }
 
-// Test Matrix3 and Quaternion inverse rotation for arbitrary axes
 TEST_F(RotationMathTest, ArbitraryAxesInverseRotations)
 {
     std::vector<std::pair<Quaternion<double>, Matrix3<double>>> test_rotations
@@ -142,30 +133,24 @@ TEST_F(RotationMathTest, ArbitraryAxesInverseRotations)
     }
 }
 
-// Test rotation composition
 TEST_F(RotationMathTest, RotationComposition)
 {
-    // Test matrices
     Matrix3<double> m1 = mat1 * mat2;
     Matrix3<double> m2 = mat2 * mat3;
     Matrix3<double> m3 = mat3 * mat1;
 
-    // Test quaternions
     Quaternion<double> q1 = quat1 * quat2;
     Quaternion<double> q2 = quat2 * quat3;
     Quaternion<double> q3 = quat3 * quat1;
 
-    // Convert quaternions to matrices
     Matrix3<double> mat_from_q1 = q1.toMatrix();
     Matrix3<double> mat_from_q2 = q2.toMatrix();
     Matrix3<double> mat_from_q3 = q3.toMatrix();
 
-    // Verify Matrix3 and Quaternion give the same result
     EXPECT_TRUE(m1 == mat_from_q1);
     EXPECT_TRUE(m2 == mat_from_q2);
     EXPECT_TRUE(m3 == mat_from_q3);
 
-    // Convert matrices to quaternions
     Quaternion<double> quat_from_m1;
     quat_from_m1.setQuaternion(m1);
     Quaternion<double> quat_from_m2;
@@ -173,7 +158,6 @@ TEST_F(RotationMathTest, RotationComposition)
     Quaternion<double> quat_from_m3;
     quat_from_m3.setQuaternion(m3);
 
-    // Verify Matrix3 and Quaternion give the same result
     EXPECT_TRUE(q1 == quat_from_m1);
     EXPECT_TRUE(q2 == quat_from_m2);
     EXPECT_TRUE(q3 == quat_from_m3);

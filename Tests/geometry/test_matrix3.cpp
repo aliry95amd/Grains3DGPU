@@ -23,7 +23,6 @@ protected:
     const double    EPSILON = 1e-10;
 };
 
-// Test basic element access with operator()
 TEST_F(Matrix3Test, ElementAccess)
 {
     EXPECT_DOUBLE_EQ(testMatrix(0, 0), 1.0);
@@ -37,7 +36,6 @@ TEST_F(Matrix3Test, ElementAccess)
     EXPECT_DOUBLE_EQ(testMatrix(2, 2), 9.0);
 }
 
-// Test row access with operator[]
 TEST_F(Matrix3Test, RowAccess)
 {
     Vector3<double> row0 = testMatrix[0];
@@ -57,7 +55,6 @@ TEST_F(Matrix3Test, RowAccess)
     EXPECT_DOUBLE_EQ(row2[2], 9.0);
 }
 
-// Test linear indexing using operator()
 TEST_F(Matrix3Test, LinearIndexing)
 {
     EXPECT_DOUBLE_EQ(testMatrix(0), 1.0);
@@ -67,7 +64,6 @@ TEST_F(Matrix3Test, LinearIndexing)
     EXPECT_DOUBLE_EQ(testMatrix(8), 9.0);
 }
 
-// Test identity matrix
 TEST_F(Matrix3Test, IdentityMatrix)
 {
     EXPECT_DOUBLE_EQ(identity(0, 0), 1.0);
@@ -81,7 +77,6 @@ TEST_F(Matrix3Test, IdentityMatrix)
     EXPECT_DOUBLE_EQ(identity(2, 1), 0.0);
 }
 
-// Test copy constructor
 TEST_F(Matrix3Test, CopyConstructor)
 {
     Matrix3<double> copy(testMatrix);
@@ -90,7 +85,6 @@ TEST_F(Matrix3Test, CopyConstructor)
     EXPECT_DOUBLE_EQ(copy(0, 2), testMatrix(0, 2));
 }
 
-// Test assignment operator
 TEST_F(Matrix3Test, AssignmentOperator)
 {
     Matrix3<double> assigned = testMatrix;
@@ -99,7 +93,6 @@ TEST_F(Matrix3Test, AssignmentOperator)
     EXPECT_DOUBLE_EQ(assigned(1, 2), testMatrix(1, 2));
 }
 
-// Test setValue methods
 TEST_F(Matrix3Test, SetValueMethods)
 {
     Matrix3<double> test;
@@ -111,7 +104,6 @@ TEST_F(Matrix3Test, SetValueMethods)
     EXPECT_DOUBLE_EQ(test(2, 1), 17.0);
 }
 
-// Test const element access
 TEST_F(Matrix3Test, ConstAccess)
 {
     const Matrix3<double> const_matrix = testMatrix;
@@ -127,7 +119,6 @@ TEST_F(Matrix3Test, ConstAccess)
     EXPECT_DOUBLE_EQ(const_matrix[2][2], 9.0);
 }
 
-// Test matrix absolute value function
 TEST_F(Matrix3Test, FabsFunction)
 {
     const Matrix3<double> negative(-1.0, -2.0, 3.0, 4.0, -5.0, -6.0, -7.0, 8.0, -9.0);
@@ -145,7 +136,6 @@ TEST_F(Matrix3Test, FabsFunction)
     EXPECT_DOUBLE_EQ(result(2, 2), 9.0);
 }
 
-// Test in-place matrix absolute value function
 TEST_F(Matrix3Test, FabsInPlace)
 {
     Matrix3<double> negative(-1.0, -2.0, 3.0, 4.0, -5.0, -6.0, -7.0, 8.0, -9.0);
@@ -163,7 +153,6 @@ TEST_F(Matrix3Test, FabsInPlace)
     EXPECT_DOUBLE_EQ(negative(2, 2), 9.0);
 }
 
-// Test matrix determinant
 TEST_F(Matrix3Test, Determinant)
 {
     EXPECT_NEAR(determinant(identity), 1.0, EPSILON);
@@ -176,7 +165,6 @@ TEST_F(Matrix3Test, Determinant)
     EXPECT_NEAR(determinant(rotation_z), 1.0, EPSILON);
 }
 
-// Test matrix transpose
 TEST_F(Matrix3Test, Transpose)
 {
     const Matrix3<double> test_const = testMatrix;
@@ -193,7 +181,6 @@ TEST_F(Matrix3Test, Transpose)
     EXPECT_DOUBLE_EQ(result(2, 2), 9.0);
 }
 
-// Test in-place matrix transpose
 TEST_F(Matrix3Test, TransposeInPlace)
 {
     Matrix3<double> matrix = testMatrix;
@@ -210,7 +197,6 @@ TEST_F(Matrix3Test, TransposeInPlace)
     EXPECT_DOUBLE_EQ(matrix(2, 2), 9.0);
 }
 
-// Test matrix inverse (now fixed)
 TEST_F(Matrix3Test, Inverse)
 {
     const Matrix3<double> invertible_const = invertible;
@@ -241,7 +227,6 @@ TEST_F(Matrix3Test, Inverse)
     }
 }
 
-// Test in-place matrix inverse
 TEST_F(Matrix3Test, InverseInPlace)
 {
     Matrix3<double> original = invertible;
@@ -266,7 +251,6 @@ TEST_F(Matrix3Test, InverseInPlace)
     }
 }
 
-// Test matrix scaling
 TEST_F(Matrix3Test, Scale)
 {
     Vector3<double>       scale_factors(2.0, 3.0, 4.0);
@@ -285,7 +269,6 @@ TEST_F(Matrix3Test, Scale)
     EXPECT_DOUBLE_EQ(result(2, 1), 0.0);
 }
 
-// Test in-place matrix scaling
 TEST_F(Matrix3Test, ScaleInPlace)
 {
     Matrix3<double> matrix = identity;
@@ -298,7 +281,6 @@ TEST_F(Matrix3Test, ScaleInPlace)
     EXPECT_DOUBLE_EQ(matrix(2, 2), 4.0);
 }
 
-// Test matrix arithmetic operations
 TEST_F(Matrix3Test, ArithmeticOperations)
 {
     Matrix3<double> sum = identity + testMatrix;
@@ -323,7 +305,6 @@ TEST_F(Matrix3Test, ArithmeticOperations)
     EXPECT_DOUBLE_EQ(scaled(2, 2), 2.5);
 }
 
-// Test matrix-vector operations
 TEST_F(Matrix3Test, MatrixVectorOperations)
 {
     Vector3<double> result = identity * v1;
@@ -343,7 +324,6 @@ TEST_F(Matrix3Test, MatrixVectorOperations)
     EXPECT_DOUBLE_EQ(result2[2], 3.0);
 }
 
-// Test matrix-matrix multiplication
 TEST_F(Matrix3Test, MatrixMultiplication)
 {
     Matrix3<double> result = identity * testMatrix;
@@ -363,7 +343,6 @@ TEST_F(Matrix3Test, MatrixMultiplication)
     EXPECT_NEAR(rotated[2], 0.0, EPSILON);
 }
 
-// Test rotation matrix detection
 TEST_F(Matrix3Test, IsRotation)
 {
     EXPECT_TRUE(isRotation(identity));
@@ -376,7 +355,6 @@ TEST_F(Matrix3Test, IsRotation)
     EXPECT_FALSE(isRotation(scaled));
 }
 
-// Test edge cases
 TEST_F(Matrix3Test, EdgeCases)
 {
     Matrix3<double> zero(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0);

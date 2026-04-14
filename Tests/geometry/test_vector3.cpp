@@ -31,7 +31,6 @@ protected:
     const double    EPSILON = 1e-10;
 };
 
-// Basic constructor and accessor tests
 TEST_F(Vector3Test, ConstructorAndAccessors)
 {
     EXPECT_DOUBLE_EQ(v1[0], 1.0);
@@ -39,7 +38,6 @@ TEST_F(Vector3Test, ConstructorAndAccessors)
     EXPECT_DOUBLE_EQ(v1[2], 3.0);
 }
 
-// Test copy constructor
 TEST_F(Vector3Test, CopyConstructor)
 {
     Vector3<double> copy(v1);
@@ -48,7 +46,6 @@ TEST_F(Vector3Test, CopyConstructor)
     EXPECT_DOUBLE_EQ(copy[2], v1[2]);
 }
 
-// Test assignment operator
 TEST_F(Vector3Test, AssignmentOperator)
 {
     Vector3<double> assigned = v2;
@@ -57,7 +54,6 @@ TEST_F(Vector3Test, AssignmentOperator)
     EXPECT_DOUBLE_EQ(assigned[2], v2[2]);
 }
 
-// Test setValue methods
 TEST_F(Vector3Test, SetValueMethods)
 {
     Vector3<double> test;
@@ -67,7 +63,6 @@ TEST_F(Vector3Test, SetValueMethods)
     EXPECT_DOUBLE_EQ(test[2], 9.0);
 }
 
-// Test normalization method
 TEST_F(Vector3Test, NormalizationMethod)
 {
     Vector3<double> test(3.0, 4.0, 0.0);
@@ -81,7 +76,6 @@ TEST_F(Vector3Test, NormalizationMethod)
     EXPECT_NEAR(test[2], 0.0, EPSILON);
 }
 
-// Test reset method
 TEST_F(Vector3Test, ResetMethod)
 {
     Vector3<double> test(1.0, 2.0, 3.0);
@@ -91,7 +85,6 @@ TEST_F(Vector3Test, ResetMethod)
     EXPECT_DOUBLE_EQ(test[2], 0.0);
 }
 
-// Test norm function
 TEST_F(Vector3Test, NormFunction)
 {
     EXPECT_NEAR(norm(unit_x), 1.0, EPSILON);
@@ -105,7 +98,6 @@ TEST_F(Vector3Test, NormFunction)
     EXPECT_NEAR(norm(negative_vec), sqrt(1.5 * 1.5 + 2.5 * 2.5 + 3.5 * 3.5), EPSILON);
 }
 
-// Test norm2 function
 TEST_F(Vector3Test, Norm2Function)
 {
     EXPECT_NEAR(norm2(unit_x), 1.0, EPSILON);
@@ -119,7 +111,6 @@ TEST_F(Vector3Test, Norm2Function)
     EXPECT_NEAR(norm2(test_vec2), 14.0, EPSILON);
 }
 
-// Test isApproxZero function
 TEST_F(Vector3Test, IsApproxZeroFunction)
 {
     EXPECT_TRUE(isApproxZero(zero_vec, EPSILON));
@@ -135,24 +126,22 @@ TEST_F(Vector3Test, IsApproxZeroFunction)
     EXPECT_FALSE(isApproxZero(large_vec, EPSILON));
 }
 
-// Test round function (in-place)
 TEST_F(Vector3Test, RoundFunction)
 {
-    Vector3<double> decimal_vec(1e-12, 2e-12, -3e-12);  // Very small values
-    round(decimal_vec, 1e-10);                          // Should round to zero
+    Vector3<double> decimal_vec(1e-12, 2e-12, -3e-12);
+    round(decimal_vec, 1e-10);
 
     EXPECT_DOUBLE_EQ(decimal_vec[0], 0.0);
     EXPECT_DOUBLE_EQ(decimal_vec[1], 0.0);
     EXPECT_DOUBLE_EQ(decimal_vec[2], 0.0);
 
     Vector3<double> large_vec(0.1, -0.2, 0.3);
-    round(large_vec, 1e-10);  // Should remain unchanged
+    round(large_vec, 1e-10);
     EXPECT_DOUBLE_EQ(large_vec[0], 0.1);
     EXPECT_DOUBLE_EQ(large_vec[1], -0.2);
     EXPECT_DOUBLE_EQ(large_vec[2], 0.3);
 }
 
-// Test arithmetic operators
 TEST_F(Vector3Test, ArithmeticOperators)
 {
     Vector3<double> sum = test_vec1 + test_vec2;
@@ -181,7 +170,6 @@ TEST_F(Vector3Test, ArithmeticOperators)
     EXPECT_DOUBLE_EQ(negated[2], -5.0);
 }
 
-// Test dot product
 TEST_F(Vector3Test, DotProduct)
 {
     EXPECT_NEAR(unit_x * unit_y, 0.0, EPSILON);
@@ -196,7 +184,6 @@ TEST_F(Vector3Test, DotProduct)
     EXPECT_NEAR(test_vec1 * zero_vec, 0.0, EPSILON);
 }
 
-// Test cross product
 TEST_F(Vector3Test, CrossProduct)
 {
     Vector3<double> cross_xy = unit_x ^ unit_y;
@@ -231,7 +218,6 @@ TEST_F(Vector3Test, CrossProduct)
     EXPECT_NEAR(result[2], 2.0, EPSILON);
 }
 
-// Test comparison operators
 TEST_F(Vector3Test, ComparisonOperators)
 {
     Vector3<double> v_copy = test_vec1;
@@ -249,7 +235,6 @@ TEST_F(Vector3Test, ComparisonOperators)
     EXPECT_FALSE(zero_vec == unit_x);
 }
 
-// Test compound assignment operators
 TEST_F(Vector3Test, CompoundAssignmentOperators)
 {
     Vector3<double> test = test_vec1;
@@ -275,7 +260,6 @@ TEST_F(Vector3Test, CompoundAssignmentOperators)
     EXPECT_DOUBLE_EQ(test[2], 5.0);
 }
 
-// Test edge cases and special values
 TEST_F(Vector3Test, EdgeCases)
 {
     double large_norm = norm(large_vec);
@@ -295,7 +279,6 @@ TEST_F(Vector3Test, EdgeCases)
     EXPECT_NEAR(norm(cross), 1.0, EPSILON);
 }
 
-// Test buffer access
 TEST_F(Vector3Test, BufferAccess)
 {
     const double* buffer = v1.getBuffer();

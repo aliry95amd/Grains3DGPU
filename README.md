@@ -1,54 +1,38 @@
 # Grains3DGPU
 
-![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Version](https://img.shields.io/badge/version-1.0.0-green.svg)
+GPU-accelerated Discrete Element Method (DEM) solver for granular material simulations. Handles non-spherical particles (superquadrics, boxes, cylinders, cones) with Nesterov-accelerated GJK collision detection.
 
-Grains3DGPU is a high-performance simulation framework for modeling the dynamics of granular materials using the Discrete Element Method (DEM) accelerated by Graphics Processing Units (GPUs). It supports complex particle shapes, advanced collision detection algorithms, and multi-GPU setups for large-scale simulations.
+## Building
 
-## Table of Contents
-- [Features](#features)
-- [Getting Started](#getting-started)
-  - [Prerequisites](#prerequisites)
-  - [Installation](#installation)
-- [Usage](#usage)
-  - [Basic Example](#basic-example)
-  - [Configuration](#configuration)
-- [Documentation](#documentation)
-- [Contributing](#contributing)
-- [License](#license)
-- [Acknowledgements](#acknowledgements)
+Requires CUDA Toolkit (11.0+), a C++17 compiler, and Python 3.6+ (optional, for visualization).
 
-## Features
+```bash
+git clone https://github.com/AliRY95/Grains3DGPU
+cd Grains3DGPU
+make install    # builds xerces, the library, and the main binary
+```
 
-- **GPU Acceleration**: Leverages CUDA for high-performance parallel computing, enabling large-scale simulations.
-- **Advanced Collision Detection**: Implements Nesterov-accelerated GJK algorithm for accurate and efficient collision detection.
-- **Support for Complex Particle Shapes**: Simulates non-spherical particles, including superquadrics and polyhedra.
-- **Multi-GPU Support**: Distributes workload across multiple GPUs for even larger and more complex simulations.
-- **User-Friendly API**: Intuitive interface for configuring simulations and retrieving results.
+To rebuild after code changes:
+```bash
+make update
+```
 
-## Getting Started
+## Running
 
-### Prerequisites
+Simulations are configured through XML input files. See `Tests/xml/` for examples.
 
-- **CUDA Toolkit**: Version 11.0 or higher.
-- **NVIDIA GPU**: Compute Capability 7.5 or higher is recommended.
-- **C++ Compiler**: GCC or MSVC compatible with C++17.
-- **Python**: For optional scripting and visualization support (version 3.6 or higher).
+## Tests
 
-### Installation
+```bash
+make build-tests && make run-tests
+```
 
-1. **Clone the repository:**
-    ```bash
-    git clone https://github.com/AliRY95/Grains3DGPU
-    cd Grains3DGPU
-    ```
+See `Tests/README.md` for details.
 
-2. **Build the project:**
-    ```bash
-    mkdir build
-    cd build
-    cmake ..
-    make
-    ```
+## Validations
 
-## Usage
+Standalone benchmarks for collision detection, GJK iteration counts, and contact force performance live under `Validations/`. Each has its own `run_all_benchmarks.sh` and `plot.py`.
+
+```bash
+make build-validation && make run-validation
+```
