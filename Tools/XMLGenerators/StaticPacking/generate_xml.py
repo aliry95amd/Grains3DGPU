@@ -1,13 +1,5 @@
 #!/usr/bin/env python3
-"""
-XML Generator for Grains3D Static Packing Simulation
-Generates insert.xml with parameterized box obstacles and particle settings.
-
-Usage:
-    python generate_xml.py --width 1.0 --depth 1.0 --height 5.0 --particles 200
-    python generate_xml.py --box-size 1.5 --height 8.0 --particles 500
-    python generate_xml.py --help
-"""
+"""Generate Grains3D static-packing insert.xml (box obstacles, particles, insertion)."""
 
 import argparse
 from cmath import acos, cos, sqrt
@@ -15,7 +7,7 @@ import os
 from typing import Dict, Any
 
 def generate_particle_block(config: Dict[str, Any]) -> str:
-    """Generate particle block based on particle type."""
+    """XML <Particle> block for the configured convex shape."""
     particle_type = config.get('particle_type', 'S1')
     num_particles = config['n']
     r = config['r']
@@ -64,18 +56,14 @@ def generate_particle_block(config: Dict[str, Any]) -> str:
 		</Particle>'''
 
 def generate_xml(config: Dict[str, Any]) -> str:
-    """Generate the complete XML content with given configuration."""
-
-    # Calculate derived values
+    """Full Grains3D XML string for `config`."""
     half_width = config['L'] / 2.0
     half_height = config['H'] / 2.0
 
-    # Domain
     domain_x = config['L']
     domain_y = config['L']
     domain_z = config['H']
 
-    # Insertion box
     insertion_min_x = 0.0
     insertion_min_y = 0.0
     insertion_min_z = 0.0
@@ -211,42 +199,34 @@ def generate_xml(config: Dict[str, Any]) -> str:
     return xml_content
 
 def get_default_config() -> Dict[str, Any]:
-    """Return default configuration parameters."""
+    """Defaults for static packing XML generation."""
     return {
-        # Simulation type
         'type': 'GPU',
         'precision': 'Double',
-        
-        # Box dimensions
+
         'L': 1.0,
         'H': 5.0,
-        
-        # Particles
+
         'n': 200,
         'r': 0.04,
         'particle_type': 'S1',
         'density': 1000,
-        
-        # Collision detection
+
         'neighbor_list_type': 'LinkedCell',
         'update_frequency': 1,
-        
-        # Contact forces (Hooke model)
-        'kn': 1.2e8,    # Normal stiffness
-        'en': 0.1,      # Normal restitution
-        'etat': 1.0e2,  # Tangential damping
-        'muc': 0.5,     # Friction coefficient
-        'kr': 0.0,      # Rolling resistance
-        
-        # Time settings
+
+        'kn': 1.2e8,
+        'en': 0.1,
+        'etat': 1.0e2,
+        'muc': 0.5,
+        'kr': 0.0,
+
         'dt': 1.0e-5,
         'end_time': 1.0e-5,
         'save_dt': 1.0e-5,
-        
-        # Forces
+
         'gravity': -9.81,
-        
-        # Particle insertion
+
         'random_seed': 1,
 
         'output_name': 'insert',
@@ -254,12 +234,10 @@ def get_default_config() -> Dict[str, Any]:
 
 def main():
     parser = argparse.ArgumentParser(description='Generate XML for Grains3D static packing simulation')
-    
-    # Box dimensions
+
     parser.add_argument('--L', type=float, help='Box width and depth (X and Y direction)')
     parser.add_argument('--H', type=float, help='Box height (Z direction)')
-    
-    # Particle parameters
+
     parser.add_argument('--type', '--t', choices=['S1', 'S4', 'B1', 'B4'], 
                        default='S1', help='Particle type')
     parser.add_argument('--n', type=int, help='Number of particles')
@@ -269,11 +247,9 @@ def main():
     parser.add_argument('--quiet', '-q', action='store_true', help='Suppress output messages')
     
     args = parser.parse_args()
-    
-    # Start with defaults
+
     config = get_default_config()
-    
-    # Update with command line arguments
+
     if args.L is not None:
         config['L'] = args.L
         config['width'] = args.L
@@ -290,11 +266,9 @@ def main():
         config['particle_radius'] = args.r
     if args.output is not None:
         config['output_name'] = args.output
-        
-    # Generate XML
+
     xml_content = generate_xml(config)
-    
-    # Write to file
+
     with open(f"{config['output_name']}.xml", 'w') as f:
         f.write(xml_content)
     

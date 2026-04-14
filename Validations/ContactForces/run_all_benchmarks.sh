@@ -1,6 +1,6 @@
 #!/bin/bash
+# Run ContactTablePerformance across capacities and load factors.
 
-# Run ContactTablePerformance across multiple capacities and load factors
 set -e
 
 EXECUTABLE="./build/ContactTablePerformance"
@@ -35,8 +35,7 @@ for cap in "${capacities[@]}"; do
     echo "  trials: $TRIALS"
     echo "--------------------------------------------------------------------------------"
 
-    # Call the benchmark: <capacity> <loadFactor> <numLookups> <numTrials> <csv>
-    # Use half of the capacity as the number of lookups for this run
+    # Executable args: <capacity> <loadFactor> <numLookups> <numTrials> <csv>
     numLookups=$((cap / 2))
     $EXECUTABLE "$cap" "$lf" "$numLookups" "$TRIALS" "$CSV_FILE"
 

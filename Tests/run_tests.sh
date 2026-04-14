@@ -1,42 +1,33 @@
 #!/bin/bash
-# GrainsGPU Test Runner Script
+# GrainsGPU test runner.
 
 set -e
 
-echo "=== GrainsGPU Test Suite ==="
+echo "GrainsGPU tests"
 
-# Check for required dependencies
 check_dependencies() {
     echo "Checking dependencies..."
-    
     if ! command -v nvcc &> /dev/null; then
         echo "Error: CUDA compiler (nvcc) not found"
         exit 1
     fi
-    
     if ! command -v cmake &> /dev/null; then
         echo "Error: CMake not found"
         exit 1
     fi
-    
     echo "Dependencies OK"
 }
 
-# Build tests
 build_tests() {
     echo "Building test suite..."
-    
     mkdir -p build
     cd build
-    
     cmake -DCMAKE_BUILD_TYPE=Debug \
           -DCUDA_TOOLKIT_ROOT_DIR=/usr/local/cuda \
           -DGTEST_ROOT=/usr/local \
           ..
-    
     make -j$(nproc)
     cd ..
-    
     echo "Build complete"
 }
 
@@ -65,10 +56,8 @@ run_smoke_tests() {
     fi
 }
 
-# Generate coverage report
 generate_coverage() {
     echo "Generating coverage report..."
-    
     if command -v gcov &> /dev/null; then
         gcov -r build/*.gcno
         lcov --capture --directory . --output-file coverage.info
@@ -81,7 +70,6 @@ generate_coverage() {
 
 main() {
     local test_type="${1:-all}"
-    
     case $test_type in
         "geometry")
             check_dependencies
@@ -109,8 +97,7 @@ main() {
             exit 1
             ;;
     esac
-    
-    echo "=== Test Suite Complete ==="
+    echo "Test suite complete"
 }
 
 main "$@"

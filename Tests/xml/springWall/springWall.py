@@ -1,29 +1,5 @@
 #!/usr/bin/env python3
-"""Post-processing script for the springWall convergence test.
-
-A sphere is launched toward a flat wall under gravity and undergoes a
-perfectly elastic Hooke spring contact (kn = 5e4 N/m, en = 1, g = 9.81).
-Because en=1 the sphere departs each contact at z=r with speed |V0|
-(energy conservation), so the trajectory is periodic with period T.
-
-Analytical solution per cycle:
-  z_eq  = r - m*g/kn           (shifted equilibrium during contact)
-  T_c   = 2*arctan(|V0|*omega/g) / omega
-
-  Contact (0 <= tau <= T_c):
-    z = z_eq + (m*g/kn)*cos(omega*tau) + (V0/omega)*sin(omega*tau)
-
-  Free flight (T_c < tau <= T):
-    z = r + |V0|*(tau - T_c) - g/2*(tau - T_c)**2
-
-  Period T = T_c + 2*|V0|/g
-
-where  r = 0.1 m,  V0 = -1.0 m/s,  kn = 5e4 N/m,  g = 9.81 m/s².
-
-With gravity the two integrators are distinguishable:
-  - FirstOrderExplicit (sym. Euler): O(dt)  — accumulates error during free flight
-  - SecondOrderLeapFrog (KDK)      : O(dt²) — exact for constant acceleration"
-"""
+"""Trajectory and convergence plots for the springWall test vs analytical z(t)."""
 import os
 import sys
 import argparse
@@ -45,13 +21,10 @@ V0   = -1.0    # initial velocity (toward wall) [m/s]
 G    = 9.81    # gravitational acceleration [m/s²]
 T_END = 0.25   # simulation end time — one bounce only, avoids phase-drift saturation [s]
 
-# Derived quantities
 _MASS  = RHO * (4.0 / 3.0) * np.pi * R ** 3   # ≈ 4.1888 kg
 OMEGA  = np.sqrt(KN / _MASS)                   # ≈ 109.25 rad/s
 _Z_EQ  = R - _MASS * G / KN                    # shifted equilibrium z during contact
 
-# T_c: numerically solve z_contact(T_c) = R for T_c > 0
-# z_contact(t) = z_eq + (R-z_eq)*cos(omega*t) + (V0/omega)*sin(omega*t)
 def _z_contact(t):
     return _Z_EQ + (R - _Z_EQ) * np.cos(OMEGA * t) + (V0 / OMEGA) * np.sin(OMEGA * t)
 
@@ -63,15 +36,11 @@ _V1    = _zdot_contact(T_C)                    # departure velocity ≈ +|V0| (e
 T_FLT  = 2.0 * abs(_V1) / G                   # free-flight duration ≈ 0.2039 s
 T_PER  = T_C + T_FLT                           # full bounce period   ≈ 0.234 s
 
-# Test matrix
 DT_VALUES = [1e-3, 1e-4, 1e-5, 1e-6]
 DT_LABELS = ["dt1e-3", "dt1e-4", "dt1e-5", "dt1e-6"]
 
-# Both integrators share the same colour; markers distinguish them in the
-# trajectory plot.  Slices stagger the marker positions so they do not overlap.
-# Finest dt = 1e-6, T_END = 0.25 s → 250 000 points; stride 5000 gives ~50 markers.
+# Same colour; markers distinguish integrators. Staggered slices (~50 markers at finest dt).
 INTEGRATORS = {
-    #  key:          (display label,                              colour,      marker, traj-slice)
     "FirstOrder":  (r"$1^{\mathrm{st}}$-order explicit",
                     "tab:blue", "o", slice(0,     None, 5000)),
     "SecondOrder": (r"$2^{\mathrm{nd}}$-order leap-frog",
@@ -81,24 +50,18 @@ FINEST_DT_LABEL = "dt1e-6"
 
 
 # ---------------------------------------------------------------------------
-# Analytical solution
-# ---------------------------------------------------------------------------
 def analytical_z(t: np.ndarray) -> np.ndarray:
-    """Return analytical sphere-centre z for absolute times within one bounce."""
+    """Analytical sphere-centre z for one bounce (contact + free flight)."""
     in_contact = t <= T_C
-    # Contact phase: harmonic oscillator around z_eq (shifted by gravity)
     z_contact = _z_contact(t)
-    # Free-flight phase: parabola departing z=R at speed +_V1
     s = t - T_C
     z_free = R + _V1 * s - 0.5 * G * s ** 2
     return np.where(in_contact, z_contact, z_free)
 
 
 # ---------------------------------------------------------------------------
-# I/O helper
-# ---------------------------------------------------------------------------
 def load_sphere_z(results_root: str, root_name: str) -> np.ndarray:
-    """Load the *_position_z.dat file and return array with columns [time, z_obs, z_sphere]."""
+    """Load *_position_z.dat -> columns [time, z_obstacle, z_sphere]."""
     fname = os.path.join(results_root, f"{root_name}_position_z.dat")
     if not os.path.exists(fname):
         msg = (f"Missing results file '{os.path.basename(fname)}' "
@@ -115,9 +78,8 @@ def plot_trajectory(results_root: str, plots_root: str) -> None:
     """z(t) for the finest dt, both integrators vs analytical solution."""
     fig, ax = plt.subplots(figsize=(5, 5))
 
-    # Analytical solution drawn first (lower zorder) so markers sit on top.
     t_fine = np.linspace(0.0, T_END, 1000)
-    anal_line, = ax.plot(t_fine, analytical_z(t_fine),
+    ax.plot(t_fine, analytical_z(t_fine),
                          linewidth=1, linestyle="--", c="k",
                          zorder=1, label="Analytical solution")
 
@@ -125,12 +87,11 @@ def plot_trajectory(results_root: str, plots_root: str) -> None:
         root_name = f"springWall_{FINEST_DT_LABEL}_{key}"
         data = load_sphere_z(results_root, root_name)
         t = data[:, 0]
-        z = data[:, 2]   # column 2 = sphere centre z (column 1 = obstacle z)
+        z = data[:, 2]
         ax.plot(t[slc], z[slc],
                 linewidth=0, c=color, marker=marker, markersize=6,
                 markerfacecolor=color, zorder=2, label=label)
 
-    # Integrators first, analytical last
     handles, labels = ax.get_legend_handles_labels()
     handles = handles[1:] + [handles[0]]
     labels  = labels[1:]  + [labels[0]]
@@ -166,8 +127,7 @@ def plot_convergence(results_root: str, plots_root: str) -> None:
             data = load_sphere_z(results_root, root_name)
             t     = data[:, 0]
             z_num = data[:, 2]
-            # Restrict to the first bounce only (t <= T_PER) to avoid
-            # phase-drift saturation across multiple cycles.
+            # First bounce only (t <= T_PER) to avoid phase-drift across cycles.
             mask  = t <= T_PER
             z_ref = analytical_z(t[mask])
             errors[i] = np.max(np.abs(z_num[mask] - z_ref))
@@ -176,7 +136,6 @@ def plot_convergence(results_root: str, plots_root: str) -> None:
                   linewidth=0, c=color, marker=marker, markersize=7,
                   markerfacecolor=color, zorder=2, label=label)
 
-    # Reference slope lines anchored at the coarsest-dt point
     dt_ref = dt_arr[0]
     err_fo = first_errors.get(
         "FirstOrder",

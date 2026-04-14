@@ -1,33 +1,5 @@
 #!/usr/bin/env python3
-"""Post-processing script for the slidingRamp test.
-
-Setup:
-  A single sphere (R=0.1 m, rho=1000 kg/m³) rests on a flat horizontal surface.
-  Gravity is tilted by theta=20° to simulate an inclined plane:
-    GX =  g*sin(20°) ≈  3.3552 m/s²  (tangential — drives sliding in X)
-    GZ = -g*cos(20°) ≈ -9.2183 m/s²  (normal — presses sphere into floor)
-
-Two contact models are compared:
-
-  Hooke (etat=0, muc=0.8):
-    Tangential force:  F_t = etat * v_t = 0  (no static friction possible)
-    The sphere slides freely under tangential gravity:
-      x(t) = 0.5 * g*sin(theta) * t²
-
-  HookeMemory (kt=2e4, etat=0, muc=0.8, mur=5.0):
-    Tangential force:  F_t = -kt * delta_t  (spring resists displacement)
-    tan(theta) = 0.364 ≤ muc = 0.8  → static friction holds
-    Rolling resistance mur=5.0 prevents sphere rolling: without it, the tangential
-    spring force torques the sphere into rolling (5/7 drift), preventing oscillation.
-    The rolling spring stiffness kr = 3*kn*mur² (with Req=1), so omega_y_max ∝ 1/mur².
-    With mur=5.0 the residual angular velocity is < 3e-5 rad/s (<0.1% spring error).
-    Sphere oscillates around equilibrium x_eq = m*g*sin(theta)/kt ≈ 0.703 mm:
-      x(t) = x_eq * (1 - cos(omega_t * t))
-      omega_t = sqrt(kt / m) ≈ 69.1 rad/s,  T_osc = 2*pi/omega_t ≈ 90.9 ms
-    (Coulomb limit never exceeded: 2*tan(theta)=0.728 < muc=0.8)
-
-  m = rho * (4/3)*pi*R^3 = 1000 * 4.189e-3 ≈ 4.189 kg
-"""
+"""Post-processing: slidingRamp — Hooke vs HookeMemory x(t) vs tilted-gravity analytics."""
 import os
 import sys
 import argparse
@@ -51,7 +23,6 @@ THETA = 20.0      # inclination angle          [°]
 G     = 9.81      # gravitational acceleration [m/s²]
 T_END = 0.3       # simulation end time        [s]
 
-# Derived
 M       = RHO * (4.0 / 3.0) * np.pi * R ** 3          # ≈ 4.189 kg
 THETA_R = np.radians(THETA)
 G_TAN   = G * np.sin(THETA_R)                          # ≈ 3.3552 m/s² (driving)
@@ -61,7 +32,6 @@ OMEGA_T = np.sqrt(KT / M)                              # ≈ 69.1 rad/s
 X_EQ    = M * G_TAN / KT                               # ≈ 7.03e-4 m (spring equil.)
 T_OSC   = 2.0 * np.pi / OMEGA_T                       # ≈ 0.0909 s (oscillation period)
 
-# Coulomb check
 _ft_peak = KT * 2.0 * X_EQ  # = 2*m*g*sin(theta)
 _coulomb  = MUC * F_N
 assert _ft_peak < _coulomb, (
@@ -71,12 +41,10 @@ assert _ft_peak < _coulomb, (
 
 
 # ---------------------------------------------------------------------------
-# Analytical solutions
-# ---------------------------------------------------------------------------
 def analytical_hooke(t: np.ndarray):
     """Hooke (no memory, etat=0): pure free sliding under tangential gravity."""
     x = 0.5 * G_TAN * t ** 2
-    z = np.full_like(t, R - M * G_NOR / KN)   # static normal overlap at sphere center
+    z = np.full_like(t, R - M * G_NOR / KN)
     return x, z
 
 
@@ -87,8 +55,6 @@ def analytical_hookememory(t: np.ndarray):
     return x, z
 
 
-# ---------------------------------------------------------------------------
-# I/O
 # ---------------------------------------------------------------------------
 def load_position(results_root: str, root_name: str, axis: str) -> np.ndarray:
     """Load *_position_{axis}.dat; columns: [time, z_obstacle, z_sphere]."""
@@ -101,22 +67,18 @@ def load_position(results_root: str, root_name: str, axis: str) -> np.ndarray:
 
 
 # ---------------------------------------------------------------------------
-# Plot: side-by-side x(t) for Hooke and HookeMemory
-# ---------------------------------------------------------------------------
 def plot_comparison(results_root: str, plots_root: str) -> None:
-    """Produce two separate figures: Hooke sliding and HookeMemory oscillation."""
+    """Two figures: Hooke sliding and HookeMemory oscillation in x (cm)."""
     t_fine = np.linspace(0.0, T_END, 2000)
     x_hooke_anal, _ = analytical_hooke(t_fine)
     x_mem_anal, _ = analytical_hookememory(t_fine)
 
-    # Marker interval (seconds)
-    marker_dt = 0.01  # markers every 0.01 s
+    marker_dt = 0.01
 
     os.makedirs(plots_root, exist_ok=True)
 
-    # -------------------- Hooke (sliding) --------------------
     fig1, ax1 = plt.subplots(figsize=(5, 5))
-    ax1.plot(t_fine, x_hooke_anal * 100,  # convert to cm
+    ax1.plot(t_fine, x_hooke_anal * 100,
              linewidth=1, linestyle="--", c="k", zorder=1, label="Analytical")
     data = load_position(results_root, "slidingRamp_Hooke", "x")
     t, x_num = data[:, 0], data[:, 2]
@@ -143,9 +105,8 @@ def plot_comparison(results_root: str, plots_root: str) -> None:
     plt.close(fig1)
     print(f"Wrote: {out1}")
 
-    # -------------------- HookeMemory (oscillation) --------------------
     fig2, ax2 = plt.subplots(figsize=(5, 5))
-    ax2.plot(t_fine, x_mem_anal * 100,  # convert to cm
+    ax2.plot(t_fine, x_mem_anal * 100,
              linewidth=1, linestyle="--", c="k", zorder=1, label="Analytical")
     data = load_position(results_root, "slidingRamp_HookeMemory", "x")
     t, x_num = data[:, 0], data[:, 2]
@@ -154,10 +115,9 @@ def plot_comparison(results_root: str, plots_root: str) -> None:
     ax2.plot(t[::stride], (x_num * 100)[::stride],
              linewidth=0, c="tab:blue", marker="o", markersize=5,
              markerfacecolor="tab:blue", zorder=2, label=r"Simulation ($k_t > 0$)")
-    # Removed x_eq horizontal line per user request
     ax2.set_xlabel(r"Time, $t$ [s]")
     ax2.set_ylabel(r"Position, $x$ [cm]")
-    ax2.set_ylim(-0.05, 1.0)  # y-range in cm: 0 to 1 cm per request
+    ax2.set_ylim(-0.05, 1.0)
     ax2.set_xlim(0.0, T_END)
     ax2.set_box_aspect(1)
     handles, labels = ax2.get_legend_handles_labels()
@@ -175,8 +135,6 @@ def plot_comparison(results_root: str, plots_root: str) -> None:
     print(f"Wrote: {out2}")
 
 
-# ---------------------------------------------------------------------------
-# Entry point
 # ---------------------------------------------------------------------------
 def main() -> None:
     parser = argparse.ArgumentParser(

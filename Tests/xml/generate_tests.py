@@ -1,13 +1,5 @@
 #!/usr/bin/env python3
-"""Populate XML templates using YAML definitions.
-
-This script reads a YAML file describing `constant` / `groups` / `fork` cases,
-merges each case with defaults, and renders `template.xml` into separate files.
-Supports YAML anchors/aliases for reusable configuration fragments.
-
-Usage:
-    python generate_tests.py -i config.yaml -t template.xml -d out_dir
-"""
+"""Render template.xml from YAML (constants, groups, fork cases; anchors supported)."""
 import argparse
 import yaml
 import itertools
@@ -15,7 +7,6 @@ import copy
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
-# ANSI color helpers for terminal output
 _C_RESET = "\033[0m"
 _C_GREEN = "\033[32m"
 _C_RED = "\033[31m"
@@ -27,7 +18,6 @@ def _red(s: str) -> str:
     return f"{_C_RED}{s}{_C_RESET}"
 
 
-# Default structured configuration dictionary using PascalCase keys.
 DEFAULT_CONFIG: Dict[str, Any] = {
     "Simulation": {
         "SimType": "Standard",
@@ -53,7 +43,6 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "ContactModelType": "Hooke",
         "MaterialA": "MatP",
         "MaterialB": "MatP",
-        # parameters serialized inline for the template
         "Parameters": 'kn="1.2e8" en="0.8" etat="100.0" muc="0.5" kr="0.0"'
     },
     "ContactModelsList": [],
@@ -70,7 +59,6 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "ParticleDensity": 1000.0,
         "ParticleMaterial": "MatP",
         "CrustThickness": 0.0002,
-        # ParticleShape is raw XML fragment inserted in template
         "ParticleShape": '<Sphere Radius="0.05"/>' ,
         "AngularPosition": {"aX": 0.0, "aY": 0.0, "aZ": 0.0}
     },
@@ -91,7 +79,6 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "VerbosityFrequency": 1000,
         "TimingsEnable": "false",
         "OutputPrecision": 6,
-        # The following sections may be strings or lists (lists become XML fragments)
         "PositionSection": "",
         "OrientationSection": "",
         "VelocitySection": "",
@@ -113,9 +100,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
 
 
 def deep_merge(a: Dict[str, Any], b: Dict[str, Any]) -> Dict[str, Any]:
-    """Deep-merge dict b into a and return the result (does not mutate b).
-    Values in b override those in a. Works recursively for nested dicts.
-    """
+    """Recursive merge of b into a copy of a (b wins on conflicts)."""
     out = copy.deepcopy(a)
     for k, v in b.items():
         if k in out and isinstance(out[k], dict) and isinstance(v, dict):
@@ -127,11 +112,8 @@ def deep_merge(a: Dict[str, Any], b: Dict[str, Any]) -> Dict[str, Any]:
 
 class TemplatePopulator:
     def __init__(self, config: Dict[str, Any]):
-        # Make a local deep copy to avoid mutating caller state
         self.config = copy.deepcopy(config)
-        # If top-level `Particles`/`Obstacle` overrides are present alongside
-        # `ParticlesList` / `ObstaclesList`, merge the scalar overrides into
-        # each list element so per-case overrides apply to generated blocks.
+        # Merge scalar `Particles` / `Obstacle` into each list entry when both exist.
         if isinstance(self.config.get("Particles"), dict) and isinstance(self.config.get("ParticlesList"), list):
             part_base = self.config.pop("Particles")
             for i, p in enumerate(self.config.get("ParticlesList", [])):
@@ -142,23 +124,16 @@ class TemplatePopulator:
                 self.config["ObstaclesList"][i] = deep_merge(obs_base, o)
 
     def _flatten_for_template(self) -> Dict[str, Any]:
-        """Produce a dict mapping template placeholder names to values.
-
-        The template uses placeholders like {domain_origin.X} or {particle_shape}.
-        This method creates keys accordingly from the nested configuration.
-        """
+        """Map nested config to template placeholder keys."""
         m: Dict[str, Any] = {}
 
-        # Simulation (PascalCase keys)
         m["sim_type"] = self.config.get("Simulation", {}).get("SimType", "")
         m["precision"] = self.config.get("Simulation", {}).get("Precision", "")
 
-        # Domain (underscore keys)
         for axis in ("X", "Y", "Z"):
             m[f"domain_origin_{axis}"] = self.config.get("DomainOrigin", {}).get(axis, "")
             m[f"domain_size_{axis}"] = self.config.get("DomainSize", {}).get(axis, "")
 
-        # Collision detection
         cd = self.config.get("CollisionDetection", {})
         m["neighbor_list_type"] = cd.get("NeighborListType", "")
         m["linked_cell_type"] = cd.get("LinkedCellType", "")
@@ -171,26 +146,22 @@ class TemplatePopulator:
         m["cd_use_relative_transformations"] = cd.get("UseRelativeTransformations", "false")
         m["narrow_phase_acceleration"] = cd.get("NarrowPhaseAcceleration", "false")
 
-        # Contact force models global settings
         cfm_cfg = self.config.get("ContactForceModels", {})
         m["cfm_enable_timings"] = cfm_cfg.get("EnableTimings", "false")
         m["cfm_compaction"] = cfm_cfg.get("Compaction", "false")
 
-        # Contact model
         cm = self.config.get("ContactModel", {})
         m["contact_model_type"] = cm.get("ContactModelType", "")
         m["contact_model_materialA"] = cm.get("MaterialA", "")
         m["contact_model_materialB"] = cm.get("MaterialB", "")
         m["contact_model_parameters"] = cm.get("Parameters", "")
 
-        # Temporal
         t = self.config.get("Temporal", {})
         m["t_start"] = t.get("TStart", "")
         m["t_end"] = t.get("TEnd", "")
         m["dt"] = t.get("DT", "")
         m["time_integration_type"] = t.get("TimeIntegrationType", "")
 
-        # Particles
         p = self.config.get("Particles", {})
         m["num_particles"] = p.get("NumParticles", "")
         m["particle_density"] = p.get("ParticleDensity", "")
@@ -200,11 +171,6 @@ class TemplatePopulator:
         for ax in ("aX", "aY", "aZ"):
             m[f"particle_angular_position_{ax}"] = p.get("AngularPosition", {}).get(ax, "")
 
-        # Note: if `particles_list` is provided in the config, we'll generate
-        # a custom `<Particles>` block later and insert it into the rendered
-        # template. Keep per-particle placeholders for backwards compatibility.
-
-        # Obstacles
         o = self.config.get("Obstacle", {})
         m["obstacle_material"] = o.get("ObstacleMaterial", "")
         m["obstacle_shape"] = o.get("ObstacleShape", "")
@@ -213,30 +179,23 @@ class TemplatePopulator:
         for ax in ("aX", "aY", "aZ"):
             m[f"obstacle_angular_position_{ax}"] = o.get("ObstacleAngularPosition", {}).get(ax, "")
 
-
-        # Forces
         g = self.config.get("Forces", {}).get("Gravity", {})
         m["gravity_GX"] = g.get("GX", "")
         m["gravity_GY"] = g.get("GY", "")
         m["gravity_GZ"] = g.get("GZ", "")
 
-        # Simulation settings and sections
         ss = self.config.get("SimulationSettings", {})
         m["force_insertion"] = ss.get("ForceInsertion", "false")
         m["verbosity_frequency"] = ss.get("VerbosityFrequency", 1000)
         m["simulation_timings_enable"] = ss.get("TimingsEnable", "false")
 
-        # Sections: if the config provides lists, assemble XML lines; if strings, use as-is.
         def build_section(key: str, tag: str) -> str:
-            # `key` is expected in PascalCase (e.g. PositionSection, WritersSection)
             val = ss.get(key, "")
             if isinstance(val, list):
-                # If the list contains dicts we assume structured writers
                 if val and isinstance(val[0], dict):
                     lines = self._build_writers_lines(val)
                     return "\n".join(lines)
                 return "\n" + "\n".join(val)
-            # If writers section is empty, emit a single indented blank line
             if not val and tag == "Writer":
                 return "\n" + "            "
             return str(val or "")
@@ -247,7 +206,6 @@ class TemplatePopulator:
         m["angular_velocity_section"] = build_section("AngularVelocitySection", "AngularVelocity")
         m["writers_section"] = build_section("WritersSection", "Writer")
 
-        # Postprocessing / TimeSave (separate from temporal settings)
         pp_root = self.config.get("PostProcessing", {})
         pp = pp_root.get("TimeSave", {})
         m["time_save_start"] = pp.get("Start", "")
@@ -257,13 +215,7 @@ class TemplatePopulator:
         return m
 
     def _build_writers_lines(self, writers_list) -> list:
-        """Return list of writer XML lines (without outer <Writers> tags).
-
-        Supports writer dicts with fields:
-          - Type: "Raw" or "Paraview"
-          - Directory, RootName
-        Produces lines like: <RawData Directory ="..." RootName="..."/>
-        """
+        """Writer XML lines (RawData / Paraview) from structured dict list."""
         lines = []
         default_precision = self.config.get("SimulationSettings", {}).get("OutputPrecision", 6)
         for w in writers_list:
@@ -282,7 +234,6 @@ class TemplatePopulator:
     def render_from_template(self, tpl: str) -> str:
         mapping = self._flatten_for_template()
 
-        # Template uses underscore-style keys; use format_map with a safe dict
         class SafeDict(dict):
             def __missing__(self, key):
                 return ""
@@ -292,18 +243,15 @@ class TemplatePopulator:
         except Exception as e:
             raise RuntimeError(f"Failed to render template: {e}")
 
-        # If ParticlesList or ObstaclesList are empty, remove those sections entirely
         if not self.config.get("ParticlesList"):
             rendered = self._remove_block(rendered, "Particles")
         if not self.config.get("ObstaclesList"):
             rendered = self._remove_block(rendered, "Obstacles")
 
-        # Replace or append blocks for particles, obstacles, and contact models
         rendered = self._replace_block_if_list(rendered, "Particles", self.config.get("ParticlesList"), self._build_particles_block)
         rendered = self._replace_block_if_list(rendered, "Obstacles", self.config.get("ObstaclesList"), self._build_obstacles_block)
         rendered = self._replace_block_if_list(rendered, "ContactForceModels", self.config.get("ContactModelsList"), self._build_contact_models_block)
 
-        # Replace ParticleInsertion block if insertion config provided
         rendered = self._replace_insertion_block(rendered, self.config.get("Insertion"))
 
         return rendered
@@ -312,36 +260,26 @@ class TemplatePopulator:
         if not lst:
             return rendered
         block = builder_func(lst)
-        # Search by tag prefix so we match even when the opening tag has attributes
-        # (e.g. <ContactForceModels EnableTimings="false" ...>)
+        # Prefix match: opening tag may include attributes.
         start_tag_prefix = f"<{tag}"
         end_tag = f"</{tag}>"
         start_idx = rendered.find(start_tag_prefix)
         if start_idx != -1:
-            # Advance past the full opening tag (find the closing '>')
             open_end_idx = rendered.find(">", start_idx)
             end_idx = rendered.find(end_tag, open_end_idx) if open_end_idx != -1 else -1
         else:
             end_idx = -1
         if start_idx != -1 and end_idx != -1:
-            # detect indentation at the start tag (chars between previous newline and start_idx)
             line_start = rendered.rfind("\n", 0, start_idx) + 1
             indent = rendered[line_start:start_idx]
-            # prefix each line of the generated block with the same indent
             indented_block = indent + block.replace("\n", "\n" + indent)
             return rendered[: line_start] + indented_block + rendered[end_idx + len(end_tag) :]
-        # fallback: append with newline
         return rendered + "\n" + block
 
     def _build_particles_block(self, particles_list) -> str:
-        """Builds a full <Particles>...</Particles> block from a list of particle dicts.
-
-        Each particle dict may contain: Number, Density, Material, Type, CrustThickness,
-        particle_shape (raw XML fragment), angular_position (dict aX,aY,aZ).
-        """
+        """Full <Particles>...</Particles> from a list of particle dicts."""
         parts = ["<Particles>"]
         for p in particles_list:
-            # Attributes: allow optional Type
             attrs = []
             if "Number" in p:
                 attrs.append(f'Number="{p["Number"]}"')
@@ -367,7 +305,6 @@ class TemplatePopulator:
                     part.append("            " + line)
             part.append("        </Convex>")
 
-            # Transformation block with Centre and AngularPosition to match template.xml
             pos = p.get("Position") or p.get("ParticlePosition") or {}
             X = pos.get("X", 0.0)
             Y = pos.get("Y", 0.0)
@@ -383,11 +320,7 @@ class TemplatePopulator:
         return "\n".join(parts)
 
     def _build_obstacles_block(self, obstacles_list) -> str:
-        """Build <Obstacles> block from list of obstacle dicts.
-        
-        Each obstacle may contain: Material, crust_thickness, obstacle_shape,
-        obstacle_position, obstacle_angular_position.
-        """
+        """Full <Obstacles>...</Obstacles> from obstacle dicts."""
         parts = ["<Obstacles>"]
         for o in obstacles_list:
             mat = o.get("Material") or o.get("ObstacleMaterial", "")
@@ -418,10 +351,7 @@ class TemplatePopulator:
         return "\n".join(parts)
 
     def _build_contact_models_block(self, models_list) -> str:
-        """Build <ContactForceModels> block from list of model dicts.
-        
-        Each model may contain: Type, materialA, materialB, parameters.
-        """
+        """Full <ContactForceModels>...</ContactForceModels> from model dicts."""
         cfm_cfg = self.config.get("ContactForceModels", {})
         enable_timings = cfm_cfg.get("EnableTimings", "false")
         compaction = cfm_cfg.get("Compaction", "false")
@@ -448,7 +378,6 @@ class TemplatePopulator:
         start_idx = rendered.find(start_tag)
         end_idx = rendered.find(end_tag, start_idx)
         if start_idx != -1 and end_idx != -1:
-            # preserve indentation as in other replacer
             line_start = rendered.rfind("\n", 0, start_idx) + 1
             indent = rendered[line_start:start_idx]
             indented_block = indent + block.replace("\n", "\n" + indent)
@@ -456,25 +385,18 @@ class TemplatePopulator:
         return rendered + "\n" + block
 
     def _remove_block(self, rendered: str, tag: str) -> str:
-        """Remove an entire XML block including its start and end tags.
-
-        Returns the modified rendered string. If the block isn't found, returns
-        the original string unchanged.
-        """
+        """Strip `<tag>...</tag>` (whole lines); no-op if not found."""
         start_tag = f"<{tag}>"
         end_tag = f"</{tag}>"
         start_idx = rendered.find(start_tag)
         end_idx = rendered.find(end_tag, start_idx)
         if start_idx != -1 and end_idx != -1:
-            # remove from the start of the line containing the start tag
             line_start = rendered.rfind("\n", 0, start_idx) + 1
             return rendered[:line_start] + rendered[end_idx + len(end_tag) :]
         return rendered
 
     def _build_insertion_block(self, cfg) -> str:
-        """Builds a <ParticleInsertion> block from insertion cfg.
-        Supported types: Random (with Windows), File (Name), Constant (X,Y,Z), Zero.
-        """
+        """<ParticleInsertion> from cfg (Random / File / Constant / Zero)."""
         fi = cfg.get("ForceInsertion", False)
         fi_attr = "1" if fi else "0"
         parts = [f"<ParticleInsertion ForceInsertion=\"{fi_attr}\">"]
@@ -490,7 +412,6 @@ class TemplatePopulator:
 
         def build_windows(windows):
             if not windows:
-                # default window: full domain
                 domain = self.config.get("DomainSize", {})
                 maxx = domain.get("X", 1.0)
                 maxy = domain.get("Y", maxx)
@@ -523,7 +444,6 @@ class TemplatePopulator:
                         parts.append(f"                <MinPoint X=\"{mp.get('X',0)}\" Y=\"{mp.get('Y',0)}\" Z=\"{mp.get('Z',0)}\"/>")
                         parts.append(f"                <MaxPoint X=\"{xp.get('X',0)}\" Y=\"{xp.get('Y',0)}\" Z=\"{xp.get('Z',0)}\"/>")
                     else:
-                        # Annulus or other types: include provided raw fields
                         for k, v in w.items():
                             if k == "Type":
                                 continue
@@ -545,27 +465,8 @@ class TemplatePopulator:
         parts.append("</ParticleInsertion>")
         return "\n".join(parts)
 
-    # Note: callers should use `render_from_template(tpl_text)` and write
-    # the result to disk. The old `save()` helper has been removed.
-
-
-
-
 def build_configs_from_yaml(data: Dict[str, Any]) -> List[Tuple[str, Dict[str, Any]]]:
-    """Build a list of (name, config_dict) from the provided YAML structure.
-
-    Expected top-level keys (case-insensitive):
-      - constant/Constant: dict of shared overrides merged into all cases
-      - groups/Group: dict mapping group names to reusable config fragments
-      - fork/Fork: list of case entries; each may have:
-          - name: optional output filename base
-          - groups: list of group names or nested lists for cartesian expansion
-          - overrides: dict of additional case-specific overrides
-
-    If `fork` is empty or missing, returns a single config merging DEFAULT + constant.
-    Supports YAML anchors/aliases for reusable fragments.
-    """
-    # Accept both lowercase and capitalized keys for backward compatibility
+    """(output_basename, merged config) pairs from YAML Constant/Groups/Fork."""
     const = data.get("Constant", {})
     groups = data.get("Groups", {}) or {}
     fork = data.get("Fork", [])
@@ -582,19 +483,13 @@ def build_configs_from_yaml(data: Dict[str, Any]) -> List[Tuple[str, Dict[str, A
 
         grp_spec = entry.get("groups") or entry.get("use_groups") or []
 
-        # Helper to normalize some common override aliases after merges
         def _normalize_cfg(cfg: Dict[str, Any]):
             cd = cfg.get("CollisionDetection", {})
-            # alias: SortFrequency -> SortingFrequency
             if "SortFrequency" in cd and "SortingFrequency" not in cd:
                 cd["SortingFrequency"] = cd.pop("SortFrequency")
             cfg["CollisionDetection"] = cd
             return cfg
 
-        # If no groups specified, produce a single case merging Constant + overrides
-        # (handled after helper functions are defined below)
-
-        # Helper functions for expanding overrides (range shorthand and list leaves)
         def _find_list_leaves(d, path=None):
             path = path or []
             leaves = []
@@ -629,30 +524,18 @@ def build_configs_from_yaml(data: Dict[str, Any]) -> List[Tuple[str, Dict[str, A
                 for item in obj:
                     _expand_range_shorthand_inplace(item)
 
-        # (The _apply_overrides implementation was moved earlier.)
-
-        # Apply overrides smartly: if overrides provide `particles`/`obstacles` dicts
-        # and the base cfg has `particles_list`/`obstacles_list`, merge the
-        # per-particle/obstacle overrides into each list element rather than
-        # replacing the whole list.
         def _apply_overrides(base_cfg, overrides_dict):
             c = copy.deepcopy(base_cfg)
             ov = copy.deepcopy(overrides_dict)
 
-            # Helper to merge transformation-related overrides (e.g. AngularPosition,
-            # Centre) into the existing element's Transformation sub-dict instead of
-            # placing them at the top-level of the particle/obstacle entry.
             def _merge_into_transformation(target_elem, elem_override):
                 if not isinstance(elem_override, dict):
                     return target_elem
                 ov_copy = copy.deepcopy(elem_override)
-                # If caller provided a full 'Transformation', merge it directly
                 if "Transformation" in ov_copy:
                     transf = ov_copy.pop("Transformation")
                     target_elem["Transformation"] = deep_merge(target_elem.get("Transformation", {}), transf)
 
-                # Common short-hand keys that users may put at the particle level;
-                # move them under 'Transformation' when found.
                 transf_keys = ["AngularPosition", "Centre", "CentrePosition"]
                 transf_collect = {}
                 for k in transf_keys:
@@ -660,24 +543,17 @@ def build_configs_from_yaml(data: Dict[str, Any]) -> List[Tuple[str, Dict[str, A
                         transf_collect[k] = ov_copy.pop(k)
                 if transf_collect:
                     target_elem["Transformation"] = deep_merge(target_elem.get("Transformation", {}), transf_collect)
-                    # Also set commonly-used top-level aliases so the builders pick up
-                    # the values regardless of whether they expect top-level keys
-                    # (e.g. AngularPosition) or nested Transformation.
                     if "AngularPosition" in transf_collect:
                         target_elem["AngularPosition"] = deep_merge(target_elem.get("AngularPosition", {}), transf_collect["AngularPosition"])
                     if "Centre" in transf_collect:
-                        # builder expects 'Position' or 'ParticlePosition' keys
                         pos = transf_collect.get("Centre", {})
                         target_elem["Position"] = deep_merge(target_elem.get("Position", {}), pos)
 
-                # Any remaining keys should be merged at the particle/obstacle level
                 return deep_merge(target_elem, ov_copy)
 
             if "Particles" in ov and isinstance(c.get("ParticlesList"), list):
                 part_ov = ov.pop("Particles")
                 for i, p in enumerate(c["ParticlesList"]):
-                    # Ensure we don't lose nested Transformation keys: merge known
-                    # transformation overrides into the existing Transformation dict.
                     merged = _merge_into_transformation(copy.deepcopy(p), part_ov)
                     c["ParticlesList"][i] = merged
 
@@ -689,7 +565,6 @@ def build_configs_from_yaml(data: Dict[str, Any]) -> List[Tuple[str, Dict[str, A
 
             return deep_merge(c, ov)
 
-        # If no groups specified, produce a single case merging Constant + overrides
         if not grp_spec:
             cfg = deep_merge(DEFAULT_CONFIG, const)
             cfg = _apply_overrides(cfg, overrides)
@@ -697,9 +572,6 @@ def build_configs_from_yaml(data: Dict[str, Any]) -> List[Tuple[str, Dict[str, A
             results.append((name_base, cfg))
             continue
 
-        # If grp_spec is a flat list of strings, treat it as alternatives:
-        # produce one case per group entry. If grp_spec contains nested lists,
-        # perform cartesian expansion across slots (each slot may have multiple options).
         if all(not isinstance(g, list) for g in grp_spec):
             for g in grp_spec:
                 safe_g = str(g).replace(" ", "_")
@@ -728,7 +600,6 @@ def build_configs_from_yaml(data: Dict[str, Any]) -> List[Tuple[str, Dict[str, A
                         results.append((name2, cfg2))
             continue
 
-        # Cartesian expansion across group slots (each slot may be a list)
         group_options = []
         for g in grp_spec:
             if isinstance(g, list):
@@ -783,7 +654,6 @@ def main() -> int:
     args = parser.parse_args()
 
     if not args.input:
-        # No YAML provided: render single file using defaults
         data = {}
     else:
         with open(args.input, 'r') as f:
@@ -792,9 +662,6 @@ def main() -> int:
             data = {}
 
         cases = build_configs_from_yaml(data)
-    # If a YAML file was provided, use its stem as the output filename base.
-    # - single-case YAML -> output name = <yaml_stem>.xml
-    # - multi-case YAML (fork) -> output names = <yaml_stem>_<case>.xml
     if args.input:
         stem = args.input.stem
         if len(cases) == 1:

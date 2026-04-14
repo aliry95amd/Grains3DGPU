@@ -1,14 +1,7 @@
 #!/usr/bin/env python3
-"""Plot GJK iteration count vs surface-to-surface distance.
+"""Plot mean GJK iterations vs distance (log bins) from gjk_iterations.csv.
 
-Reads the CSV produced by GJKIterationsTest and creates one figure with one
-subplot per shape pair.  The x-axis is the log10-binned distance (order of
-magnitude), and the y-axis is the mean number of GJK iterations with ±1
-standard deviation shown as a shaded band.
-
-Usage
------
-    python3 plot.py --csv data/gjk_iterations.csv --plot-dir data
+Usage: python3 plot.py --csv data/gjk_iterations.csv --plot-dir data
 """
 
 import argparse
@@ -40,20 +33,7 @@ PAIR_ORDER = ["box-box", "cylinder-cylinder", "superquadric-superquadric", "cyli
 
 # ---------------------------------------------------------------------------
 def bin_data(df_pair: pd.DataFrame, bins_per_decade: int = 5):
-    """Compute mean and std of NbIter grouped by log10-distance bins.
-
-    Parameters
-    ----------
-    df_pair : DataFrame with columns ActualDistance and NbIter
-    bins_per_decade : number of bins per decade of distance
-
-    Returns
-    -------
-    bin_centers : array of bin centre distances (geometric mean)
-    means       : array of mean NbIter per bin
-    stds        : array of std  NbIter per bin
-    counts      : array of sample count per bin
-    """
+    """Bin by log10(distance); return geometric bin centres and mean/std/count of NbIter."""
     log_dist = np.log10(df_pair["ActualDistance"].values)
     n_iter   = df_pair["NbIter"].values.astype(float)
 
@@ -108,7 +88,6 @@ def main():
 
     df = pd.read_csv(args.csv_path)
 
-    # Validate expected columns
     required = {"ShapePair", "ActualDistance", "NbIter"}
     if not required.issubset(df.columns):
         raise ValueError(f"CSV is missing columns: {required - set(df.columns)}")
@@ -119,8 +98,6 @@ def main():
     df = df[(df["ActualDistance"] > 0.0) & (df["NbIter"] < 1000)].copy()
 
     # -----------------------------------------------------------------------
-    # Single figure with 1x4 subplots (one per shape pair, in a row).
-    # Axes are shared so every panel has the same x and y range.
     fig, axes = plt.subplots(1, 4, figsize=(16, 4),
                              sharex=True, sharey=True)
 
@@ -137,8 +114,6 @@ def main():
 
         centers, means, stds, _ = bin_data(df_pair, bins_per_decade=5)
 
-        # Gaussian smoothing (sigma=1 bin) applied to mean and std band
-        # so the shaded region has a clean, continuous appearance.
         sigma = 1.0
         means_s = gaussian_filter1d(means, sigma=sigma)
         stds_s  = gaussian_filter1d(stds,  sigma=sigma)
@@ -167,7 +142,6 @@ def main():
         ax.set_box_aspect(1)
         ax.grid(color="lightgrey", linestyle="--", linewidth=0.5)
 
-        # x-label on every panel (all are bottom row); y-label only on left
         ax.set_xlabel(r"Distance, $d$ [m]")
         if ax_idx == 0:
             ax.set_ylabel(r"GJK iterations $[-]$")
