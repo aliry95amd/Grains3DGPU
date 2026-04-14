@@ -76,3 +76,4 @@ Validations/*/data/
 # IDEs and editors
 *.vscode
 *.ncu-rep
+__pycache__/
