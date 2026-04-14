@@ -139,7 +139,7 @@ void Grains<T>::setupComponents(DOMNode* root, DOMElement* rootElement)
     for(uint i = 0; i < obstacleData.numTemplates; ++i)
     {
         m_rigidBodyList[offset]    = new RigidBody<T>(*obstacleData.refRB[i]);
-        initialBodyTags[offset]    = makeStandaloneBodyTag(offset);
+        initialBodyTags[offset]    = makeStandaloneBodyTag(i);
         initialPosition[offset]    = obstacleData.refInitialPos[i];
         initialOrientation[offset] = obstacleData.refInitialOri[i];
         initialLocalPos[offset]    = Vector3<T>(T(0), T(0), T(0));
@@ -170,8 +170,13 @@ void Grains<T>::setupComponents(DOMNode* root, DOMElement* rootElement)
                 initialOrientation[offset] = particleData.refInitialOri[i];
                 initialLocalPos[offset]    = particleData.refLocalPos[rbIdx];
                 initialLocalQuat[offset]   = particleData.refLocalQuat[rbIdx];
+                // shapeId = numObstacles + protoBase + k (prototype index, not slot index)
+                // All instances of the same particle prototype share the same shapeId,
+                // keeping the value well within the 10-bit field regardless of particle count.
+                const uint sid = numObstacles + protoBase + k;
+                GAssert(sid < 1024u, "shapeId overflow: too many unique particle prototypes");
                 initialBodyTags[offset]
-                    = isc ? makeSubBodyTag(offset, compositeIdx, k) : makeStandaloneBodyTag(offset);
+                    = isc ? makeSubBodyTag(sid, compositeIdx, k) : makeStandaloneBodyTag(sid);
                 T r = particleData.refRB[rbIdx]->getCircumscribedRadius();
                 if(r > maxParticleRadius)
                     maxParticleRadius = r;
