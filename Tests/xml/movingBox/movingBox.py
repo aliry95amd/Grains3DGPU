@@ -14,7 +14,7 @@ plt.rcParams.update({"text.usetex": True, "font.family": "Helvetica"})
 # Physical parameters (must match the YAML)
 # ---------------------------------------------------------------------------
 V0 = 5.0      # initial vertical velocity  [m/s]
-G  = -9.81    # gravitational acceleration [m/s²]
+G  = -9.81    # gravitational acceleration [m/s^2]
 Z0 = 0.0      # initial z position         [m]
 T_END = 1.0   # simulation end time        [s]
 
@@ -78,7 +78,7 @@ def plot_trajectory(results_root: str, plots_root: str) -> None:
 
 
 def plot_convergence(results_root: str, plots_root: str) -> None:
-    """L∞ error along trajectory vs dt (log-log) with reference slopes."""
+    """Linf error along trajectory vs dt (log-log) with reference slopes."""
     fig, ax = plt.subplots(figsize=(5, 5))
 
     dt_labels = DT_LABELS

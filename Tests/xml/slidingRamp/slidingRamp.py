@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Post-processing: slidingRamp — Hooke vs HookeMemory x(t) vs tilted-gravity analytics."""
+"""Post-processing: slidingRamp -- Hooke vs HookeMemory x(t) vs tilted-gravity analytics."""
 import os
 import sys
 import argparse
@@ -14,28 +14,28 @@ plt.rcParams.update({"text.usetex": True, "font.family": "Helvetica", "font.size
 # Physical parameters (must match the YAML)
 # ---------------------------------------------------------------------------
 R     = 0.1       # sphere radius              [m]
-RHO   = 1000.0    # sphere density             [kg/m³]
+RHO   = 1000.0    # sphere density             [kg/m^3]
 KN    = 5.0e4     # normal spring stiffness    [N/m]
 KT    = 2.0e4     # tangential spring (HookeMemory only) [N/m]
 EN    = 0.9       # normal restitution
 MUC   = 0.8       # Coulomb friction coefficient
-THETA = 20.0      # inclination angle          [°]
-G     = 9.81      # gravitational acceleration [m/s²]
+THETA = 20.0      # inclination angle          [ deg]
+G     = 9.81      # gravitational acceleration [m/s^2]
 T_END = 0.3       # simulation end time        [s]
 
-M       = RHO * (4.0 / 3.0) * np.pi * R ** 3          # ≈ 4.189 kg
+M       = RHO * (4.0 / 3.0) * np.pi * R ** 3          # ~ 4.189 kg
 THETA_R = np.radians(THETA)
-G_TAN   = G * np.sin(THETA_R)                          # ≈ 3.3552 m/s² (driving)
-G_NOR   = G * np.cos(THETA_R)                          # ≈ 9.2183 m/s² (normal)
-F_N     = M * G_NOR                                    # ≈ 38.60 N
-OMEGA_T = np.sqrt(KT / M)                              # ≈ 69.1 rad/s
-X_EQ    = M * G_TAN / KT                               # ≈ 7.03e-4 m (spring equil.)
-T_OSC   = 2.0 * np.pi / OMEGA_T                       # ≈ 0.0909 s (oscillation period)
+G_TAN   = G * np.sin(THETA_R)                          # ~ 3.3552 m/s^2 (driving)
+G_NOR   = G * np.cos(THETA_R)                          # ~ 9.2183 m/s^2 (normal)
+F_N     = M * G_NOR                                    # ~ 38.60 N
+OMEGA_T = np.sqrt(KT / M)                              # ~ 69.1 rad/s
+X_EQ    = M * G_TAN / KT                               # ~ 7.03e-4 m (spring equil.)
+T_OSC   = 2.0 * np.pi / OMEGA_T                       # ~ 0.0909 s (oscillation period)
 
 _ft_peak = KT * 2.0 * X_EQ  # = 2*m*g*sin(theta)
 _coulomb  = MUC * F_N
 assert _ft_peak < _coulomb, (
-    f"Peak spring force {_ft_peak:.2f} N exceeds Coulomb limit {_coulomb:.2f} N — "
+    f"Peak spring force {_ft_peak:.2f} N exceeds Coulomb limit {_coulomb:.2f} N -- "
     "choose larger muc or smaller theta"
 )
 
@@ -144,15 +144,15 @@ def main() -> None:
     parser.add_argument("--plot-dir",   default="./plots/slidingRamp")
     args = parser.parse_args()
 
-    print("Sliding Ramp – physical parameters:")
+    print("Sliding Ramp -- physical parameters:")
     print(f"  R         = {R} m  (sphere radius)")
-    print(f"  rho       = {RHO} kg/m³  =>  m = {M:.5f} kg")
-    print(f"  theta     = {THETA}°  =>  tan(theta) = {np.tan(THETA_R):.4f}")
+    print(f"  rho       = {RHO} kg/m^3  =>  m = {M:.5f} kg")
+    print(f"  theta     = {THETA} deg  =>  tan(theta) = {np.tan(THETA_R):.4f}")
     print(f"  kn        = {KN:.1e} N/m")
     print(f"  kt        = {KT:.1e} N/m  (HookeMemory only)")
     print(f"  muc       = {MUC}")
-    print(f"  G_tan     = {G_TAN:.4f} m/s²  (drives sliding in X)")
-    print(f"  G_nor     = {G_NOR:.4f} m/s²  (presses into floor)")
+    print(f"  G_tan     = {G_TAN:.4f} m/s^2  (drives sliding in X)")
+    print(f"  G_nor     = {G_NOR:.4f} m/s^2  (presses into floor)")
     print(f"  F_n       = {F_N:.4f} N   (static normal force)")
     print(f"  Coulomb   = muc*F_n = {_coulomb:.4f} N")
     print(f"  x_eq      = {X_EQ*1e3:.4f} mm  (HookeMemory spring equilibrium)")

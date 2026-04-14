@@ -8,9 +8,9 @@
 /** @brief Body tag bit layout and helper functions for composite-body encoding.
 
     A body tag is a single uint32 that encodes three fields:
-      - Field 0: shapeId (10 bits)          — index into the RigidBody prototype array (0–1023)
-      - Field 1: compositeIdx (14 bits)     — 0 = standalone; 1–16383 = owning composite index
-      - Field 2: subBodyLocalIdx (8 bits)   — 0 = master / composite CoM; 1–255 = sub-body slot
+      - Field 0: shapeId (10 bits)          -- index into the RigidBody prototype array (0--1023)
+      - Field 1: compositeIdx (14 bits)     -- 0 = standalone; 1--16383 = owning composite index
+      - Field 2: subBodyLocalIdx (8 bits)   -- 0 = master / composite CoM; 1--255 = sub-body slot
 
     A standalone particle has compositeIdx == 0 (and subBodyLocalIdx == 0).
     isSubBody(tag) is equivalent to compositeIdx != 0.

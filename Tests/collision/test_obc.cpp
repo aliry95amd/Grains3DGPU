@@ -121,36 +121,36 @@ protected:
         // Identity quaternion: no rotation
         q_id = Quaternion<double>(0.0, 0.0, 0.0, 1.0);
 
-        // 90° rotation around Y: maps local +Z to world +X
-        // q = (0, sin45°, 0, cos45°)
+        // 90 deg rotation around Y: maps local +Z to world +X
+        // q = (0, sin45 deg, 0, cos45 deg)
         q_rot90Y = makeQuat(0.0, 1.0, 0.0, M_PI / 2.0);
 
-        // 90° rotation around X: maps local +Z to world -Y
-        // Rx(90°) * (0,0,1) = (0, -1, 0)
+        // 90 deg rotation around X: maps local +Z to world -Y
+        // Rx(90 deg) * (0,0,1) = (0, -1, 0)
         q_rot90X = makeQuat(1.0, 0.0, 0.0, M_PI / 2.0);
 
-        // 45° rotation around Y: maps local +Z to world (√2/2, 0, √2/2)
+        // 45 deg rotation around Y: maps local +Z to world (sqrt(2)/2, 0, sqrt(2)/2)
         q_rot45Y = makeQuat(0.0, 1.0, 0.0, M_PI / 4.0);
 
-        // 30° rotation around an oblique axis (1/√2, 1/√2, 0) — arbitrary orientation
+        // 30 deg rotation around an oblique axis (1/sqrt(2), 1/sqrt(2), 0) -- arbitrary orientation
         q_rot30_oblique = makeQuat(1.0, 1.0, 0.0, M_PI / 6.0);
     }
 
     Vector3<double>    ori_z;            // local cylinder axis = +Z
     Quaternion<double> q_id;             // identity
-    Quaternion<double> q_rot90Y;         // 90° around world Y
-    Quaternion<double> q_rot90X;         // 90° around world X
-    Quaternion<double> q_rot45Y;         // 45° around world Y
-    Quaternion<double> q_rot30_oblique;  // 30° around (1,1,0)/√2
+    Quaternion<double> q_rot90Y;         // 90 deg around world Y
+    Quaternion<double> q_rot90X;         // 90 deg around world X
+    Quaternion<double> q_rot45Y;         // 45 deg around world Y
+    Quaternion<double> q_rot30_oblique;  // 30 deg around (1,1,0)/sqrt(2)
 };
 
 // =================================================================================================
-// Tests — Cylinder A is Z-aligned at origin (identity), cylinder B varies.
+// Tests -- Cylinder A is Z-aligned at origin (identity), cylinder B varies.
 // Both axes are non-parallel in all tests so the algorithm is well-conditioned.
 // =================================================================================================
 
 // -------------------------------------------------------------------------------------------------
-// Clearly separated: B is X-aligned (A⊥B) and displaced far to the side (+Y direction).
+// Clearly separated: B is X-aligned (A perp B) and displaced far to the side (+Y direction).
 // The lateral offset (Y) exceeds r1+r2, so the cylindrical hulls cannot overlap.
 // Expected: false
 // -------------------------------------------------------------------------------------------------
@@ -195,7 +195,7 @@ TEST_F(OBCSimpleTest, PerpendicularAxes_SameCenter)
 
 // -------------------------------------------------------------------------------------------------
 // Separated axially: B is X-aligned but displaced far from A along Z.
-// A extends ±1 in Z; B is far above at z=5, outside A's extent.
+// A extends +/-1 in Z; B is far above at z=5, outside A's extent.
 // Expected: false
 // -------------------------------------------------------------------------------------------------
 TEST_F(OBCSimpleTest, PerpendicularAxes_AxiallySeparated)
@@ -243,7 +243,7 @@ TEST_F(OBCSimpleTest, PerpendicularAxes_PartialOverlap)
 // -------------------------------------------------------------------------------------------------
 TEST_F(OBCSimpleTest, FortyFiveDegreeAxes_SameCenter)
 {
-    // A: Z-aligned at origin  B: tilted 45° around Y (world axis = (√2/2, 0, √2/2))
+    // A: Z-aligned at origin  B: tilted 45 deg around Y (world axis = (sqrt(2)/2, 0, sqrt(2)/2))
     checkAllOBCOverloads(1.0,
                          2.0,
                          ori_z,
@@ -264,7 +264,7 @@ TEST_F(OBCSimpleTest, FortyFiveDegreeAxes_SameCenter)
 // -------------------------------------------------------------------------------------------------
 TEST_F(OBCSimpleTest, FortyFiveDegreeAxes_ClearSeparation)
 {
-    // A: Z-aligned at origin  B: tilted 45° around Y, displaced 10 units in X
+    // A: Z-aligned at origin  B: tilted 45 deg around Y, displaced 10 units in X
     checkAllOBCOverloads(1.0,
                          1.0,
                          ori_z,
@@ -286,7 +286,7 @@ TEST_F(OBCSimpleTest, FortyFiveDegreeAxes_ClearSeparation)
 // -------------------------------------------------------------------------------------------------
 TEST_F(OBCSimpleTest, PerpendicularAxes_Rotated90X_SameCenter)
 {
-    // A: Z-aligned at origin  B: rotated 90° around X -> world axis = (0, -1, 0)
+    // A: Z-aligned at origin  B: rotated 90 deg around X -> world axis = (0, -1, 0)
     checkAllOBCOverloads(1.0,
                          2.0,
                          ori_z,
@@ -323,8 +323,8 @@ TEST_F(OBCSimpleTest, PerpendicularAxes_Rotated90X_AxiallySeparated)
 }
 
 // =================================================================================================
-// Tests with non-identity A orientation — stress-tests the coordinate transformation.
-// A is -Y-aligned at (1, 2, 3) (rotated 90° around X).  B varies.
+// Tests with non-identity A orientation -- stress-tests the coordinate transformation.
+// A is -Y-aligned at (1, 2, 3) (rotated 90 deg around X).  B varies.
 // =================================================================================================
 
 // -------------------------------------------------------------------------------------------------
@@ -374,7 +374,7 @@ TEST_F(OBCSimpleTest, NonIdentityA_BFar_Separated)
 }
 
 // =================================================================================================
-// Tests with non-identity orientation on BOTH cylinders — maximum transformation stress.
+// Tests with non-identity orientation on BOTH cylinders -- maximum transformation stress.
 // =================================================================================================
 
 // -------------------------------------------------------------------------------------------------
@@ -385,8 +385,8 @@ TEST_F(OBCSimpleTest, NonIdentityA_BFar_Separated)
 // -------------------------------------------------------------------------------------------------
 TEST_F(OBCSimpleTest, BothRotated_SameCenter_MustIntersect)
 {
-    //  A: center (3,-1,2), rotated 30° around oblique axis (1,1,0)/√2
-    //  B: center (3,-1,2), rotated 90° around Y
+    //  A: center (3,-1,2), rotated 30 deg around oblique axis (1,1,0)/sqrt(2)
+    //  B: center (3,-1,2), rotated 90 deg around Y
     const Vector3<double> center(3.0, -1.0, 2.0);
     checkAllOBCOverloads(1.5,
                          2.0,
@@ -409,8 +409,8 @@ TEST_F(OBCSimpleTest, BothRotated_SameCenter_MustIntersect)
 // -------------------------------------------------------------------------------------------------
 TEST_F(OBCSimpleTest, BothRotated_FarApart_MustNotIntersect)
 {
-    //  A: center (-5,0,0), rotated 90° around X
-    //  B: center (15,0,0), rotated 45° around Y
+    //  A: center (-5,0,0), rotated 90 deg around X
+    //  B: center (15,0,0), rotated 45 deg around Y
     checkAllOBCOverloads(2.0,
                          3.0,
                          ori_z,
@@ -426,7 +426,7 @@ TEST_F(OBCSimpleTest, BothRotated_FarApart_MustNotIntersect)
 }
 
 // -------------------------------------------------------------------------------------------------
-// A rotated 30° (oblique) at (-2,4,-1), B rotated 90°X at (-2,4,-1.3).
+// A rotated 30 deg (oblique) at (-2,4,-1), B rotated 90 degX at (-2,4,-1.3).
 // Centers are only 0.3 units apart while both radii are 1.0 and half-heights 1.5.
 // Expected: true
 // -------------------------------------------------------------------------------------------------
@@ -447,7 +447,7 @@ TEST_F(OBCSimpleTest, BothRotated_CloseCenters_Intersecting)
 }
 
 // -------------------------------------------------------------------------------------------------
-// A rotated 30° (oblique) at (0,0,0), B rotated 90°X at (0,0,10).
+// A rotated 30 deg (oblique) at (0,0,0), B rotated 90 degX at (0,0,10).
 // Clearly separated: 10-unit gap far exceeds both half-heights.
 // Expected: false
 // -------------------------------------------------------------------------------------------------
@@ -472,7 +472,7 @@ TEST_F(OBCSimpleTest, BothRotated_LargeAxialGap_Separated)
 // =================================================================================================
 
 // -------------------------------------------------------------------------------------------------
-// Large A, tiny B at A's center — B is completely inside A.
+// Large A, tiny B at A's center -- B is completely inside A.
 // Expected: true
 // -------------------------------------------------------------------------------------------------
 TEST_F(OBCSimpleTest, LargeCylinderContainsSmall_SameCenter)
@@ -584,7 +584,7 @@ TEST_F(OBCSimpleTest, SymmetryAB_Separated)
 
 // -------------------------------------------------------------------------------------------------
 // Non-Z local axis: both cylinders lie along their local X-axis (ori = (1,0,0)).
-// A stays at identity (so world axis = X), B is rotated 90° around Z
+// A stays at identity (so world axis = X), B is rotated 90 deg around Z
 // (world axis = Y).  They share the same center -> must intersect.
 // Expected: true
 // -------------------------------------------------------------------------------------------------
@@ -592,9 +592,9 @@ TEST_F(OBCSimpleTest, NonZLocalAxis_SameCenter)
 {
     const Vector3<double> ori_x(1.0, 0.0, 0.0);
 
-    // 90° rotation around Z maps local +X to world +... let's use the identity
+    // 90 deg rotation around Z maps local +X to world +... let's use the identity
     // quaternion so A's world axis stays +X.
-    // B is rotated 90° around Z: Rz(90°) maps +X -> +Y.
+    // B is rotated 90 deg around Z: Rz(90 deg) maps +X -> +Y.
     const Quaternion<double> q_rot90Z = makeQuat(0.0, 0.0, 1.0, M_PI / 2.0);
 
     checkAllOBCOverloads(1.0,
@@ -636,7 +636,7 @@ TEST_F(OBCSimpleTest, NonZLocalAxis_Separated)
 
 // =================================================================================================
 // Random consistency test: generate 100 random configurations and verify all four overloads
-// agree on the result.  No expected boolean is asserted — the test only checks mutual
+// agree on the result.  No expected boolean is asserted -- the test only checks mutual
 // consistency between overloads.  A fixed seed makes failures reproducible.
 // =================================================================================================
 TEST_F(OBCSimpleTest, RandomConfigs_AllOverloadsConsistent)

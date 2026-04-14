@@ -27,7 +27,7 @@
 // TODO: Fuse flagActivePairs_Kernel + DeviceSelect::Flagged into a single DeviceSelect::If pass
 //       using an OverlapNegativeSelector predicate. The predicate approach compiles and links
 //       correctly but contacts are not detected (nActive always 0).  Root cause not yet
-//       identified — likely related to ContactInfo device function visibility inside CUB's
+//       identified -- likely related to ContactInfo device function visibility inside CUB's
 //       internally-instantiated kernel. Revisit when upgrading CUDA/CUB version.
 // NOTE: getOverlapDistance() and getSnapshot() are now inlined in ContactInfo.hh so the full
 //       body is visible to CUB's template instantiation in this TU.
@@ -78,7 +78,7 @@ INLINE size_t queryCubSelectIfTempStorageBytes(uint  nPairs,
     @param nPairs          total number of pairs
     @param activeIdxDev    device array with capacity >= nPairs to receive active indices
     @param mappedCountDev  mapped-pinned device alias (getDeviceData()) to receive the count;
-                           CUB writes here directly into pinned host memory — no cudaMemcpy needed
+                           CUB writes here directly into pinned host memory -- no cudaMemcpy needed
     @param tempStorage     preallocated CUB temporary storage
     @param tempStorageBytes size of tempStorage in bytes
     @param mappedCountHost mapped-pinned host pointer (getData()) read after synchronize

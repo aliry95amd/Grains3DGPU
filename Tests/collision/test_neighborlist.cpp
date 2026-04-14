@@ -247,7 +247,7 @@ TEST_F(NeighborListSimpleTest, NSQ_GPU_KnownGroundTruth)
 }
 
 // ------------------------------------------------------------------------------------------------
-// Test 3: LinkedCell CPU (HOST) — large cell covering whole domain -> all 10 pairs found.
+// Test 3: LinkedCell CPU (HOST) -- large cell covering whole domain -> all 10 pairs found.
 // ------------------------------------------------------------------------------------------------
 TEST_F(NeighborListSimpleTest, LinkedCell_HOST_KnownGroundTruth)
 {
@@ -272,7 +272,7 @@ TEST_F(NeighborListSimpleTest, LinkedCell_HOST_KnownGroundTruth)
 }
 
 // ------------------------------------------------------------------------------------------------
-// Test 4: LinkedCell SORTBASED GPU — large cell -> all 10 pairs found.
+// Test 4: LinkedCell SORTBASED GPU -- large cell -> all 10 pairs found.
 // ------------------------------------------------------------------------------------------------
 TEST_F(NeighborListSimpleTest, LinkedCell_SortBased_GPU_KnownGroundTruth)
 {
@@ -298,7 +298,7 @@ TEST_F(NeighborListSimpleTest, LinkedCell_SortBased_GPU_KnownGroundTruth)
 }
 
 // ------------------------------------------------------------------------------------------------
-// Test 5: LinkedCell ATOMIC GPU — large cell -> all 10 pairs found.
+// Test 5: LinkedCell ATOMIC GPU -- large cell -> all 10 pairs found.
 // ------------------------------------------------------------------------------------------------
 TEST_F(NeighborListSimpleTest, LinkedCell_Atomic_GPU_KnownGroundTruth)
 {
@@ -323,7 +323,7 @@ TEST_F(NeighborListSimpleTest, LinkedCell_Atomic_GPU_KnownGroundTruth)
 }
 
 // ------------------------------------------------------------------------------------------------
-// Test 6: LinkedCell ATOMICFIXED GPU — large cell -> all 10 pairs found.
+// Test 6: LinkedCell ATOMICFIXED GPU -- large cell -> all 10 pairs found.
 // ------------------------------------------------------------------------------------------------
 TEST_F(NeighborListSimpleTest, LinkedCell_AtomicFixed_GPU_KnownGroundTruth)
 {
@@ -548,7 +548,7 @@ TEST_F(NeighborListSpatialFilterTest, NSQ_GPU_ReturnsAllPairs)
 }
 
 // ------------------------------------------------------------------------------------------------
-// Test 10: LinkedCell HOST — spatially filtered to only 6 within-cluster pairs.
+// Test 10: LinkedCell HOST -- spatially filtered to only 6 within-cluster pairs.
 //          Explicitly verifies that all 9 cross-cluster pairs are absent.
 // ------------------------------------------------------------------------------------------------
 TEST_F(NeighborListSpatialFilterTest, LinkedCell_HOST_SpatialFilter_KnownPairs)
@@ -623,7 +623,7 @@ TEST_F(NeighborListSpatialFilterTest, AllLinkedCell_GPU_SpatialFilter_KnownPairs
 //  --------------------------------------
 //  A 4x4x4 = 64-particle uniform grid with 1.0 spacing.
 //  The LinkedCell uses a single large cell (cellSize=20) so ALL particles are in the same
-//  cell neighbourhood — both NSQ and every LinkedCell variant must return the same
+//  cell neighbourhood -- both NSQ and every LinkedCell variant must return the same
 //  C(64,2) = 2016 pairs, verifying cross-algorithm consistency at a larger scale.
 // ================================================================================================
 class NeighborListConsistencyTest : public ::testing::Test
@@ -779,7 +779,7 @@ TEST_F(NeighborListConsistencyTest, AllAlgorithms_Return_Same_Pairs)
 //  FIXTURE: NeighborListBruteForceTest  (preserved from original, fixed)
 //  -----------------------------------------------------------------------
 //  8 particles in a 2x2x2 grid.  Verifies NSQ and LinkedCell CPU vs GPU.
-//  The original loop covered only 2 of 3 GPU LinkedCell variants — now all 3 are tested.
+//  The original loop covered only 2 of 3 GPU LinkedCell variants -- now all 3 are tested.
 // ================================================================================================
 class NeighborListBruteForceTest : public ::testing::Test
 {
@@ -1054,7 +1054,7 @@ protected:
 };
 
 // ------------------------------------------------------------------------------------------------
-// Test 15: Raw pair buffer validity — no self-pairs, no duplicates, valid indices for all
+// Test 15: Raw pair buffer validity -- no self-pairs, no duplicates, valid indices for all
 //          6 CPU/GPU algorithm variants.
 // ------------------------------------------------------------------------------------------------
 TEST_F(NeighborListPairValidityTest, AllAlgorithms_RawPairBuffer_Valid)
@@ -1120,14 +1120,14 @@ TEST_F(NeighborListPairValidityTest, AllAlgorithms_RawPairBuffer_Valid)
 // ================================================================================================
 //  FIXTURE: NeighborListLargeScaleTest
 //  -------------------------------------
-//  8×8×8 = 512 particles on a uniform grid, spacing 1.0.
+//  8x8x8 = 512 particles on a uniform grid, spacing 1.0.
 //  Particles occupy (0..7, 0..7, 0..7).  Two LinkedCell configs are used:
 //
-//  (A) ONE BIG CELL (cellSize=20) — every particle sees every other particle.
+//  (A) ONE BIG CELL (cellSize=20) -- every particle sees every other particle.
 //      -> All 6 algorithms must agree on exactly C(512,2) = 130,816 pairs.
 //
-//  (B) REALISTIC CELLS (cellSize=2.0) — domain [-0.5,7.5]^3 -> 4 cells per axis.
-//      Each cell holds a 2×2×2=8-particle sub-cube; adjacent cells share a face/edge/corner.
+//  (B) REALISTIC CELLS (cellSize=2.0) -- domain [-0.5,7.5]^3 -> 4 cells per axis.
+//      Each cell holds a 2x2x2=8-particle sub-cube; adjacent cells share a face/edge/corner.
 //      -> All LinkedCell variants (CPU+GPU) must agree on the same pair set.
 //      -> NSQ returns strictly MORE pairs (it has no spatial filter), confirming LC IS filtering.
 //      -> Pair validity (no self-pairs, no duplicates, valid indices) is checked for all variants.
@@ -1186,19 +1186,19 @@ protected:
         lcParamsLarge.cellSizeFactor         = 1.0;
         lcParamsLarge.maxNumCellsPerObstacle = 8;
         lcParamsLarge.maxParticlesPerCell    = 512;
-        // Must pre-allocate enough: C(512,2)=130816 -> 130816/512 ≈ 256 pairs/particle minimum
+        // Must pre-allocate enough: C(512,2)=130816 -> 130816/512 ~ 256 pairs/particle minimum
         lcParamsLarge.initialNumberOfPairsPerParticle = 512;
         lcParamsLarge.updateFrequency                 = 0;
         lcParamsLarge.sortFrequency                   = 0;
 
-        // (B) Realistic config: domain [-0.5,7.5]^3 -> cellSize=2.0 -> 4×4×4 cells
-        //     Each cell contains 2×2×2=8 particles; 27-cell stencil neighbourhood
+        // (B) Realistic config: domain [-0.5,7.5]^3 -> cellSize=2.0 -> 4x4x4 cells
+        //     Each cell contains 2x2x2=8 particles; 27-cell stencil neighbourhood
         lcParamsRealist.minCorner              = Vector3<double>(-0.5, -0.5, -0.5);
         lcParamsRealist.maxCorner              = Vector3<double>(7.5, 7.5, 7.5);
         lcParamsRealist.minCellSize            = 2.0;
         lcParamsRealist.cellSizeFactor         = 1.0;
         lcParamsRealist.maxNumCellsPerObstacle = 8;
-        // 27 cells × 8 particles/cell = 216 potential neighbors per particle
+        // 27 cells x 8 particles/cell = 216 potential neighbors per particle
         lcParamsRealist.maxParticlesPerCell             = 16;
         lcParamsRealist.initialNumberOfPairsPerParticle = 128;
         lcParamsRealist.updateFrequency                 = 0;
@@ -1212,7 +1212,7 @@ protected:
 };
 
 // ------------------------------------------------------------------------------------------------
-// Test 16: 512 particles, one big cell — all 6 algorithms agree on exactly 130,816 pairs.
+// Test 16: 512 particles, one big cell -- all 6 algorithms agree on exactly 130,816 pairs.
 // ------------------------------------------------------------------------------------------------
 TEST_F(NeighborListLargeScaleTest, LargeCell_AllAlgorithms_Agree_On_130816_Pairs)
 {
@@ -1298,7 +1298,7 @@ TEST_F(NeighborListLargeScaleTest, LargeCell_AllAlgorithms_Agree_On_130816_Pairs
 }
 
 // ------------------------------------------------------------------------------------------------
-// Test 17: 512 particles, realistic cell size (2.0) — all LinkedCell variants agree pairwise
+// Test 17: 512 particles, realistic cell size (2.0) -- all LinkedCell variants agree pairwise
 //          and NSQ returns strictly more pairs than LinkedCell (spatial filtering is active).
 // ------------------------------------------------------------------------------------------------
 TEST_F(NeighborListLargeScaleTest, RealisticCells_AllLinkedCell_Agree_NSQ_Larger)
@@ -1363,7 +1363,7 @@ TEST_F(NeighborListLargeScaleTest, RealisticCells_AllLinkedCell_Agree_NSQ_Larger
 }
 
 // ------------------------------------------------------------------------------------------------
-// Test 18: 512 particles, realistic cells — raw pair buffer validity for all algorithms.
+// Test 18: 512 particles, realistic cells -- raw pair buffer validity for all algorithms.
 //          Checks no self-pairs, no duplicate pairs, all indices in [0, 512).
 // ------------------------------------------------------------------------------------------------
 TEST_F(NeighborListLargeScaleTest, RealisticCells_RawPairBuffer_Valid)
@@ -1429,7 +1429,7 @@ TEST_F(NeighborListLargeScaleTest, RealisticCells_RawPairBuffer_Valid)
 }
 
 // ------------------------------------------------------------------------------------------------
-// Test 19: 512 particles, realistic cells — pair count is identical on repeated calls.
+// Test 19: 512 particles, realistic cells -- pair count is identical on repeated calls.
 //          The neighbor list should update only on the first call (updateCount==0); subsequent
 //          calls with the same positions must return the same count without corruption.
 // ------------------------------------------------------------------------------------------------
@@ -1465,7 +1465,7 @@ TEST_F(NeighborListLargeScaleTest, NSQ_PairCount_Equals_NChoose2)
 }
 
 // ------------------------------------------------------------------------------------------------
-// Test 20: 512 particles, realistic cells — ATOMICFIXED pair count matches ATOMIC.
+// Test 20: 512 particles, realistic cells -- ATOMICFIXED pair count matches ATOMIC.
 //          ATOMICFIXED pre-sizes a 2D array; if maxParticlesPerCell is too small it silently
 //          drops pairs.  This test directly compares the two GPU atomic variants.
 // ------------------------------------------------------------------------------------------------
@@ -1500,7 +1500,7 @@ TEST_F(NeighborListLargeScaleTest, RealisticCells_AtomicFixed_Matches_Atomic)
         << "ATOMICFIXED pair count (" << fixed_pairs.size() << ") differs from ATOMIC ("
         << atomic_pairs.size() << "); maxParticlesPerCell may be too small";
     EXPECT_EQ(fixed_pairs, atomic_pairs)
-        << "ATOMICFIXED and ATOMIC pair sets differ — likely a capacity overflow in ATOMICFIXED";
+        << "ATOMICFIXED and ATOMIC pair sets differ -- likely a capacity overflow in ATOMICFIXED";
     cudaDeviceSynchronize();
 }
 
@@ -1510,7 +1510,7 @@ TEST_F(NeighborListLargeScaleTest, RealisticCells_AtomicFixed_Matches_Atomic)
 //  Random positions matching the benchmark scenario:
 //    - Domain  : [0, 1.6]^3 (sphere AR=1, N=512 benchmark: dom_mul=32, R=0.05)
 //    - CellSize: 0.1 (= 2*R for sphere radius 0.05)
-//    - Grid    : 16×16×16 = 4096 cells
+//    - Grid    : 16x16x16 = 4096 cells
 //    - N       : 32 and 128 particles
 //    - Seed    : 42 (fixed for reproducibility)
 //
@@ -1596,21 +1596,21 @@ protected:
     void TearDown() override
     {
         GrainsParameters<double>::m_simulationState.neighborListUpdateCount = 0;
-        // Note: memory cleanup omitted intentionally – RigidBody owns the Box pointer and
+        // Note: memory cleanup omitted intentionally -- RigidBody owns the Box pointer and
         // frees it in its destructor; deleting sharedBox here causes a double-free/crash.
         // (Consistent with all other fixtures in this file.)
     }
 };
 
 // ------------------------------------------------------------------------------------------------
-// Test 21: N=32 random positions — all algorithms agree on the exact same pair set.
+// Test 21: N=32 random positions -- all algorithms agree on the exact same pair set.
 //          The LC HOST pair set is the reference (same as NSQ restricted to 1-cell neighborhood).
 // ------------------------------------------------------------------------------------------------
 TEST_F(NeighborListRandomPositionTest, N32_AllAlgorithms_Agree)
 {
     using GP = GrainsParameters<double>;
 
-    // Run NSQ CPU (ground truth – finds ALL pairs regardless of distance)
+    // Run NSQ CPU (ground truth -- finds ALL pairs regardless of distance)
     resetNLCounter();
     GP::m_collisionDetection.neighborListType = NeighborListType::NSQ;
     auto    NL_nsq_cpu    = NeighborListFactory<double, MemType::HOST>::create(&rb_cpu,
@@ -1670,7 +1670,7 @@ TEST_F(NeighborListRandomPositionTest, N32_AllAlgorithms_Agree)
 }
 
 // ------------------------------------------------------------------------------------------------
-// Test 22: N=128 random positions — all LC algorithms agree (larger sparse case).
+// Test 22: N=128 random positions -- all LC algorithms agree (larger sparse case).
 // ------------------------------------------------------------------------------------------------
 TEST_F(NeighborListRandomPositionTest, N128_AllLinkedCell_Agree)
 {

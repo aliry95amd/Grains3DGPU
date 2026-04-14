@@ -53,7 +53,7 @@ __GLOBAL__ void moveParticles_Kernel(const TimeIntegrator<T>* const* TI,
         return;
 
     const uint cID = nObstacles + pID;
-    // Skip non-master sub-bodies — their positions are set by updateSubBodyPositions_Kernel
+    // Skip non-master sub-bodies -- their positions are set by updateSubBodyPositions_Kernel
     if(isSubBody(bodyTag[cID]) && getSubBodyLocalIdx(bodyTag[cID]) != 0u)
         return;
 
@@ -87,7 +87,7 @@ __GLOBAL__ void advanceVelocity_Kernel(const TimeIntegrator<T>* const* TI,
         return;
 
     const uint cID = nObstacles + pID;
-    // Skip non-master sub-bodies — they are slaved to their composite master
+    // Skip non-master sub-bodies -- they are slaved to their composite master
     if(isSubBody(bodyTag[cID]) && getSubBodyLocalIdx(bodyTag[cID]) != 0u)
         return;
 

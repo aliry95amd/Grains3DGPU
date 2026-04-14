@@ -34,7 +34,7 @@ cp -a "${CASE_DIR}/." "${RUN_DIR}/"
 REL_XML="${INPUT_XML#${CASE_DIR}/}"
 
 echo "========================================"
-echo "GRAINS3D-GPU — SLURM Job ${SLURM_JOB_ID}"
+echo "GRAINS3D-GPU -- SLURM Job ${SLURM_JOB_ID}"
 echo "========================================"
 echo "Date       : $(date)"
 echo "Node       : ${SLURM_NODELIST}"

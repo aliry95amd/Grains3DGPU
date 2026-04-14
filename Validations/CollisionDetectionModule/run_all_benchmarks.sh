@@ -1,7 +1,7 @@
 
 #!/bin/bash
 
-# Simple Cartesian-product benchmark: vary N × shape × aspect ratio
+# Simple Cartesian-product benchmark: vary N x shape x aspect ratio
 set -e
 
 BIN="./build/CDModuleBenchmark"

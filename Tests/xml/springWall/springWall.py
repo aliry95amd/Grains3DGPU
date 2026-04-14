@@ -15,14 +15,14 @@ plt.rcParams.update({"text.usetex": True, "font.family": "Helvetica"})
 # Physical parameters (must match the YAML)
 # ---------------------------------------------------------------------------
 R    = 0.1     # sphere radius              [m]
-RHO  = 1000.0  # sphere density             [kg/m³]
+RHO  = 1000.0  # sphere density             [kg/m^3]
 KN   = 5.0e4   # normal spring stiffness    [N/m]
 V0   = -1.0    # initial velocity (toward wall) [m/s]
-G    = 9.81    # gravitational acceleration [m/s²]
-T_END = 0.25   # simulation end time — one bounce only, avoids phase-drift saturation [s]
+G    = 9.81    # gravitational acceleration [m/s^2]
+T_END = 0.25   # simulation end time -- one bounce only, avoids phase-drift saturation [s]
 
-_MASS  = RHO * (4.0 / 3.0) * np.pi * R ** 3   # ≈ 4.1888 kg
-OMEGA  = np.sqrt(KN / _MASS)                   # ≈ 109.25 rad/s
+_MASS  = RHO * (4.0 / 3.0) * np.pi * R ** 3   # ~ 4.1888 kg
+OMEGA  = np.sqrt(KN / _MASS)                   # ~ 109.25 rad/s
 _Z_EQ  = R - _MASS * G / KN                    # shifted equilibrium z during contact
 
 def _z_contact(t):
@@ -32,9 +32,9 @@ def _zdot_contact(t):
     return -(R - _Z_EQ) * OMEGA * np.sin(OMEGA * t) + V0 * np.cos(OMEGA * t)
 
 T_C    = brentq(lambda t: _z_contact(t) - R, 0.5 * np.pi / OMEGA, 1.9 * np.pi / OMEGA)
-_V1    = _zdot_contact(T_C)                    # departure velocity ≈ +|V0| (en=1)
-T_FLT  = 2.0 * abs(_V1) / G                   # free-flight duration ≈ 0.2039 s
-T_PER  = T_C + T_FLT                           # full bounce period   ≈ 0.234 s
+_V1    = _zdot_contact(T_C)                    # departure velocity ~ +|V0| (en=1)
+T_FLT  = 2.0 * abs(_V1) / G                   # free-flight duration ~ 0.2039 s
+T_PER  = T_C + T_FLT                           # full bounce period   ~ 0.234 s
 
 DT_VALUES = [1e-3, 1e-4, 1e-5, 1e-6]
 DT_LABELS = ["dt1e-3", "dt1e-4", "dt1e-5", "dt1e-6"]
@@ -111,10 +111,10 @@ def plot_trajectory(results_root: str, plots_root: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Convergence plot  (L∞ error vs Δt)
+# Convergence plot  (Linf error vs dt)
 # ---------------------------------------------------------------------------
 def plot_convergence(results_root: str, plots_root: str) -> None:
-    """Log-log L∞ position error vs dt for both integrators."""
+    """Log-log Linf position error vs dt for both integrators."""
     fig, ax = plt.subplots(figsize=(5, 5))
 
     dt_arr = np.array(DT_VALUES)
@@ -186,9 +186,9 @@ def main() -> None:
 
     print(f"Spring-wall parameters (with gravity):")
     print(f"  r      = {R} m")
-    print(f"  rho    = {RHO} kg/m³  =>  m = {_MASS:.5f} kg")
+    print(f"  rho    = {RHO} kg/m^3  =>  m = {_MASS:.5f} kg")
     print(f"  kn     = {KN:.1e} N/m  =>  omega = {OMEGA:.4f} rad/s")
-    print(f"  g      = {G} m/s²")
+    print(f"  g      = {G} m/s^2")
     print(f"  z_eq   = {_Z_EQ:.6f} m  (shifted equilibrium during contact)")
     print(f"  T_c    = {T_C*1e3:.3f} ms  (contact duration, numerical)")
     print(f"  V1     = {_V1:.6f} m/s  (departure speed)")

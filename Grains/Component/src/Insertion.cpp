@@ -359,7 +359,7 @@ __HOST__ void Insertion<T>::insert(const GrainsMemBuffer<RigidBody<T>*>* rigidBo
             const uint insertID = i + numObstacles;
 
             // Slave sub-bodies are positioned by updateSubBodyPositions() after the master is
-            // placed — skip them here to avoid consuming insertion data for non-master slots
+            // placed -- skip them here to avoid consuming insertion data for non-master slots
             if(isSubBody(bodyTag[insertID]) && getSubBodyLocalIdx(bodyTag[insertID]) > 0u)
                 continue;
 

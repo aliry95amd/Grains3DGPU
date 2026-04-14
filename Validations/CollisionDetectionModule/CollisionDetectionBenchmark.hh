@@ -79,7 +79,7 @@ class BenchmarkRunner
 {
 public:
     // -------------------------------------------------------------------------
-    /** @brief Constructor – allocates particle data, inserts them, and builds the CDM.
+    /** @brief Constructor -- allocates particle data, inserts them, and builds the CDM.
         @param scenario  Full benchmark configuration
         @param csv       CSV writer to append the result row to */
     BenchmarkRunner(const BenchmarkScenario& scenario, CSVWriter& csv)
@@ -92,7 +92,7 @@ public:
     }
 
     // -------------------------------------------------------------------------
-    /** @brief Constructor – reuses pre-inserted host particle data, skipping insertion.
+    /** @brief Constructor -- reuses pre-inserted host particle data, skipping insertion.
         Used for HOST (CPU) runners where no device data is needed.
         @param scenario  Full benchmark configuration
         @param csv       CSV writer to append the result row to
@@ -116,7 +116,7 @@ public:
     }
 
     // -------------------------------------------------------------------------
-    /** @brief Constructor – reuses pre-inserted host particle data AND the shared device RB
+    /** @brief Constructor -- reuses pre-inserted host particle data AND the shared device RB
         pointer array, skipping both insertion and copyHostToDevice.
         The device RigidBody objects are owned by dpd and must outlive this runner.
         @param scenario  Full benchmark configuration
@@ -582,7 +582,7 @@ private:
         const auto cdp = buildCDParams();
 
         // Allocate a new pointer array and copy device-side pointers from the shared buffer.
-        // The pointed-to RigidBody objects are NOT duplicated – only the pointer values are copied.
+        // The pointed-to RigidBody objects are NOT duplicated -- only the pointer values are copied.
         m_rb.initialize(N);
         cudaErrCheck(cudaMemcpy(m_rb.getData(),
                                 dpd.rb.getData(),

@@ -79,7 +79,7 @@ public:
     /** @brief Default constructor (forbidden) */
     CollisionDetectionModule() = delete;
 
-    /** @brief Constructor — builds the NeighborList internally.
+    /** @brief Constructor -- builds the NeighborList internally.
         @param rigidBody    Pointer to the rigid body buffer
         @param positions    Position buffer (used for initial cell assignment)
         @param orientations Quaternion buffer

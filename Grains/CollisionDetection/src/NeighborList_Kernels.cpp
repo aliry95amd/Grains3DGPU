@@ -116,7 +116,7 @@ __HOST__ void updateNeighborList_LC_Host(const uint*                            
                     }
                     else
                     {
-                        // Cross-cell: always emit – uniqueness is guaranteed by targetCell > c
+                        // Cross-cell: always emit -- uniqueness is guaranteed by targetCell > c
                         const uint lo
                             = primaryParticle < otherParticle ? primaryParticle : otherParticle;
                         const uint hi

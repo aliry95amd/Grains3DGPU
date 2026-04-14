@@ -17,7 +17,7 @@ plt.rcParams.update({"text.usetex": True, "font.family": "Helvetica"})
 
 # ---------------------------------------------------------------------------
 # Style map: all subplots share the same colour.  #2282A4 is used for both
-# the line/markers and (with transparency) the ±1 std shaded band.
+# the line/markers and (with transparency) the +/-1 std shaded band.
 _LINE_COLOR  = "tab:blue"
 _SHADE_COLOR = "tab:blue"
 

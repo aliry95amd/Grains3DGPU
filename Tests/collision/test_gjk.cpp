@@ -300,7 +300,7 @@ TEST_F(GJKTest, QuaternionRotationTests)
 {
     Vector3<double> overlapping_pos(0.5, 0.0, 0.0);
 
-    double angles[] = {0.0, M_PI / 12.0, M_PI / 8.0, M_PI / 6.0};  // 0°, 15°, 22.5°, 30°
+    double angles[] = {0.0, M_PI / 12.0, M_PI / 8.0, M_PI / 6.0};  // 0 deg, 15 deg, 22.5 deg, 30 deg
 
     for(double angle : angles)
     {
@@ -855,8 +855,8 @@ static void checkAllGJKIntersectOverloads(const Convex<double>&     a,
     avoided: for degenerate configurations (e.g. parallel face-to-face boxes)
     GJK may return any valid witness on the closest feature, and overloads that
     receive pre-computed relative transforms vs. absolute world transforms start
-    the search in opposite directions, converging to different — but equally
-    valid — corners of the same face.
+    the search in opposite directions, converging to different -- but equally
+    valid -- corners of the same face.
 
     @param distEPS  Tolerance for distance / segment-length comparison */
 static void checkAllGJKClosestPointsOverloads(const Convex<double>&     a,
@@ -1015,7 +1015,7 @@ TEST_F(GJKOverloadConsistencyTest, IntersectOverloads_BoxBox_Separated)
 
 TEST_F(GJKOverloadConsistencyTest, IntersectOverloads_BoxBox_Rotated_Overlapping)
 {
-    // A rotated 45° around Z, B displaced 0.5 in X, rotated 90° around Y
+    // A rotated 45 deg around Z, B displaced 0.5 in X, rotated 90 deg around Y
     checkAllGJKIntersectOverloads(*boxA,
                                   *boxB,
                                   Vector3<double>(0.0, 0.0, 0.0),
@@ -1129,7 +1129,7 @@ TEST_F(GJKOverloadConsistencyTest, ClosestPoints_BoxBox_IdentityOrientation)
 
 TEST_F(GJKOverloadConsistencyTest, ClosestPoints_BoxBox_Rotated)
 {
-    // Box A identity at origin, box B rotated 90°Y, center at (4, 0, 0)
+    // Box A identity at origin, box B rotated 90 degY, center at (4, 0, 0)
     checkAllGJKClosestPointsOverloads(*boxA,
                                       *boxB,
                                       Vector3<double>(0.0, 0.0, 0.0),

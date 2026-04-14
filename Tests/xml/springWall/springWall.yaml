@@ -5,21 +5,21 @@
 #
 # Initial position: sphere centre at Z = r = 0.1 m (just touching the wall face at Z = 0).
 # Initial velocity: V0 = -1.0 m/s (moving toward wall).
-# Gravity         : GZ = -9.81 m/s²
+# Gravity         : GZ = -9.81 m/s^2
 #
 # Analytical solution per cycle:
 #   z_eq   = r - m*g/kn                (shifted equilibrium during contact)
 #   T_c    = 2*arctan(|V0|*omega/g) / omega
-#   Contact (0 ≤ t ≤ T_c):
+#   Contact (0 <= t <= T_c):
 #     z(t) = z_eq + (m*g/kn)*cos(omega*t) + (V0/omega)*sin(omega*t)
 #   Free    (t > T_c, tau = t - T_c):
 #     z(t) = r + |V0|*tau - g/2*tau^2
-# Period: T = T_c + 2*|V0|/g ≈ 0.231 s
-# where r = 0.1 m, V0 = -1.0 m/s, kn = 5e4 N/m, g = 9.81 m/s².
+# Period: T = T_c + 2*|V0|/g ~ 0.231 s
+# where r = 0.1 m, V0 = -1.0 m/s, kn = 5e4 N/m, g = 9.81 m/s^2.
 #
 # Test matrix (8 cases total):
-#   · 4 timesteps  : dt = 1e-3, 1e-4, 1e-5, 1e-6 s
-#   · 2 integrators: FirstOrderExplicit, SecondOrderLeapFrog
+#   - 4 timesteps  : dt = 1e-3, 1e-4, 1e-5, 1e-6 s
+#   - 2 integrators: FirstOrderExplicit, SecondOrderLeapFrog
 
 _sphere_template: &sphere_particle
   Density: 1000
@@ -101,7 +101,7 @@ Constant:
     OutputPrecision: 15
 
 Fork:
-  # ─── FirstOrderExplicit ────────────────────────────────────────────────────
+  # --- FirstOrderExplicit ----------------------------------------------------
   - name: dt1e-3_FirstOrder
     overrides:
       Temporal:
@@ -144,7 +144,7 @@ Fork:
             Directory: ./results/springWall
             RootName: springWall_dt1e-5_FirstOrder
 
-  # ─── SecondOrderLeapFrog ───────────────────────────────────────────────────
+  # --- SecondOrderLeapFrog ---------------------------------------------------
   - name: dt1e-3_SecondOrder
     overrides:
       Temporal:

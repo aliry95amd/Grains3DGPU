@@ -46,7 +46,7 @@ __HOSTDEVICE__ static INLINE void solveQuarticOBC(T b, T c, T d, T e, T sol[4], 
 
     if(fabs(q) < EPS<T>)
     {
-        // Reduce to biquadratic: solve y^2 = (-p ± sqrt(p^2/4 - r))
+        // Reduce to biquadratic: solve y^2 = (-p +/- sqrt(p^2/4 - r))
         const T del = p2 / T(4) - r;
         if(del < T(0))
             return;

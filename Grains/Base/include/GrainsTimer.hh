@@ -52,7 +52,7 @@ enum class FMStage : uint8_t
 // =================================================================================================
 /** @brief Wall-clock timer for the main simulation-loop stages.
 
-        Call enable(isGPU) once at setup — the timer records whether it is running on the GPU and
+        Call enable(isGPU) once at setup -- the timer records whether it is running on the GPU and
         issues cudaDeviceSynchronize() inside stop() only when needed.  When disabled,
         start()/stop() are single always-false predicted branches with no clock calls.
 

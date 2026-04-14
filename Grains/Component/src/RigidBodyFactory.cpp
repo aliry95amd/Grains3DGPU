@@ -209,7 +209,7 @@ __HOST__ void RigidBodyFactory<T>::create(DOMNode*         obstacles,
             }
             else
             {
-                // Composite particle — collect and sort sub-bodies by LocalIdx
+                // Composite particle -- collect and sort sub-bodies by LocalIdx
                 DOMNodeList* allChildren = ReaderXML::getNodes(nParticle);
                 uint         numChildren = allChildren ? allChildren->getLength() : 0;
                 std::vector<std::pair<uint, DOMNode*>> sortedSubs;

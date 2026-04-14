@@ -14,19 +14,19 @@ plt.rcParams.update({"text.usetex": True, "font.family": "Helvetica", "font.size
 # Physical parameters (must match the YAML)
 # ---------------------------------------------------------------------------
 R      = 0.1       # sphere radius               [m]
-RHO    = 1000.0    # sphere density              [kg/m³]
+RHO    = 1000.0    # sphere density              [kg/m^3]
 KN     = 5.0e4     # normal spring stiffness     [N/m]
 V0     = -1.0      # initial velocity of sphere 1 [m/s]
 V2I    = 0.0       # initial velocity of sphere 2 [m/s]
-G      = -9.81     # gravitational acceleration  [m/s²]
+G      = -9.81     # gravitational acceleration  [m/s^2]
 T_END  = 0.3       # simulation end time          [s]
 
 Z1_INIT = 0.4      # initial z of sphere 1
 Z2_INIT = 0.0      # initial z of sphere 2
 
-M     = RHO * (4.0 / 3.0) * np.pi * R ** 3   # ≈ 4.18879 kg
-OMEGA = np.sqrt(2.0 * KN / M)                 # relative-motion angular freq ≈ 154.53 rad/s
-T_C   = np.pi / OMEGA                         # contact duration ≈ 0.0203 s
+M     = RHO * (4.0 / 3.0) * np.pi * R ** 3   # ~ 4.18879 kg
+OMEGA = np.sqrt(2.0 * KN / M)                 # relative-motion angular freq ~ 154.53 rad/s
+T_C   = np.pi / OMEGA                         # contact duration ~ 0.0203 s
 
 T0    = (Z1_INIT - Z2_INIT - 2.0 * R) / (V2I - V0)
 
@@ -148,7 +148,7 @@ def plot_trajectory(results_root: str, plots_root: str) -> None:
 
 # ---------------------------------------------------------------------------
 def plot_convergence(results_root: str, plots_root: str) -> None:
-    """Log-log L∞ position error vs dt for both integrators."""
+    """Log-log Linf position error vs dt for both integrators."""
     fig, ax = plt.subplots(figsize=(5, 5))
     dt_arr = np.array(DT_VALUES)
     first_errors: dict = {}
@@ -207,11 +207,11 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    print("Colliding Spheres Convergence – physical parameters:")
+    print("Colliding Spheres Convergence -- physical parameters:")
     print(f"  R         = {R} m")
-    print(f"  rho       = {RHO} kg/m³  =>  m = {M:.5f} kg")
+    print(f"  rho       = {RHO} kg/m^3  =>  m = {M:.5f} kg")
     print(f"  kn        = {KN:.1e} N/m  =>  omega = {OMEGA:.4f} rad/s")
-    print(f"  g         = {G} m/s²")
+    print(f"  g         = {G} m/s^2")
     print(f"  V0        = {V0} m/s  (initial velocity of sphere 1)")
     print(f"  t0        = {T0:.4f} s   (free-approach duration until contact)")
     print(f"  v1(t0)    = {V1_AT_T0:.4f} m/s  (sphere 1 velocity at contact)")

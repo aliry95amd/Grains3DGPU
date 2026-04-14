@@ -157,22 +157,22 @@ public:
         Concurrent execution strategy using CUDA streams:
 
         Timeline (adaptive skin mode):
-        ┌─────────────────────────────────────────────────────────────────────────┐
-        │ Default Stream: resizeCells_Device -> cudaMemcpyAsync (D2H) -> [event]    │
-        └──────────────────────────────────────┬──────────────────────────────────┘
-                                               │ (resize complete event)
-                                               │
-        ┌──────────────────────────────────────▼──────────────────────────────────┐
-        │ Stream 1: [wait event] -> memset(neighbors) -> generateNeighborCells      │
-        └─────────────────────────────────────────────────────────────────────────┘
+        +-------------------------------------------------------------------------+
+        \| Default Stream: resizeCells_Device -> cudaMemcpyAsync (D2H) -> [event]    \|
+        +--------------------------------------+----------------------------------+
+                                               \| (resize complete event)
+                                               \|
+        +--------------------------------------v----------------------------------+
+        \| Stream 1: [wait event] -> memset(neighbors) -> generateNeighborCells      \|
+        +-------------------------------------------------------------------------+
 
-        ┌─────────────────────────────────────────────────────────────────────────┐
-        │ Stream 0: cudaMemcpyAsync (old positions, D2D) [independent]            │
-        └─────────────────────────────────────────────────────────────────────────┘
+        +-------------------------------------------------------------------------+
+        \| Stream 0: cudaMemcpyAsync (old positions, D2D) [independent]            \|
+        +-------------------------------------------------------------------------+
 
-        ┌─────────────────────────────────────────────────────────────────────────┐
-        │ Stream 2: memset(particleCounts) -> computeCellParticleIDs               │
-        └─────────────────────────────────────────────────────────────────────────┘
+        +-------------------------------------------------------------------------+
+        \| Stream 2: memset(particleCounts) -> computeCellParticleIDs               \|
+        +-------------------------------------------------------------------------+
 
         Dependencies:
         - Stream 1 waits for resize completion (cudaStreamWaitEvent)
@@ -233,7 +233,7 @@ public:
             // Non-adaptive: cell geometry is fixed, no need to regenerate neighbor cells.
             // Explicitly synchronize the null stream before launching on non-null streams to
             // ensure any prior default-stream work (GJK kernels, timer syncs, etc.) has
-            // completed — this mirrors the cudaStreamSynchronize(0) that the adaptive path
+            // completed -- this mirrors the cudaStreamSynchronize(0) that the adaptive path
             // performs inside the resize block above.
             cudaStreamSynchronize(0);
         }

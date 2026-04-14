@@ -194,7 +194,7 @@ __HOSTDEVICE__ static INLINE void computeContactForces_common(const ContactForce
             historyPtr = &(contactMemory.m_historyData[historyIndex]);
         }
 
-        // Reset intermediate torces before accumulating — these per-pair slots are never
+        // Reset intermediate torces before accumulating -- these per-pair slots are never
         // cleared between timesteps, and computeForces uses addForce (accumulates).
         torceA[pairID].reset();
         torceB[pairID].reset();

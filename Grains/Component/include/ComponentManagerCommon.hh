@@ -85,7 +85,7 @@ __HOSTDEVICE__ static INLINE void advanceVelocity_common(const TimeIntegrator<T>
                                                          const uint                      cID)
 {
     const RigidBody<T>* rb = rigidBody[cID];
-    // Compute acceleration from forces at x_{n+1} — torce is NOT reset
+    // Compute acceleration from forces at x_{n+1} -- torce is NOT reset
     const Kinematics<T> acceleration
         = rb->computeMomentum(kinematics[cID].getAngularComponent(), torce[cID], quaternion[cID]);
     TI[0]->AdvanceVelocity(acceleration, kinematics[cID]);

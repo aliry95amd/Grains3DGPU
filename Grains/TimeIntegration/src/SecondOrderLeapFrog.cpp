@@ -56,7 +56,7 @@ __HOSTDEVICE__ void SecondOrderLeapFrog<T>::Move(const Kinematics<T>& momentum,
         = velocity.getTranslationalComponent() + half_dt * momentum.getTranslationalComponent();
     // Drift: dx = dt * v_half  (second-order position update)
     transMotion = dt * vHalf;
-    // Store v_{n+1/2} — second half-kick happens later in AdvanceVelocity
+    // Store v_{n+1/2} -- second half-kick happens later in AdvanceVelocity
     velocity.setTranslationalComponent(vHalf);
 
     // -- Rotational --

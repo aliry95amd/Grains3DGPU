@@ -4,23 +4,23 @@
 # The spheres approach, collide, and bounce apart.
 #
 # Physical parameters:
-#   R   = 0.1 m,  rho = 1000 kg/m³  =>  m = rho*(4/3)*pi*R³ ≈ 4.18879 kg
+#   R   = 0.1 m,  rho = 1000 kg/m^3  =>  m = rho*(4/3)*pi*R^3 ~ 4.18879 kg
 #   kn  = 5.0e4 N/m,  en = 1.0 (elastic)
 #
 # Analytical solution (all motion in Z):
-#   Phase 1 – free approach  [0, t0 = 0.2 s]:
+#   Phase 1 -- free approach  [0, t0 = 0.2 s]:
 #     z1(t) = 0.4 + (-1)*t = 0.4 - t,   z2(t) = 0
 #
-#   Phase 2 – contact  [t0, t0 + Tc]:
-#     omega = sqrt(2*kn/m) ≈ 154.53 rad/s,   Tc = pi/omega ≈ 0.0203 s
+#   Phase 2 -- contact  [t0, t0 + Tc]:
+#     omega = sqrt(2*kn/m) ~ 154.53 rad/s,   Tc = pi/omega ~ 0.0203 s
 #     Relative coordinate: x(tau) = (-1/omega)*sin(omega*tau)   [tau = t - t0]
 #     Centre of mass:       z_cm(tau) = 0.1 - 0.5*tau
 #     z1 = z_cm + R + x/2,   z2 = z_cm - R - x/2
 #
-#   Phase 3 – post-contact  [t0 + Tc, Tend = 0.3 s]:
+#   Phase 3 -- post-contact  [t0 + Tc, Tend = 0.3 s]:
 #     Elastic equal-mass collision => sphere 1 stops, sphere 2 takes -1 m/s
-#     z1 = z1_end ≈ 0.1898  (stationary)
-#     z2 = z2_end + (-1)*(t - t0 - Tc)   where z2_end ≈ -0.0102
+#     z1 = z1_end ~ 0.1898  (stationary)
+#     z2 = z2_end + (-1)*(t - t0 - Tc)   where z2_end ~ -0.0102
 #
 # Fork matrix (8 cases):
 #   dt in {1e-3, 1e-4, 1e-5, 1e-6}  x  integrator in {FirstOrderExplicit, SecondOrderLeapFrog}
@@ -90,7 +90,7 @@ Constant:
     OutputPrecision: 15
 
 Fork:
-  # ─── FirstOrderExplicit ────────────────────────────────────────────────────
+  # --- FirstOrderExplicit ----------------------------------------------------
   - name: dt1e-3_FirstOrder
     overrides:
       Temporal:
@@ -147,7 +147,7 @@ Fork:
             Directory: ./results/collidingSpheresConv
             RootName: collidingSpheresConv_dt1e-6_FirstOrder
 
-  # ─── SecondOrderLeapFrog ───────────────────────────────────────────────────
+  # --- SecondOrderLeapFrog ---------------------------------------------------
   - name: dt1e-3_SecondOrder
     overrides:
       Temporal:

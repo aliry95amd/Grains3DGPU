@@ -59,7 +59,7 @@ install-githook:
 
 apply-clang-format:
 	@if ! command -v clang-format >/dev/null 2>&1; then \
-	  echo "clang-format not found — skipping formatting."; \
+	  echo "clang-format not found -- skipping formatting."; \
 	else \
 	  echo "Formatting all source files according to .clang-format ..."; \
 	  find ./Grains/ -name "*.cpp" -o -name "*.hh" | \

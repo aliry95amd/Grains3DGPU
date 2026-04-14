@@ -105,7 +105,7 @@ __HOSTDEVICE__ Vector3<T> Sphere<T>::computeBoundingBox() const
 template <typename T>
 __HOSTDEVICE__ Vector3<T> Sphere<T>::computeBoundingCylinder() const
 {
-    // [radius, halfHeight, axisIndex=Z(2)] — any axis is equivalent for a sphere
+    // [radius, halfHeight, axisIndex=Z(2)] -- any axis is equivalent for a sphere
     return Vector3<T>(m_radius, m_radius, T(2));
 }
 

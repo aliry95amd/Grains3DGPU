@@ -65,7 +65,7 @@ __HOSTDEVICE__ static INLINE auto getPropertiesForContact(const RigidBody<T>& rb
 
 // -------------------------------------------------------------------------------------------------
 /** @brief ShapeData-only variant of getPropertiesForContact. Reads all needed scalar data
-    directly from ShapeData fields — no RigidBody or virtual dispatch required.
+    directly from ShapeData fields -- no RigidBody or virtual dispatch required.
     @param sdA pre-built ShapeData for body A
     @param sdB pre-built ShapeData for body B */
 template <typename T>

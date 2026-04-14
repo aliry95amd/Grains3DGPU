@@ -188,7 +188,7 @@ int main(int argc, char* argv[])
               << "  Superquadric  : " << rSqr << " m\n\n";
 
     // ---- gap sweep (log-uniform) -------------------------------------------
-    // Reference length: rCyl (≈ 0.1)
+    // Reference length: rCyl (~ 0.1)
     // Gap range: [1e-4 * ref, 1e2 * ref]  => 7 decades
     const double refLen = rCyl;
     const int    nGaps  = 140;  // ~20 samples per decade

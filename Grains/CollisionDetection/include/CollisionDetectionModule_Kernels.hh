@@ -221,7 +221,7 @@ __GLOBAL__ void fillBVData_Kernel(BVData<T>*                 bvData,
                                   const uint                 nUniqueShapes);
 
 /** @brief Narrow-phase GJK detection with vtable-free support evaluation via ShapeData.
-    ShapeData indexed by shapeId (via bodyTags) for deduplication — no RigidBody needed.
+    ShapeData indexed by shapeId (via bodyTags) for deduplication -- no RigidBody needed.
     When activePairIndices is non-null each thread resolves its original pair index via the
     indirection table; when null the thread ID maps directly to the pair.
     @param shapeData         Pre-built ShapeData array (shapeId-indexed, size = nUniqueShapes)
@@ -244,7 +244,7 @@ __GLOBAL__ void detectCollisionsComponents_Kernel(const ShapeData<T>*  shapeData
 
 /** @brief Narrow-phase GJK detection with vtable-free support evaluation via ShapeData,
     using absolute world-frame positions and quaternions.
-    ShapeData indexed by shapeId (via bodyTags) for deduplication — no RigidBody needed.
+    ShapeData indexed by shapeId (via bodyTags) for deduplication -- no RigidBody needed.
     When activePairIndices is non-null each thread resolves its original pair index via the
     indirection table; when null the thread ID maps directly to the pair.
     @param shapeData         Pre-built ShapeData array (shapeId-indexed, size = nUniqueShapes)

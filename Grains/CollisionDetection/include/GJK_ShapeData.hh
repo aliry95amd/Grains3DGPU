@@ -252,7 +252,7 @@ __HOSTDEVICE__ Vector3<T>
 // -------------------------------------------------------------------------------------------------
 /** @brief Fills compact ShapeData and BVData tables indexed by shapeId.
     One entry per unique shape prototype (size = nUniqueShapes, NOT nComponents).
-    repSlots[k] is any component slot whose shapeId == k — all slots with the same shapeId
+    repSlots[k] is any component slot whose shapeId == k -- all slots with the same shapeId
     share identical RigidBody* and produce identical entries.
     Must be called on HOST with HOST-resident rigidBodies and repSlots.
     @param sdOut         output ShapeData array (size >= nUniqueShapes)

@@ -81,7 +81,7 @@ public:
     /** @brief Default constructor (forbidden except in derived classes) */
     ComponentManager() = default;
 
-    /** @brief Constructor — fully initialises all component state and creates CDM + ForceModule.
+    /** @brief Constructor -- fully initialises all component state and creates CDM + ForceModule.
         For HOST managers the five HOST buffers are moved (O(1) pointer swap).
         For DEVICE managers they are uploaded via cudaMemcpy.
         @param rigidBody   Pointer to the M-typed rigid body buffer

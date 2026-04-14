@@ -271,7 +271,7 @@ TEST_F(OBBIntersectionTest, JustSeparatedAlongX)
 }
 
 // -------------------------------------------------------------------------------------------------
-// B rotated 90° around Y but placed at same center -> still intersecting.
+// B rotated 90 deg around Y but placed at same center -> still intersecting.
 // Expected: true
 // -------------------------------------------------------------------------------------------------
 TEST_F(OBBIntersectionTest, Rotated90Y_SameCenter)
@@ -283,7 +283,7 @@ TEST_F(OBBIntersectionTest, Rotated90Y_SameCenter)
 }
 
 // -------------------------------------------------------------------------------------------------
-// B rotated 45° around Z and displaced far in X.
+// B rotated 45 deg around Z and displaced far in X.
 // Expected: false
 // -------------------------------------------------------------------------------------------------
 TEST_F(OBBIntersectionTest, Rotated45Z_FarAlong_X)

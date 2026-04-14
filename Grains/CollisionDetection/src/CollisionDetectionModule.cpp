@@ -85,7 +85,7 @@ CollisionDetectionModule<T, M>::CollisionDetectionModule(
     }
     // Always build the compact shape/BV tables so that toggling usePrebuiltShapes at
     // runtime (e.g. across benchmark iterations) never reads an uninitialized m_shapeData.
-    // Cost is O(nUniqueShapes) — dominated by every other init step.
+    // Cost is O(nUniqueShapes) -- dominated by every other init step.
     {
         const uint nComponents = nObstacles + nParticles;
         buildShapeAndBVData(rigidBody->getData(), hostBodyTags, nComponents);
@@ -812,7 +812,7 @@ void CollisionDetectionModule<T, M>::filterPairsBV(
         }
         else
         {
-            // BV is OFF: composite-only filter — relPosition/relQuaternion not used by the
+            // BV is OFF: composite-only filter -- relPosition/relQuaternion not used by the
             // kernel. Prebuilt is identical for OFF, use regular kernel.
             filterPairsBV_Kernel<T, BoundingVolumeType::OFF>
                 <<<numBlocks, numThreads>>>(rigidBodies,

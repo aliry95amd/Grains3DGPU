@@ -10,7 +10,7 @@
 
     This class provides functionalities to manage linked cells for collision detection using a
     pre-sized fixed array approach. Unlike LinkedCell_Atomic which uses dynamic sizing with prefix
-    sums, this variant allocates a fixed 2D array [numCells × maxParticlesPerCell] for direct
+    sums, this variant allocates a fixed 2D array [numCells x maxParticlesPerCell] for direct
     particle insertion.
 
     Best for: Dense/uniform particle distributions where memory overhead is acceptable in exchange
@@ -174,22 +174,22 @@ public:
         Concurrent execution strategy using CUDA streams:
 
         Timeline (adaptive skin mode):
-        ┌─────────────────────────────────────────────────────────────────────────┐
-        │ Default Stream: resizeCells_Device -> cudaMemcpyAsync (D2H) -> [event]    │
-        └──────────────────────────────────────┬──────────────────────────────────┘
-                                               │ (resize complete event)
-                                               │
-        ┌──────────────────────────────────────▼──────────────────────────────────┐
-        │ Stream 1: [wait event] -> memset(neighbors) -> generateNeighborCells      │
-        └─────────────────────────────────────────────────────────────────────────┘
+        +-------------------------------------------------------------------------+
+        \| Default Stream: resizeCells_Device -> cudaMemcpyAsync (D2H) -> [event]    \|
+        +--------------------------------------+----------------------------------+
+                                               \| (resize complete event)
+                                               \|
+        +--------------------------------------v----------------------------------+
+        \| Stream 1: [wait event] -> memset(neighbors) -> generateNeighborCells      \|
+        +-------------------------------------------------------------------------+
 
-        ┌─────────────────────────────────────────────────────────────────────────┐
-        │ Stream 0: cudaMemcpyAsync (old positions, D2D) [independent]            │
-        └─────────────────────────────────────────────────────────────────────────┘
+        +-------------------------------------------------------------------------+
+        \| Stream 0: cudaMemcpyAsync (old positions, D2D) [independent]            \|
+        +-------------------------------------------------------------------------+
 
-        ┌─────────────────────────────────────────────────────────────────────────┐
-        │ Stream 2: memset(particleCounts) -> memset(cellParticles) -> directInsert │
-        └─────────────────────────────────────────────────────────────────────────┘
+        +-------------------------------------------------------------------------+
+        \| Stream 2: memset(particleCounts) -> memset(cellParticles) -> directInsert \|
+        +-------------------------------------------------------------------------+
 
         Dependencies:
         - Stream 1 waits for resize completion (cudaStreamWaitEvent)

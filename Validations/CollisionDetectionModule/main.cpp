@@ -11,7 +11,7 @@
 // Forward declarations
 // =================================================================================================
 
-/** @brief Dispatch to BenchmarkRunner<T, M> for the right precision × platform combo.
+/** @brief Dispatch to BenchmarkRunner<T, M> for the right precision x platform combo.
     Runs the full Cartesian product over all CD-pipeline axes.
     runID is incremented in-place. */
 template <typename T>

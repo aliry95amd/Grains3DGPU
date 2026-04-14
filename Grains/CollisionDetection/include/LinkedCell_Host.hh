@@ -243,7 +243,7 @@ public:
 
         // Collect obstacles: check the candidate's own cell AND all 27 neighboring cells
         // against each obstacle's registered cell list.  The particle-particle search below
-        // uses the same 27-cell radius, so the two searches are now symmetric — without this
+        // uses the same 27-cell radius, so the two searches are now symmetric -- without this
         // a candidate sitting in a cell adjacent to an obstacle boundary would miss the
         // obstacle entirely and get inserted overlapping it.
         const uint2* obstacleIDs         = this->getObstacleIDs();

@@ -321,7 +321,7 @@ private:
                              static_cast<T>(m_config.domainMax[Z]));
         positionWindows.emplace_back(domainMin, domainMax, seed);
 
-        // Create insertion windows for random orientations (Euler angles: 0 to 2π)
+        // Create insertion windows for random orientations (Euler angles: 0 to 2*pi)
         std::vector<InsertionWindow<T>> orientationWindows;
         Vector3<T>                      angleMin(T(0), T(0), T(0));
         Vector3<T>                      angleMax(T(2.0 * M_PI), T(2.0 * M_PI), T(2.0 * M_PI));
